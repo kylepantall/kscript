@@ -34,6 +34,11 @@ namespace KScript.Language.Features
                 values.AddRange(members.Select(m => new NativeValueSuggestion(m, name)));
                 return values;
             }
+            if (FiniteValueChoices(analysis, type) is IReadOnlyList<string> choices)
+            {
+                values.AddRange(choices.Take(MaxAcceptedValues).Select(value => new NativeValueSuggestion(value, name)));
+                return values;
+            }
             if (name == KType.Bool)
             {
                 values.Add(new NativeValueSuggestion("true", KType.Bool));
@@ -62,6 +67,32 @@ namespace KScript.Language.Features
                 }
             }
             return values;
+        }
+
+        private static IReadOnlyList<string> FiniteValueChoices(DocumentAnalysis analysis, string type)
+        {
+            string name = SplitType(type).Name;
+            TypeShape shape = analysis.RootScope?.Lookup(name, int.MaxValue)?.Shape;
+            var named = shape?.ValueChoices;
+            if (!type.Contains('(')) return named;
+            TypeRef parsed = TypeRef.Parse(type);
+            if (parsed == null || parsed.ListDepth != 0 || parsed.ArgBase?.ListDepth > 0) return null;
+            var rules = new List<TypeRules>();
+            for (TypeRef level = parsed; level?.Args != null; level = level.ArgBase)
+                rules.Add(TypeRules.FromOptions(level.Args, out _));
+            TypeRules finite = rules.FirstOrDefault(rule => rule?.OneOf != null);
+            if (finite == null) return named;
+            var choices = Analyzer.ChoicesFromRules(finite, rules.Concat(shape?.LiteralRules ?? Array.Empty<TypeRules>()), shape?.Instance?.Type ?? name);
+            return named == null ? choices : choices.Intersect(named, StringComparer.Ordinal).ToArray();
+        }
+
+        /// <summary>A literal KScript expression for textual suggestions, including apostrophes and template text.</summary>
+        internal static string QuotedValue(string value)
+        {
+            if (!value.Contains('\'')) return "'" + value + "'";
+            if (!value.Contains('$') && !value.Contains('{'))
+                return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+            return string.Join(" + \"'\" + ", value.Split('\'').Select(part => "'" + part + "'"));
         }
 
         /// <summary>The values of the enum called <paramref name="name"/> (declared here or imported), or null.</summary>

@@ -59,6 +59,7 @@ namespace KScript.Language.Analysis
                     Kind = model ? KType.Model : null,
                     LiteralPattern = literalPattern,
                     LiteralRules = literalPattern == null ? null : StaticRefinementRules(e).ToArray(),
+                    ValueChoices = refinedRoot == null ? null : RefinementChoices(e, refinedRoot),
                 };
                 Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, declaredType);
                 root.Declare(symbol, 0);
@@ -136,6 +137,7 @@ namespace KScript.Language.Analysis
                 if (IsModelElement(e))
                 {
                     FillModelFields(e, shape);
+                    result.ModelFieldsAtDeclaration[e] = shape.Fields.Values.OrderBy(f => !f.Declaration.HasValue).ToArray();
                     FillRelations(e, shape);
                 }
             }
@@ -245,7 +247,7 @@ namespace KScript.Language.Analysis
             {
                 var fields = shape.Fields.ToList();
                 shape.Fields.Clear();
-                shape.Fields["id"] = new FieldInfo("id", new TypeShape(KType.Number) { Declared = true }, null, "The record's key, numbered by the database.");
+                shape.Fields["id"] = new FieldInfo("id", new TypeShape(KType.Number) { Declared = true }, null, "The record's key, numbered by the database.", "int");
                 foreach (KeyValuePair<string, FieldInfo> f in fields)
                 {
                     shape.Fields[f.Key] = f.Value;
@@ -253,12 +255,12 @@ namespace KScript.Language.Analysis
             }
             if (IsYes(e.GetAttributeValue("timestamps")))
             {
-                shape.Fields["created_at"] = new FieldInfo("created_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was added.");
-                shape.Fields["updated_at"] = new FieldInfo("updated_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was last saved.");
+                shape.Fields["created_at"] = new FieldInfo("created_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was added.", "date");
+                shape.Fields["updated_at"] = new FieldInfo("updated_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was last saved.", "date");
             }
             if (IsYes(e.GetAttributeValue("soft_deletes")))
             {
-                shape.Fields["deleted_at"] = new FieldInfo("deleted_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was deleted, or null.");
+                shape.Fields["deleted_at"] = new FieldInfo("deleted_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was deleted, or null.", "date?");
             }
         }
 
@@ -433,6 +435,10 @@ namespace KScript.Language.Analysis
             TypeShape instance = declaredTypes.TryGetValue(e, out TypeShape declared) ? declared : null;
             if (IsKScriptElementName(e, "model"))
             {
+                if (instance != null)
+                {
+                    CheckModelOptions(e, info, instance.Name);
+                }
                 CheckDrift(e);
             }
             bool refined = instance != null && instance.Type != KType.Map;

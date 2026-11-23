@@ -98,6 +98,7 @@ namespace KScript.Language.Analysis
         private Symbol NewVariable(string name, TextSpan span, MarkupElement element, SymbolKind kind, TypeShape shape)
         {
             Symbol symbol = new Symbol { Name = name, Kind = kind, DeclarationSpan = span, DeclaringElement = element, Shape = shape ?? TypeShape.Unknown };
+            symbol.IsTypeDeclaration = kind == SymbolKind.Constant && element?.Name is "type" or "model" or "enum" or "error" or "job";
             result.Symbols.Add(symbol);
             result.References.Add(new SymbolReference(symbol, span, true, true));
             return symbol;

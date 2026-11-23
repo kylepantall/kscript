@@ -44,8 +44,14 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
-            List<CompletionItem> items = GetCompletionsAt(analysis, offset);
-            if ((trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
+            List<CompletionItem> modelHeader = ModelHeaderCompletions(analysis, offset);
+            List<CompletionItem> items = modelHeader ?? GetCompletionsAt(analysis, offset);
+            if (trigger == "[" && offset > 0 && analysis.Source.Text[offset - 1] == '['
+                && modelHeader == null && !items.Any(i => i.Kind == CompletionKind.Value))
+            {
+                return new List<CompletionItem>();
+            }
+            if (modelHeader == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
                 return new List<CompletionItem>();
             }
@@ -851,23 +857,26 @@ namespace KScript.Language.Features
                 return MethodCompletions(analysis, region, p - 2, replace, pipe: true);
             }
 
-            List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false);
-            start.InsertRange(0, ParameterNameCompletions(analysis, region, wordStart, replace));
-            start.InsertRange(0, NamedValueCompletions(analysis, region, wordStart, replace));
+            List<CompletionItem> parameterNames = ParameterNameCompletions(analysis, region, wordStart, replace, out bool positionalModel);
+            List<CompletionItem> namedValues = NamedValueCompletions(analysis, region, wordStart, replace, out bool namedModel);
+            bool preferModels = positionalModel || namedModel;
+            List<CompletionItem> start = ExpressionStartCompletions(analysis, offset, replace, template: false, preferModels: preferModels);
+            start.InsertRange(0, parameterNames);
+            start.InsertRange(0, namedValues);
             start.InsertRange(0, DeclaredTypeValueCompletions(region, wordStart, replace));
             start.InsertRange(0, WordArgumentCompletions(analysis, region, wordStart, replace));
             start.InsertRange(0, ListItemCompletions(analysis, region, wordStart, replace));
-            return start;
+            return preferModels ? start.OrderBy(i => i.SortText ?? i.Label, StringComparer.Ordinal).ToList() : start;
         }
 
-        private List<CompletionItem> ExpressionStartCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool template)
+        private List<CompletionItem> ExpressionStartCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool template, bool preferModels = false)
         {
             List<CompletionItem> items = new List<CompletionItem>();
             if (template)
             {
                 return items;
             }
-            items.AddRange(VariableCompletions(analysis, offset, replace, withSigil: true));
+            items.AddRange(VariableCompletions(analysis, offset, replace, withSigil: true, preferModels: preferModels));
             items.AddRange(CommandCompletions(analysis, replace, withSigil: true));
             bool codeFile = analysis.Markup.Syntax == KScript.Syntax.Markup.SourceSyntax.Code;
             items.AddRange(ExpressionKeywords.Where(k => !(codeFile && ComparisonWords.Contains(k.Word))).Select(k => new CompletionItem
@@ -883,27 +892,39 @@ namespace KScript.Language.Features
             return items;
         }
 
-        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil)
+        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil, bool preferModels = false)
         {
             Scope scope = analysis.ScopeAt(offset);
             // The script's own variables come first, the one declared nearest above the cursor at the top; the
             // variables KScript provides ($args, $env...) follow by name.
-            List<Symbol> visible = scope.VisibleAt(offset).Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import).ToList();
+            List<Symbol> visible = scope.VisibleAt(offset)
+                .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import
+                    && (!s.IsTypeDeclaration || (withSigil && scope.Lookup(s.Name, offset) == s))).ToList();
+            if (preferModels)
+            {
+                visible.AddRange(scope.VisibleAt(offset)
+                    .Where(s => s.Kind == SymbolKind.Import && scope.Lookup(s.Name, offset) == s)
+                    .SelectMany(s => s.Members.Values).Where(m => m.IsTypeDeclaration && m.Shape.Kind == KType.Model));
+            }
             Dictionary<Symbol, int> nearest = visible.Where(s => s.Kind != SymbolKind.BuiltIn && s.Kind != SymbolKind.FrontMatter)
                 .OrderByDescending(s => s.DeclarationSpan.Start).Select((s, i) => (s, i)).ToDictionary(p => p.s, p => p.i);
-            return visible
-                .Select(s => new CompletionItem
+            return visible.Select(s =>
+            {
+                bool modelValue = preferModels && s.IsTypeDeclaration && s.Shape.Kind == KType.Model;
+                string name = s.Alias == null ? s.Name : s.Alias.Name + "." + s.Name;
+                return new CompletionItem
                 {
-                    Label = (withSigil ? "$" : string.Empty) + s.Name,
-                    Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
+                    Label = withSigil && !s.IsTypeDeclaration ? "$" + name : name,
+                    Kind = modelValue ? CompletionKind.Value : s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : s.IsConst ? CompletionKind.Constant : CompletionKind.Variable,
                     Detail = s.Shape.Display(),
                     Documentation = SymbolMarkdown(analysis, s),
                     ReplaceSpan = replace,
                     // The span replaced is the bare word (the $ isn't typed yet, or sits before it), so filter on the bare name.
-                    FilterText = s.Name,
-                    SortText = nearest.TryGetValue(s, out int rank) ? "0" + rank.ToString("D4") + s.Name : "1" + s.Name,
-                })
-                .ToList();
+                    FilterText = name,
+                    SortText = modelValue ? "!" + name
+                        : nearest.TryGetValue(s, out int rank) ? "0" + rank.ToString("D4") + s.Name : "1" + s.Name,
+                };
+            }).ToList();
         }
 
         private List<CompletionItem> CommandCompletions(DocumentAnalysis analysis, TextSpan replace, bool withSigil)
@@ -1117,7 +1138,9 @@ namespace KScript.Language.Features
             TextSpan replace = TextSpan.FromBounds(wordStart, offset);
             if (sigil == '$')
             {
-                return VariableCompletions(analysis, offset, replace, withSigil: false);
+                List<CompletionItem> variables = VariableCompletions(analysis, offset, replace, withSigil: false);
+                string expectedType = ExpectedTypeAt(analysis, wordStart - 1) ?? CallArgumentTypeAt(analysis, wordStart - 1);
+                return RankVariables(analysis, offset, variables, expectedType);
             }
             if (ExpectedTypeAt(analysis, wordStart - 1) is string expected && SplitType(expected).Name == "handle")
             {
@@ -1151,7 +1174,10 @@ namespace KScript.Language.Features
         /// The type the value starting at <paramref name="valueStart"/> must have, when the line says: <c>tz: timezone = ‸</c>,
         /// or <c>tz = ‸</c> for a variable declared with a type. Null when it isn't known.
         /// </summary>
-        internal string ExpectedTypeAt(DocumentAnalysis analysis, int valueStart)
+        internal string ExpectedTypeAt(DocumentAnalysis analysis, int valueStart) =>
+            ExpectedSlotAt(analysis, valueStart)?.Type;
+
+        private string AssignmentTypeAt(DocumentAnalysis analysis, int valueStart)
         {
             if (analysis.Markup.Syntax != SourceSyntax.Code)
             {
@@ -1170,9 +1196,9 @@ namespace KScript.Language.Features
             }
             if (AssignBefore.Match(before) is { Success: true } assign
                 && analysis.ScopeAt(valueStart).Lookup(assign.Groups[1].Value, valueStart) is Symbol { Kind: SymbolKind.Variable or SymbolKind.Parameter } v
-                && v.Shape.Type != KType.Any && (v.Shape.Name != null || EnumValuesOf(analysis, v.Shape.Type) != null || KScript.Metadata.NativeTypes.Get(v.Shape.Type) != null))
+                && v.Shape.Type != KType.Any)
             {
-                return v.Shape.Name ?? v.Shape.Type;
+                return v.DeclaringElement?.GetAttributeValue("type") ?? v.Shape.Name ?? v.Shape.Type;
             }
             return null;
         }
@@ -1185,36 +1211,58 @@ namespace KScript.Language.Features
         {
             string text = analysis.Source.Text;
             int start = RawValueStart(text, offset);
-            if (start < offset && (text[start] == '$' || text[start] == '@' || text[start] == '\'' || text[start] == '"'))
+            bool quoted = false;
+            string typed = text.Substring(start, offset - start);
+            TextSpan replace = TextSpan.FromBounds(start, RawValueEnd(text, offset));
+            ExpectedValueSlot? expected = ExpectedSlotAt(analysis, start);
+            if ((expected == null || typed.StartsWith('\'') || typed.StartsWith('"')) && QuotedValueAt(analysis, offset) is Token token)
             {
-                return null;
+                start = token.Span.Start;
+                expected = ExpectedSlotAt(analysis, start);
+                typed = Quotes.Decode(text, start + 1, offset, text[start]);
+                replace = TextSpan.FromBounds(start, token.Error == null ? token.Span.End : offset);
+                quoted = true;
             }
-            if (!(ExpectedTypeAt(analysis, start) is string type))
-            {
-                return null;
-            }
-            List<CompletionItem> items = ValueItems(analysis, type, text.Substring(start, offset - start), TextSpan.FromBounds(start, RawValueEnd(text, offset)), "the type of this value");
+            if (expected is not ExpectedValueSlot slot || (!quoted && typed.Length > 0 && typed[0] is '$' or '@')) return null;
+            List<CompletionItem> items = ValueItems(analysis, slot, typed, replace, quoted);
             if (items.Count == 0)
             {
                 return null;
             }
+            if (quoted) return items;
             TextSpan word = TextSpan.FromBounds(WordStart(text, offset), offset);
             items.AddRange(ExpressionStartCompletions(analysis, offset, word, template: false).Where(i => i.Kind != CompletionKind.Keyword || i.Label == "null"));
             return items;
         }
 
-        /// <summary>Completion items for the values <paramref name="type"/> accepts, sorted before everything else.</summary>
-        internal List<CompletionItem> ValueItems(DocumentAnalysis analysis, string type, string typed, TextSpan replace, string where) =>
-            AcceptedValues(analysis, type, typed).Select((v, i) => new CompletionItem
+        /// <summary>Completion items for the values a slot accepts, sorted before other expressions.</summary>
+        private List<CompletionItem> ValueItems(DocumentAnalysis analysis, ExpectedValueSlot slot, string typed, TextSpan replace, bool quoted)
+        {
+            string name = SplitType(slot.Type).Name;
+            bool finite = IsFiniteRefinement(analysis, slot.Type);
+            bool quote = quoted || (slot.InMap || finite) && IsTextualChoice(analysis, slot.Type);
+            MarkupAttribute attribute = analysis.Markup.Syntax == SourceSyntax.Code ? null
+                : analysis.Markup.FindElementAt(replace.Start)?.GetAttribute("value");
+            string Insertion(string value)
+            {
+                string insert = quote ? QuotedValue(value) : slot.InContainer ? ArgumentText(value) : null;
+                if (attribute == null) return insert;
+                string escaped = (insert ?? value).Replace("&", "&amp;").Replace("<", "&lt;");
+                escaped = attribute.Quote == '\'' ? escaped.Replace("'", "&apos;") : escaped.Replace("\"", "&quot;");
+                return insert != null || escaped != value ? escaped : null;
+            }
+            return AcceptedValues(analysis, slot.Type, typed).Select((v, i) => new CompletionItem
             {
                 Label = v.Value,
                 Kind = CompletionKind.Value,
-                Detail = v.Detail ?? SplitType(type).Name,
-                Documentation = v.Documentation ?? $"A value {SplitType(type).Name} accepts ({where}).",
+                Detail = v.Detail ?? name,
+                Documentation = v.Documentation ?? $"A value {name} accepts.",
+                InsertText = Insertion(v.Value),
                 ReplaceSpan = replace,
                 FilterText = v.Value,
                 SortText = "000" + i.ToString("D4"),
             }).ToList();
+        }
 
         /// <summary>Where an unquoted value under the cursor starts: Europe/Lo‸ starts at E, en-G‸ at e.</summary>
         internal static int RawValueStart(string text, int offset)

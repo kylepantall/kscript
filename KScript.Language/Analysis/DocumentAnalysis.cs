@@ -70,6 +70,20 @@ namespace KScript.Language.Analysis
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
 
+        // Model options are checked before relation foreign keys and count fields are added.
+        internal Dictionary<MarkupElement, FieldInfo[]> ModelFieldsAtDeclaration { get; } = new();
+
+        /// <summary>The fields an option can name, with explicitly declared fields first.</summary>
+        internal IEnumerable<FieldInfo> ModelOptionFields(MarkupElement model, string option)
+        {
+            if (model == null || !ModelFieldsAtDeclaration.TryGetValue(model, out FieldInfo[] fields))
+            {
+                return Array.Empty<FieldInfo>();
+            }
+            // An explicit key must be declared, even when the model would otherwise get an automatic id.
+            return option == "key" ? fields.Where(f => f.Declaration.HasValue) : fields;
+        }
+
         /// <summary>Where the members of an <c>&lt;import as="..."&gt;</c> alias are declared in the imported file: lib.slugify.</summary>
         public Dictionary<(Symbol Alias, string Member), ExternalLocation> ExternalMembers { get; } = new Dictionary<(Symbol, string), ExternalLocation>();
         public Scope RootScope { get; internal set; }

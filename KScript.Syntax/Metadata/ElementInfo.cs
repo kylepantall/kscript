@@ -1,5 +1,8 @@
 namespace KScript.Metadata
 {
+    /// <summary>How a declaration option refers to the fields of its own model.</summary>
+    public enum ModelFieldKind { None, Single, List, Groups }
+
     public sealed class AttributeInfo
     {
         public AttributeInfo(string name, AttributeKind kind, string description, bool required = false, params string[] options)
@@ -23,6 +26,8 @@ namespace KScript.Metadata
         /// which may be written with or without quotes. Null when any value fits.
         /// </summary>
         public string Type { get; init; }
+
+        public ModelFieldKind ModelFields { get; init; }
 
         /// <summary>Another attribute that can stand in for this one when it is required (<c>value</c> or element text).</summary>
         public bool SatisfiedByContent { get; init; }

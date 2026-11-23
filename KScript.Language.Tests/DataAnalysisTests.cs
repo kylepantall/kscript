@@ -84,6 +84,66 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void TableMethodsAcceptModelsAndRecordsAndHasTableAlsoAcceptsNames()
+        {
+            TestHelpers.AssertClean(Code(Users + """
+                echo $db->has_table(User)
+                echo $db->has_table('users')
+                echo $db->has_table(name: users)
+                echo $db->create_table(model: User)
+                member = User->first()
+                echo $db->has_table($member)
+                echo $db->create_table($member)
+                fn table_exists(name: string) => $db->has_table($name)
+                fn create_for(value) => $db->create_table($value)
+                fn create_or_fallback(value) => $db->create_table($value ?? 'fallback')
+                fn check_or_fallback(value) => $db->has_table($value ?? 42)
+                fn custom_method(target) => $target->create_table('users')
+                """));
+        }
+
+        [Theory]
+        [InlineData("has_table(42)", "a model or a table name")]
+        [InlineData("has_table(name: [])", "a model or a table name")]
+        [InlineData("has_table('   ')", "table name cannot be blank")]
+        [InlineData("create_table('users')", "a model")]
+        [InlineData("create_table(model: false)", "a model")]
+        [InlineData("create_table({name: 'User'})", "a model")]
+        public void TableMethodsReportKnownInvalidArguments(string call, string expected)
+        {
+            DocumentAnalysis a = Code("import KScript.Data\necho $db->" + call);
+            Diagnostic d = Assert.Single(a.Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Equal(DiagnosticSeverity.Error, d.Severity);
+            Assert.Contains(expected, d.Message);
+        }
+
+        [Fact]
+        public void PatternLiteralsAreTableNamesButCannotStandInForAModel()
+        {
+            const string declarations = "import KScript.Data\ntype TableName with [string] { pattern: /^table_[a-z]+$/ }\n";
+            TestHelpers.AssertClean(Code(declarations + "echo $db->has_table(table_users)\necho $db->has_table(name: table_users)"));
+            foreach (string argument in new[] { "table_users", "model: table_users" })
+            {
+                DocumentAnalysis a = Code(declarations + $"echo $db->create_table({argument})");
+                Diagnostic diagnostic = Assert.Single(a.Diagnostics);
+                Assert.Equal(DiagnosticCodes.TypeMismatch, diagnostic.Code);
+                Assert.Contains("needs a model", diagnostic.Message);
+            }
+        }
+
+        [Fact]
+        public void TableMethodsReportPlainTypesAndDeclaredWrongVariables()
+        {
+            DocumentAnalysis a = Code("""
+                import KScript.Data
+                type Person { name: string }
+                echo $db->has_table(Person)
+                fn create_for(name: string) => $db->create_table($name)
+                """);
+            Assert.Equal(2, a.Diagnostics.Count(d => d.Code == DiagnosticCodes.TypeMismatch));
+        }
+
+        [Fact]
         public void AModelCanNameItsKey()
         {
             DocumentAnalysis a = Code("""

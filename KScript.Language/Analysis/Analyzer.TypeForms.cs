@@ -15,7 +15,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>True for the name of a declared type: a type, model, enum, error type or job, declared here or imported.</summary>
         private bool IsTypeSymbol(Symbol symbol) =>
-            symbol != null && (TypeInference.IsTypeSymbol(symbol) || (symbol.SourcePath != null && importedTypes.Contains((symbol.SourcePath, symbol.Name))));
+            symbol != null && (TypeInference.IsTypeSymbol(symbol) || symbol.IsTypeDeclaration);
 
         /// <summary>A bare name that is a declared type (<c>as: Repo</c>, <c>User->find(1)</c>, <c>Size.small</c>) is the type: a reference to it.</summary>
         private bool ReferenceDeclaredType(IdentifierNode node, ExpressionRegion region, Scope scope)
@@ -33,14 +33,7 @@ namespace KScript.Language.Analysis
         /// <summary>KS6014: <c>$Repo</c> for a declared type. A type is named bare.</summary>
         private void CheckTypeIsBare(Symbol symbol, TextSpan nameSpan)
         {
-            if (!IsTypeSymbol(symbol) || nameSpan.Start == 0 || source.Text[nameSpan.Start - 1] != '$')
-            {
-                return;
-            }
-            // t = Repo: $t is a variable that holds a type, and a variable is read with $.
-            // An imported type is declared, here, by its import.
-            bool imported = symbol.SourcePath != null && importedTypes.Contains((symbol.SourcePath, symbol.Name));
-            if (!imported && symbol.DeclaringElement != null && symbol.DeclaringElement.Name is not ("type" or "model" or "enum" or "error" or "job"))
+            if (symbol?.IsTypeDeclaration != true || nameSpan.Start == 0 || source.Text[nameSpan.Start - 1] != '$')
             {
                 return;
             }

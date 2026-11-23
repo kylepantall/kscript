@@ -19,17 +19,8 @@ namespace KScript.Language.Features
         private static readonly string[] RefinementRuleLines = { "min", "max", "pattern", "one_of", "not", "validate", "normalize" };
         private static readonly string[] RecordRuleLines = { "pattern", "parse", "validate" };
 
-        /// <summary>Model settings whose value is a list of the model's fields.</summary>
-        private static readonly HashSet<string> FieldListSettings = new HashSet<string> { "unique", "index", "hidden", "guarded", "key" };
-
         private static readonly Regex BodyWordLine = new Regex(@"^[ \t]*(\w*)$", RestrictOptions);
         private static readonly Regex BodySettingLine = new Regex(@"^[ \t]*(\w+)[ \t]*:[ \t]*(.*)$", RestrictOptions);
-
-        /// <summary>The start of an option in a model's brackets: model User(‸ or model User(timestamps, un‸.</summary>
-        private static readonly Regex ModelOptionWord = new Regex(@"^[ \t]*model[ \t]+\w+[ \t]*\(((?:[^()\[\]]|\[[^\[\]]*\])*?)(?<=[(,][ \t]*)(\w*)$", RestrictOptions);
-
-        /// <summary>Inside a list of fields in a model's brackets: model User(hidden: [‸ or model User(unique: [email, [team, sl‸.</summary>
-        private static readonly Regex ModelOptionList = new Regex(@"^[ \t]*model[ \t]+(\w+)[ \t]*\(.*\b(unique|index|hidden|guarded)[ \t]*:[ \t]*(\[(?:[^\[\]]|\[[^\[\]]*\])*(?:\[[^\[\]]*)?)$", RestrictOptions);
 
         private const RegexOptions RestrictOptions = RegexOptions.Compiled | RegexOptions.CultureInvariant;
 
@@ -56,16 +47,6 @@ namespace KScript.Language.Features
                 return TypeArgumentCompletions(typeName, replace, written);
             }
 
-            if (ModelOptionList.Match(before) is { Success: true } list && ModelNamed(analysis, list.Groups[1].Value, offset) is MarkupElement listed)
-            {
-                return ModelSettingValueCompletions(listed, list.Groups[2].Value, list.Groups[3].Value, offset);
-            }
-
-            if (ModelOptionWord.Match(before) is { Success: true } option)
-            {
-                return ModelOptionCompletions(option.Groups[1].Value, TextSpan.FromBounds(offset - option.Groups[2].Length, offset));
-            }
-
             MarkupElement owner = BlockOwnerAt(analysis, offset);
             if (owner == null)
             {
@@ -80,7 +61,7 @@ namespace KScript.Language.Features
 
             if (owner.Name == "model" && BodySettingLine.Match(before) is { Success: true } setting && CodeParser.ModelSettings.Contains(setting.Groups[1].Value))
             {
-                return ModelSettingValueCompletions(owner, setting.Groups[1].Value, setting.Groups[2].Value, offset);
+                return ModelSettingValueCompletions(analysis, owner, setting.Groups[1].Value, offset - setting.Groups[2].Length, offset);
             }
             return null;
         }
@@ -97,19 +78,44 @@ namespace KScript.Language.Features
             return items;
         }
 
-        /// <summary>The model of this name whose header holds the offset (or the first of that name, while the line is half-written).</summary>
-        private static MarkupElement ModelNamed(DocumentAnalysis analysis, string name, int offset)
+        /// <summary>Complete a model header from the parsed option at the caret, including headers and arrays spanning lines.</summary>
+        private List<CompletionItem> ModelHeaderCompletions(DocumentAnalysis analysis, int offset)
         {
-            List<MarkupElement> models = analysis.Markup.RootElements.SelectMany(r => new[] { r }.Concat(r.ChildElements))
-                .Where(e => e.Name == "model" && e.GetAttributeValue("name")?.Trim() == name).ToList();
-            return models.FirstOrDefault(e => offset >= e.Span.Start && offset <= e.Span.End) ?? models.FirstOrDefault();
+            if (analysis.Markup.Syntax != SourceSyntax.Code || analysis.Markup.FindElementAt(offset) is not { Name: "model" } model
+                || offset > model.StartTagSpan.End || model.GetAttribute("name")?.Span.End is not int nameEnd || offset <= nameEnd)
+            {
+                return null;
+            }
+            string text = analysis.Source.Text;
+            int open = nameEnd;
+            while (open < offset && char.IsWhiteSpace(text[open])) open++;
+            if (open >= offset || text[open] != '(' || InComment(text, offset)) return null;
+
+            foreach (MarkupAttribute option in model.Attributes)
+            {
+                if (!option.IsArgument || offset <= option.NameSpan.End || offset > option.Span.End) continue;
+                int start = option.NameSpan.End;
+                while (start < offset && char.IsWhiteSpace(text[start])) start++;
+                if (start < offset && text[start] is ':' or '=')
+                {
+                    return ModelSettingValueCompletions(analysis, model, option.Name, start + 1, offset);
+                }
+            }
+            int word = WordStart(text, offset);
+            int before = word;
+            while (before > open && char.IsWhiteSpace(text[before - 1])) before--;
+            if (before <= open || text[before - 1] is not ('(' or ',')) return null;
+            int end = offset;
+            while (end < text.Length && Lexer.IsIdentChar(text[end])) end++;
+            TextSpan replace = TextSpan.FromBounds(word, end);
+            HashSet<string> have = model.Attributes.Where(a => a.NameSpan.Start != word).Select(a => a.Name).ToHashSet(StringComparer.Ordinal);
+            return ModelOptionCompletions(have, replace);
         }
 
-        /// <summary>The options a model takes in its brackets and doesn't have yet: model User(timestamps, unique: [email]).</summary>
-        private List<CompletionItem> ModelOptionCompletions(string written, TextSpan replace)
+        /// <summary>The options a model takes in its brackets and doesn't have yet.</summary>
+        private List<CompletionItem> ModelOptionCompletions(HashSet<string> have, TextSpan replace)
         {
             ElementInfo info = Catalog.GetElement("model");
-            HashSet<string> have = new HashSet<string>(Regex.Matches(written, @"(?:^|,)[ \t]*(\w+)").Select(m => m.Groups[1].Value), StringComparer.Ordinal);
             List<CompletionItem> items = new List<CompletionItem>();
             foreach (string name in CodeParser.ModelSettings.Where(n => !have.Contains(n)))
             {
@@ -121,8 +127,9 @@ namespace KScript.Language.Features
                     Detail = "model option",
                     Documentation = a?.Description,
                     // A flag is on by being named: model User(timestamps).
-                    InsertText = a?.Kind == AttributeKind.Bool ? name : FieldListSettings.Contains(name) && name != "key" ? name + ": [$1]" : name + ": \"$1\"",
+                    InsertText = a?.Kind == AttributeKind.Bool ? name : a?.ModelFields is ModelFieldKind.List or ModelFieldKind.Groups ? name + ": [$1]" : name + ": \"$1\"",
                     IsSnippet = a?.Kind != AttributeKind.Bool,
+                    SuggestAgain = a?.ModelFields is ModelFieldKind.Single or ModelFieldKind.List or ModelFieldKind.Groups,
                     ReplaceSpan = replace,
                     SortText = "0" + name,
                 });
@@ -184,71 +191,65 @@ namespace KScript.Language.Features
         };
 
         /// <summary>After <c>timestamps: </c>, true and false; after <c>hidden: [</c> and the other field lists, the model's fields.</summary>
-        private List<CompletionItem> ModelSettingValueCompletions(MarkupElement model, string setting, string valueBefore, int offset)
+        private List<CompletionItem> ModelSettingValueCompletions(DocumentAnalysis analysis, MarkupElement model, string setting, int start, int offset)
         {
-            int wordLength = 0;
-            while (wordLength < valueBefore.Length && Lexer.IsIdentChar(valueBefore[valueBefore.Length - 1 - wordLength]))
+            string text = analysis.Source.Text;
+            while (start < offset && char.IsWhiteSpace(text[start])) start++;
+            int wordStart = Math.Max(start, WordStart(text, offset));
+            int wordEnd = offset;
+            while (wordEnd < text.Length && Lexer.IsIdentChar(text[wordEnd])) wordEnd++;
+            TextSpan replace = TextSpan.FromBounds(wordStart, wordEnd);
+            AttributeInfo option = Catalog.GetElement("model")?.GetAttribute(setting);
+            if (option?.Kind == AttributeKind.Bool)
             {
-                wordLength++;
-            }
-            TextSpan replace = TextSpan.FromBounds(offset - wordLength, offset);
-            AttributeInfo a = Catalog.GetElement("model")?.GetAttribute(setting);
-            if (a?.Kind == AttributeKind.Bool)
-            {
-                return wordLength == valueBefore.Length
-                    ? new[] { "true", "false" }.Select(v => new CompletionItem { Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "true" ? "0" : "1" }).ToList()
-                    : new List<CompletionItem>();
-            }
-            if (!FieldListSettings.Contains(setting))
-            {
-                return new List<CompletionItem>();
-            }
-            string prefix = valueBefore.Substring(0, valueBefore.Length - wordLength).TrimEnd();
-            bool namePosition = prefix.Length == 0 || prefix.EndsWith('[') || prefix.EndsWith(',');
-            if (!namePosition)
-            {
-                return new List<CompletionItem>();
-            }
-            HashSet<string> listed = new HashSet<string>(Regex.Matches(prefix, @"\w+").Select(m => m.Value), StringComparer.Ordinal);
-            return ModelFieldNames(model).Where(f => !listed.Contains(f.Name)).Select((f, i) => new CompletionItem
-            {
-                Label = f.Name,
-                Kind = CompletionKind.Field,
-                Detail = f.Type,
-                Documentation = f.Description,
-                ReplaceSpan = replace,
-                SortText = i.ToString("D3"),
-            }).ToList();
-        }
-
-        /// <summary>The fields a model's records have: its own lines, then id, and the columns its settings add.</summary>
-        private static List<(string Name, string Type, string Description)> ModelFieldNames(MarkupElement model)
-        {
-            List<(string Name, string Type, string Description)> fields = model.ChildElements
-                .Where(e => e.Name == "field" && !string.IsNullOrEmpty(e.GetAttributeValue("name")))
-                .Select(e => (e.GetAttributeValue("name").TrimEnd('?'), e.GetAttributeValue("type") ?? "any", e.GetAttributeValue("description")))
-                .ToList();
-            void Add(string name, string type, string description)
-            {
-                if (fields.All(f => f.Name != name))
+                return wordStart == start ? new[] { "true", "false" }.Select(v => new CompletionItem
                 {
-                    fields.Add((name, type, description));
+                    Label = v, Kind = CompletionKind.Value, Detail = setting, ReplaceSpan = replace, SortText = v == "true" ? "0" : "1",
+                }).ToList() : new List<CompletionItem>();
+            }
+            if (option == null || option.ModelFields == ModelFieldKind.None) return new List<CompletionItem>();
+
+            int beforeWord = wordStart;
+            if (beforeWord > start && text[beforeWord - 1] is '\'' or '"') beforeWord--;
+            while (beforeWord > start && char.IsWhiteSpace(text[beforeWord - 1])) beforeWord--;
+            bool single = option.ModelFields == ModelFieldKind.Single;
+            if (single ? beforeWord != start : beforeWord <= start || text[beforeWord - 1] is not ('[' or ','))
+                return new List<CompletionItem>();
+
+            // Composite indexes may reuse a column in another group. Exclude only siblings of the current item.
+            HashSet<string> listed = new(StringComparer.Ordinal);
+            if (!single)
+            {
+                int depth = 0;
+                for (int i = start; i < offset; i++)
+                {
+                    if (text[i] == '[') depth++;
+                    else if (text[i] == ']') depth--;
+                }
+                if (depth < 1 || depth > (option.ModelFields == ModelFieldKind.Groups ? 2 : 1)) return new List<CompletionItem>();
+                MarkupAttribute attr = model.GetAttribute(setting);
+                int limit = attr?.Span.End ?? offset;
+                int groupStart = depth == 1 ? start : text.LastIndexOf('[', beforeWord - 1);
+                int level = depth - 1;
+                for (int i = groupStart; i < limit;)
+                {
+                    char ch = text[i++];
+                    if (ch == '[') level++;
+                    else if (ch == ']' && --level < depth) break;
+                    else if (level == depth && Lexer.IsIdentStart(ch))
+                    {
+                        int first = i - 1;
+                        while (i < limit && Lexer.IsIdentChar(text[i])) i++;
+                        if (first != wordStart || i != wordEnd) listed.Add(text[first..i]);
+                    }
                 }
             }
-            Add("id", "int", "The key the database numbers, added when the model doesn't declare it.");
-            if (IsYesText(model.GetAttributeValue("timestamps")))
+            return analysis.ModelOptionFields(model, setting).Where(f => !listed.Contains(f.Name)).Select((f, i) => new CompletionItem
             {
-                Add("created_at", "date", "When the record was first saved (the timestamps option).");
-                Add("updated_at", "date", "When the record was last saved (the timestamps option).");
-            }
-            if (IsYesText(model.GetAttributeValue("soft_deletes")))
-            {
-                Add("deleted_at", "date?", "When the record was deleted (the soft_deletes option).");
-            }
-            return fields;
+                Label = f.Name, Kind = CompletionKind.Field, Detail = f.DeclaredType ?? f.Shape.Display(), Documentation = f.Description,
+                ReplaceSpan = replace, SortText = i.ToString("D3"),
+            }).ToList();
         }
-
-        private static bool IsYesText(string value) => value?.Trim() is "yes" or "true";
 
         /// <summary>
         /// The argument name being typed in a type used with rules, <c>string(m‸</c> or <c>uuid(min: 1, ‸</c>: the type,

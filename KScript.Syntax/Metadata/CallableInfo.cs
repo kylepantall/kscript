@@ -2,6 +2,9 @@ namespace KScript.Metadata
 {
     public sealed class ParameterInfo
     {
+        // A type alternative, distinct from an enum such as "home | desktop" whose values are literal words.
+        public const string ModelOrString = "model or string";
+
         public ParameterInfo(string name, bool optional = false, bool variadic = false, string description = null, string type = null, IReadOnlyList<string> values = null)
         {
             Name = name;
@@ -30,6 +33,8 @@ namespace KScript.Metadata
         public Deprecation Deprecated { get; internal set; }
 
         public bool IsFlag => Type == KType.Bool;
+
+        public bool AcceptsModel => Type is KType.Model or ModelOrString;
 
         public string Label => (Variadic ? Name + "..." : Optional ? Name + "?" : Name)
             + (Values.Count > 0 ? ": " + string.Join(" | ", Values) : Type != null ? ": " + Type : string.Empty);

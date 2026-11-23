@@ -47,13 +47,13 @@ namespace KScript.Data
                 new A("fields", K.Fields, "A short model's fields on one line: `name: string, email: email`. Bigger models list one <field> per line."),
                 new A("table", K.Text, "The table its records are kept in. Default: the plural of the name in snake case (User is users, BlogPost blog_posts)."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection (main)."),
-                new A("key", K.Text, "The field that is the key. Default: id, an int the database numbers, added when the model doesn't declare it."),
+                new A("key", K.Text, "The field that is the key. Default: id, an int the database numbers, added when the model doesn't declare it.") { ModelFields = ModelFieldKind.Single },
                 new A("timestamps", K.Bool, "true adds created_at and updated_at, set when records are saved."),
                 new A("soft_deletes", K.Bool, "true adds deleted_at: ->delete() sets it instead of removing the row, and queries leave those records out (->with_trashed() keeps them)."),
-                new A("unique", K.Text, "Fields no two records may share: `[email]`, or `[email, [team_id, slug]]` for a pair that is unique together. Saving a clash fails with UniqueViolation."),
-                new A("index", K.Text, "Fields to index, so queries on them are fast: `[team_id, [team_id, created_at]]`."),
-                new A("hidden", K.Text, "Fields left out of JSON (and so out of route responses): `[password]`."),
-                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `user.role = 'admin'`."),
+                new A("unique", K.Text, "Fields no two records may share: `[email]`, or `[email, [team_id, slug]]` for a pair that is unique together. Saving a clash fails with UniqueViolation.") { ModelFields = ModelFieldKind.Groups },
+                new A("index", K.Text, "Fields to index, so queries on them are fast: `[team_id, [team_id, created_at]]`.") { ModelFields = ModelFieldKind.Groups },
+                new A("hidden", K.Text, "Fields left out of JSON (and so out of route responses): `[password]`.") { ModelFields = ModelFieldKind.List },
+                new A("guarded", K.Text, "Fields ->create($form) and ->update($form) don't set, so a form can't change them: `[role]`. Set them on the record instead: `user.role = 'admin'`.") { ModelFields = ModelFieldKind.List },
                 new A("extra", K.Enum, "Keys ->create() is given that the model doesn't have: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
                 new A("description", K.Text, "What the model is, shown on hover."),
             };
@@ -534,13 +534,13 @@ namespace KScript.Data
                 (t, c) => RunSql(c, DatabaseOf(t, c), c.Str(0), c.Arg(1, "as"))).Info.KeepsBareWords = true;
             p.Method(KType.Database, "tables", "", "The names of the tables in the database.", KType.List,
                 (t, c) => DatabaseOf(t, c).Tables(c.Interpreter).Cast<object>().ToList());
-            p.Method(KType.Database, "has_table", "name", "True when the database has the table: a name, or a model's table.", KType.Bool,
+            p.Method(KType.Database, "has_table", "name: " + ParameterInfo.ModelOrString, "True when the database has a model's table or a table with the given name: $db->has_table(User) or $db->has_table('users').", KType.Bool,
                 (t, c) =>
                 {
                     string table = ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->has_table()");
                     return DatabaseOf(t, c).Tables(c.Interpreter).Contains(table);
                 }).Info.KeepsBareWords = true;
-            p.Method(KType.Database, "create_table", "model", "Makes a model's table and indexes, if the database doesn't have them yet, and the pivot tables of its many to many relations whose other table is there. Make the tables a model links to first. Good for scripts and tests; projects use migrations.", KType.Bool,
+            p.Method(KType.Database, "create_table", "model: model", "Makes a model's table and indexes, if the database doesn't have them yet, and the pivot tables of its many to many relations whose other table is there. Make the tables a model links to first. Good for scripts and tests; projects use migrations.", KType.Bool,
                 (t, c) =>
                 {
                     ModelInfo model = ModelInfo.Of(c.Arg(0)) ?? throw new KScriptException($"->create_table() needs a model, such as User, but got {Values.Describe(c.Arg(0))}.", "Argument");

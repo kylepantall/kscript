@@ -791,7 +791,7 @@ namespace KScript.Language.Analysis
             {
                 ReportDeprecatedCall(applicable[0], $"->{name}", nameSpan, count >= 0 ? args : null, 0, region);
             }
-            if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable), region, nameSpan))
+            if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable, receiver.Type != KType.Any), region, nameSpan))
             {
                 return;
             }

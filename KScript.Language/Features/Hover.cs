@@ -469,6 +469,9 @@ namespace KScript.Language.Features
                         sb.Append(": ").Append(s.Shape.Pretty());
                     }
                     break;
+                case SymbolKind.Constant when s.IsTypeDeclaration:
+                    sb.Append(s.Shape.Kind == KType.Model ? s.Shape.Display() : s.Name);
+                    break;
                 default:
                     sb.Append(s.Kind switch
                     {

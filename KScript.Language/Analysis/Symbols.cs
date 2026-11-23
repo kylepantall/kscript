@@ -65,6 +65,9 @@ namespace KScript.Language.Analysis
         /// <summary>The statically checkable rules in this literal type's declaring module.</summary>
         internal IReadOnlyList<KScript.Runtime.TypeRules> LiteralRules { get; init; }
 
+        /// <summary>Finite scalar values declared by one_of on this refinement or its bases.</summary>
+        internal IReadOnlyList<string> ValueChoices { get; init; }
+
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
         public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
 
@@ -251,6 +254,9 @@ namespace KScript.Language.Analysis
         public string Package { get; internal set; }
 
         public bool IsConst => Kind == SymbolKind.Constant;
+
+        /// <summary>A type, model, enum, error or job declaration, as distinct from a variable holding that type.</summary>
+        internal bool IsTypeDeclaration { get; set; }
 
         /// <summary>True if the user can rename it (not a built-in or front matter key).</summary>
         public bool CanRename => Kind != SymbolKind.BuiltIn && Alias == null;

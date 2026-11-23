@@ -508,6 +508,7 @@ namespace KScript.Language.Analysis
                 string where = ProjectRelative(full);
                 Symbol symbol = ImportedConstant(name, owner.NameSpan, owner, full, where,
                     (new ExternalLocation(full, other.GetPosition(span.Start), other.GetPosition(span.End)), model.Documentation ?? $"A model of this project, from {where}"));
+                symbol.IsTypeDeclaration = true;
                 root.Declare(symbol, 0);
             }
         }
@@ -548,6 +549,7 @@ namespace KScript.Language.Analysis
                 DeclaringElement = import,
                 SourcePath = full,
                 Description = constant.Description ?? $"Imported from {src}",
+                IsTypeDeclaration = importedTypes.Contains((full, name)),
                 Shape = TypeShape.Unknown,
             };
             if (full != null && importedEnums.TryGetValue((full, name), out List<string> values))
