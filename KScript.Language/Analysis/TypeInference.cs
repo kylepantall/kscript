@@ -55,12 +55,13 @@ namespace KScript.Language.Analysis
                     if (list.Items.Count > 0)
                     {
                         TypeShape first = Infer(list.Items[0], region);
+                        IEnumerable<TypeShape> rest = list.Items.Skip(1).Select(item => Infer(item, region));
                         if (first.Type == KType.Map)
                         {
                             TypeShape merged = new TypeShape(KType.Map);
-                            foreach (ExprNode item in list.Items)
+                            foreach (TypeShape item in rest.Prepend(first))
                             {
-                                foreach (KeyValuePair<string, FieldInfo> f in Infer(item, region).Fields)
+                                foreach (KeyValuePair<string, FieldInfo> f in item.Fields)
                                 {
                                     merged.Fields.TryAdd(f.Key, f.Value);
                                 }
@@ -69,7 +70,7 @@ namespace KScript.Language.Analysis
                         }
                         else
                         {
-                            shape.Element = list.Items.All(i => Infer(i, region).Type == first.Type) ? first : TypeShape.Unknown;
+                            shape.Element = rest.All(item => item.Type == first.Type) ? first : TypeShape.Unknown;
                         }
                     }
                     return shape;
