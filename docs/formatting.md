@@ -272,4 +272,37 @@ Format(model: 'Attachments', options: 'one_per_line')
 - `Style` overrides document-wide formatting defaults. It accepts `indent_size`, `use_tabs`, `print_width`, `max_blank_lines`, `end_of_line` and the switches listed under [Turning rules off](#turning-rules-off). Formatting starts with the built-in style, then applies editor indentation, project `Style` settings and explicit `format` settings in `kscript.json`, in that order.
 - `Lint` checks an element for either `missing_attribute` or `forbidden_attribute`. Codes must be unique and use `KS9xxx`. The default severity is `warning`. Set `severity:` to `error`, `warning`, `info` or `hint`, or override it in `kscript.json` with `"lint": { "rules": { "KS9001": "error" } }`.
 - `Format` sets the attribute layout of an HTML or XML tag to `one_per_line` or `inline`. It can also split a script model's options one per line and add a trailing comma. Use `'*'` for all tags or models. A named layout takes precedence over `'*'`.
-- Rule arguments are literals. Use numbers or booleans for layout settings such as `print_width` or `use_tabs`, and quote text settings. The rule file is parsed as declarations. Checking or formatting never executes the file.
+- Use numbers or booleans for literal layout settings such as `print_width` or `use_tabs`. Quote literal text settings.
+
+### Function rules
+
+Use `fn(value) => ...` when the rule depends on the document. This rule trims a literal `alt` attribute. Interpolated attributes and event or binding expressions keep their original text.
+
+```kscript kscript.rules.kscript
+Format(
+  element: 'img',
+  attribute: 'alt',
+  value: fn(text) => $text->trim(),
+)
+```
+
+A layout function returns `'one_per_line'`, `'inline'` or `null` to use the normal layout. For example, this rule condenses an empty block to `Something(val1, val2) {}` and expands the arguments with trailing commas when the block has content.
+
+```kscript kscript.rules.kscript
+Format(
+  statement: 'Something',
+  arguments: fn(node) => $node.has_body_content ? 'one_per_line' : 'inline',
+)
+```
+
+Use `attributes:` with an HTML or XML `element:` to choose its layout the same way. A node passed to a function has `name`, `kind`, `attributes` and `has_body_content`. A lint `check:` function can return its own message, `true` for the declaration's message, or `false` or `null` to skip the diagnostic.
+
+```kscript kscript.rules.kscript
+Lint(
+  code: 'KS9002',
+  element: 'img',
+  check: fn(node) => $node.attributes->has('alt') ? null : 'An image needs alternative text.',
+)
+```
+
+Functions run in a restricted expression context with access to their argument, comparisons, conditionals and text operations such as `trim()`, `upper()` and `starts_with()`. Project rule files use declarations and cannot import packages or call commands.

@@ -1,6 +1,7 @@
 using System.Text;
 
 using KScript.Language.Catalog;
+using KScript.Runtime;
 using KScript.Language.Rules;
 using KScript.Syntax;
 using KScript.Metadata;
@@ -113,7 +114,14 @@ namespace KScript.Language.Formatting
             text ??= string.Empty;
             if (rules.Error is Diagnostic invalid && !DocumentRules.IsRuleFile(path))
                 return new FormatResult { Error = $"not formatted: {DocumentRules.FileName}: {invalid.Message}" };
-            return isCode ? CodeFormatter.Format(text, options, rules) : FormatMarkup(text, kind, options, rules);
+            try
+            {
+                return isCode ? CodeFormatter.Format(text, options, rules) : FormatMarkup(text, kind, options, rules);
+            }
+            catch (KScriptException ex)
+            {
+                return new FormatResult { Error = $"not formatted: {DocumentRules.FileName}: {ex.Message}" };
+            }
         }
 
         private static FormatResult FormatMarkup(string text, DocumentKind kind, FormatOptions options, DocumentRules rules)
@@ -559,13 +567,13 @@ namespace KScript.Language.Formatting
 
         private void AppendStartTag(MarkupElement e, int depth)
         {
-            List<string> attributes = e.Attributes.Select(a => Normalise(text.Substring(a.Span.Start, a.Span.Length))).ToList();
+            List<string> attributes = e.Attributes.Select(a => FormatAttribute(e, a)).ToList();
             string close = e.SelfClosing ? " />" : e.StartTagClosed ? ">" : string.Empty;
 
             string oneLine = "<" + e.Name + string.Concat(attributes.Select(a => " " + a)) + close;
             int firstLine = oneLine.IndexOf('\n');
             bool tooLong = CurrentColumn() + (firstLine < 0 ? oneLine.Length : firstLine) > options.PrintWidth;
-            bool? wrap = rules.WrapTag(e.Name);
+            bool? wrap = rules.WrapTag(e, document.Kind);
             if (!options.TidyTags || (wrap == null && !options.WrapAttributes && WasWrapped(e)))
             {
                 // Kept exactly as written.
@@ -588,6 +596,20 @@ namespace KScript.Language.Formatting
             }
             sb.Append(close);
             lineIndent = outer;
+        }
+
+        private string FormatAttribute(MarkupElement element, MarkupAttribute attribute)
+        {
+            string raw = text.Substring(attribute.Span.Start, attribute.Span.Length);
+            string replacement = html && options.TidyTags ? rules.FormatAttribute(element, attribute) : null;
+            if (replacement != null && replacement != attribute.ValueText)
+            {
+                TextSpan value = attribute.Value.SourceSpan;
+                int offset = value.Start - attribute.Span.Start;
+                string escaped = System.Net.WebUtility.HtmlEncode(replacement);
+                raw = raw.Remove(offset, value.Length).Insert(offset, escaped);
+            }
+            return Normalise(raw);
         }
 
         /// <summary>True when the author put line breaks between the attributes (not just inside a value).</summary>

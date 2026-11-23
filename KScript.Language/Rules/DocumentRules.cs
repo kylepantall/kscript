@@ -3,6 +3,7 @@ using System.Globalization;
 using KScript.Language.Analysis;
 using KScript.Language.Formatting;
 using KScript.Projects;
+using KScriptException = KScript.Runtime.KScriptException;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
 
@@ -16,6 +17,9 @@ namespace KScript.Language.Rules
 
         private readonly List<LintRule> lint = new List<LintRule>();
         private readonly Dictionary<string, bool> tags = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Func<MarkupElement, bool?>> statements = new Dictionary<string, Func<MarkupElement, bool?>>(StringComparer.Ordinal);
+        private readonly Dictionary<(string Element, string Attribute), RuleFunction> values = new Dictionary<(string, string), RuleFunction>();
+        private readonly Dictionary<string, RuleFunction> openTags = new Dictionary<string, RuleFunction>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> models = new HashSet<string>(StringComparer.Ordinal);
         private readonly FormatSettings style = new FormatSettings { EndOfLine = null };
         private readonly List<Diagnostic> diagnostics = new List<Diagnostic>();
@@ -66,25 +70,83 @@ namespace KScript.Language.Rules
                 {
                     var comparison = document.Kind == DocumentKind.Script ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
                     if (!element.Name.Equals(rule.Element, comparison)) continue;
-                    bool present = element.Attributes.Any(a => a.Name.Equals(rule.Attribute, comparison));
-                    if (present == rule.Forbid)
+                    try
                     {
-                        document.Diagnostics.Add(new Diagnostic(element.NameSpan, rule.Severity, rule.Code, rule.Message));
+                        string message = LintMessage(rule, element, document.Kind, document.Markup.Syntax);
+                        if (message != null) document.Diagnostics.Add(new Diagnostic(element.NameSpan, rule.Severity, rule.Code, message));
+                    }
+                    catch (KScriptException ex)
+                    {
+                        document.Diagnostics.Add(new Diagnostic(element.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidToolingRule,
+                            $"{FileName}, {rule.Code}: {ex.Message}"));
                     }
                 }
             }
         }
 
-        internal bool? WrapTag(string name)
+        private static string LintMessage(LintRule rule, MarkupElement element, DocumentKind kind, SourceSyntax syntax)
         {
-            if (tags.TryGetValue(name, out bool wrap) || tags.TryGetValue("*", out wrap)) return wrap;
-            return ReferenceEquals(this, Default) ? null : Default.WrapTag(name);
+            if (rule.Check != null)
+            {
+                return rule.Check.Evaluate(RuleFunction.Node(element, kind, syntax)) switch
+                {
+                    null or false => null,
+                    true => rule.Message ?? $"Rule {rule.Code} matched.",
+                    string message => message,
+                    _ => throw new KScriptException("A lint function must return text, bool or null.", "Type"),
+                };
+            }
+            bool present = element.Attributes.Any(a => a.Name.Equals(rule.Attribute,
+                kind == DocumentKind.Script ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase));
+            return present == rule.Forbid ? rule.Message : null;
         }
+
+        internal bool? WrapTag(MarkupElement element, DocumentKind kind)
+        {
+            string name = element.Name;
+            if (openTags.TryGetValue(name, out RuleFunction action)) return Layout(action.Evaluate(RuleFunction.Node(element, kind, SourceSyntax.Xml)));
+            if (tags.TryGetValue(name, out bool wrap)) return wrap;
+            if (openTags.TryGetValue("*", out action)) return Layout(action.Evaluate(RuleFunction.Node(element, kind, SourceSyntax.Xml)));
+            if (tags.TryGetValue("*", out wrap)) return wrap;
+            return ReferenceEquals(this, Default) ? null : Default.WrapTag(element, kind);
+        }
+
+        internal string FormatAttribute(MarkupElement element, MarkupAttribute attribute)
+        {
+            if (attribute.ValueText == null || attribute.Quote is not ('\'' or '"')
+                || attribute.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) || attribute.Name.StartsWith("on-", StringComparison.OrdinalIgnoreCase)
+                || attribute.ValueText.IndexOfAny(new[] { '{', '}' }) >= 0) return null;
+            string name = attribute.Name.ToLowerInvariant();
+            if (!values.TryGetValue((element.Name.ToLowerInvariant(), name), out RuleFunction action)
+                && !values.TryGetValue(("*", name), out action)) return null;
+            return action.Evaluate(attribute.ValueText) switch
+            {
+                null => null,
+                string replacement when replacement.IndexOfAny(new[] { '{', '}' }) < 0 => replacement,
+                _ => throw new KScriptException("An attribute value function must return literal text without template braces, or null.", "Type"),
+            };
+        }
+
+        internal bool? WrapStatement(MarkupElement statement)
+        {
+            if (!statements.TryGetValue(statement.Name, out Func<MarkupElement, bool?> action)
+                && !statements.TryGetValue("*", out action)) return null;
+            return action(statement);
+        }
+
+        private static bool? Layout(object result) => result switch
+        {
+            "one_per_line" => true,
+            "inline" => false,
+            null => null,
+            _ => throw new KScriptException("A layout function must return 'one_per_line', 'inline' or null.", "Type"),
+        };
 
         internal bool WrapModel(string name) =>
             models.Contains(name) || models.Contains("*") || (!ReferenceEquals(this, Default) && Default.WrapModel(name));
 
-        internal bool HasModelRules => models.Count > 0 || Default.models.Count > 0;
+        internal bool HasDeclarationRules => models.Count > 0 || Default.models.Count > 0 || statements.Count > 0;
+        internal bool HasStatementRules => statements.Count > 0;
 
         internal void ApplyStyle(FormatOptions options) => options.Apply(style);
 
@@ -118,19 +180,29 @@ namespace KScript.Language.Rules
                     continue;
                 }
                 var args = new Dictionary<string, string>(StringComparer.Ordinal);
+                RuleFunction function = null;
+                string functionKey = null;
                 foreach (MarkupAttribute attribute in statement.Attributes)
                 {
+                    if ((statement.Name, attribute.Name) is ("Lint", "check") or ("Format", "attributes" or "arguments" or "value")
+                        && RuleFunction.Parse(attribute.ValueText) is RuleFunction callback)
+                    {
+                        if (function != null) rules.Invalid(attribute.Span, "A declaration can have one function argument.");
+                        function = callback;
+                        functionKey = attribute.Name;
+                        continue;
+                    }
                     Token value = ReadLiteral(document.Source, attribute);
                     if (value.Kind == TokenKind.String)
                     {
                         args[attribute.Name] = value.Text;
                         continue;
                     }
-                    rules.Invalid(attribute.Span, $"Write a quoted literal for '{attribute.Name}'.");
+                    rules.Invalid(attribute.Span, $"Write a quoted literal for '{attribute.Name}', or a supported one-argument rule function where allowed.");
                 }
 
-                if (statement.Name == "Lint") rules.AddLint(statement, args);
-                else rules.AddFormat(statement, args);
+                if (statement.Name == "Lint") rules.AddLint(statement, args, function);
+                else rules.AddFormat(statement, args, functionKey, function);
             }
             return rules;
         }
@@ -184,7 +256,7 @@ namespace KScript.Language.Rules
             }
         }
 
-        private void AddLint(MarkupElement statement, Dictionary<string, string> args)
+        private void AddLint(MarkupElement statement, Dictionary<string, string> args, RuleFunction check)
         {
             string code = args.GetValueOrDefault("code");
             string element = args.GetValueOrDefault("element");
@@ -194,22 +266,55 @@ namespace KScript.Language.Rules
             string severity = args.GetValueOrDefault("severity") ?? "warning";
             if (code == null || code.Length != 6 || !code.StartsWith("KS9", StringComparison.Ordinal)
                 || !code.Skip(3).All(char.IsAsciiDigit) || lint.Any(rule => rule.Code == code)
-                || string.IsNullOrWhiteSpace(element) || string.IsNullOrWhiteSpace(message)
-                || (missing == null) == (forbidden == null) || string.IsNullOrWhiteSpace(missing ?? forbidden)
+                || string.IsNullOrWhiteSpace(element)
+                || (check == null ? (missing == null) == (forbidden == null) || string.IsNullOrWhiteSpace(missing ?? forbidden)
+                    || string.IsNullOrWhiteSpace(message) : missing != null || forbidden != null)
                 || severity is not ("error" or "warning" or "info" or "hint")
                 || args.Keys.Any(key => key is not ("code" or "element" or "message" or "severity" or "missing_attribute" or "forbidden_attribute")))
             {
-                Invalid(statement.NameSpan, "Lint needs a unique KS9xxx code, element, message and one of missing_attribute or forbidden_attribute. Severity can be error, warning, info or hint.");
+                Invalid(statement.NameSpan, "Lint needs a unique KS9xxx code, element and one of check, missing_attribute or forbidden_attribute. Literal attribute checks also need a message. Severity can be error, warning, info or hint.");
                 return;
             }
-            lint.Add(new LintRule(code, element, missing ?? forbidden, forbidden != null, message, LintRules.ToSeverity(severity)));
+            lint.Add(new LintRule(code, element, missing ?? forbidden, forbidden != null, message, LintRules.ToSeverity(severity), check));
         }
 
-        private void AddFormat(MarkupElement statement, Dictionary<string, string> args)
+        private void AddFormat(MarkupElement statement, Dictionary<string, string> args, string functionKey, RuleFunction function)
         {
+            if (functionKey == "attributes" && args.Count == 1 && args.TryGetValue("element", out string tag) && !string.IsNullOrWhiteSpace(tag))
+            {
+                tags.Remove(tag);
+                openTags[tag] = function;
+                return;
+            }
+            if (functionKey == "value" && args.Count == 2 && args.TryGetValue("element", out tag) && args.TryGetValue("attribute", out string attribute)
+                && !string.IsNullOrWhiteSpace(tag) && !string.IsNullOrWhiteSpace(attribute))
+            {
+                values[(tag.ToLowerInvariant(), attribute.ToLowerInvariant())] = function;
+                return;
+            }
+            if (args.TryGetValue("statement", out string target) && !string.IsNullOrWhiteSpace(target))
+            {
+                if (functionKey == "arguments" && args.Count == 1)
+                {
+                    statements[target] = element => Layout(function.Evaluate(RuleFunction.Node(element, DocumentKind.Script, SourceSyntax.Code)));
+                    return;
+                }
+                if (function == null && args.Count == 2 && args.GetValueOrDefault("arguments") is "one_per_line" or "inline")
+                {
+                    bool layout = args["arguments"] == "one_per_line";
+                    statements[target] = _ => layout;
+                    return;
+                }
+            }
+            if (function != null)
+            {
+                Invalid(statement.NameSpan, "This Format function does not match its target. Use element with attributes or attribute and value, or statement with arguments.");
+                return;
+            }
             if (args.Count == 2 && args.TryGetValue("element", out string element) && !string.IsNullOrWhiteSpace(element)
                 && args.GetValueOrDefault("attributes") is "one_per_line" or "inline")
             {
+                openTags.Remove(element);
                 tags[element] = args["attributes"] == "one_per_line";
                 return;
             }
@@ -219,12 +324,12 @@ namespace KScript.Language.Rules
                 models.Add(model);
                 return;
             }
-            Invalid(statement.NameSpan, "Format needs element and attributes ('one_per_line' or 'inline'), or model and options ('one_per_line').");
+            Invalid(statement.NameSpan, "Format needs element and attributes, model and options, or statement and arguments.");
         }
 
         private void Invalid(TextSpan span, string message) =>
             diagnostics.Add(new Diagnostic(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidToolingRule, message));
 
-        private sealed record LintRule(string Code, string Element, string Attribute, bool Forbid, string Message, DiagnosticSeverity Severity);
+        private sealed record LintRule(string Code, string Element, string Attribute, bool Forbid, string Message, DiagnosticSeverity Severity, RuleFunction Check);
     }
 }

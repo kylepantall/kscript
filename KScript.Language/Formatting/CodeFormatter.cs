@@ -110,18 +110,19 @@ namespace KScript.Language.Formatting
                 text = Space(text);
             }
             text = Layout(text, options);
-            if (full && (options.WrapAttributes || options.WrapStrings || options.WrapChains || options.WrapBodies || options.WrapComments || rules.HasModelRules))
+            if (full && (options.WrapAttributes || options.WrapStrings || options.WrapChains || options.WrapBodies || options.WrapComments || rules.HasDeclarationRules))
             {
                 for (int i = 0; i < 24; i++)
                 {
-                    if (options.WrapAttributes || rules.HasModelRules)
-                    {
-                        string models = WrapModelOptions(text, options, rules);
-                        if (models != text) text = Layout(models, options);
-                    }
                     string wrapped = Wrap(text, options);
+                    if (wrapped != text) wrapped = Layout(wrapped, options);
+                    if (options.WrapAttributes || rules.HasDeclarationRules)
+                    {
+                        string declarationLayout = WrapDeclarationArguments(wrapped, options, rules);
+                        if (declarationLayout != wrapped) wrapped = Layout(declarationLayout, options);
+                    }
                     if (wrapped == text) break;
-                    text = Layout(wrapped, options);
+                    text = wrapped;
                 }
             }
             return text;
@@ -1119,31 +1120,43 @@ namespace KScript.Language.Formatting
 
         #region Wrapping
 
-        /// <summary>Lay out long or already split model headers with one option and a comma on each line.</summary>
-        private static string WrapModelOptions(string text, FormatOptions options, DocumentRules rules)
+        /// <summary>Lay out model options and named statement arguments without changing their values.</summary>
+        private static string WrapDeclarationArguments(string text, FormatOptions options, DocumentRules rules)
         {
-            if (!text.Contains("model", StringComparison.Ordinal)) return text;
+            if (!rules.HasStatementRules && !text.Contains("model", StringComparison.Ordinal)) return text;
 
             Scan scan = null;
             Edits edits = new Edits();
-            foreach (MarkupElement model in CodeParser.Parse(text).DescendantElements().Where(e => e.Name == "model"))
+            foreach (MarkupElement declaration in CodeParser.Parse(text).DescendantElements())
             {
-                MarkupAttribute name = model.GetAttribute("name");
-                bool forced = rules.WrapModel(name?.ValueText);
-                if (!forced && !options.WrapAttributes) continue;
-                int nameEnd = name?.Span.End ?? model.NameSpan.End;
+                bool model = declaration.Name == "model";
+                if (!model && (!rules.HasStatementRules || string.IsNullOrEmpty(declaration.Name) || !char.IsUpper(declaration.Name[0]))) continue;
+                MarkupAttribute name = model ? declaration.GetAttribute("name") : null;
+                int nameEnd = name?.Span.End ?? declaration.NameSpan.End;
                 int open = SkipAllSpaces(text, nameEnd);
                 if (Peek(text, open) != '(') continue;
-
                 scan ??= Read(text);
                 int close = scan.Match[open];
                 if (close < 0 || Array.IndexOf(scan.Verbatim, true, open, close - open + 1) >= 0) continue;
+                bool? layout = model ? (rules.WrapModel(name?.ValueText) ? true : null) : rules.WrapStatement(declaration);
+                if (layout == null && (!model || !options.WrapAttributes)) continue;
 
-                MarkupAttribute[] args = model.Attributes.Where(a => a.Span.Start > open && a.Span.End <= close).ToArray();
+                MarkupAttribute[] args = declaration.Attributes.Where(a => a.Span.Start > open && a.Span.End <= close).ToArray();
+                if (layout == false)
+                {
+                    if (CanJoin(open, close, args))
+                    {
+                        string joined = string.Join(", ", args.Select(arg => text.Substring(arg.Span.Start, arg.Span.Length)));
+                        if (text.Substring(open + 1, close - open - 1) != joined)
+                            edits.Replace(open + 1, close - open - 1, joined);
+                        LayoutEmptyBody(close, multiline: false);
+                    }
+                    continue;
+                }
                 if (args.Length == 0) continue;
                 List<int> commas = TopLevelCommas(scan, open, close);
                 bool trailingComma = commas.Count > 0 && commas[^1] >= args[^1].Span.End;
-                if (!forced && !trailingComma && text.IndexOf('\n', open, close - open) < 0)
+                if (layout != true && !trailingComma && text.IndexOf('\n', open, close - open) < 0)
                 {
                     int start = text.LastIndexOf('\n', open) + 1;
                     int end = text.IndexOf('\n', close);
@@ -1160,8 +1173,30 @@ namespace KScript.Language.Formatting
                     if (!commas.Any(comma => comma >= arg.End && comma < next)) edits.Insert(arg.End, ",");
                 }
                 BreakBefore(close);
+                if (!model && layout == true) LayoutEmptyBody(close, multiline: true);
             }
             return edits.Apply(text);
+
+            bool CanJoin(int open, int close, MarkupAttribute[] args)
+            {
+                for (int at = open + 1; at < close; at++)
+                {
+                    if (scan.States[at] is State.LineComment or State.BlockComment) return false;
+                }
+                return args.All(arg => text.IndexOf('\n', arg.Span.Start, arg.Span.Length) < 0);
+            }
+
+            void LayoutEmptyBody(int close, bool multiline)
+            {
+                int brace = SkipAllSpaces(text, close + 1);
+                if (Peek(text, brace) != '{' || !scan.IsBlock[brace]) return;
+                int end = scan.Match[brace];
+                if (end <= brace || scan.Verbatim[end] || !string.IsNullOrWhiteSpace(text.Substring(brace + 1, end - brace - 1))) return;
+                if (multiline && text.IndexOf('\n', brace, end - brace) < 0)
+                    edits.Replace(brace + 1, end - brace - 1, "\n");
+                else if (!multiline && end > brace + 1)
+                    edits.Replace(brace + 1, end - brace - 1, string.Empty);
+            }
 
             void BreakBefore(int token)
             {
