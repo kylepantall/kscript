@@ -51,7 +51,16 @@ namespace KScript.Language.Analysis
                 TypeShape instance = rootShape != null && !model
                     ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element }
                     : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep", Kind = model ? KType.Record : null };
-                Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, new TypeShape(KType.Type) { Name = name, Instance = instance, Kind = model ? KType.Model : null });
+                var literalPattern = !model && KScript.Runtime.PatternLiterals.ReadsWords(refinedRoot) && e.GetAttribute("pattern") != null ? RulesOf(e)?.Pattern : null;
+                var declaredType = new TypeShape(KType.Type)
+                {
+                    Name = name,
+                    Instance = instance,
+                    Kind = model ? KType.Model : null,
+                    LiteralPattern = literalPattern,
+                    LiteralRules = literalPattern == null ? null : StaticRefinementRules(e).ToArray(),
+                };
+                Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, declaredType);
                 root.Declare(symbol, 0);
                 declaredTypes[e] = instance;
             }
@@ -67,6 +76,30 @@ namespace KScript.Language.Analysis
                 string description = type.Key.GetAttributeValue("description");
                 symbol.Description = (description != null ? description + "\n\n" : string.Empty)
                     + (IsModelElement(type.Key) ? "model " : "type ") + type.Value.Name + " {\n" + string.Concat(type.Value.Fields.Values.Select(f => "  " + f.Name + ": " + f.Shape.Display() + "\n")) + "}";
+            }
+        }
+
+        private void CheckDuplicateLiteralPatterns()
+        {
+            var groups = VisibleLiteralPatterns(result.RootScope, 0)
+                .GroupBy(candidate => (candidate.Pattern.Pattern, candidate.Pattern.Regex.Options));
+            foreach (var group in groups)
+            {
+                if (!group.Skip(1).Any()) continue;
+
+                // Prefer the pattern in this document. If two explicit imports bring the types
+                // together, mark the later import. Auto-loaded natives are checked in their own files.
+                var site = group.Select(candidate => candidate.Type)
+                    .Where(symbol => symbol.SourcePath == null || symbol.DeclaringElement?.Name == "import")
+                    .OrderBy(symbol => symbol.SourcePath == null)
+                    .ThenBy(symbol => symbol.DeclarationSpan.Start)
+                    .LastOrDefault();
+                if (site == null) continue;
+
+                var pattern = site.SourcePath == null ? site.DeclaringElement?.GetAttribute("pattern") : null;
+                var names = group.Select(candidate => candidate.Name).OrderBy(name => name, StringComparer.Ordinal);
+                Report(pattern?.Value.SourceSpan ?? site.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.DuplicateLiteralPattern,
+                    $"The literal types {string.Join(", ", names)} declare the same pattern. Name the intended type when using a matching word.");
             }
         }
 
@@ -285,7 +318,7 @@ namespace KScript.Language.Analysis
             {
                 foreach ((string name, string type, TextSpan span, string description) in InlineFields(fields.Value))
                 {
-                    shape.Fields[name] = new FieldInfo(name, TypeNamed(type, span.Start) ?? TypeShape.Unknown, span, description);
+                    shape.Fields[name] = new FieldInfo(name, TypeNamed(type, span.Start) ?? TypeShape.Unknown, span, description, type);
                 }
             }
 
@@ -302,7 +335,7 @@ namespace KScript.Language.Analysis
                 string description = field.GetAttributeValue("description");
                 string detail = from != null ? $"Read from {from}." : field.GetAttribute("value") != null ? "Worked out from the other fields." : null;
                 description = description != null && detail != null ? description + " " + detail : description ?? detail;
-                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description);
+                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type);
             }
         }
 

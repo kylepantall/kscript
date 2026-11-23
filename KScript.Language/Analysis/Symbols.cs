@@ -59,6 +59,12 @@ namespace KScript.Language.Analysis
         /// <summary>For a &lt;type&gt; value (<c>Repo</c>): the shape of the records it makes.</summary>
         public TypeShape Instance { get; init; }
 
+        /// <summary>The type's directly declared pattern when a bare word can denote an instance.</summary>
+        internal KScript.Runtime.RegexValue LiteralPattern { get; init; }
+
+        /// <summary>The statically checkable rules in this literal type's declaring module.</summary>
+        internal IReadOnlyList<KScript.Runtime.TypeRules> LiteralRules { get; init; }
+
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
         public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
 
@@ -173,12 +179,13 @@ namespace KScript.Language.Analysis
 
     public sealed class FieldInfo
     {
-        public FieldInfo(string name, TypeShape shape, TextSpan? declaration, string description = null)
+        public FieldInfo(string name, TypeShape shape, TextSpan? declaration, string description = null, string declaredType = null)
         {
             Name = name;
             Shape = shape;
             Declaration = declaration;
             Description = description;
+            DeclaredType = declaredType;
         }
 
         public string Name { get; }
@@ -188,6 +195,7 @@ namespace KScript.Language.Analysis
         public TextSpan? Declaration { get; }
 
         public string Description { get; }
+        internal string DeclaredType { get; }
     }
 
     /// <summary>A declared name: a variable, parameter, function or import.</summary>
@@ -288,6 +296,9 @@ namespace KScript.Language.Analysis
 
         public bool IsDeclaration { get; }
         public bool IsWrite { get; }
+
+        /// <summary>The value depends on this type, but the use contains the literal's spelling, not the type's name.</summary>
+        public bool IsPatternLiteral { get; init; }
     }
 
     /// <summary>A region of a scope in which some names are visible.</summary>

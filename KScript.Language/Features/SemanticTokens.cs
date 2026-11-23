@@ -152,7 +152,11 @@ namespace KScript.Language.Features
                                 break;
                             }
                             case TokenKind.Identifier:
-                                if (prev.Text == "as" && casts.Any(c => c.TypeSpan.Start == t.Span.Start))
+                                if (references.TryGetValue(span.Start, out SymbolReference literal) && literal.IsPatternLiteral)
+                                {
+                                    tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
+                                }
+                                else if (prev.Text == "as" && casts.Any(c => c.TypeSpan.Start == t.Span.Start))
                                 {
                                     tokens.Add(new SemanticToken(span, SemanticTokenType.Type, SemanticTokenModifiers.None));
                                 }

@@ -100,7 +100,7 @@ namespace KScript.Net
         private static readonly Lazy<HttpClient> Client = new Lazy<HttpClient>(() =>
         {
             var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("KScript/2.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(HttpIdentity.Product);
             return client;
         });
 
@@ -206,7 +206,7 @@ namespace KScript.Net
         {
             Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
-            var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["user-agent"] = HttpIdentity.Product };
             if (options.TryGetValue("headers", out object h) && h is Dictionary<string, object> given)
             {
                 foreach (var kv in given) headers[kv.Key.ToLowerInvariant()] = Values.ToStr(kv.Value);

@@ -26,6 +26,10 @@ namespace KScript.Language.Analysis
                 case ErrorNode _:
                     return;
 
+                case BinaryNode or MemberNode when TryCompoundPatternLiteral(node, region, scope):
+                    // my-post, api.corp.com, 1.4.2: words a pattern type reads.
+                    return;
+
                 case LiteralNode literal:
                     if (literal.Template != null)
                     {
@@ -41,7 +45,10 @@ namespace KScript.Language.Analysis
 
                 case CastNode cast:
                 {
-                    AnalyzeExpr(cast.Value, region, scope, ExprContext.Value);
+                    int offset = region.Source.ToSource(cast.Value.Span.Start);
+                    string raw = cast.Value is IdentifierNode word && IsUnboundLiteralWord(word.Name, scope, offset)
+                        && RawTextKindOf(cast.TypeName, scope, offset) != null && TypeNamed(cast.TypeName, offset) != null ? word.Name : null;
+                    if (raw == null) AnalyzeExpr(cast.Value, region, scope, ExprContext.Value);
                     if (cast.TypeName.Length == 0)
                     {
                         return;
@@ -55,7 +62,14 @@ namespace KScript.Language.Analysis
                     TextSpan nameSpan = region.Source.ToSource(new TextSpan(cast.TypeSpan.Start, TypeBase(cast.TypeName).Length));
                     if (CheckTypeText(cast.TypeName, nameSpan, nameSpan.Start, scope))
                     {
-                        CheckTypedLiteral(cast.Value, cast.TypeName, region.Source, scope, nameSpan.Start);
+                        if (raw != null)
+                        {
+                            CheckLiteralFits(raw, cast.TypeName, region.Source.ToSource(cast.Value.Span), scope, offset);
+                        }
+                        else
+                        {
+                            CheckTypedLiteral(cast.Value, cast.TypeName, region.Source, scope, nameSpan.Start);
+                        }
                     }
                     return;
                 }
@@ -268,7 +282,8 @@ namespace KScript.Language.Analysis
                         return Collect(b.Left) && Collect(b.Right);
                     case LiteralNode { Kind: LiteralKind.Number }:
                         return true;
-                    case IdentifierNode id when id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) == null:
+                    case IdentifierNode id when id.Name != "_" && scope.Lookup(id.Name, region.Source.ToSource(id.Span.Start)) == null
+                        && !TryPatternLiteral(id, region, scope, record: false):
                         words.Add(id);
                         return true;
                     default:
@@ -305,7 +320,7 @@ namespace KScript.Language.Analysis
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier, message, fixes);
         }
 
-        private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context)
+        private void AnalyzeBareIdentifier(IdentifierNode id, ExpressionRegion region, Scope scope, ExprContext context, bool allowPattern = true)
         {
             if ((id.Name == "_" && context == ExprContext.Argument) || ReferenceDeclaredType(id, region, scope) || ReferenceBareErrorType(id, region, scope))
             {
@@ -314,6 +329,7 @@ namespace KScript.Language.Analysis
 
             TextSpan span = region.Source.ToSource(id.Span);
             Symbol symbol = scope.Lookup(id.Name, span.Start);
+            if (symbol == null && allowPattern && TryPatternLiteral(id, region, scope)) return;
             List<QuickFix> fixes = new List<QuickFix>();
             string hint;
             if (symbol != null && symbol.Kind != SymbolKind.Function && symbol.Kind != SymbolKind.Import)
@@ -390,14 +406,14 @@ namespace KScript.Language.Analysis
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
                 ReportIfDeprecated(fn, nameSpan);
-                if (count >= 0)
-                {
-                    NoteCallArguments(fn, c.Arguments, piped > 0 ? pipedShape ?? TypeShape.Unknown : null, region);
-                }
                 if (count >= 0 && !(fn.SourcePath != null && fn.Parameters.Count == 0 && !result.ExternalDeclarations.ContainsKey(fn))
                     && !CheckNamedArguments($"@{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, full))
                 {
                     CheckFunctionArgumentCount(fn, count, full);
+                }
+                if (count >= 0)
+                {
+                    NoteCallArguments(fn, c.Arguments, piped > 0 ? pipedShape ?? TypeShape.Unknown : null, region);
                 }
                 return;
             }
@@ -516,11 +532,11 @@ namespace KScript.Language.Analysis
                         {
                             result.References.Add(new SymbolReference(fn, span, false, false));
                             ReportIfDeprecated(fn, span);
-                            NoteCallArguments(fn, call.Arguments, left ?? TypeShape.Unknown, region);
                             if (!CheckNamedArguments($"@{fn.Name}()", call.Arguments, 1, SlotsOf(fn, scope), region, region.Source.ToSource(call.Span)))
                             {
                                 CheckFunctionArgumentCount(fn, call.Arguments.Count + 1, region.Source.ToSource(call.Span));
                             }
+                            NoteCallArguments(fn, call.Arguments, left ?? TypeShape.Unknown, region);
                             return;
                         }
                         if (AnalyzeTypeCall(call, id, region, scope, piped: true))

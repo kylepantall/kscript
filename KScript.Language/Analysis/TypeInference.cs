@@ -125,6 +125,13 @@ namespace KScript.Language.Analysis
                     // A declared type is named bare: Repo->check($data), User->find(1), Size.small.
                     return named.Shape;
 
+                case IdentifierNode id when result.PatternLiteralTypes.TryGetValue(region.Source.ToSource(id.Span.Start), out Symbol literalType):
+                    return literalType.Shape.Instance;
+
+                case BinaryNode or MemberNode when result.PatternLiteralWords.TryGetValue(region.Source.ToSource(node.Span), out Symbol wordType):
+                    // my-post, 1.4.2: words a pattern type reads.
+                    return wordType.Shape.Instance;
+
                 case MemberNode member:
                 {
                     TypeShape target = Infer(member.Target, region);
@@ -376,7 +383,7 @@ namespace KScript.Language.Analysis
                 case IdentifierNode id:
                 {
                     int offset = region.Source.ToSource(id.Span.Start);
-                    return result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
+                    return !result.PatternLiteralTypes.ContainsKey(offset) && result.RootScope?.Innermost(offset).Lookup(id.Name, offset) == null;
                 }
                 case BinaryNode { Operator: "+" or "-" or "*" or "/" or "%" or "**" } b:
                     return IsBareWord(b.Left, region) || IsBareWord(b.Right, region);

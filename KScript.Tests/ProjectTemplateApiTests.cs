@@ -369,6 +369,32 @@ public sealed class ProjectTemplateApiTests : IDisposable
     }
 
     [Fact]
+    public void LocalApiProvidesRequestAndResponseIdentityHeadersWithOverrides()
+    {
+        using var site = new TempSite(
+            ("kscript.json", "{}"),
+            ("routes/api.kscript", """
+                import KScript.Http
+                Routes {
+                  Get(path: "/agent") { return { agent: $request.headers['user-agent'] } }
+                  Get(path: "/custom") { return @response('ok', headers: { Server: 'example-origin' }) }
+                }
+                """),
+            ("ask.kscript", """
+                import KScript.Net
+                echo @api('/api/agent')->json().agent
+                echo @api('/api/agent', options: { headers: { 'User-Agent': 'example-app/1.0' } })->json().agent
+                echo @api('/api/agent')->json().agent
+                echo @api('/api/agent')->header('server')
+                echo @api('/missing')->header('Server')
+                echo @api('/api/custom')->header('Server')
+                """));
+        var (output, error) = RunScript(Path.Combine(site.Root, "ask.kscript"));
+        Assert.Null(error);
+        Assert.Equal("kscript\nexample-app/1.0\nkscript\nkscript\nkscript\nexample-origin\n", output);
+    }
+
+    [Fact]
     public void ApiWithAPathAsksTheProjectsOwnRoutes()
     {
         using var site = new TempSite(

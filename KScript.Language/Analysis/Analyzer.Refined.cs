@@ -95,6 +95,124 @@ namespace KScript.Language.Analysis
             (IsKScriptElementName(e, "type") && catalog.GetElement("type")?.Package == "KScript.Core")
             || IsModelElement(e);
 
+        private sealed class LiteralVocabulary
+        {
+            public LiteralVocabulary((Symbol Type, string Name, RegexValue Pattern)[] candidates) => Candidates = candidates;
+            public (Symbol Type, string Name, RegexValue Pattern)[] Candidates { get; }
+            public Dictionary<string, (Symbol Type, string Error)> Words { get; } = new Dictionary<string, (Symbol, string)>(StringComparer.Ordinal);
+        }
+
+        private LiteralVocabulary moduleLiteralPatterns;
+        private readonly Dictionary<string, LiteralVocabulary> shadowedLiteralPatterns = new Dictionary<string, LiteralVocabulary>(StringComparer.Ordinal);
+
+        private IEnumerable<(Symbol Type, string Name, RegexValue Pattern)> VisibleLiteralPatterns(Scope scope, int offset) =>
+            LiteralPatternsAt(scope, offset).Candidates;
+
+        private LiteralVocabulary LiteralPatternsAt(Scope scope, int offset)
+        {
+            // Type declarations are hoisted. Only names of those declarations can be shadowed as a scope is walked.
+            moduleLiteralPatterns ??= new LiteralVocabulary(result.RootScope.VisibleAt(0)
+                .Where(s => s.Shape.LiteralPattern != null && s.Name == s.Shape.Name && result.RootScope.Lookup(s.Name, 0) == s)
+                .Select(s => (s, s.Name, s.Shape.LiteralPattern)).ToArray());
+            var candidates = moduleLiteralPatterns.Candidates;
+            if (candidates.All(c => scope.Lookup(c.Name, offset) == c.Type)) return moduleLiteralPatterns;
+
+            var visible = candidates.Where(c => scope.Lookup(c.Name, offset) == c.Type).ToArray();
+            string names = string.Join(" ", visible.Select(c => c.Name));
+            if (!shadowedLiteralPatterns.TryGetValue(names, out LiteralVocabulary vocabulary))
+            {
+                shadowedLiteralPatterns[names] = vocabulary = new LiteralVocabulary(visible);
+            }
+            return vocabulary;
+        }
+
+        private bool IsUnboundLiteralWord(string word, Scope scope, int offset) =>
+            word != "_" && !Lexer.Keywords.Contains(word) && scope.Lookup(word, offset) == null
+            && !(catalog.GetCommand(word) is { } command && importedPackages.Contains(command.Package))
+            && !importedErrors.Contains(word) && !(ErrorTypes.BuiltIn.TryGetValue(word, out var error) && error.Name == word);
+
+        /// <summary>Consider the spelling only when the normal name and argument rules have given it no meaning.</summary>
+        private bool TryPatternLiteral(IdentifierNode id, ExpressionRegion region, Scope scope = null, bool record = true) =>
+            !partsOfUnfitWords.Contains(id) && TryPatternLiteral(id, id.Name, region, scope, record);
+
+        /// <summary>The names in a word no pattern type fits (api in api.corp.com): not read as a type on their own, as at run time.</summary>
+        private readonly HashSet<IdentifierNode> partsOfUnfitWords = new HashSet<IdentifierNode>();
+
+        /// <summary>
+        /// Words joined by - + / or . (<c>my-post</c>, <c>api.corp.com</c>, <c>1.4.2</c>; see
+        /// <see cref="PatternLiterals.WordOf"/>): true when a pattern type reads the whole word. When none does, its names
+        /// aren't read as types on their own either, and the word is reported as it always was.
+        /// </summary>
+        private bool TryCompoundPatternLiteral(ExprNode node, ExpressionRegion region, Scope scope)
+        {
+            TextSpan span = region.Source.ToSource(node.Span);
+            if (LiteralPatternsAt(scope, span.Start).Candidates.Length == 0)
+            {
+                return false;
+            }
+            string word = PatternLiterals.WordOf(node, region.Source.Value, name => IsUnboundLiteralWord(name, scope, span.Start));
+            if (word == null)
+            {
+                return false;
+            }
+            if (TryPatternLiteral(node, word, region, scope, record: true))
+            {
+                return true;
+            }
+            partsOfUnfitWords.UnionWith(node.DescendantsAndSelf().OfType<IdentifierNode>());
+            return false;
+        }
+
+        private bool TryPatternLiteral(ExprNode node, string word, ExpressionRegion region, Scope scope, bool record)
+        {
+            TextSpan span = region.Source.ToSource(node.Span);
+            scope ??= result.ScopeAt(span.Start);
+            if (!IsUnboundLiteralWord(word, scope, span.Start))
+            {
+                return false;
+            }
+            LiteralVocabulary vocabulary = LiteralPatternsAt(scope, span.Start);
+            if (vocabulary.Candidates.Length == 0) return false;
+            if (!vocabulary.Words.TryGetValue(word, out var match))
+            {
+                try
+                {
+                    Symbol type = PatternLiterals.Resolve(word, vocabulary.Candidates);
+                    match = (type, type == null ? null : PatternLiteralProblem(type, word, scope, span.Start));
+                }
+                catch (KScriptException error)
+                {
+                    match = (null, error.Message);
+                }
+                vocabulary.Words.Add(word, match);
+            }
+            if (match.Error != null && record)
+            {
+                Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidTypedValue, match.Error, match.Type != null ? null :
+                    new[] { new QuickFix($"Quote as '{word}'", new TextChange(span, "'" + word + "'")) });
+            }
+            if (match.Type == null) return match.Error != null;
+            if (record)
+            {
+                if (node is IdentifierNode)
+                {
+                    result.PatternLiteralTypes[span.Start] = match.Type;
+                }
+                else
+                {
+                    result.PatternLiteralWords[span] = match.Type;
+                }
+                result.References.Add(new SymbolReference(match.Type, span, false, false) { IsPatternLiteral = true });
+            }
+            return true;
+        }
+
+        /// <summary>A rule of the pattern type <paramref name="type"/> that <paramref name="word"/> breaks, read as its root (string, domain, ...).</summary>
+        private string PatternLiteralProblem(Symbol type, string word, Scope scope, int offset) =>
+            type.Shape.Instance?.Type is string root && root != KType.String
+                ? LiteralProblem(word, type.Name, scope, offset)
+                : RefinementProblem(type.Name, word, word, "string", type.Shape.LiteralRules);
+
         private bool IsModelElement(MarkupElement e) =>
             IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
 
@@ -377,19 +495,25 @@ namespace KScript.Language.Analysis
 
             // Each refinement, innermost first, as the runtime checks them. A type that normalizes changes the value first,
             // so the check stops there; validate: rules need the running script.
-            List<MarkupElement> chain = RefinementChain(element);
+            return RefinementProblem(name, shown, value, root, StaticRefinementRules(element));
+        }
+
+        private IEnumerable<TypeRules> StaticRefinementRules(MarkupElement element)
+        {
+            var chain = RefinementChain(element);
             chain.Reverse();
             foreach (MarkupElement level in chain)
             {
-                if (level.ChildElements.Any(c => IsKScriptElementName(c, "normalize")))
-                {
-                    return null;
-                }
-                TypeRules rules = RulesOf(level);
-                if (rules == null)
-                {
-                    return null;
-                }
+                if (level.ChildElements.Any(c => IsKScriptElementName(c, "normalize")) || RulesOf(level) is not TypeRules rules)
+                    yield break;
+                yield return rules;
+            }
+        }
+
+        private static string RefinementProblem(string name, string shown, object value, string root, IEnumerable<TypeRules> levels)
+        {
+            foreach (TypeRules rules in levels)
+            {
                 string problem = rules.CheckPlain(value, item => PlainAs(root, item)).FirstOrDefault();
                 if (problem != null)
                 {
@@ -428,7 +552,18 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The plain rules (min, max, pattern, one_of, not) written on a &lt;type&gt;, or null if they can't be read.</summary>
-        private static TypeRules RulesOf(MarkupElement type)
+        private TypeRules RulesOf(MarkupElement type)
+        {
+            if (!staticTypeRules.TryGetValue(type, out TypeRules rules))
+            {
+                staticTypeRules[type] = rules = ReadRules(type);
+            }
+            return rules;
+        }
+
+        private readonly Dictionary<MarkupElement, TypeRules> staticTypeRules = new Dictionary<MarkupElement, TypeRules>();
+
+        private static TypeRules ReadRules(MarkupElement type)
         {
             var options = new List<KeyValuePair<string, object>>();
             foreach (string name in TypeRules.Attributes)

@@ -36,18 +36,17 @@ namespace KScript.Http
                 ?? (host != null && host.Items.TryGetValue(Translator.RequestKey, out object r) ? r as Dictionary<string, object> : null);
             if (current != null) Forward(current, request);
 
-            PageResult result = app.Handle(request);
-            if (result == null)
+            PageResult result = app.Handle(request) ?? new PageResult
             {
-                return new LocalResponse
-                {
-                    Status = 404,
-                    Reason = "Not Found",
-                    Body = Values.ToJson(new Dictionary<string, object> { ["error"] = $"No route for {request["method"]} {request["path"]}." }),
-                    Headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "application/json; charset=utf-8" },
-                };
-            }
-            var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = result.ContentType };
+                Status = 404,
+                Body = Values.ToJson(new Dictionary<string, object> { ["error"] = $"No route for {request["method"]} {request["path"]}." }),
+                ContentType = "application/json; charset=utf-8",
+            };
+            var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = result.ContentType,
+                ["Server"] = HttpIdentity.Product,
+            };
             foreach (var kv in result.Headers) headers[kv.Key] = kv.Value;
             if (result.Cookies.Count > 0) headers["Set-Cookie"] = string.Join(", ", result.Cookies);
             return new LocalResponse { Status = result.Status, Reason = ReasonFor(result.Status), Body = result.Body ?? string.Empty, Headers = headers };
