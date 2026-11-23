@@ -93,6 +93,7 @@ namespace KScript.Docs
             new Guide("agents", "agents.md", "Tools", "Coding agents", "kscript"),
             new Guide("upgrading", "upgrading.md", "More", "What changed", "kscript"),
             new Guide("roadmap", "roadmap.md", "More", "Roadmap"),
+            new Guide("builtin-api-gaps", "builtin-api-gaps.md", "More", "Built-in API gaps"),
         };
 
         /// <summary>
@@ -119,21 +120,25 @@ namespace KScript.Docs
         /// </summary>
         public string Format { get; set; } = "kscript";
 
-        private DocsSite(LanguageCatalog catalog, string version)
+        private readonly bool includeInstallGuide;
+
+        private DocsSite(LanguageCatalog catalog, string version, bool includeInstallGuide)
         {
             Catalog = catalog;
             Version = version;
+            this.includeInstallGuide = includeInstallGuide;
         }
 
         /// <summary>Builds every page. <paramref name="readGuide"/> reads a docs/ file (by default, the copy built into kscript).</summary>
-        public static DocsSite Build(LanguageCatalog catalog = null, string version = null, Func<string, string> readGuide = null)
+        public static DocsSite Build(LanguageCatalog catalog = null, string version = null, Func<string, string> readGuide = null, bool includeInstallGuide = true)
         {
-            var site = new DocsSite(catalog ?? LanguageCatalog.Default, version ?? KScript.Updates.SelfUpdater.CurrentVersion);
+            var site = new DocsSite(catalog ?? LanguageCatalog.Default, version ?? KScript.Updates.SelfUpdater.CurrentVersion, includeInstallGuide);
             readGuide ??= ReadEmbeddedGuide;
 
             site.AddHome();
             foreach (Guide guide in Guides)
             {
+                if (!includeInstallGuide && guide.Slug == "install") continue;
                 string markdown = readGuide(guide.File);
                 if (markdown != null) site.AddGuide(guide, markdown);
             }
@@ -177,12 +182,15 @@ namespace KScript.Docs
         private static readonly Regex Href = new Regex(@"href=""([^""#:]*)(#[^""]*)?""", RegexOptions.Compiled);
 
         /// <summary>The URL of a link in a guide: other guides stay on the site; files in the repository go to GitHub.</summary>
-        internal static string LinkTarget(string target, string anchor)
+        internal static string LinkTarget(string target, string anchor, bool includeInstallGuide = true)
         {
             if (target.Length == 0) return anchor;
             string file = target.Replace("docs/", string.Empty);
             Guide guide = Guides.FirstOrDefault(g => string.Equals(g.File, file, StringComparison.OrdinalIgnoreCase));
-            if (guide != null) return "/guide/" + guide.Slug + anchor;
+            if (guide != null)
+                return !includeInstallGuide && guide.Slug == "install"
+                    ? $"{Repository}/blob/master/docs/{guide.File}{anchor}"
+                    : "/guide/" + guide.Slug + anchor;
             if (target.StartsWith("/", StringComparison.Ordinal)) return target + anchor;
             string path = target.StartsWith("../", StringComparison.Ordinal) ? target.Substring(3) : "docs/" + target;
             bool isFile = System.IO.Path.HasExtension(path.TrimEnd('/'));
@@ -205,7 +213,7 @@ namespace KScript.Docs
 
             string html = Markdig.Markdown.ToHtml(withPlaceholders, Html.Pipeline);
             html = Regex.Replace(html, @"<div data-block=""(\d+)""></div>", m => blocks[int.Parse(m.Groups[1].Value)]);
-            html = Href.Replace(html, m => $"href=\"{Html.H(LinkTarget(m.Groups[1].Value, m.Groups[2].Value))}\"");
+            html = Href.Replace(html, m => $"href=\"{Html.H(LinkTarget(m.Groups[1].Value, m.Groups[2].Value, includeInstallGuide))}\"");
             html = Regex.Replace(html, "<table>", "<div class=\"table\"><table>").Replace("</table>", "</table></div>");
 
             string title = guide.NavTitle;

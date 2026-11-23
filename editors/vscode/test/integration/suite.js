@@ -78,6 +78,13 @@ async function runsScripts(folder) {
   assert.strictEqual(stopped.range.start.line, 1, 'the error is on the line that threw: ' + JSON.stringify(stopped));
   assert.strictEqual(stopped.severity, vscode.DiagnosticSeverity.Error);
 
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(bad.uri, bad.lineAt(1).range, 'echo "in stock"');
+  assert.ok(await vscode.workspace.applyEdit(edit));
+  await waitFor(() => !vscode.languages.getDiagnostics(bad.uri).some((d) => /out of stock/.test(d.message)),
+    'the stale runtime error to clear after an unsaved text edit');
+  assert.ok(bad.isDirty);
+
   // New Script opens a script that is ready to run, with the first thing to change selected.
   const fresh = await vscode.commands.executeCommand('kscript.newScript');
   assert.strictEqual(fresh.languageId, 'kscript-code', 'the new script is KScript');

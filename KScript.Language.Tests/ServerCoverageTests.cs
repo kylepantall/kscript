@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 
 using KScript.Language.Analysis;
 using KScript.Language.Features;
+using KScript.Language.Rules;
 using KScript.LanguageServer;
 
 namespace KScript.Language.Tests
@@ -90,6 +91,108 @@ namespace KScript.Language.Tests
             output.Where(m => m["method"]?.GetValue<string>() == "window/logMessage").Select(m => m["params"]["message"].GetValue<string>());
 
         #endregion
+
+        [Fact]
+        public void ProjectRulesWrittenInKScriptWorkInCliAndLsp()
+        {
+            string folder = Directory.CreateTempSubdirectory("kscript-rules-").FullName;
+            try
+            {
+                string page = Path.Combine(folder, "page.html");
+                string config = Path.Combine(folder, "kscript.json");
+                string ruleFile = Path.Combine(folder, DocumentRules.FileName);
+                const string source = "<img src=\"/logo.svg\">\n";
+                const string expected = "<img\n    src=\"/logo.svg\">\n";
+                const string settings = "{\"lint\":{\"rules\":{\"KS9001\":\"error\"}}}";
+                const string rules = """
+                    Style(indent_size: 4)
+                    Lint(code: 'KS9001', element: 'img', missing_attribute: 'alt', message: 'Give this image alternative text.')
+                    Format(element: 'img', attributes: 'one_per_line')
+                    Format(model: 'Attachments', options: 'one_per_line')
+                    """;
+                File.WriteAllText(page, source);
+                File.WriteAllText(config, settings);
+                File.WriteAllText(ruleFile, rules);
+                using StringWriter report = new StringWriter();
+                Assert.Equal(1, CheckCommand.Run(new[] { page }, report, json: true));
+                JsonNode problem = Assert.Single(JsonNode.Parse(report.ToString())["problems"].AsArray());
+                Assert.Equal("KS9001", problem["code"].GetValue<string>());
+                Assert.Equal("error", problem["severity"].GetValue<string>());
+                Assert.Equal(0, CheckCommand.Run(new[] { ruleFile }, TextWriter.Null));
+                Assert.Equal(1, FormatCommand.Run(new[] { page, "--check" }, TextWriter.Null));
+                Assert.Equal(0, FormatCommand.Run(new[] { page }, TextWriter.Null));
+                Assert.Equal(expected, File.ReadAllText(page).Replace("\r\n", "\n"));
+                Assert.Equal(0, FormatCommand.Run(new[] { page, "--check" }, TextWriter.Null));
+
+                string model = Path.Combine(folder, "model.kscript");
+                File.WriteAllText(model, "model Attachments(timestamps) { name: string }\n");
+                Assert.Equal(0, FormatCommand.Run(new[] { model }, TextWriter.Null));
+                Assert.Contains("\n    timestamps,\n) {", File.ReadAllText(model).Replace("\r\n", "\n"));
+
+                string uri = Workspace.PathToUri(page);
+                Memory files = new Memory();
+                files.Files[config] = settings;
+                files.Files[ruleFile] = rules;
+                var (_, output) = Converse(files, Init(), OpenDoc(uri, source, "html"),
+                    Req(2, "textDocument/formatting", Doc(uri)));
+                Assert.Equal("\n   ", Assert.Single(Reply(output, 2)["result"].AsArray())["newText"].GetValue<string>());
+                JsonNode notification = output.Single(m => m["method"]?.GetValue<string>() == "textDocument/publishDiagnostics");
+                JsonNode diagnostic = Assert.Single(notification["params"]["diagnostics"].AsArray());
+                Assert.Equal("KS9001", diagnostic["code"].GetValue<string>());
+                Assert.Null(diagnostic["codeDescription"]);
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void FunctionRulesInspectMarkupTrimValuesAndChooseArgumentLayout()
+        {
+            string folder = Directory.CreateTempSubdirectory("kscript-functions-").FullName;
+            try
+            {
+                File.WriteAllText(Path.Combine(folder, "kscript.json"), "{}");
+                File.WriteAllText(Path.Combine(folder, DocumentRules.FileName), """
+                    Lint(code: 'KS9001', element: 'img', check: fn(node) => !$node.attributes->has('alt') ? 'Give ' + $node.name + ' alternative text.' : null)
+                    Format(element: 'img', attribute: 'alt', value: fn(text) => $text->trim())
+                    Format(statement: 'Something', arguments: fn(node) => $node.has_body_content ? 'one_per_line' : 'inline')
+                    """);
+                string page = Path.Combine(folder, "page.html");
+                File.WriteAllText(page, """
+                    <main><img src="/a.svg"><img src="/b.svg" alt='  A &amp; B  '><img src="/c.svg" alt=" {'Templated'} "></main>
+                    """);
+                using StringWriter report = new StringWriter();
+                Assert.Equal(1, CheckCommand.Run(new[] { page }, report, warningsAsErrors: true, json: true));
+                Assert.True(report.ToString().Contains("Give img alternative text.", StringComparison.Ordinal), report.ToString());
+                Assert.Equal(0, FormatCommand.Run(new[] { page }, TextWriter.Null));
+                Assert.Contains("alt='A &amp; B'", File.ReadAllText(page));
+                Assert.Contains("alt=\" {'Templated'} \"", File.ReadAllText(page));
+
+                string script = Path.Combine(folder, "script.kscript");
+                File.WriteAllText(script, "Something(\n  val1,\n  val2,\n) {\n}\nSomething(val1,val2) { echo 'body' }\n");
+                Assert.Equal(0, FormatCommand.Run(new[] { script }, TextWriter.Null));
+                Assert.Equal("Something(val1, val2) {}\nSomething(\n  val1,\n  val2,\n) {\n  echo 'body'\n}\n",
+                    File.ReadAllText(script).Replace("\r\n", "\n"));
+                Assert.Equal(0, FormatCommand.Run(new[] { script, page, "--check" }, TextWriter.Null));
+            }
+            finally
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void RuleFilesRejectExecutableStatementsAndArguments()
+        {
+            DocumentAnalysis result = Analyzer.Analyze(
+                "import KScript.IO\nFormat(element: @env('TAG'), attributes: 'inline')\nFormat(element: 'img', attribute: 'alt', value: fn(text) => @env($text))\n",
+                DocumentRules.FileName);
+            Assert.Contains(result.Diagnostics, d => d.Code == KScript.Syntax.DiagnosticCodes.InvalidToolingRule && d.Message.Contains("declarations only"));
+            Assert.Contains(result.Diagnostics, d => d.Code == KScript.Syntax.DiagnosticCodes.InvalidToolingRule && d.Message.Contains("quoted literal"));
+            Assert.Contains(result.Diagnostics, d => d.Code == KScript.Syntax.DiagnosticCodes.InvalidToolingRule && d.Message.Contains("'value'"));
+        }
 
         [Fact]
         public void TheTestListReadsTestFilesThatAreNotOpen()

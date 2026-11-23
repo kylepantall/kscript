@@ -1,6 +1,7 @@
 using System.Text;
 
 using KScript.Language.Formatting;
+using KScript.Language.Rules;
 using KScript.Projects;
 using KScript.Syntax.Text;
 
@@ -120,7 +121,8 @@ namespace KScript.LanguageServer
                 bool bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
                 string original = new UTF8Encoding(false).GetString(bytes, bom ? 3 : 0, bytes.Length - (bom ? 3 : 0));
 
-                FormatResult result = Formatter.Format(original, file, FormatOptions.From(config));
+                DocumentRules rules = DocumentRules.ForProject(config?.Directory);
+                FormatResult result = Formatter.Format(original, file, FormatOptions.From(config, rules: rules), rules);
                 if (!result.Succeeded)
                 {
                     LinePosition pos = new SourceText(original).GetPosition(result.ErrorSpan?.Start ?? 0);

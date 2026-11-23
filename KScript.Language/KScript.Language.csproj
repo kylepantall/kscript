@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Formatting/Styles/base.kscript" LogicalName="KScript.Formatting.Base" />
   </ItemGroup>
 
   <ItemGroup>

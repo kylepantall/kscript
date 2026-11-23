@@ -1,5 +1,8 @@
 namespace KScript.Metadata
 {
+    /// <summary>A capability an explicitly supplied type must provide.</summary>
+    public enum TypeArgumentConstraint { None, DeclaredRecord, Array, Iterable, Mappable }
+
     public sealed class ParameterInfo
     {
         // A type alternative, distinct from an enum such as "home | desktop" whose values are literal words.
@@ -32,6 +35,12 @@ namespace KScript.Metadata
         /// <summary>Named fields accepted when this parameter is a map. Each field can describe a nested map.</summary>
         public IReadOnlyList<ParameterInfo> Fields { get; init; } = Array.Empty<ParameterInfo>();
 
+        public TypeArgumentConstraint TypeConstraint { get; init; }
+        public Signature FunctionSignature { get; init; }
+
+        /// <summary>A field of the result (or its list element) populated by the type argument.</summary>
+        public string ResultField { get; init; }
+
         /// <summary>The default value and an example value, written as KScript expressions for the reference.</summary>
         public string DefaultValue { get; init; }
         public string Example { get; init; }
@@ -44,7 +53,7 @@ namespace KScript.Metadata
         public bool AcceptsModel => Type is KType.Model or ModelOrString;
 
         public string Label => (Variadic ? Name + "..." : Optional ? Name + "?" : Name)
-            + (Values.Count > 0 ? ": " + string.Join(" | ", Values) : Type != null ? ": " + Type : string.Empty);
+            + (Values.Count > 0 ? ": " + string.Join(" | ", Values) : Type != null ? ": " + (FunctionSignature?.FunctionLabel ?? Type) : string.Empty);
     }
 
     /// <summary>One way to call a command or method.</summary>
@@ -57,6 +66,23 @@ namespace KScript.Metadata
         public int MinArgs => Parameters.Count(p => !p.Optional && !p.Variadic);
 
         public int MaxArgs => Parameters.Any(p => p.Variadic) ? int.MaxValue : Parameters.Count;
+
+        /// <summary>Whether this signature can take all arguments supplied by a fixed positional call.</summary>
+        public bool AcceptsPositionalCall(Signature call)
+        {
+            int count = call.Parameters.Count;
+            if (count > MaxArgs || Parameters.Skip(count).Any(p => !p.Optional && !p.Variadic)) return false;
+            for (int i = 0; i < count; i++)
+            {
+                ParameterInfo supplied = call.Parameters[i];
+                ParameterInfo accepted = Parameters[Math.Min(i, Parameters.Count - 1)];
+                string type = accepted.Type?.TrimEnd('?');
+                if (accepted.Values.Count != 0 || (type != null && type != "any" && type != supplied.Type)) return false;
+            }
+            return true;
+        }
+
+        public string FunctionLabel => $"fn({string.Join(", ", Parameters.Select(p => p.Label))})";
 
         /// <summary>
         /// Parses "a, b?, rest..." into a signature. A parameter may give a type, "recursive?: bool", or the values it

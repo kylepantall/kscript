@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Language.Catalog;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
@@ -255,6 +256,8 @@ namespace KScript.Language.Analysis
         public List<FunctionParameter> Parameters { get; } = new List<FunctionParameter>();
 
         public int RequiredParameterCount => Parameters.Count(p => !p.HasDefault);
+
+        internal Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault, type: p.Type)).ToArray());
 
         /// <summary>For &lt;enum&gt; types: their values, in order. A parameter typed with the enum takes them bare.</summary>
         public List<string> EnumValues { get; internal set; }

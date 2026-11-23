@@ -39,6 +39,9 @@ namespace KScript.Caching
 
         public abstract void Put(string key, object value, DateTime? expires);
 
+        public abstract bool PutIfAbsent(string key, object value, DateTime? expires);
+        public abstract CacheStore Group(string name);
+
         public abstract bool Forget(string key);
 
         public abstract int Flush();
@@ -77,6 +80,15 @@ namespace KScript.Caching
                 case "set":
                     Put(Key(call), call.Arg(1), Expires(call.Arg(2)));
                     result = call.Arg(1);
+                    return true;
+                case "set_if_absent":
+                    result = PutIfAbsent(Key(call), call.Need(1), Expires(call.Arg(2)));
+                    return true;
+                case "group":
+                    result = Group(Key(call));
+                    return true;
+                case "clear_group":
+                    result = (double)Group(Key(call)).Flush();
                     return true;
                 case "remember":
                 {
@@ -153,6 +165,9 @@ namespace KScript.Caching
             ("get", "key, default?", "The value kept under a key, or default (null) when it isn't there or has run out.", KType.Any),
             ("has", "key", "True when a value is kept under the key and hasn't run out.", KType.Bool),
             ("set", "key, value, ttl?: duration", "Keeps a value under a key. ttl is how long, such as 30s, 10m, 2h or 1d (a plain number is seconds). Without it the value is kept until it is removed.", KType.Any),
+            ("set_if_absent", "key, value, ttl?: duration", "Stores a value only when the key is missing or expired. True if this call stored it.", KType.Bool),
+            ("group", "name: string", "A separate cache namespace inside this store.", KType.Cache),
+            ("clear_group", "name: string", "Clears this named cache group and returns how many entries were removed.", KType.Number),
             ("remember", "key, compute: fn, ttl?: duration", "The value under a key; when there isn't one, calls compute, keeps what it returns and returns that.", KType.Any),
             ("remove", "key", "Removes a key. True when it was there.", KType.Bool),
             ("increment", "key, by?: number, ttl?: duration", "Adds to the number under a key (1 by default; 0 when it isn't there) and returns the new number.", KType.Number),
@@ -168,6 +183,10 @@ namespace KScript.Caching
         private static readonly ConcurrentDictionary<string, MemoryCacheStore> Stores = new ConcurrentDictionary<string, MemoryCacheStore>(StringComparer.Ordinal);
 
         private readonly ConcurrentDictionary<string, (object Value, DateTime? Expires)> entries = new ConcurrentDictionary<string, (object, DateTime?)>(StringComparer.Ordinal);
+
+        private readonly ConcurrentDictionary<string, MemoryCacheStore> groups = new(StringComparer.Ordinal);
+
+        public override CacheStore Group(string name) => groups.GetOrAdd(name, group => new MemoryCacheStore(group));
 
         private MemoryCacheStore(string name) : base(name)
         {
@@ -191,7 +210,7 @@ namespace KScript.Caching
                     expires = entry.Expires;
                     return true;
                 }
-                entries.TryRemove(key, out _);
+                entries.TryRemove(new KeyValuePair<string, (object Value, DateTime? Expires)>(key, entry));
             }
             value = null;
             expires = null;
@@ -201,10 +220,27 @@ namespace KScript.Caching
         public override void Put(string key, object value, DateTime? expires)
         {
             entries[key] = (Copy(value), expires);
+            Prune();
+        }
+
+        private void Prune()
+        {
             if (entries.Count <= MaxEntries) return;
             DateTime now = Clock();
-            foreach (var old in entries.Where(e => e.Value.Expires <= now).ToList()) entries.TryRemove(old.Key, out _);
-            foreach (var old in entries.OrderBy(e => e.Value.Expires ?? DateTime.MaxValue).Take(entries.Count - MaxEntries).ToList()) entries.TryRemove(old.Key, out _);
+            foreach (var old in entries.Where(e => e.Value.Expires <= now).ToList()) entries.TryRemove(old);
+            foreach (var old in entries.OrderBy(e => e.Value.Expires ?? DateTime.MaxValue).Take(entries.Count - MaxEntries).ToList()) entries.TryRemove(old);
+        }
+
+        public override bool PutIfAbsent(string key, object value, DateTime? expires)
+        {
+            var replacement = (Copy(value), expires);
+            while (true)
+            {
+                if (entries.TryAdd(key, replacement)) { Prune(); return true; }
+                if (!entries.TryGetValue(key, out var current)) continue;
+                if (current.Expires == null || current.Expires > Clock()) return false;
+                if (entries.TryUpdate(key, replacement, current)) return true;
+            }
         }
 
         public override bool Forget(string key) => entries.TryRemove(key, out _);
@@ -226,7 +262,27 @@ namespace KScript.Caching
     /// <summary>A cache in files, one per key, in the app's cache folder: values last between runs.</summary>
     public sealed class FileCacheStore : CacheStore
     {
-        public FileCacheStore(string name, string folder) : base(name) => Folder = folder;
+        private readonly string mutexName;
+
+        public FileCacheStore(string name, string folder) : base(name)
+        {
+            Folder = folder;
+            string path = Path.GetFullPath(folder);
+            mutexName = "kscript-cache-" + Digest(OperatingSystem.IsWindows() ? path.ToUpperInvariant() : path);
+        }
+
+        public override CacheStore Group(string name) => new FileCacheStore(name, Path.Combine(Folder, "groups", Digest(name)));
+
+        private static string Digest(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+
+        private T Locked<T>(Func<T> use)
+        {
+            using var mutex = new Mutex(false, mutexName);
+            try { mutex.WaitOne(); }
+            catch (AbandonedMutexException) { }
+            try { return use(); }
+            finally { mutex.ReleaseMutex(); }
+        }
 
         /// <summary>Where the files are.</summary>
         public string Folder { get; }
@@ -234,9 +290,17 @@ namespace KScript.Caching
         public override string Kind => "file";
 
         private string FileFor(string key) =>
-            Path.Combine(Folder, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key))).Substring(0, 32).ToLowerInvariant() + ".json");
+            Path.Combine(Folder, Digest(key)[..32] + ".json");
 
         public override bool TryGet(string key, out object value, out DateTime? expires)
+        {
+            var entry = Locked(() => TryGetUnlocked(key, out object stored, out DateTime? end) ? (true, stored, end) : (false, null, null));
+            value = entry.Item2;
+            expires = entry.Item3;
+            return entry.Item1;
+        }
+
+        private bool TryGetUnlocked(string key, out object value, out DateTime? expires)
         {
             value = null;
             expires = null;
@@ -270,7 +334,20 @@ namespace KScript.Caching
             }
         }
 
-        public override void Put(string key, object value, DateTime? expires)
+        public override void Put(string key, object value, DateTime? expires) => Locked(() =>
+        {
+            PutUnlocked(key, value, expires);
+            return true;
+        });
+
+        public override bool PutIfAbsent(string key, object value, DateTime? expires) => Locked(() =>
+        {
+            if (TryGetUnlocked(key, out _, out _)) return false;
+            PutUnlocked(key, value, expires);
+            return true;
+        });
+
+        private void PutUnlocked(string key, object value, DateTime? expires)
         {
             Directory.CreateDirectory(Folder);
             var map = new Dictionary<string, object>
@@ -281,25 +358,29 @@ namespace KScript.Caching
             };
             string file = FileFor(key);
             string temp = file + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            File.WriteAllText(temp, Values.ToJson(map));
-            File.Move(temp, file, overwrite: true);
+            try
+            {
+                File.WriteAllText(temp, Values.ToJson(map));
+                File.Move(temp, file, overwrite: true);
+            }
+            finally { File.Delete(temp); }
         }
 
-        public override bool Forget(string key)
+        public override bool Forget(string key) => Locked(() =>
         {
             string file = FileFor(key);
             if (!Read(file, out var entry) || entry.Key != key) return false;
             File.Delete(file);
             return true;
-        }
+        });
 
-        public override int Flush()
+        public override int Flush() => Locked(() =>
         {
             if (!Directory.Exists(Folder)) return 0;
             string[] files = Directory.GetFiles(Folder, "*.json");
             foreach (string file in files) File.Delete(file);
             return files.Length;
-        }
+        });
 
         public override IEnumerable<string> Keys()
         {

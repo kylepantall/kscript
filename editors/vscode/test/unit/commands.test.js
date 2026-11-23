@@ -3,18 +3,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { registerCommands } = require('../../src/commands');
 
 // Exercise the same command handlers the palette, toolbar and CodeLens invoke.
-function setup() {
+function setup(onTask = () => 0) {
   const uri = (file) => ({ scheme: 'file', fsPath: file, toString: () => file });
   const folders = ['one', 'two'].map((name) => ({ uri: uri(path.resolve(name)) }));
   const commands = new Map();
   const tasks = [];
   const messages = [];
+  const diagnostics = new Map();
+  let documentChanged;
+  const edit = (uri, contentChanges = [{}]) => documentChanged({ document: { uri }, contentChanges });
   const workspace = {
     workspaceFolders: folders,
     textDocuments: [],
+    onDidChangeTextDocument: (handler) => { documentChanged = handler; },
     getWorkspaceFolder: (file) => folders.find((f) => file.fsPath.startsWith(f.uri.fsPath + path.sep)),
   };
   const window = {
@@ -23,6 +28,15 @@ function setup() {
   };
   const vscode = {
     workspace, window,
+    Uri: { file: uri },
+    Range: class { constructor(...positions) { this.positions = positions; } },
+    Diagnostic: class { constructor(range, message, severity) { Object.assign(this, { range, message, severity }); } },
+    DiagnosticSeverity: { Error: 0 },
+    languages: { createDiagnosticCollection: () => ({
+      clear: () => diagnostics.clear(),
+      delete: (file) => diagnostics.delete(file.toString()),
+      set: (file, items) => diagnostics.set(file.toString(), items),
+    }) },
     commands: { registerCommand: (id, handler) => commands.set(id, handler) },
     TaskGroup: { Test: {} }, TaskScope: { Workspace: 1, Global: 2 }, TaskRevealKind: { Always: 1 },
     ProcessExecution: class { constructor(command, args, options) { Object.assign(this, { command, args, options }); } },
@@ -30,7 +44,8 @@ function setup() {
     tasks: {
       executeTask: async (task) => { tasks.push(task); return task; },
       onDidEndTaskProcess: (callback) => {
-        queueMicrotask(() => callback({ execution: tasks.at(-1), exitCode: 0 }));
+        const execution = tasks.at(-1);
+        queueMicrotask(() => callback({ execution, exitCode: onTask(execution, edit) }));
         return { dispose() {} };
       },
     },
@@ -42,7 +57,7 @@ function setup() {
     workspace.textDocuments.push(doc);
     return doc;
   }
-  return { folders, commands, document, workspace, window, tasks, messages };
+  return { folders, commands, document, workspace, window, tasks, messages, diagnostics, edit };
 }
 
 test('project commands use the active root and save only its dirty files', async () => {
@@ -105,4 +120,28 @@ test('Check This File saves its target and passes its path and matcher to the CL
   target.uri.scheme = 'untitled';
   await commands.get('kscript.checkFile')(target.uri);
   assert.equal(tasks.length, 1);
+});
+
+test('a runtime diagnostic survives until a text edit and ignores a result from before an edit', async () => {
+  let editDuringRun = false;
+  const { commands, document, window, diagnostics, edit } = setup((task, change) => {
+    const file = task.execution.args[0];
+    assert.deepEqual(task.matchers, []);
+    fs.writeFileSync(task.execution.options.env.KSCRIPT_RUN_ERROR_FILE, `ERROR ${file}:2:3: Network: Request failed\n`);
+    if (editDuringRun) change({ toString: () => file });
+    return 3;
+  });
+  const source = document(path.resolve('scripts'), 'main.kscript');
+  window.activeTextEditor = { document: source };
+  assert.equal(await commands.get('kscript.run')(), 3);
+  const [error] = diagnostics.get(source.fileName);
+  assert.equal(error.message, 'Network: Request failed');
+  assert.deepEqual(error.range.positions, [1, 2, 1, 3]);
+  edit(source.uri, []);
+  assert.equal(diagnostics.size, 1);
+  edit(source.uri);
+  assert.equal(diagnostics.size, 0);
+  editDuringRun = true;
+  assert.equal(await commands.get('kscript.run')(), 3);
+  assert.equal(diagnostics.size, 0);
 });

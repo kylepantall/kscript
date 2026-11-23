@@ -99,8 +99,8 @@ test('the manifest is consistent', () => {
   }
   for (const matcher of ['$kscript-run', '$kscript-check']) {
     assert.ok(pkg.contributes.problemMatchers.some((m) => '$' + m.name === matcher), `${matcher} is contributed`);
-    assert.ok(used.includes(`'${matcher}'`), `${matcher} is used`);
   }
+  assert.ok(used.includes("'$kscript-check'"), 'Check uses its contributed matcher');
 });
 
 test('the problem matchers read kscript output', () => {

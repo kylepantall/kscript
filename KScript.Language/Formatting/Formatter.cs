@@ -1,6 +1,8 @@
 using System.Text;
 
 using KScript.Language.Catalog;
+using KScript.Runtime;
+using KScript.Language.Rules;
 using KScript.Syntax;
 using KScript.Metadata;
 using KScript.Syntax.Markup;
@@ -68,6 +70,7 @@ namespace KScript.Language.Formatting
         private readonly string text;
         private readonly MarkupDocument document;
         private readonly FormatOptions options;
+        private readonly DocumentRules rules;
         private readonly bool html;
         private readonly string eol;
         private readonly StringBuilder sb = new StringBuilder();
@@ -81,10 +84,11 @@ namespace KScript.Language.Formatting
         /// <summary>The indent (in columns) of the output line being written.</summary>
         private int lineIndent;
 
-        private Formatter(MarkupDocument document, FormatOptions options)
+        private Formatter(MarkupDocument document, FormatOptions options, DocumentRules rules)
         {
             this.document = document;
             this.options = options;
+            this.rules = rules;
             text = document.Source.Text;
             html = document.Kind != DocumentKind.Script;
             eol = options.EndOfLine switch
@@ -96,20 +100,37 @@ namespace KScript.Language.Formatting
         }
 
         /// <summary>Formats a document, choosing how to parse it from its path (as the analyzer does).</summary>
-        public static FormatResult Format(string text, string path, FormatOptions options = null) =>
-            MarkupParser.IsCodePath(path)
-                ? CodeFormatter.Format(text, options)
-                : Format(text, MarkupParser.KindFromPath(path), options);
+        public static FormatResult Format(string text, string path, FormatOptions options = null, DocumentRules rules = null) =>
+            FormatDocument(text, path, MarkupParser.KindFromPath(path), MarkupParser.IsCodePath(path), options, rules);
 
-        public static FormatResult Format(string text, DocumentKind kind, FormatOptions options = null)
+        public static FormatResult Format(string text, DocumentKind kind, FormatOptions options = null, DocumentRules rules = null) =>
+            FormatDocument(text, null, kind, false, options, rules);
+
+        /// <summary>Formats a document whose syntax and kind are known, including editor buffers without a path.</summary>
+        public static FormatResult FormatDocument(string text, string path, DocumentKind kind, bool isCode, FormatOptions options = null, DocumentRules rules = null)
         {
-            options ??= FormatOptions.Default;
+            rules ??= DocumentRules.Default;
+            options ??= FormatOptions.From(null, rules: rules);
+            text ??= string.Empty;
+            if (rules.Error is Diagnostic invalid && !DocumentRules.IsRuleFile(path))
+                return new FormatResult { Error = $"not formatted: {DocumentRules.FileName}: {invalid.Message}" };
+            try
+            {
+                return isCode ? CodeFormatter.Format(text, options, rules) : FormatMarkup(text, kind, options, rules);
+            }
+            catch (KScriptException ex)
+            {
+                return new FormatResult { Error = $"not formatted: {DocumentRules.FileName}: {ex.Message}" };
+            }
+        }
+
+        private static FormatResult FormatMarkup(string text, DocumentKind kind, FormatOptions options, DocumentRules rules)
+        {
             if (kind == DocumentKind.Markdown)
             {
                 return new FormatResult { Error = "Markdown pages are not reformatted." };
             }
 
-            text ??= string.Empty;
             // A byte order mark is kept as it was and not seen by the parser.
             string bom = text.Length > 0 && text[0] == '\uFEFF' ? "\uFEFF" : string.Empty;
             MarkupDocument document = MarkupParser.Parse(text.Substring(bom.Length), kind);
@@ -124,7 +145,7 @@ namespace KScript.Language.Formatting
                 };
             }
 
-            Formatter f = new Formatter(document, options);
+            Formatter f = new Formatter(document, options, rules);
             f.Run();
             return new FormatResult { Text = bom + f.sb.ToString() };
         }
@@ -412,14 +433,22 @@ namespace KScript.Language.Formatting
             List<Item> items = Items(e.Children, contentStart, contentEnd);
 
             bool textMode = e.Children.OfType<MarkupText>().Any(t => !t.IsWhitespace || t.IsCData);
-            if (textMode)
+            if (html && IsInlineRun(items, contentStart, contentEnd))
+            {
+                // Keep the gaps between inline nodes exactly. Attributes inside their tags can still wrap.
+                int at = contentStart;
+                foreach (Item item in items)
+                {
+                    sb.Append(text, at, item.Start - at);
+                    if (item.Node is MarkupElement && !item.Verbatim) EmitItem(item, depth + 1);
+                    else sb.Append(text, item.Start, item.End - item.Start);
+                    at = item.End;
+                }
+                sb.Append(text, at, contentEnd - at);
+            }
+            else if (textMode)
             {
                 EmitText(e, depth, contentStart, contentEnd);
-            }
-            else if (html && items.All(i => !IsBlock(i)) && text.IndexOf('\n', contentStart, contentEnd - contentStart) < 0)
-            {
-                // Inline elements written on one line (a row of links, say) stay as they are.
-                sb.Append(text, contentStart, contentEnd - contentStart);
             }
             else if (items.Count > 0)
             {
@@ -453,6 +482,18 @@ namespace KScript.Language.Formatting
             {
                 sb.Append("</").Append(e.Name).Append('>');
             }
+        }
+
+        private bool IsInlineRun(List<Item> items, int start, int end)
+        {
+            int at = start;
+            foreach (Item item in items)
+            {
+                if (IsBlock(item) || text.IndexOf('\n', at, item.Start - at) >= 0) return false;
+                if ((item.Node is not MarkupElement || item.Verbatim) && text.IndexOf('\n', item.Start, item.End - item.Start) >= 0) return false;
+                at = item.End;
+            }
+            return text.IndexOf('\n', at, end - at) < 0;
         }
 
         /// <summary>
@@ -526,19 +567,20 @@ namespace KScript.Language.Formatting
 
         private void AppendStartTag(MarkupElement e, int depth)
         {
-            List<string> attributes = e.Attributes.Select(a => Normalise(text.Substring(a.Span.Start, a.Span.Length))).ToList();
+            List<string> attributes = e.Attributes.Select(a => FormatAttribute(e, a)).ToList();
             string close = e.SelfClosing ? " />" : e.StartTagClosed ? ">" : string.Empty;
 
             string oneLine = "<" + e.Name + string.Concat(attributes.Select(a => " " + a)) + close;
             int firstLine = oneLine.IndexOf('\n');
             bool tooLong = CurrentColumn() + (firstLine < 0 ? oneLine.Length : firstLine) > options.PrintWidth;
-            if (!options.TidyTags || (!options.WrapAttributes && WasWrapped(e)))
+            bool? wrap = rules.WrapTag(e, document.Kind);
+            if (!options.TidyTags || (wrap == null && !options.WrapAttributes && WasWrapped(e)))
             {
                 // Kept exactly as written.
                 sb.Append(Normalise(text.Substring(e.StartTagSpan.Start, e.StartTagSpan.Length)).Replace("\n", eol));
                 return;
             }
-            if (attributes.Count < 2 || !options.WrapAttributes || !(tooLong || WasWrapped(e)))
+            if (attributes.Count == 0 || !(wrap ?? (attributes.Count >= 2 && options.WrapAttributes && (tooLong || WasWrapped(e)))))
             {
                 sb.Append(oneLine.Replace("\n", eol));
                 return;
@@ -554,6 +596,20 @@ namespace KScript.Language.Formatting
             }
             sb.Append(close);
             lineIndent = outer;
+        }
+
+        private string FormatAttribute(MarkupElement element, MarkupAttribute attribute)
+        {
+            string raw = text.Substring(attribute.Span.Start, attribute.Span.Length);
+            string replacement = html && options.TidyTags ? rules.FormatAttribute(element, attribute) : null;
+            if (replacement != null && replacement != attribute.ValueText)
+            {
+                TextSpan value = attribute.Value.SourceSpan;
+                int offset = value.Start - attribute.Span.Start;
+                string escaped = System.Net.WebUtility.HtmlEncode(replacement);
+                raw = raw.Remove(offset, value.Length).Insert(offset, escaped);
+            }
+            return Normalise(raw);
         }
 
         /// <summary>True when the author put line breaks between the attributes (not just inside a value).</summary>

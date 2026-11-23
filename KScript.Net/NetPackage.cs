@@ -9,12 +9,13 @@ namespace KScript.Net
     /// <summary>The answer to <c>@api()</c>: <c>.status</c>, <c>.is_ok</c>, <c>.text</c>, <c>->json()</c>, <c>->header(name)</c>.</summary>
     public sealed class ResponseValue : IKObject
     {
-        public ResponseValue(string url, int status, string reason, string body, Dictionary<string, object> headers)
+        public ResponseValue(string url, int status, string reason, string body, Dictionary<string, object> headers, byte[] bytes = null)
         {
             Url = url;
             Status = status;
             Reason = reason;
             Body = body;
+            Bytes = bytes;
             Headers = headers;
         }
 
@@ -22,6 +23,8 @@ namespace KScript.Net
         public int Status { get; }
         public string Reason { get; }
         public string Body { get; }
+        private byte[] Bytes { get; }
+        internal byte[] BinaryBody => Bytes ?? Encoding.UTF8.GetBytes(Body ?? string.Empty);
         public Dictionary<string, object> Headers { get; }
 
         public bool Ok => Status >= 200 && Status < 300;
@@ -40,6 +43,7 @@ namespace KScript.Net
                 "url" => Url,
                 "headers" => Headers,
                 "text" => Body,
+                "bytes" => Base64Type.EncodeBytes(BinaryBody),
                 _ => null,
             };
             return value != null;
@@ -83,6 +87,7 @@ namespace KScript.Net
             ("is_ok", KType.Bool, "True when the status is 2xx."),
             ("url", KType.String, "The address that was fetched."),
             ("text", KType.String, "The body as text."),
+            ("bytes", "base64", "The bytes of the response body, held as a base64 value."),
             ("headers", KType.Map, "The response headers as a map."),
         };
 
@@ -95,7 +100,7 @@ namespace KScript.Net
     }
 
     /// <summary>KScript.Net: HTTP requests and downloads.</summary>
-    public sealed class NetPackage : KScriptPackage
+    public sealed partial class NetPackage : KScriptPackage
     {
         private static readonly Lazy<HttpClient> Client = new Lazy<HttpClient>(() =>
         {
@@ -111,6 +116,7 @@ namespace KScript.Net
         protected override void Register(PackageBuilder p)
         {
             LoopbackJsonConnection.Register(p);
+            RegisterHttpHelpers(p);
             foreach (var f in ResponseValue.Fields)
                 p.Field(KType.Response, f.Name, f.Type, f.Description);
             foreach (var m in ResponseValue.Methods)
@@ -130,10 +136,14 @@ namespace KScript.Net
                                 { DefaultValue = "'GET'", Example = "'POST'" },
                             new ParameterInfo("headers", optional: true, type: KType.Map, description: "Header names and values. Set `User-Agent` to identify the client or `Content-Type` to override the body format header.")
                                 { DefaultValue = "{ 'User-Agent': 'kscript' }", Example = "{ Accept: 'application/json' }" },
-                            new ParameterInfo("body", optional: true, type: KType.Any, description: "A map or list is sent as JSON with `application/json`. Other non-null values are sent as text with `text/plain; charset=utf-8`.")
+                            new ParameterInfo("body", optional: true, type: KType.Any, description: "Maps and lists are sent as JSON, base64 values as binary data, and other values as UTF-8 text.")
                                 { DefaultValue = "null", Example = "{ title: 'Ship it' }" },
                             new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "Maximum wait for an outbound HTTP(S) request. A number is seconds. In-process requests to project routes ignore this field.")
                                 { DefaultValue = "100s", Example = "30s" },
+                            new ParameterInfo("retries", optional: true, type: KType.Number, description: "Additional attempts on transient outbound failures for GET, HEAD and OPTIONS.")
+                                { DefaultValue = "0", Example = "2" },
+                            new ParameterInfo("retry_delay", optional: true, type: Duration.TypeName, description: "Time between retry attempts.")
+                                { DefaultValue = "100ms", Example = "250ms" },
                         },
                     }) })
             {
@@ -158,6 +168,14 @@ namespace KScript.Net
                 if (File.Exists(to) && c.Has(2, "overwrite") && !Values.Truthy(c.Arg(2, "overwrite"))) return to;
                 if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                     throw c.Error($"'{url}' isn't an http:// or https:// address.", "Argument");
+                if (c.Host.Items.GetValueOrDefault(HttpStubKey) is ICallable stub)
+                {
+                    ResponseValue reply = StubResponse(c, stub, uri, "GET", new Dictionary<string, object>());
+                    if (!reply.Ok) throw c.Error($"{url} answered {reply.Status} {reply.Reason}.", "Network");
+                    Directory.CreateDirectory(Path.GetDirectoryName(to));
+                    File.WriteAllBytes(to, reply.BinaryBody);
+                    return to;
+                }
                 using HttpResponseMessage response = Client.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, c.Interpreter.Options.Cancellation).GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                     throw c.Error($"{url} answered {(int)response.StatusCode} {response.ReasonPhrase}.", "Network");
@@ -176,19 +194,54 @@ namespace KScript.Net
                     prefer: "@api($url)->check()->json(as: Type) to fail fast and check the data's shape.")));
         }
 
-        private static object Api(CallContext c)
+        private static object Api(CallContext c) => Api(c, c.Str(0), c.Arg(1) == null ? new Dictionary<string, object>() : c.Map(1));
+
+        private static ResponseValue Api(CallContext c, string url, Dictionary<string, object> options)
         {
-            string url = c.Str(0);
-            if (url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal)) return Local(c, url);
+            if (url.StartsWith('/') && !url.StartsWith("//", StringComparison.Ordinal)) return Local(c, url, options);
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 throw c.Error($"@api() needs an http:// or https:// address, or a path on this app such as '/api/notes', but got '{url}'.", "Argument");
 
-            Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
-            using var request = new HttpRequestMessage(new HttpMethod(method), uri);
+            double retries = options.GetValueOrDefault("retries") is object count ? Values.ToNumber(count, "retries") : 0;
+            if (retries < 0 || retries > 10 || retries != Math.Truncate(retries))
+                throw c.Error("retries must be a whole number from 0 to 10.", "Argument");
+            if (retries > 0 && method is not ("GET" or "HEAD" or "OPTIONS"))
+                throw c.Error("Automatic retries require GET, HEAD, or OPTIONS.", "Argument");
+            double seconds = options.TryGetValue("timeout", out object t) && t != null ? Duration.Seconds(t, "timeout") : 100;
+            double delay = options.GetValueOrDefault("retry_delay") is object wait ? Duration.Seconds(wait, "retry_delay") : 0.1;
+            if (delay < 0 || seconds <= 0 || !double.IsFinite(seconds) || !double.IsFinite(delay))
+                throw c.Error("timeout must be positive and retry_delay must be nonnegative.", "Argument");
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(c.Interpreter.Options.Cancellation);
+            timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
+            try
+            {
+                for (int attempt = 0; ; attempt++)
+                {
+                    timeout.Token.ThrowIfCancellationRequested();
+                    try
+                    {
+                        ResponseValue response = Send(c, uri, method, options, timeout.Token);
+                        if (attempt >= retries || response.Status is not (408 or 429 or 502 or 503 or 504)) return response;
+                    }
+                    catch (KScriptException ex) when (ex.Type == "Network" && attempt < retries) { }
+                    Task.Delay(TimeSpan.FromSeconds(delay), timeout.Token).GetAwaiter().GetResult();
+                }
+            }
+            catch (OperationCanceledException) when (!c.Interpreter.Options.Cancellation.IsCancellationRequested)
+            {
+                throw new KScriptException($"{url} didn't answer within {seconds} seconds.", "Timeout");
+            }
+        }
 
+        private static ResponseValue Send(CallContext c, Uri uri, string method, Dictionary<string, object> options, CancellationToken stop)
+        {
+            if (c.Host.Items.GetValueOrDefault(HttpStubKey) is ICallable stub)
+                return StubResponse(c, stub, uri, method, options);
+
+            using var request = new HttpRequestMessage(new HttpMethod(method), uri);
             string contentType = null;
-            if (options.TryGetValue("headers", out object h) && Values.Unwrap(h) is Dictionary<string, object> headers)
+            if (options.GetValueOrDefault("headers") is Dictionary<string, object> headers)
             {
                 foreach (var kv in headers)
                 {
@@ -196,31 +249,34 @@ namespace KScript.Net
                     else request.Headers.TryAddWithoutValidation(kv.Key, Values.ToStr(kv.Value));
                 }
             }
-            if (options.TryGetValue("body", out object body) && body != null)
+            if (options.GetValueOrDefault("body") is object body)
             {
-                bool json = Values.Unwrap(body) is Dictionary<string, object> or List<object>;
-                request.Content = new StringContent(json ? Values.ToJson(body) : Values.ToStr(body), Encoding.UTF8);
-                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? (json ? "application/json" : "text/plain; charset=utf-8"));
+                string defaultType;
+                if (Base64Type.TryDecodeBytes(body, out byte[] binary))
+                {
+                    request.Content = new ByteArrayContent(binary);
+                    defaultType = "application/octet-stream";
+                }
+                else
+                {
+                    bool json = Values.Unwrap(body) is Dictionary<string, object> or List<object>;
+                    request.Content = new StringContent(json ? Values.ToJson(body) : Values.ToStr(body), Encoding.UTF8);
+                    defaultType = json ? "application/json" : "text/plain; charset=utf-8";
+                }
+                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? defaultType);
             }
-
-            double seconds = options.TryGetValue("timeout", out object t) && t != null ? Duration.Seconds(t, "timeout") : 100;
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(c.Interpreter.Options.Cancellation);
-            timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
             try
             {
-                using HttpResponseMessage response = Client.Value.SendAsync(request, timeout.Token).GetAwaiter().GetResult();
-                string text = response.Content.ReadAsStringAsync(timeout.Token).GetAwaiter().GetResult();
+                using HttpResponseMessage response = Client.Value.SendAsync(request, stop).GetAwaiter().GetResult();
+                byte[] bytes = response.Content.ReadAsByteArrayAsync(stop).GetAwaiter().GetResult();
+                string text = response.Content.ReadAsStringAsync(stop).GetAwaiter().GetResult();
                 var responseHeaders = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
                 foreach (var header in response.Headers.Concat(response.Content.Headers)) responseHeaders[header.Key] = string.Join(", ", header.Value);
-                return new ResponseValue(url, (int)response.StatusCode, response.ReasonPhrase, text, responseHeaders);
-            }
-            catch (OperationCanceledException) when (!c.Interpreter.Options.Cancellation.IsCancellationRequested)
-            {
-                throw new KScriptException($"{url} didn't answer within {seconds} seconds.", "Timeout");
+                return new ResponseValue(uri.OriginalString, (int)response.StatusCode, response.ReasonPhrase, text, responseHeaders, bytes);
             }
             catch (HttpRequestException ex)
             {
-                throw new KScriptException($"Couldn't reach {url}: {ex.Message}", "Network");
+                throw new KScriptException($"Couldn't reach {uri}: {ex.Message}", "Network");
             }
         }
 
@@ -228,9 +284,8 @@ namespace KScript.Net
         /// @api('/api/notes'): a request to the routes of the script's own project, answered in this process. The
         /// method, headers and body options are used; outbound timeout is inapplicable here.
         /// </summary>
-        private static object Local(CallContext c, string url)
+        private static ResponseValue Local(CallContext c, string url, Dictionary<string, object> options)
         {
-            Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
             var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["user-agent"] = HttpIdentity.Product };
             if (options.TryGetValue("headers", out object h) && Values.Unwrap(h) is Dictionary<string, object> given)
@@ -240,6 +295,8 @@ namespace KScript.Net
             string body = string.Empty;
             if (options.TryGetValue("body", out object b) && b != null)
             {
+                if (Base64Type.TryDecodeBytes(b, out _))
+                    throw c.Error("Binary request bodies are supported for outbound HTTP requests.", "Argument");
                 bool json = Values.Unwrap(b) is Dictionary<string, object> or List<object>;
                 body = json ? Values.ToJson(b) : Values.ToStr(b);
                 headers.TryAdd("content-type", json ? "application/json" : "text/plain; charset=utf-8");

@@ -263,25 +263,31 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private Symbol ReferenceFunction(string name, TextSpan span, Scope scope)
+        private Symbol ReferenceFunction(string name, TextSpan span, Scope scope, Signature contract = null)
         {
             int dot = name.IndexOf('.');
             if (dot > 0)
             {
-                ReferenceImportedFunction(name, dot, span, scope);
-                return null;
+                Symbol imported = ReferenceImportedFunction(name, dot, span, scope);
+                if (contract != null && imported?.Kind == SymbolKind.Function) CheckSignature(new[] { imported.PositionalSignature });
+                else if (contract != null && scope.Lookup(name[..dot], span.Start)?.Package is string package
+                    && catalog.GetCommand(name[(dot + 1)..]) is CallableInfo aliased && aliased.Package == package)
+                    CheckSignature(aliased.Signatures);
+                return imported;
             }
             Symbol fn = scope.Lookup(name, int.MaxValue, includeMethods: true);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, span, false, false));
                 ReportIfDeprecated(fn, span);
+                if (contract != null) CheckSignature(new[] { fn.PositionalSignature });
                 return fn;
             }
 
             if (catalog.GetCommand(name) is CallableInfo command)
             {
                 ReportDeprecated(command.Deprecated, $"@{command.Name}", span, span);
+                CheckSignature(command.Signatures);
                 if (command.Package != null)
                 {
                     usedPackages.Add(command.Package);
@@ -295,10 +301,17 @@ namespace KScript.Language.Analysis
                 $"No function named '{name}'. Declare it with {FnHint(name)}." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),
                 SuggestFix(span, name, candidates, n => n));
             return null;
+
+            void CheckSignature(IReadOnlyList<Signature> signatures)
+            {
+                if (contract != null && !signatures.Any(candidate => candidate.AcceptsPositionalCall(contract)))
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                        $"'{name}' must accept {contract.FunctionLabel} here.");
+            }
         }
 
         /// <summary><c>people.show</c> in a function name attribute: a function of a script (or package) imported with as="people".</summary>
-        private void ReferenceImportedFunction(string name, int dot, TextSpan span, Scope scope)
+        private Symbol ReferenceImportedFunction(string name, int dot, TextSpan span, Scope scope)
         {
             string aliasName = name.Substring(0, dot), member = name.Substring(dot + 1);
             TextSpan aliasSpan = new TextSpan(span.Start, dot);
@@ -310,13 +323,13 @@ namespace KScript.Language.Analysis
                 Report(aliasSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
                     $"Nothing is imported as '{aliasName}'. Import it with " + (IsCode ? $"import \"...\" as {aliasName}." : $"<import path=\"...\" as=\"{aliasName}\" />."),
                     SuggestFix(aliasSpan, aliasName, aliases, n => n));
-                return;
+                return null;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
             if (member.Length == 0)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"Name a function of the import '{aliasName}' after the dot.");
-                return;
+                return null;
             }
             ReferenceMember(import, member, memberSpan);
             if (import.Shape.Fields.Count > 0 && !import.Shape.Fields.ContainsKey(member))
@@ -324,6 +337,7 @@ namespace KScript.Language.Analysis
                 Report(memberSpan, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction, $"The import '{aliasName}' has no '{member}'.",
                     SuggestFix(memberSpan, member, import.Shape.Fields.Keys, n => n));
             }
+            return import.Members.TryGetValue(member, out Symbol fn) ? fn : null;
         }
 
         private void CheckFunctionArgumentCount(Symbol fn, int count, TextSpan span)

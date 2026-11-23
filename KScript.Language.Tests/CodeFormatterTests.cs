@@ -198,6 +198,29 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void KeepsTrailingCommaInMultilineModelOptions()
+        {
+            const string input = "model Attachments(\n    timestamps,\n    soft_deletes,\n) {\n  name: string\n}\n";
+            Assert.Equal(Lines("model Attachments(", "  timestamps,", "  soft_deletes,", ") {", "  name: string", "}"), Fmt(input));
+        }
+
+        [Fact]
+        public void LaysOutLongAndPartlySplitModelOptions()
+        {
+            string shortHeader = Lines("model Attachments(timestamps, soft_deletes) {", "  name: string", "}");
+            string multiline = Lines("model Attachments(", "  timestamps,", "  soft_deletes,", ") {", "  name: string", "}");
+            FormatOptions narrow = new FormatOptions { PrintWidth = 40 };
+            Assert.Equal(shortHeader, Fmt(shortHeader));
+            Assert.Equal(multiline, Fmt(shortHeader.Replace("soft_deletes)", "soft_deletes,)")));
+            Assert.Equal(multiline, Fmt(shortHeader, narrow));
+            Assert.Equal(multiline, Fmt(multiline, narrow));
+
+            string partial = Lines("model Attachments(timestamps, // Set the creation date", "  unique: [name, author]) {", "  name: string", "  author: string", "}");
+            Assert.Equal(Lines("model Attachments(", "  timestamps, // Set the creation date", "  unique: [name, author],", ") {", "  name: string", "  author: string", "}"), Fmt(partial));
+            Assert.StartsWith(Lines("model Attachments(timestamps, // Set the creation date", "  unique: [name, author]) {"), Fmt(partial, Without(o => o.WrapAttributes = false)));
+        }
+
+        [Fact]
         public void IndentsArgumentListsAndArrays()
         {
             string input = "x = call(\n1,\n2\n)\nlist = [\n1,\n2,\n]\n";

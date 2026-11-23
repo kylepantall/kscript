@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Language.Features;
+using KScript.Language.Rules;
 using KScript.Syntax.Text;
 using KScript.Projects;
 
@@ -307,8 +308,9 @@ namespace KScript.LanguageServer
         /// <summary>Analyzes a document and applies its project's kscript.json lint settings (rule severities, excluded paths).</summary>
         private DocumentAnalysis Analyze(OpenDocument doc)
         {
-            DocumentAnalysis analysis = Analyzer.Analyze(doc.Text, doc.AnalysisPath, workspace, service.Catalog, doc.Kind);
-            LintRules.Apply(analysis.Diagnostics, ProjectFor(doc.Path), doc.Path);
+            ProjectConfig project = ProjectFor(doc.Path);
+            DocumentAnalysis analysis = service.Analyze(doc.Text, doc.AnalysisPath, doc.Kind, DocumentRules.ForProject(project?.Directory, workspace));
+            LintRules.Apply(analysis.Diagnostics, project, doc.Path);
             return analysis;
         }
 
@@ -877,11 +879,13 @@ namespace KScript.LanguageServer
                 ["range"] = Range(source, d.Span),
                 ["severity"] = (int)d.Severity,
                 ["code"] = d.Code,
-                // Editors show the code as a link to what it means and how to fix it.
-                ["codeDescription"] = new JsonObject { ["href"] = DiagnosticCodes.HelpUrl(d.Code) },
                 ["source"] = "kscript",
                 ["message"] = d.Message,
             };
+            if (DiagnosticCodes.IsBuiltIn(d.Code))
+            {
+                json["codeDescription"] = new JsonObject { ["href"] = DiagnosticCodes.HelpUrl(d.Code) };
+            }
             if (DiagnosticCodes.IsUnnecessary(d.Code))
             {
                 json["tags"] = new JsonArray(1);

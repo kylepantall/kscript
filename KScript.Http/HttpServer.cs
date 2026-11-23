@@ -17,20 +17,12 @@ namespace KScript.Http
         public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default,
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null)
         {
-            var site = new PageSite(siteFolder);
-            var app = new HttpApp(site.Root, project, log);
+            var app = new HttpApp(siteFolder, project, log);
             app.LoadStartupConfig();
-            site.StartupConfig = app.StartupConfig;
-            if (app.StartupConfig != null)
-                foreach (string path in app.StartupConfig.FileSources)
-                    site.HiddenFiles.Add(Path.GetRelativePath(site.Root, path).Replace('\\', '/'));
-            if (app.ViewsFolder is string views) site.HiddenFolders.Add(views.Split('/', '\\')[0]);
-            string projectRoot = project?.FilePath == null ? site.Root : Path.GetDirectoryName(Path.GetFullPath(project.FilePath));
-            ProtectStorage(site, projectRoot, app.Settings.Auth, app.StartupConfig);
+            PageSite site = app.PageSite;
             site.RenderPage = app.RenderFilePage;
             if (app.HasRoutes)
             {
-                site.IsRoutedPath = path => app.Table().Match("GET", path) != null || app.IsApiPath(path);
                 try
                 {
                     RouteTable table = app.Table();
@@ -134,7 +126,7 @@ namespace KScript.Http
         /// kscript routes [folder]: prints every route, its name and what answers it (-v adds middleware and files).
         /// <paramref name="plain"/> prints the plain table coding agents' docs use instead.
         /// </summary>
-        public static int ListRoutes(string siteFolder, ProjectConfig project, TextWriter output, TextWriter error, bool verbose = false, bool plain = false)
+        public static int ListRoutes(string siteFolder, ProjectConfig project, TextWriter output, TextWriter error, bool verbose = false, bool plain = false, bool json = false)
         {
             HttpApp app;
             try
@@ -146,13 +138,19 @@ namespace KScript.Http
                 KScript.Runtime.ErrorReport.Write(error, ex);
                 return ExitCodes.Usage;
             }
-            if (!app.HasRoutes)
+            if (!json && !app.HasRoutes)
             {
                 new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.kscript (or api.kscript) with import KScript.Http and a Routes {{ }} block, or routes.ks.xml starting with <KScript.Routes>.");
                 return ExitCodes.Usage;
             }
             try
             {
+                if (json)
+                {
+                    app.LoadStartupConfig();
+                    output.WriteLine(Values.ToJson(RouteCatalog.Entries(app, app.Table()), indented: true));
+                    return 0;
+                }
                 if (plain)
                 {
                     output.Write(HttpApp.Describe(app.LoadRoutes(), app.SiteRoot));

@@ -185,7 +185,7 @@ The `views` folder is never served as pages, because a view needs its controller
 
 ## Middleware
 
-Middleware is a function that takes the request and `$next`. It can stop the request by returning a response, or call `$next($request)` and change the response it gets back:
+Custom middleware must accept two positional arguments, a request map and a `next` function. Untyped parameters and additional parameters with defaults also work. KScript checks the signature when loading the route, and the editor checks the function reference. Return a response to stop the request, or call `$next($request)` to continue and optionally change the response:
 
 ```kscript
 // middleware/security.kscript

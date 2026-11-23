@@ -57,6 +57,22 @@ namespace KScript.Http
         /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>
         public ProjectConfig Project { get; }
         public TextWriter Log { get; }
+        private PageSite pageSite;
+
+        internal PageSite PageSite => LazyInitializer.EnsureInitialized(ref pageSite, CreatePageSite);
+
+        private PageSite CreatePageSite()
+        {
+            if (StartupConfig == null) LoadStartupConfig();
+            var site = new PageSite(SiteRoot) { StartupConfig = StartupConfig };
+            if (StartupConfig != null)
+                foreach (string path in StartupConfig.FileSources)
+                    site.HiddenFiles.Add(Path.GetRelativePath(site.Root, path).Replace('\\', '/'));
+            if (ViewsFolder is string views) site.HiddenFolders.Add(views.Split('/', '\\')[0]);
+            HttpServer.ProtectStorage(site, projectRoot, Settings.Auth, StartupConfig);
+            if (HasRoutes) site.IsRoutedPath = path => Table().Match("GET", path) != null || IsApiPath(path);
+            return site;
+        }
         internal ConfigValue StartupConfig { get; private set; }
         public IReadOnlyList<RouteFileInfo> Files { get; }
         public bool HasRoutes => Files.Count > 0;
@@ -269,6 +285,7 @@ namespace KScript.Http
 
         internal PageResult RenderFilePage(PageRoute route, Dictionary<string, object> request)
         {
+            request[RequestFields.RouteInfo.Name] = RouteCatalog.PageInfo(route.Path, route.Params.Keys, RouteCatalog.PageLabelKey(this, route.File));
             var ctx = new RequestContext(this, request);
             try
             {
@@ -361,6 +378,7 @@ namespace KScript.Http
                 ctx.Route = route;
                 foreach (var kv in match.Parameters) ((Dictionary<string, object>)request["params"])[kv.Key] = kv.Value;
                 request[RouteRequestFields.Route.Name] = route.Name;
+                request[RequestFields.RouteInfo.Name] = RouteCatalog.HttpInfo(route, null);
 
                 Func<Dictionary<string, object>, object> answer;
                 if (match.Route != null)

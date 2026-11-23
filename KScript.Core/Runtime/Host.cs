@@ -41,6 +41,11 @@ namespace KScript.Runtime
         /// <summary>True while one test of <see cref="TestFile"/> runs (not its top-level code).</summary>
         public bool TestRunning { get; set; }
 
+        /// <summary>Clock and environment overrides used within a scoped test callback.</summary>
+        public DateTime? ClockOverride { get; set; }
+        public IReadOnlyDictionary<string, string> EnvironmentOverrides { get; set; }
+        public DateTime Now => ClockOverride ?? DateTime.Now;
+
         /// <summary>
         /// Work to do when the running test ends, such as undoing its database changes. Packages add to it while a
         /// test runs; the test runner runs it, newest first, and empties it.

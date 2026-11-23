@@ -12,7 +12,7 @@ A folder covers the same files as `kscript check`: scripts everywhere, and `.htm
 
 ## What it changes
 
-The formatter only touches whitespace that can't change what a file does.
+The formatter adjusts layout and separators while preserving what the file does.
 
 ### .kscript files
 
@@ -21,6 +21,7 @@ The formatter only touches whitespace that can't change what a file does.
 - `else`, `elif`, `catch` and `finally` go on the line of the `}` before them: `} else {`.
 - Spacing inside a line: one space after commas and colons (`add(1, 2)`, `{ a: 1 }`), around `=` and `=>`, before a block's `{` and before a `//` comment at the end of a line.
 - A line that runs past `print_width` (80 columns unless you [set it](#settings)) is wrapped, as described in [Long lines](#long-lines).
+- Model options go one per line when the header is long or already split. A trailing comma also requests this layout for a short header. Each option gets a comma, including the last one, so adding an option changes one line.
 - Trailing spaces are removed, runs of blank lines shrink to `max_blank_lines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
 
 ```kscript
@@ -140,7 +141,7 @@ becomes
 - **Attribute values** are kept exactly as written, including values that span several lines.
 - **Comments** are kept; a multi-line comment moves as a block.
 - **Raw content** is kept exactly, trailing spaces included: CDATA sections, and in pages the content of `<pre>`, `<textarea>`, `<script>` and `<style>`. `<markdown>` keeps its trailing spaces (two spaces at the end of a line are a line break in Markdown). Add your own elements to `format.preserve`, or use the [ignore comments](#leaving-part-of-a-file-alone).
-- **Pages render the same.** In a page, a line break only goes where there was already whitespace or next to a block-level element such as `<div>` or `<li>`, so inline elements written side by side (`<b>a</b><i>b</i>`) stay together. An inline row written on one line, like a `<nav>` of links, stays on one line. In script elements whose content is text, such as `<echo>`, no whitespace is added between child elements either.
+- **Pages render the same.** Inline elements written side by side (`<b>a</b><i>b</i>`) stay together. An inline tag can spread its attributes across lines while preserving the text and spaces around it, including in a row of links or in a sentence. Between elements, a line break only goes where there was already whitespace or next to a block-level element such as `<div>` or `<li>`. In script elements whose content is text, such as `<echo>`, no whitespace is added between child elements either.
 - `<!doctype>`, `<?xml ?>`, a byte order mark and the file's line endings (unless `end_of_line` says otherwise) are kept.
 
 A file with markup errors (an unclosed element, a stray `<`) is left alone: `kscript fmt` reports the first error and exits 1, and the editor makes no change. Fix the error, which `kscript check` and the editor also show, and format again.
@@ -190,7 +191,7 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | `wrap_comments` | `.kscript` files: breaks a `//` or `///` comment line that runs past `print_width` between words. | Comments stay as written. |
 | `wrap_strings` | `.kscript` files: breaks a string that runs past `print_width` at a space, ending the line with `\` so the break isn't part of the string. | Long strings stay on one line. |
 
-In `.kscript` files, `tidy_tags` does nothing, `wrap_attributes` puts one item per line in long calls, arrays and maps, and `statement_per_line` opens up one-line blocks and splits `;`.
+In `.kscript` files, `tidy_tags` does nothing, `wrap_attributes` lays out long calls, arrays, maps and model options, and `statement_per_line` opens up one-line blocks and splits `;`.
 
 ```jsonc
 {
@@ -249,3 +250,59 @@ VS Code has its own HTML formatter, which doesn't know about KScript elements or
 ```
 
 Other editors get formatting from `kscript lsp` (the LSP `textDocument/formatting` request). In CI, run `kscript fmt --check`.
+
+## Project rules
+
+The [built-in KScript style](../KScript.Language/Formatting/Styles/base.kscript) sets the defaults for the CLI and editor. Put `kscript.rules.kscript` beside `kscript.json`. The command line and editor both read it when checking or formatting project files.
+
+```kscript kscript.rules.kscript
+Style(indent_size: 4, print_width: 100)
+
+Lint(
+  code: 'KS9001',
+  element: 'img',
+  missing_attribute: 'alt',
+  message: 'Give this image alternative text.',
+)
+
+Format(element: 'img', attributes: 'one_per_line')
+Format(model: 'Attachments', options: 'one_per_line')
+```
+
+- `Style` overrides document-wide formatting defaults. It accepts `indent_size`, `use_tabs`, `print_width`, `max_blank_lines`, `end_of_line` and the switches listed under [Turning rules off](#turning-rules-off). Formatting starts with the built-in style, then applies editor indentation, project `Style` settings and explicit `format` settings in `kscript.json`, in that order.
+- `Lint` checks an element for either `missing_attribute` or `forbidden_attribute`. Codes must be unique and use `KS9xxx`. The default severity is `warning`. Set `severity:` to `error`, `warning`, `info` or `hint`, or override it in `kscript.json` with `"lint": { "rules": { "KS9001": "error" } }`.
+- `Format` sets the attribute layout of an HTML or XML tag to `one_per_line` or `inline`. It can also split a script model's options one per line and add a trailing comma. Use `'*'` for all tags or models. A named layout takes precedence over `'*'`.
+- Use numbers or booleans for literal layout settings such as `print_width` or `use_tabs`. Quote literal text settings.
+
+### Function rules
+
+Use `fn(value) => ...` when the rule depends on the document. This rule trims a literal `alt` attribute. Interpolated attributes and event or binding expressions keep their original text.
+
+```kscript kscript.rules.kscript
+Format(
+  element: 'img',
+  attribute: 'alt',
+  value: fn(text) => $text->trim(),
+)
+```
+
+A layout function returns `'one_per_line'`, `'inline'` or `null` to use the normal layout. For example, this rule condenses an empty block to `Something(val1, val2) {}` and expands the arguments with trailing commas when the block has content.
+
+```kscript kscript.rules.kscript
+Format(
+  statement: 'Something',
+  arguments: fn(node) => $node.has_body_content ? 'one_per_line' : 'inline',
+)
+```
+
+Use `attributes:` with an HTML or XML `element:` to choose its layout the same way. A node passed to a function has `name`, `kind`, `attributes` and `has_body_content`. A lint `check:` function can return its own message, `true` for the declaration's message, or `false` or `null` to skip the diagnostic.
+
+```kscript kscript.rules.kscript
+Lint(
+  code: 'KS9002',
+  element: 'img',
+  check: fn(node) => $node.attributes->has('alt') ? null : 'An image needs alternative text.',
+)
+```
+
+Functions run in a restricted expression context with access to their argument, comparisons, conditionals and text operations such as `trim()`, `upper()` and `starts_with()`. Project rule files use declarations and cannot import packages or call commands.

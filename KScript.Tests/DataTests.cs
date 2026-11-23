@@ -372,6 +372,22 @@ public sealed class DataModelTests : DataFixture
 public sealed class DataQueryTests : DataFixture
 {
     [Fact]
+    public void CursorUpsertAndSchemaInspectionWorkTogether()
+    {
+        string[] result = Lines(Users + """
+
+            User->upsert({ name: 'Ada updated', email: 'ada@example.com' }, key: 'email')
+            echo User->count()
+            page = User->cursor_paginate(per_page: 1)
+            echo $page.items->first().name
+            echo User->cursor_paginate(per_page: 1, after: $page.next).items->first().name
+            echo $db->describe_table(User).columns->pluck('name')->contains('email')
+            """);
+        Assert.Equal(new[] { "3", "Ada updated", "Ben", "true" }, result);
+    }
+
+
+    [Fact]
     public void LambdaConditionsBecomeSql()
     {
         string[] lines = Lines(Users + """

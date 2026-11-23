@@ -137,7 +137,9 @@ public sealed class DocsConventionTests
         var source = new SourceText(body);
         string[] lines = body.Split('\n');
         string LineOf(Diagnostic d) => lines[Math.Clamp(source.GetPosition(Math.Min(d.Span.Start, body.Length)).Line - 1, 0, lines.Length - 1)];
-        return Analyzer.Analyze(body, code ? "example.kscript" : "example.ks.xml", EmptyFileSystem.Instance).Diagnostics
+        string ruleFile = KScript.Language.Rules.DocumentRules.FileName;
+        string path = code && fence.Words.Contains(ruleFile) ? ruleFile : code ? "example.kscript" : "example.ks.xml";
+        return Analyzer.Analyze(body, path, EmptyFileSystem.Instance).Diagnostics
             .Where(d => d.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning)
             .Where(d => !FromBeingAnExcerpt(d, body, LineOf(d)))
             .OrderBy(d => d.Span.Start)

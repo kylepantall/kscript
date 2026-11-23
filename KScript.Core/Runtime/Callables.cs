@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Syntax.Text;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
@@ -176,6 +177,7 @@ namespace KScript.Runtime
 
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }
+        public Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault, type: p.Type)).ToArray());
         public string Description { get; }
         internal MarkupElement Element { get; }
         internal ExprNode ValueExpression { get; }

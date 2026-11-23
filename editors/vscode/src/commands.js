@@ -5,7 +5,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { RUN_ENV, untitledPath, isTestFile, docsArgs } = require('./run');
+const { RUN_ENV, parseRunError, untitledPath, isTestFile, docsArgs } = require('./run');
 const { STARTER, starterSelection } = require('./starter');
 
 const KSCRIPT_LANGUAGES = ['kscript', 'kscript-code'];
@@ -16,6 +16,20 @@ const KSCRIPT_LANGUAGES = ['kscript', 'kscript-code'];
  * @param server () => the kscript to run: { command, args } or { error }
  */
 function registerCommands(vscode, context, server) {
+  const runDiagnostics = vscode.languages.createDiagnosticCollection('kscript-run');
+  let currentRun;
+  let diagnosticEntry;
+  context.subscriptions.push(
+    runDiagnostics,
+    vscode.workspace.onDidChangeTextDocument(({ document, contentChanges }) => {
+      if (contentChanges.length === 0) return;
+      const editedUri = document.uri.toString();
+      if (editedUri === diagnosticEntry) runDiagnostics.clear();
+      else runDiagnostics.delete(document.uri);
+      currentRun?.edited.add(editedUri);
+    }),
+  );
+
   function kscript(what) {
     const found = server();
     if (found.error) {
@@ -101,9 +115,33 @@ function registerCommands(vscode, context, server) {
     const file = await fileFor(doc);
     if (!file) return undefined;
     const folder = doc.isUntitled ? undefined : folderOf(doc.uri);
-    return runTask(found, `run ${path.basename(file)}`, 'run', [file], {
-      folder, cwd: folder ? folder.uri.fsPath : path.dirname(file), file, env: RUN_ENV, matcher: '$kscript-run', focus: true,
-    });
+    const execution = { edited: new Set() };
+    currentRun = execution;
+    runDiagnostics.clear();
+    diagnosticEntry = undefined;
+    const reportFolder = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'kscript-run-'));
+    const report = path.join(reportFolder, 'error');
+    try {
+      const code = await runTask(found, `run ${path.basename(file)}`, 'run', [file], {
+        folder, cwd: folder ? folder.uri.fsPath : path.dirname(file), file,
+        env: { ...RUN_ENV, KSCRIPT_RUN_ERROR_FILE: report }, focus: true,
+      });
+      if (code !== 3 || currentRun !== execution) return code;
+      const error = parseRunError(await fs.promises.readFile(report, 'utf8').catch(() => ''));
+      if (!error || currentRun !== execution) return code;
+      const uri = doc.isUntitled && error.file === file ? doc.uri : vscode.Uri.file(error.file);
+      const entryUri = doc.uri.toString();
+      if (execution.edited.has(entryUri) || execution.edited.has(uri.toString())) return code;
+      const range = new vscode.Range(error.line - 1, error.column - 1, error.line - 1, error.column);
+      const diagnostic = new vscode.Diagnostic(range, error.message, vscode.DiagnosticSeverity.Error);
+      diagnostic.source = 'kscript run';
+      runDiagnostics.set(uri, [diagnostic]);
+      diagnosticEntry = entryUri;
+      return code;
+    } finally {
+      if (currentRun === execution) currentRun = undefined;
+      await fs.promises.rm(reportFolder, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   async function checkFile(target) {

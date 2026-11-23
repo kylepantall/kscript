@@ -142,6 +142,59 @@ public class HttpAppTests
         return app.Handle(new Dictionary<string, object> { ["method"] = method, ["path"] = path, ["body"] = body ?? string.Empty, ["headers"] = headers, ["query"] = q });
     }
 
+    [Fact]
+    public void DiscoversLocalizedTypedRoutesAndCanonicalPages()
+    {
+        using var site = Site("""
+            <KScript.Routes>
+              <import path="types/navigation.kscript" />
+              <Get path="/home" name="home" redirect="/" label_key="routes.home" data="Navigation(order: 10)" />
+              <Get path="/menu" view="menu.html" />
+              <Get path="/catalog">
+                <return value="{ typed: @routes(data_type: Navigation, locale: 'fr'), pages: @routes(kind: 'page'), match: @route_match('/posts/123'), current: @route_is('/catalog') }" />
+              </Get>
+            </KScript.Routes>
+            """,
+            ("index.html", "<h1>Welcome</h1>"),
+            ("_internal.html", "<h1>Hidden</h1>"),
+            ("home.html", "<h1>Shadowed</h1>"),
+            ("posts/[slug].md", "# A post"),
+            ("views/menu.html", """
+                <import package="KScript.Http" />
+                <import path="/types/navigation.kscript" />
+                <for each="entry" in="@routes(data_type: Navigation)">
+                  <a href="{ @route($entry.name) }" data-order="{ $entry.data.order }">{ $entry.label }</a>
+                </for>
+                """),
+            ("types/navigation.kscript", "type Navigation { order: int }"),
+            ("locales/fr.json", """{"routes":{"home":"Maison"}}"""));
+        HttpApp app = App(site);
+        PageResult reply = Send(app, "GET", "/catalog");
+        Assert.Equal(200, reply.Status);
+        using var json = System.Text.Json.JsonDocument.Parse(reply.Body);
+        var typed = Assert.Single(json.RootElement.GetProperty("typed").EnumerateArray());
+        Assert.Equal("Maison", typed.GetProperty("label").GetString());
+        Assert.Equal(10, typed.GetProperty("data").GetProperty("order").GetInt32());
+        var pages = json.RootElement.GetProperty("pages").EnumerateArray().Select(page => page.GetProperty("path").GetString());
+        Assert.Equal(new[] { "/", "/posts/{slug}" }, pages);
+        Assert.Equal("123", json.RootElement.GetProperty("match").GetProperty("parameters").GetProperty("slug").GetString());
+        Assert.True(json.RootElement.GetProperty("current").GetBoolean());
+        PageResult menu = Send(app, "GET", "/menu", query: "lang=fr");
+        Assert.Equal(200, menu.Status);
+        Assert.Contains("""<a href="/home" data-order="10">Maison</a>""", menu.Body);
+    }
+
+    [Fact]
+    public void JsonRoutesCanListADirectoryOfPagesWithoutRouteFiles()
+    {
+        using var site = new TempSite(("index.html", "<h1>Home</h1>"), ("help/index.md", "# Help"));
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        Assert.Equal(0, HttpServer.ListRoutes(site.Root, null, output, error, json: true));
+        using var json = System.Text.Json.JsonDocument.Parse(output.ToString());
+        Assert.Equal(new[] { "/", "/help" }, json.RootElement.EnumerateArray().Select(entry => entry.GetProperty("path").GetString()));
+    }
+
     private const string Routes = """
         <KScript.Routes>
           <import path="controllers/people.ks.xml" as="people" />
@@ -543,6 +596,8 @@ public class HttpAppTests
     [InlineData("<KScript.Routes><Route methods=\"get, fetch\" path=\"/a\" redirect=\"/\" /></KScript.Routes>", "'FETCH' isn't an HTTP method")]
     [InlineData("<KScript.Routes><Get path=\"/a\" redirect=\"/\" middleware=\"nope\" /></KScript.Routes>", "No function named 'nope'")]
     [InlineData("<KScript.Routes><Get path=\"/a\" redirect=\"/\" middleware=\"throttle:many\" /></KScript.Routes>", null)]
+    [InlineData("<KScript.Routes><fn name=\"destroy\" params=\"id: int\" value=\"$id\"/><Get path=\"/a\" redirect=\"/\" middleware=\"destroy\"/></KScript.Routes>", "Middleware 'destroy' must accept fn(request: map, next: fn)")]
+    [InlineData("<KScript.Routes><fn name=\"check\" params=\"request, next, other\" value=\"$next($request)\"/><Middleware use=\"check\"/></KScript.Routes>", "Middleware 'check' must accept fn(request: map, next: fn)")]
     public void RouteFileMistakesAreExplained(string routes, string message)
     {
         using var site = Site(routes);

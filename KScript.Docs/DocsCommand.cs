@@ -89,7 +89,7 @@ namespace KScript.Docs
             string folder = Path.Combine(Path.GetTempPath(), "kscript-docs-" + Guid.NewGuid().ToString("N"));
             try
             {
-                DocsSite site = DocsSite.Build();
+                DocsSite site = DocsSite.Build(includeInstallGuide: false);
                 site.Format = format ?? ProjectFormat(KScript.Runtime.WorkingFolder.Current);
                 site.WriteTo(folder);
                 string query = words.Count == 0 ? string.Empty : "/?q=" + Uri.EscapeDataString(string.Join(" ", words));
@@ -134,7 +134,7 @@ namespace KScript.Docs
             string site = Path.Combine(Path.GetTempPath(), "kscript-docs-" + Guid.NewGuid().ToString("N"));
             try
             {
-                var docs = new ProjectDocs(DocsSite.Build(), folder, project, site);
+                var docs = new ProjectDocs(DocsSite.Build(includeInstallGuide: false), folder, project, site);
                 return await KScript.Http.HttpServer.RunAsync(site, null, chosen, "localhost", null, stop,
                     before: request =>
                     {

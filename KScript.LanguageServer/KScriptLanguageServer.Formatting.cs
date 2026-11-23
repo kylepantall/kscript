@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 
 using KScript.Language.Formatting;
+using KScript.Language.Rules;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
@@ -30,11 +31,12 @@ namespace KScript.LanguageServer
             {
                 return new JsonArray();
             }
-            FormatOptions options = FormatOptions.From(project, tabSize, insertSpaces);
+            DocumentRules rules = DocumentRules.ForProject(project?.Directory, workspace);
+            FormatOptions options = FormatOptions.From(project, tabSize, insertSpaces, rules);
 
             // .kscript files (or an unsaved document in the KScript (code) language) have their own formatter.
             bool code = MarkupParser.IsCodePath(doc.Path) || (doc.Path == null && doc.LanguageId == "kscript-code");
-            FormatResult result = code ? CodeFormatter.Format(doc.Text, options) : Formatter.Format(doc.Text, doc.Kind, options);
+            FormatResult result = Formatter.FormatDocument(doc.Text, doc.Path, doc.Kind, code, options, rules);
             if (!result.Succeeded)
             {
                 if (doc.Kind != DocumentKind.Markdown)

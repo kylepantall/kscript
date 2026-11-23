@@ -534,11 +534,18 @@ namespace KScript.Language.Features
                 case AttributeKind.FunctionReferences:
                 {
                     // Functions, functions of imported scripts (people.show), and built-in middleware (KScript.Http).
-                    List<CompletionItem> items = FunctionSymbolCompletions(analysis, replace);
+                    List<CompletionItem> items = FunctionSymbolCompletions(analysis, replace, a.FunctionSignature);
                     foreach (Symbol import in analysis.Symbols.Where(s => s.Kind == SymbolKind.Import))
                     {
                         foreach (FieldInfo field in import.Shape.Fields.Values.Where(f => f.Shape.Type == KType.Fn))
                         {
+                            if (a.FunctionSignature is Signature contract)
+                            {
+                                if (import.Members.TryGetValue(field.Name, out Symbol function) && function.Kind == SymbolKind.Function
+                                    && !function.PositionalSignature.AcceptsPositionalCall(contract)) continue;
+                                if (import.Package is string package && Catalog.GetCommand(field.Name) is CallableInfo command && command.Package == package
+                                    && !command.Signatures.Any(s => s.AcceptsPositionalCall(contract))) continue;
+                            }
                             items.Add(new CompletionItem { Label = import.Name + "." + field.Name, Kind = CompletionKind.Function, Detail = field.Description, ReplaceSpan = replace });
                         }
                     }
@@ -781,8 +788,13 @@ namespace KScript.Language.Features
             _ => "text",
         };
 
-        private static string OptionsLine(AttributeInfo a) =>
-            a.Options.Count > 0 ? "\n\nOne of: " + string.Join(", ", a.Options.Select(o => "`" + o + "`")) : string.Empty;
+        private static string OptionsLine(AttributeInfo a)
+        {
+            string contract = a.FunctionSignature is Signature signature ? $"\n\nCustom function: `{signature.FunctionLabel}`." : string.Empty;
+            return a.Options.Count > 0
+                ? contract + (a.FunctionSignature != null ? "\n\nBuilt-ins: " : "\n\nOne of: ") + string.Join(", ", a.Options.Select(o => "`" + o + "`"))
+                : contract;
+        }
 
         #endregion
 
@@ -964,8 +976,9 @@ namespace KScript.Language.Features
             return items;
         }
 
-        private List<CompletionItem> FunctionSymbolCompletions(DocumentAnalysis analysis, TextSpan replace) =>
+        private List<CompletionItem> FunctionSymbolCompletions(DocumentAnalysis analysis, TextSpan replace, Signature contract) =>
             analysis.VisibleFunctions(replace.Start)
+                .Where(s => contract == null || s.PositionalSignature.AcceptsPositionalCall(contract))
                 .Select(s => new CompletionItem { Label = s.Name, Kind = CompletionKind.Function, Detail = s.TypedSignature, ReplaceSpan = replace })
                 .ToList();
 

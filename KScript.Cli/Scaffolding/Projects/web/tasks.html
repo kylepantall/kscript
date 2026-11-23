@@ -17,7 +17,10 @@
     <ul class="tasks">
       <for each="t" in="$tasks">
         <li class="{ $t.done ? 'done' : '' }">
-          <label><input type="checkbox" checked="{$t.done}" on-change="tasks = @toggle_task($tasks, id: $t.id)"> {$t.title}</label>
+          <label><input
+            type="checkbox"
+            checked="{$t.done}"
+            on-change="tasks = @toggle_task($tasks, id: $t.id)"> {$t.title}</label>
           <button
             class="remove"
             title="Remove"

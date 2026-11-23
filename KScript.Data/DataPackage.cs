@@ -204,6 +204,8 @@ namespace KScript.Data
                     int page = pageArg == null || (pageArg is string s && !double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? 1 : (int)Values.ToNumber(pageArg, "page");
                     return q.Paginate(c, perPage, page);
                 }),
+            new("cursor_paginate", "per_page?: number, after?, key?: string, descending?: bool", "Reads one page using a unique, non-null key (the model key by default). Returns { items, has_more, next }; pass next as after to continue.", KType.Map,
+                (q, c) => q.CursorPaginate(c, c.Int(0, 15), c.Arg(1), c.Str(2, null), c.Bool(3))),
             new("chunk", "size: number, work: fn", "Reads the rows a batch at a time and calls work with each batch (and its number from 0): for going through more rows than fit in memory. Return false from work to stop.", KType.Null,
                 (q, c) => { q.Chunk(c, Count(c.Arg(0), "->chunk() size"), c.Fn(1)); return null; }),
             new("update", "values...", "Sets columns on every row that matches, without reading them: `->update(active: false)`. Returns how many rows changed.", KType.Number,
@@ -216,6 +218,8 @@ namespace KScript.Data
             new("force_delete", "", "Deletes every row that matches, even for models with soft_deletes. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: true)),
             new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
             new("insert", "rows", "Adds rows: a map, or a list of maps. On a model each one is checked like ->create(). Returns how many were added.", KType.Number, (q, c) => q.Insert(c, c.Arg(0))),
+            new("upsert", "row: map, key?: string", "Atomically inserts a row or updates supplied fields on unique conflict. The key must name a unique column. The returned count is the provider’s affected-row count.", KType.Number,
+                (q, c) => q.Upsert(c, c.Map(0), c.Str(1, null))),
             new("sql", "", "The SQL the query runs and its parameters, without running it: { sql, params }.", KType.Map, (q, c) => q.Describe()),
             new("with", "relations...", "Loads relations with the records, one query per relation rather than one per record: `->with(author, tags)`, `->with(posts.tags)`, or `->with(posts: fn(q) => $q->where(published: true))` to load only some.", KType.Query,
                 (q, c) => Relations(c, "with").Aggregate(q, (acc, r) => acc.Loading(r.Path, r.Constrain)), Bare: true),
@@ -536,6 +540,8 @@ namespace KScript.Data
                 (t, c) => RunSql(c, DatabaseOf(t, c), c.Str(0), c.Arg(1, "as"))).Info.KeepsBareWords = true;
             p.Method(KType.Database, "tables", "", "The names of the tables in the database.", KType.List,
                 (t, c) => DatabaseOf(t, c).Tables(c.Interpreter).Cast<object>().ToList());
+            p.Method(KType.Database, "describe_table", "table: " + ParameterInfo.ModelOrString, "Returns columns, indexes, and keys for the named table or model.", KType.Map,
+                (t, c) => TableDescription.Read(DatabaseOf(t, c), c, ModelInfo.Of(c.Arg(0))?.Table ?? Word(c.Arg(0), "->describe_table()"))).Info.KeepsBareWords = true;
             p.Method(KType.Database, "has_table", "name: " + ParameterInfo.ModelOrString, "True when the database has a model's table or a table with the given name: $db->has_table(User) or $db->has_table('users').", KType.Bool,
                 (t, c) =>
                 {

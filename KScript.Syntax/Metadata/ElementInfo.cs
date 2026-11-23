@@ -27,6 +27,10 @@ namespace KScript.Metadata
         /// </summary>
         public string Type { get; init; }
 
+        /// <summary>The fixed arguments passed to a function reference, or null for an unrestricted reference.</summary>
+        public Signature FunctionSignature { get; init; }
+        public bool RequiresDeclaredRecord { get; init; }
+
         public ModelFieldKind ModelFields { get; init; }
 
         /// <summary>Another attribute that can stand in for this one when it is required (<c>value</c> or element text).</summary>

@@ -185,7 +185,22 @@ function registerTestExplorer(vscode, context, server, client) {
     watcher.onDidCreate((uri) => fileItem(uri)),
     watcher.onDidDelete((uri) => controller.items.delete(uri.toString())),
     vscode.workspace.onDidOpenTextDocument(changed),
-    vscode.workspace.onDidChangeTextDocument((e) => changed(e.document)),
+    vscode.workspace.onDidChangeTextDocument(({ document, contentChanges }) => {
+      if (contentChanges.length === 0 || document.uri.scheme !== 'file') return;
+      if (isTestFile(document.uri.fsPath)) {
+        const item = controller.items.get(document.uri.toString());
+        if (item) controller.invalidateTestResults(item);
+        changed(document);
+      } else if (document.languageId === 'kscript' || document.languageId === 'kscript-code') {
+        // Test files can import code from another file in their workspace folder.
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        const items = [];
+        controller.items.forEach((item) => {
+          if (vscode.workspace.getWorkspaceFolder(item.uri)?.uri.toString() === folder?.uri.toString()) items.push(item);
+        });
+        if (items.length) controller.invalidateTestResults(items);
+      }
+    }),
     { dispose: () => clearTimeout(timer) },
   );
   return controller;

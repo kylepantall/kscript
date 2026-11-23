@@ -66,6 +66,19 @@ namespace KScript.Runtime
         }
 
         /// <summary>The bytes base64 text holds, standard or URL-safe, padded or not. Throws FormatException when it isn't base64.</summary>
+        public static NativeText EncodeBytes(byte[] bytes) => new NativeText("base64", Convert.ToBase64String(bytes));
+
+        public static bool TryDecodeBytes(object value, out byte[] bytes)
+        {
+            if (Values.Unwrap(value) is NativeText { TypeName: "base64" } encoded)
+            {
+                bytes = Bytes(encoded.Text);
+                return true;
+            }
+            bytes = null;
+            return false;
+        }
+
         internal static byte[] Bytes(string s)
         {
             string t = s.Trim().Replace('-', '+').Replace('_', '/');

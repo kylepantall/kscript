@@ -317,6 +317,28 @@ namespace KScript.Data
             };
         }
 
+        public Dictionary<string, object> CursorPaginate(CallContext call, int perPage, object after, string key, bool descending)
+        {
+            if (perPage is < 1 or > 1000) throw call.Error("per_page must be between 1 and 1000.", "Argument");
+            key ??= Model?.Key ?? throw call.Error("Specify a unique, non-null key column for cursor pagination.", "Argument");
+            if (Columns != null && !Columns.Contains(key)) throw call.Error($"Select '{key}' to use it as a cursor.", "Argument");
+            SqlColumn column = ColumnNamed(key, " for cursor pagination");
+            var query = this with { Order = new[] { ((SqlExpr)column, descending) }, Offset = null, Limit = perPage + 1 };
+            if (after != null)
+                query = query.And(new SqlBinary(descending ? "<" : ">", column, new SqlValue(after, column.Column)));
+            List<object> items = query.Get(call);
+            if (items.Any(item => item is not Dictionary<string, object> row || row.GetValueOrDefault(key) == null))
+                throw call.Error($"Cursor key '{key}' must have a value on every row.", "Argument");
+            bool more = items.Count > perPage;
+            if (more) items.RemoveAt(perPage);
+            return new Dictionary<string, object>
+            {
+                ["items"] = items,
+                ["has_more"] = more,
+                ["next"] = more ? ((Dictionary<string, object>)items[^1])[key] : null,
+            };
+        }
+
         /// <summary>Reads the rows a few at a time, in key order, calling <paramref name="fn"/> with each batch. Returning false stops.</summary>
         public void Chunk(CallContext call, int size, ICallable fn)
         {
@@ -395,13 +417,49 @@ namespace KScript.Data
                 List<object> many => many.Select(r => r as Dictionary<string, object> ?? throw new KScriptException($"->insert() needs maps, one per row, but one is {Values.Describe(r)}.", "Argument")).ToList(),
                 _ => throw new KScriptException($"->insert() needs a map, or a list of maps, but got {Values.Describe(rows)}.", "Argument"),
             };
-            if (Model != null) return list.Select(r => Records.Create(call, Model, r)).Count();
-            double count = 0;
-            foreach (Dictionary<string, object> row in list)
+            if (list.Count == 0) return 0;
+            return Database.InTransaction(call.Interpreter, () =>
             {
-                count += Database.Execute(call.Interpreter, InsertStatement(Database.Dialect, Table, row.Select(kv => (kv.Key, (SqlExpr)new SqlValue(kv.Value))).ToList(), null), Table);
+                if (Model != null) return (double)list.Select(r => Records.Create(call, Model, r)).Count();
+                return (double)list.Sum(row => Database.Execute(call.Interpreter, InsertStatement(Database.Dialect, Table,
+                    row.Select(kv => (kv.Key, (SqlExpr)new SqlValue(kv.Value))).ToList(), null), Table));
+            });
+        }
+
+        public double Upsert(CallContext call, Dictionary<string, object> row, string key)
+        {
+            key ??= Model?.Key ?? throw call.Error("upsert requires a unique conflict key.", "Argument");
+            ColumnNamed(key, " for upsert");
+            if (row.GetValueOrDefault(key) == null) throw call.Error($"upsert requires a value for '{key}'.", "Argument");
+            if (Model != null && Model.Guarded.Contains(key)) throw call.Error($"'{key}' is a guarded field.", "Argument");
+            var values = Model == null
+                ? row.Select(entry => (entry.Key, (SqlExpr)new SqlValue(entry.Value))).ToList()
+                : Records.InsertValues(Model, Records.Prepare(call, Model, row));
+            var update = values.Select(value => value.Item1).Where(name => name != key && (Model == null
+                || (name != Model.Key && name != ModelInfo.CreatedAt && (row.ContainsKey(name) || (Model.Timestamps && name == ModelInfo.UpdatedAt))))).ToList();
+            Dialect dialect = Database.Dialect;
+            SqlStatement insert = InsertStatement(dialect, Table, values, null);
+            if (dialect is MySqlDialect)
+            {
+                // ON DUPLICATE KEY can match another unique index. Keep that row intact and report the conflict.
+                string keyColumn = dialect.Quote(key);
+                var writeColumns = update.Count > 0 ? update : new List<string> { key };
+                string assignments = string.Join(", ", writeColumns.Select(name =>
+                {
+                    string column = dialect.Quote(name);
+                    return $"{column} = IF({keyColumn} <=> VALUES({keyColumn}), VALUES({column}), {column})";
+                }));
+                return Database.InTransaction(call.Interpreter, () =>
+                {
+                    int changed = Database.Execute(call.Interpreter, new SqlStatement(insert.Text + " ON DUPLICATE KEY UPDATE " + assignments, insert.Parameters), Table);
+                    var sought = new Query(Database, Table, null).And(new SqlBinary("=", new SqlColumn(key, null), values.Single(v => v.Item1 == key).Item2));
+                    if (!sought.Exists(call))
+                        throw call.Error($"upsert encountered a unique conflict on a column other than '{key}'.", "UniqueViolation");
+                    return changed;
+                });
             }
-            return count;
+            string sql = update.Count == 0 ? dialect.InsertOrIgnore(insert.Text, key) : dialect.Upsert(insert.Text, key, update);
+            return Database.Execute(call.Interpreter, new SqlStatement(sql, insert.Parameters), Table);
         }
 
         internal static SqlStatement InsertStatement(Dialect d, string table, List<(string Name, SqlExpr Value)> values, string returning)
