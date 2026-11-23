@@ -746,10 +746,16 @@ public sealed class DocsTests
         string homePage = await home.Content.ReadAsStringAsync();
         Assert.Contains("<title>KScript docs</title>", homePage);
         Assert.Contains("data-default-format=\"xml\"", homePage);
+        Assert.DoesNotContain("href=\"/guide/install\"", homePage);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync("/guide/install")).StatusCode);
+        string gettingStarted = await http.GetStringAsync("/guide/getting-started");
+        Assert.Contains("https://github.com/kylepantall/kscript/blob/master/docs/install.md", gettingStarted);
         Assert.Contains("The KScript language", await http.GetStringAsync("/guide/language"));
         Assert.Contains("string methods", await http.GetStringAsync("/reference/methods/string/"));
         Assert.Contains("--accent", await http.GetStringAsync("/assets/docs.css"));
-        Assert.StartsWith("[", await http.GetStringAsync("/assets/search.json"));
+        string search = await http.GetStringAsync("/assets/search.json");
+        Assert.StartsWith("[", search);
+        Assert.DoesNotContain("/guide/install", search);
 
         HttpResponseMessage missing = await http.GetAsync("/no/such/page");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
