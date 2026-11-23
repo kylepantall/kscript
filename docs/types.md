@@ -281,7 +281,7 @@ echo "{ $me == @joan }"
 
 ### Recognizing a custom literal by its pattern
 
-A visible refinement of `string` can give an unquoted word its type. Declare a `pattern` on the refinement itself. The pattern must match the whole word, with its usual regex flags.
+A visible refinement of `string`, or of a native type written as a word (`domain`, `semver`, `timezone` and the like), can give an unquoted word its type. Declare a `pattern` on the refinement itself. The pattern must match the whole word, with its usual regex flags. A word can join names and numbers with `-`, `+`, `/` or `.`, with no spaces: `post = my-first-post`, `host = api.corp.com`, `v = 1.4.2`. Numbers alone are still arithmetic (`1+2` is 3), and when no type fits the whole word, no part of it is read as a type on its own.
 
 ```kscript
 type PasskeySessionKey with [string] {

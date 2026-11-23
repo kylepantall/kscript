@@ -24,8 +24,11 @@ namespace KScript.Runtime
         /// <summary>Written after a named argument, so it can only be a flag.</summary>
         public bool AfterNamed { get; }
 
-        /// <summary>Only a plain identifier token may be inferred as a project pattern literal.</summary>
+        /// <summary>A plain name, which a pattern type can read (passkey_abc).</summary>
         internal bool IsIdentifier { get; init; }
+
+        /// <summary>Words joined by - + / or . (my-post, 1.4.2), which a pattern type can read like a name.</summary>
+        internal bool IsCompound { get; init; }
 
         public string Source => (Negated ? "not " : string.Empty) + Name;
 
@@ -148,7 +151,7 @@ namespace KScript.Runtime
         }
 
         private static PatternLiteral Infer(BareWord word, CallContext call) =>
-            word.IsIdentifier ? Interpreter.InferredLiteral(word.Name, call.Scope, call.Module) : null;
+            word.IsIdentifier || word.IsCompound ? Interpreter.InferredLiteral(word.Name, call.Scope, call.Module) : null;
 
         private static IEnumerable<Signature> Ordered(CallableInfo info, CallContext call)
         {

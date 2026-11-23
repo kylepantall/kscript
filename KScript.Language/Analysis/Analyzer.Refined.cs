@@ -132,42 +132,86 @@ namespace KScript.Language.Analysis
             && !importedErrors.Contains(word) && !(ErrorTypes.BuiltIn.TryGetValue(word, out var error) && error.Name == word);
 
         /// <summary>Consider the spelling only when the normal name and argument rules have given it no meaning.</summary>
-        private bool TryPatternLiteral(IdentifierNode id, ExpressionRegion region, Scope scope = null, bool record = true)
+        private bool TryPatternLiteral(IdentifierNode id, ExpressionRegion region, Scope scope = null, bool record = true) =>
+            !partsOfUnfitWords.Contains(id) && TryPatternLiteral(id, id.Name, region, scope, record);
+
+        /// <summary>The names in a word no pattern type fits (api in api.corp.com): not read as a type on their own, as at run time.</summary>
+        private readonly HashSet<IdentifierNode> partsOfUnfitWords = new HashSet<IdentifierNode>();
+
+        /// <summary>
+        /// Words joined by - + / or . (<c>my-post</c>, <c>api.corp.com</c>, <c>1.4.2</c>; see
+        /// <see cref="PatternLiterals.WordOf"/>): true when a pattern type reads the whole word. When none does, its names
+        /// aren't read as types on their own either, and the word is reported as it always was.
+        /// </summary>
+        private bool TryCompoundPatternLiteral(ExprNode node, ExpressionRegion region, Scope scope)
         {
-            TextSpan span = region.Source.ToSource(id.Span);
+            TextSpan span = region.Source.ToSource(node.Span);
+            if (LiteralPatternsAt(scope, span.Start).Candidates.Length == 0)
+            {
+                return false;
+            }
+            string word = PatternLiterals.WordOf(node, region.Source.Value, name => IsUnboundLiteralWord(name, scope, span.Start));
+            if (word == null)
+            {
+                return false;
+            }
+            if (TryPatternLiteral(node, word, region, scope, record: true))
+            {
+                return true;
+            }
+            partsOfUnfitWords.UnionWith(node.DescendantsAndSelf().OfType<IdentifierNode>());
+            return false;
+        }
+
+        private bool TryPatternLiteral(ExprNode node, string word, ExpressionRegion region, Scope scope, bool record)
+        {
+            TextSpan span = region.Source.ToSource(node.Span);
             scope ??= result.ScopeAt(span.Start);
-            if (!IsUnboundLiteralWord(id.Name, scope, span.Start))
+            if (!IsUnboundLiteralWord(word, scope, span.Start))
             {
                 return false;
             }
             LiteralVocabulary vocabulary = LiteralPatternsAt(scope, span.Start);
             if (vocabulary.Candidates.Length == 0) return false;
-            if (!vocabulary.Words.TryGetValue(id.Name, out var match))
+            if (!vocabulary.Words.TryGetValue(word, out var match))
             {
                 try
                 {
-                    Symbol type = PatternLiterals.Resolve(id.Name, vocabulary.Candidates);
-                    match = (type, type == null ? null : RefinementProblem(type.Name, id.Name, id.Name, "string", type.Shape.LiteralRules));
+                    Symbol type = PatternLiterals.Resolve(word, vocabulary.Candidates);
+                    match = (type, type == null ? null : PatternLiteralProblem(type, word, scope, span.Start));
                 }
                 catch (KScriptException error)
                 {
                     match = (null, error.Message);
                 }
-                vocabulary.Words.Add(id.Name, match);
+                vocabulary.Words.Add(word, match);
             }
             if (match.Error != null && record)
             {
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidTypedValue, match.Error, match.Type != null ? null :
-                    new[] { new QuickFix($"Quote as '{id.Name}'", new TextChange(span, "'" + id.Name + "'")) });
+                    new[] { new QuickFix($"Quote as '{word}'", new TextChange(span, "'" + word + "'")) });
             }
             if (match.Type == null) return match.Error != null;
             if (record)
             {
-                result.PatternLiteralTypes[span.Start] = match.Type;
+                if (node is IdentifierNode)
+                {
+                    result.PatternLiteralTypes[span.Start] = match.Type;
+                }
+                else
+                {
+                    result.PatternLiteralWords[span] = match.Type;
+                }
                 result.References.Add(new SymbolReference(match.Type, span, false, false) { IsPatternLiteral = true });
             }
             return true;
         }
+
+        /// <summary>A rule of the pattern type <paramref name="type"/> that <paramref name="word"/> breaks, read as its root (string, domain, ...).</summary>
+        private string PatternLiteralProblem(Symbol type, string word, Scope scope, int offset) =>
+            type.Shape.Instance?.Type is string root && root != KType.String
+                ? LiteralProblem(word, type.Name, scope, offset)
+                : RefinementProblem(type.Name, word, word, "string", type.Shape.LiteralRules);
 
         private bool IsModelElement(MarkupElement e) =>
             IsKScriptElementName(e, "model") && catalog.GetElement("model")?.Package == "KScript.Data";
