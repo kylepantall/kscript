@@ -123,7 +123,7 @@ namespace KScript.Language.Rules
             {
                 null => null,
                 string replacement when replacement.IndexOfAny(new[] { '{', '}' }) < 0 => replacement,
-                _ => throw new KScriptException("An attribute value function must return literal text without template braces, or null.", "Type"),
+                _ => throw new KScriptException("An HTML value rule must return plain text or null. Interpolation braces are reserved.", "Type"),
             };
         }
 
