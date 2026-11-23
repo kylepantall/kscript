@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
+using KScript.Language.Catalog;
 using KScript.Metadata;
 using KScript.Runtime;
 
@@ -288,9 +289,11 @@ namespace KScript.Docs
             var sb = new StringBuilder();
             string deprecatedClass = e.Deprecated != null ? " deprecated" : string.Empty;
             string shown = DualName(e);
+            string codeHelp = CodeStatementHelp.For(e.Name);
             sb.Append($"<section class=\"entry{deprecatedClass}\" id=\"{anchor}\"><h3 class=\"sig\"><a class=\"anchor\" href=\"#{anchor}\">#</a>{(e.Deprecated != null ? "<del>" + shown + "</del>" + DeprecatedBadge : shown)}</h3>");
             sb.Append(DeprecationNote(e.Deprecated));
-            sb.Append($"<div class=\"desc\">{Describe(e.Description)}</div>");
+            sb.Append(codeHelp == null ? $"<div class=\"desc\">{Describe(e.Description)}</div>"
+                : $"<div class=\"desc f-xml\">{Describe(e.Description)}</div><div class=\"desc f-ks\">{Html.Inline(codeHelp)}</div>");
 
             var facts = new List<string>();
             facts.Add(e.Content switch
@@ -308,18 +311,27 @@ namespace KScript.Docs
             if (e.MustFollow?.Count > 0) facts.Add($"Follows {string.Join(" or ", e.MustFollow.Select(TagName))}.");
             if (e.IsLoop) facts.Add(Html.Dual("A loop: <code>&lt;break /&gt;</code> and <code>&lt;continue /&gt;</code> work inside.", "A loop: <code>break</code> and <code>continue</code> work inside."));
             if (e.AllowsExtraAttributes) facts.Add(Html.Dual("Other attributes become variables.", "Other options become variables."));
-            sb.Append($"<p class=\"facts\">{string.Join(" ", facts)}</p>");
+            sb.Append($"<p class=\"facts{(codeHelp == null ? string.Empty : " f-xml")}\">{string.Join(" ", facts)}</p>");
 
-            if (e.Attributes.Count > 0)
+            void AppendOptions(IEnumerable<AttributeInfo> options, string formatClass, string label)
             {
-                sb.Append($"<div class=\"table\"><table class=\"params\"><thead><tr><th>{Html.Dual("Attribute", "Option")}</th><th>Value</th><th>Description</th></tr></thead><tbody>");
-                foreach (AttributeInfo a in e.Attributes)
+                var attributes = options.ToList();
+                if (attributes.Count == 0) return;
+                sb.Append($"<div class=\"table{formatClass}\"><table class=\"params\"><thead><tr><th>{label}</th><th>Value</th><th>Description</th></tr></thead><tbody>");
+                foreach (AttributeInfo a in attributes)
                 {
                     string value = a.Options.Count > 0 ? string.Join(" | ", a.Options.Select(o => $"<code>{Html.H(o)}</code>")) : KindName(a.Kind);
                     string attrName = a.Deprecated != null ? $"<del><code>{Html.H(a.Name)}</code></del>{DeprecatedBadge}" : $"<code>{Html.H(a.Name)}</code>";
                     sb.Append($"<tr{(a.Deprecated != null ? " class=\"deprecated\"" : "")}><td>{attrName}{(a.Required ? " <span class=\"req\">required</span>" : "")}</td><td>{value}</td><td>{DeprecationNote(a.Deprecated)}{Describe(a.Description)}</td></tr>");
                 }
                 sb.Append("</tbody></table></div>");
+            }
+            if (codeHelp == null)
+                AppendOptions(e.Attributes, string.Empty, Html.Dual("Attribute", "Option"));
+            else
+            {
+                AppendOptions(e.Attributes, " f-xml", "Attribute");
+                AppendOptions(CodeStatementHelp.Options(e), " f-ks", "Option");
             }
             if (e.Example != null) sb.Append(Example("<" + e.Name + ">", e.Example, e.Package));
             sb.Append("</section>");

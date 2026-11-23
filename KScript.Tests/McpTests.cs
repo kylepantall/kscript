@@ -232,7 +232,11 @@ public sealed class McpTests : IDisposable
     public void Every_element_and_callable_renders()
     {
         DocsMarkdown docs = Server().Docs;
-        foreach (ElementInfo e in docs.Catalog.Elements) Assert.StartsWith("# <", docs.Element(e, "kscript"));
+        foreach (ElementInfo e in docs.Catalog.Elements)
+        {
+            Assert.StartsWith("# <", docs.Element(e, "xml"));
+            Assert.StartsWith(CodeStatementHelp.For(e.Name) == null ? "# <" : "# " + e.Name, docs.Element(e, "kscript"));
+        }
         foreach (CallableInfo c in docs.Catalog.Commands.Concat(docs.Catalog.Methods)) Assert.StartsWith("# ", docs.Callable(c, "xml"));
 
         // Every kind of content, context and rule an element can have.
@@ -371,8 +375,8 @@ public sealed class McpTests : IDisposable
     public void Lookup_explains_any_name()
     {
         McpServer server = Server();
-        Assert.StartsWith("# <for>", Call(server, "lookup", new { name = "<for each>" }).Text);
-        Assert.StartsWith("# <for>", Call(server, "lookup", new { name = "</for>" }).Text);
+        Assert.StartsWith("# <for>", Call(server, "lookup", new { name = "<for each>", format = "xml" }).Text);
+        Assert.StartsWith("# for", Call(server, "lookup", new { name = "</for>", format = "kscript" }).Text);
         Assert.StartsWith("# @read_text(", Call(server, "lookup", new { name = "@read_text()" }).Text);
         Assert.StartsWith("# string->replace(", Call(server, "lookup", new { name = "string->replace" }).Text);
         Assert.StartsWith("# string->replace(", Call(server, "lookup", new { name = "->replace", type = "string" }).Text);

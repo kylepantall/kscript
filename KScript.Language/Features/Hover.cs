@@ -26,6 +26,7 @@ namespace KScript.Language.Features
             ["and"] = "True if both sides are true.",
             ["or"] = "True if either side is true.",
             ["not"] = "Negates a condition.",
+            ["!"] = "Negates a condition like `not`. After a method arrow, `->!method()` negates the result of that call.",
             ["in"] = "Membership: true if the left value is in the list (or a key of the map, or a substring) on the right.",
             ["??"] = "The left value, or the right value if the left is null: `$user.name ?? 'guest'`.",
             ["?."] = "Field access that gives null instead of an error when the value is null.",
@@ -315,20 +316,22 @@ namespace KScript.Language.Features
         internal static string ElementMarkdown(ElementInfo e, bool code = false)
         {
             StringBuilder sb = new StringBuilder();
+            string codeHelp = code ? CodeStatementHelp.For(e.Name) : null;
             sb.Append(code ? "**" + e.Name + "**" : "**<" + e.Name + ">**");
             if (e.Planned)
             {
                 sb.Append(" (KScript 2, planned: no package implements it yet)");
             }
-            sb.Append("\n\n").Append(DeprecationLine(e.Deprecated, code ? e.Name : "<" + e.Name + ">")).Append(TagsAsCode(e.Description, code));
+            sb.Append("\n\n").Append(DeprecationLine(e.Deprecated, code ? e.Name : "<" + e.Name + ">")).Append(codeHelp ?? TagsAsCode(e.Description, code));
             if (e.Package != null && e.Package != "KScript.Core")
             {
                 sb.Append("\n\nFrom ").Append(e.Package).Append(e.Context == ElementContext.Page ? " (pages)." : ".");
             }
-            if (e.Attributes.Count > 0)
+            var options = code ? CodeStatementHelp.Options(e).ToList() : e.Attributes;
+            if (options.Count > 0)
             {
                 sb.Append(code ? "\n\n| Argument | |\n|---|---|\n" : "\n\n| Attribute | |\n|---|---|\n");
-                foreach (AttributeInfo a in e.Attributes)
+                foreach (AttributeInfo a in options)
                 {
                     sb.Append("| ").Append(a.Deprecated != null ? "~~`" + a.Name + "`~~" : "`" + a.Name + "`").Append(a.Required ? " (required)" : string.Empty).Append(" | ")
                       .Append((DeprecationLine(a.Deprecated, a.Name).Trim() + " " + TagsAsCode(a.Description, code)).Trim().Replace("|", "\\|").Replace("\n", " ")).Append(" |\n");

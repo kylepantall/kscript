@@ -15,6 +15,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="KScript.Tests" />
     <InternalsVisibleTo Include="KScript.Http" />
+    <InternalsVisibleTo Include="KScript.Web" />
     <InternalsVisibleTo Include="KScript.Queue" />
     <InternalsVisibleTo Include="KScript.Language" />
     <InternalsVisibleTo Include="KScript.Data" />

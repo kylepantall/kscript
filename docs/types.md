@@ -177,7 +177,7 @@ echo $price + $extra                  // GBP 1.60
 echo $price->add($extra, rate: 0.92)  // GBP 1.69
 ```
 
-To share rates across fresh runs, put them in your project's `config.yaml` or `config.json`. The outer key names the incoming currency and the inner key names the receiving currency.
+To share rates across fresh runs, put them in a file listed under `config.files` in `kscript.json`. The outer key names the incoming currency and the inner key names the receiving currency. This example uses YAML.
 
 ```yaml
 money:

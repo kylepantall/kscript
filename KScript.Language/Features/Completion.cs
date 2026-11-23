@@ -53,7 +53,8 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
-            if (modelOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
+            if (modelOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind is CompletionKind.Parameter or CompletionKind.Value or CompletionKind.Attribute
+                || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
                 return new List<CompletionItem>();
             }
@@ -471,14 +472,8 @@ namespace KScript.Language.Features
                 return items;
             }
 
-            // In a .kscript file, statements with their own syntax (fn f(a), if x {) take no named arguments, and the rest
-            // write them as name: value.
             bool code = analysis.Markup.Syntax == SourceSyntax.Code;
-            if (code && CodeStatementSnippets.ContainsKey(e.Name))
-            {
-                return items;
-            }
-            foreach (AttributeInfo a in info.Attributes)
+            foreach (AttributeInfo a in code ? CodeStatementHelp.Options(info) : info.Attributes)
             {
                 if (e.Attributes.Any(x => x.Name == a.Name && !(x.NameSpan.Start == start)))
                 {
@@ -846,6 +841,10 @@ namespace KScript.Language.Features
             if (before == '>' && wordStart >= 2 && text[wordStart - 2] == '-')
             {
                 return MethodCompletions(analysis, region, wordStart - 2, replace, pipe: false);
+            }
+            if (before == '!' && wordStart >= 3 && text[wordStart - 2] == '>' && text[wordStart - 3] == '-')
+            {
+                return MethodCompletions(analysis, region, wordStart - 3, replace, pipe: false);
             }
             if (before == '.' && wordStart >= 2 && text[wordStart - 2] != '.')
             {

@@ -1,4 +1,0 @@
-# Settings that every script and page reads as $config, such as $config.app.name (see the language guide).
-# config.<env>.yaml files (kscript make config staging) are laid over these with kscript --env <env>.
-app:
-  name: {{ title }}

@@ -65,6 +65,12 @@ test('quoted expressions in XML and page interpolation use member and variable s
   assert.doesNotMatch(scopeOf(tokens, 'literal'), /meta\.embedded\.expression/);
 });
 
+test('negation and a negated method are highlighted in XML expressions', async () => {
+  const tokens = tokenize(await load(), '<kscript><echo>{ ! null->!is_null() }</echo></kscript>');
+  assert.match(scopeOf(tokens, '!'), /keyword\.operator\.kscript/);
+  assert.match(scopeOf(tokens, 'is_null'), /entity\.name\.function\.method\.kscript/);
+});
+
 test('control flow and declaration tags are coloured like keywords', async () => {
   const grammar = await load();
   const tokens = tokenize(grammar, '<kscript>\n  <let name="n" value="3" />\n  <if test="$n gt 2"><echo>big</echo></if>\n  <fn name="f" value="1" />\n</kscript>');

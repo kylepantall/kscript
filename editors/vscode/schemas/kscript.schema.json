@@ -332,13 +332,13 @@
       "properties": {
         "environment": {
           "type": "string",
-          "description": "The environment used when neither kscript --env nor KSCRIPT_ENV names one. Its files (staging.yaml, config.staging.json, .env.staging) are layered over the base files."
+          "description": "The environment used when neither kscript --env nor KSCRIPT_ENV names one. Matching variants such as settings.staging.yaml and .env.staging layer over the listed files."
         },
         "files": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["config", ".env"],
-          "description": "The base files, in order. A name without an extension means .json, .yaml and .yml; end a name with ? if it may be missing."
+          "default": [".env"],
+          "description": "The base files, in order. List a .kscript or .ks.xml file with configure(environment), or a YAML, JSON or .env file. A name without an extension means .json, .yaml and .yml. End a name with ? if it may be missing."
         },
         "prefix": {
           "type": "string",
@@ -346,7 +346,7 @@
         },
         "root": {
           "type": "string",
-          "description": "The folder the files are in, relative to kscript.json. Default: each script's own folder."
+          "description": "The folder the files are in, relative to kscript.json. Default: the project folder."
         },
         "required": {
           "type": "array",

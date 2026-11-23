@@ -197,7 +197,7 @@ namespace KScript.Language.Features
                                 {
                                     tokens.Add(new SemanticToken(span, SemanticTokenType.Keyword, SemanticTokenModifiers.None));
                                 }
-                                else if (prev.Is("->"))
+                                else if (prev.Is("->") || (prev.Is("!") && i >= 2 && list[i - 2].Is("->")))
                                 {
                                     tokens.Add(new SemanticToken(span, SemanticTokenType.Method, SemanticTokenModifiers.DefaultLibrary));
                                 }

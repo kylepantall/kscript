@@ -1,0 +1,19 @@
+--- make
+description: Script that returns settings as $config, for the project or one environment
+category: Settings
+usage: <base|environment>
+example: kscript make config base
+example: kscript make config staging
+to: {{ paths.config }}/config{{#unless name in base, default, config}}.{{ kebab }}{{/unless}}{{ ext }}
+hint: List the base config script under config.files in kscript.json. Matching environment variants are loaded automatically.
+---
+fn configure(environment: string) {
+{{#if name in base, default, config}}
+  return {
+    app: { name: 'My app', debug: $environment == 'development' }
+    logging: { level: 'info' }
+  }
+{{else}}
+  return { app: { debug: $environment == 'development' or $environment == 'dev' or $environment == 'test' } }
+{{/if}}
+}

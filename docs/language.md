@@ -35,7 +35,7 @@ A `{ }` in double quotes always holds an expression, whatever it opens with: a v
 
 ## Expressions
 
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Comparisons are symbols and logic is words: write `and`, `or` and `not`, never `&&`, `||` or `!`. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
 Use `expression as Type` for a checked conversion, for example `$text as int`. The target can also be a declared record, enum or refinement type. [Checked conversions](types.md#checked-conversions-with-as)
 
@@ -460,6 +460,41 @@ Inside a catch, `throw if condition` rethrows the current error when the conditi
 
 Use `/// @throws Network` to document an error that callers may need to handle, including an error from a dynamically chosen function. Hover and signature help show known errors. A helper can let an error reach its caller. At a top-level script statement, `kscript check` and the editor warn when a known error can still escape ([KS5016](errors.md#ks5016)).
 
+### Throw with a value and a cause
+
+Use `throw Error(message: ..., value: ..., cause: ...)` to raise a generic error with extra data. The name before the parentheses sets the error type. Use `Error` for a generic error, a built-in type such as `Validation`, or a type you declare yourself. The named arguments become fields. `message:` sets the explanation and `cause:` holds the earlier error when you wrap one.
+
+```kscript try
+age = -1
+try {
+  try {
+    throw Validation "Age must be positive, got {$age}"
+  } catch Validation as original {
+    throw Error(
+      message: 'Could not save profile',
+      value: $age,
+      cause: $original
+    )
+  }
+} catch Error as err {
+  echo "{ $err.type }: { $err.message }"
+  echo "Rejected value: { $err['value'] }"
+  echo "Caused by: { $err.cause.message }"
+}
+```
+
+```text
+Error: Could not save profile
+Rejected value: -1
+Caused by: Age must be positive, got -1
+```
+
+Omit `cause:` when raising the first error. Use bracket lookup, such as `$err['value']`, for fields added directly to a built-in error. For fields callers should be able to discover and type-check, [declare an error type](#error-types) and catch that type. Its declared fields can be read with dot syntax, such as `$err.value`.
+
+If you already have a map with `type`, `message`, and other fields, throw the map directly with `throw $payload`. Passing the map as the first argument to `Error($payload)` converts it to message text. The error constructor offers named arguments in editor completion.
+
+In XML, the same throw is `<throw value="Error(message: 'Could not save profile', value: $age, cause: $original)" />`. The outer XML `value` attribute holds the entire error expression. The inner `value:` argument is the extra field on that error. For a type and message alone, `<throw type="Validation" message="Invalid age" />` corresponds to `throw Validation "Invalid age"`.
+
 ### Error types
 
 Declare your own error types with `error`. Fields work as in a [`type`](#typed-data), the message can use them, and `extends` says what kind of error it is:
@@ -515,7 +550,7 @@ A name in `catch` or `throw` that is neither declared nor built in still works (
 
 In the editor, hover over a project JSON or YAML setting such as `$config.passkeys.url` to see its type. Go to Definition on `url` opens the key in the project file that supplies it. This also works inside interpolated strings such as `"{$config.passkeys.url}/{$kind}/finish"`. Go to Definition on `$kind` opens the variable or parameter declaration.
 
-Every script can read settings without an import. `$config` reads `config.json`, `config.yaml` (or `config.yml`) and `.env` from the script's folder the first time it is used:
+Every script can read settings through `$config` without an import. For example, a project that lists `config.yaml` under `config.files` can read these settings:
 
 ```yaml
 # config.yaml
@@ -536,13 +571,39 @@ key = $config->require('api.key') // stops with a clear message when it's missin
 
 Money arithmetic reads directed exchange rates from `money.exchange_rates` in these settings. For example, `money.exchange_rates.EUR.GBP` supplies pounds per euro when adding a euro amount to a pound balance. See [Money](types.md#money) for the configuration and a runnable example.
 
-**Environments.** `kscript --env staging script.kscript` (or `KSCRIPT_ENV=staging`, or `config(env: staging)`) layers the environment's files over the base files. Later files win, and maps merge field by field:
+**Project sources.** List settings files in the manifest. Without `config.files`, a project loads optional `.env` and its environment variant. Standalone scripts outside a project also support the existing `config.json` and `config.yaml` discovery.
 
-1. `config.json`, `config.yaml`, `config.yml`, then `.env`
-2. `config.staging.json`, `config.staging.yaml`, `config.staging.yml`, then `.env.staging`
-3. `staging.json`, `staging.yaml`, `staging.yml`
-4. with `config.user` in `kscript.json` (or `config(user: true)`), the person's own `config.json`, `config.yaml` or `config.yml` from the app's config folder (see [App folders](storage.md#the-persons-own-settings-configuser))
-5. environment variables with the prefix, when there is one
+```json
+{
+  "config": { "files": ["config/config.kscript", ".env?"] }
+}
+```
+
+A config script exports `configure(environment)`. The loader calls it with the selected environment, or `development` when none is set. The function returns a map. Its values keep their KScript types, and paths inside the script resolve from its own folder.
+
+```kscript
+fn configure(environment: string) {
+  return {
+    http: { timeout: $environment == 'production' ? 8s : 30s }
+    name: @env('APP_NAME', default: 'My app')
+  }
+}
+```
+
+The app sees the returned fields through `$config`. The configuration script can use `@env()`, `$env`, and imported functions or packages. It can load data with `@read_yaml()` from KScript.IO. `$config` becomes available to the app once configuration has finished loading.
+
+**YAML expressions.** To use YAML as a config source, set `"files": ["settings.yaml", ".env?"]`. Quoted scalars can contain KScript expressions in `{ }`. A whole expression keeps its type. An expression surrounded by text is interpolated. `{{` and `}}` emit literal braces. Use the explicit `!kscript` tag for a whole expression and quote the braces when the expression contains YAML punctuation.
+
+```yaml
+http:
+  timeout: !kscript { 8s }
+  retries: '{ $environment == "production" ? 2 : 0 }'
+  label: 'api-{ $environment }-{{literal}}'
+```
+
+YAML expressions can use `$environment`, `$env`, and Core functions such as `@env()`. Files read directly with `@read_yaml()` are plain data.
+
+**Environments.** Select one with `kscript --env staging script.kscript`, `KSCRIPT_ENV=staging`, or the manifest's `config.environment`. The loader applies named base files in order, then matching variants such as `config.staging.kscript`, `settings.staging.yaml` and `.env.staging`. Optional user settings and prefixed process environment variables apply last. Maps merge field by field.
 
 **Environment variables.** With a prefix, variables override the files, and `__` nests: with `config(prefix: APP_)`, `APP_DATABASE__HOST=db.internal` sets `database.host`. Names don't depend on case, so `$config.database.host` and `$config.DATABASE.HOST` are the same setting. Values such as `true`, `false` and `8080` become booleans and numbers.
 
@@ -557,7 +618,7 @@ config(files: ['themes/dark.json'], into: theme) // a separate set of settings i
 
 `files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `$text->yaml()`, `$value->to_yaml()` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
 
-Pages served by `kscript serve` read settings from the site folder. They never change environment variables, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
+Pages served by `kscript serve` read project settings and can use `@env()` for configured .env values. They leave the process environment alone, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
 
 ## Logging: $log
 

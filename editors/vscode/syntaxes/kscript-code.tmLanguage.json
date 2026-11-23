@@ -350,7 +350,7 @@
       "name": "entity.name.function.kscript"
     },
     "method": {
-      "match": "(?<=->)\\s*([A-Za-z_][\\w]*)",
+      "match": "(?:(?<=->)|(?<=->!))\\s*([A-Za-z_][\\w]*)",
       "captures": {
         "1": {
           "name": "support.function.kscript"

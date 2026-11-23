@@ -101,7 +101,8 @@ namespace KScript.Runtime
             if (FileRoot == null && (path == "~" || path.StartsWith("~/", StringComparison.Ordinal) || path.StartsWith("~\\", StringComparison.Ordinal)))
                 path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), path.Length > 2 ? path.Substring(2) : string.Empty);
             if (FileRoot != null) path = path.TrimStart('/', '\\');
-            string full = Path.GetFullPath(Path.Combine(FileRoot ?? baseDirectory ?? WorkingDirectory, path));
+            string basePath = EvaluatingConfig ? baseDirectory ?? FileRoot : FileRoot ?? baseDirectory;
+            string full = Path.GetFullPath(Path.Combine(basePath ?? WorkingDirectory, path));
             CheckPath(full, path);
             return full;
         }
@@ -123,6 +124,9 @@ namespace KScript.Runtime
 
         /// <summary>Where <c>$config</c> reads settings from (kscript --env, kscript.json's config section). Null for the defaults.</summary>
         public ConfigOptions Config { get; set; }
+
+        internal bool EvaluatingConfig { get; init; }
+        internal IReadOnlyDictionary<string, string> ConfigEnvironment { get; set; }
 
         /// <summary>The run's logging: providers and levels, set up from $config.logging on first use.</summary>
         public LogHub Logs

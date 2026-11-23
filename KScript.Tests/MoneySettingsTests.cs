@@ -10,7 +10,7 @@ public sealed class MoneySettingsTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(project, "scripts"));
         Directory.CreateDirectory(Path.Combine(project, "settings"));
-        File.WriteAllText(Path.Combine(project, "kscript.json"), """{"config":{"root":"settings","environment":"stage"}}""");
+        File.WriteAllText(Path.Combine(project, "kscript.json"), """{"config":{"root":"settings","files":["config?"],"environment":"stage"}}""");
     }
 
     public void Dispose() => Directory.Delete(project, recursive: true);

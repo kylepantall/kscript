@@ -243,11 +243,16 @@ namespace KScript.Language.Tests
             Assert.Contains("kscript check --output json", section);
             Assert.Contains("1 script, 0 test files. Its own 1 function and 0 types, enums and consts", section);
             Assert.Contains("runs `*.test.kscript` files", section);
+            Assert.Contains("Required project conventions", section);
+            Assert.Contains("kscript fmt --check", section);
+            Assert.DoesNotContain("kscript make route", section);
+            Assert.DoesNotContain("Keep presentation in views", section);
             Assert.Contains("- `KScript.Core`: The language itself", section);
             Assert.DoesNotContain("Entry point", section);
             Assert.True(AgentDocs.EstimateTokens(section) < 2000);
 
             Write("kscript.json", "{ \"name\": \"demo\", \"make\": { \"syntax\": \"xml\" } }");
+            Assert.Contains("runs `*.test.ks.xml` files", AgentDocs.AgentsSection(AgentDocs.Read(dir)));
             Write("a.test.kscript", "import KScript.Test\n");
             Write("b.test.kscript", "import KScript.Test\n");
             Write("index.html", "<p>hi</p>");
@@ -256,16 +261,17 @@ namespace KScript.Language.Tests
             Assert.Contains("XML attributes can't hold a raw `<`", xml);
             Assert.Contains("runs the 2 test files", xml);
             Assert.Contains("1 page", xml);
+            Assert.Contains("Keep presentation in views", xml);
             Assert.Contains("`.ks.xml`", xml);
         }
 
         [Fact]
         public void AgentsShowDomainTypesAndFrameworkPlacement()
         {
-            Write("kscript.json", """{ "name": "portal", "packages": ["KScript.Http"] }""");
-            Write("natives/passkey-session-key.kscript", """
-                type PasskeySessionKey with [string] {
-                  min: 8
+            Write("kscript.json", """{ "name": "inventory", "packages": ["KScript.Http"] }""");
+            Write("natives/item-key.kscript", """
+                type ItemKey with [string] {
+                  min: 5
                   normalize: $value->trim()
                   fn size() => $value->count()
                 }
@@ -275,12 +281,14 @@ namespace KScript.Language.Tests
             string section = AgentDocs.AgentsSection(project);
             Assert.Contains("kscript make native", section);
             Assert.Contains("kscript make request", section);
+            Assert.Contains("type the controller’s `json` parameter", section);
+            Assert.Contains("cover applicable rejected inputs and recovery", section);
             Assert.Contains("KS5016", section);
             string index = AgentDocs.Index(project);
-            Assert.Contains("type PasskeySessionKey with [string]", index);
-            Assert.Contains("min: 8", index);
+            Assert.Contains("type ItemKey with [string]", index);
+            Assert.Contains("min: 5", index);
             Assert.Contains("normalize: $value->trim()", index);
-            Assert.Contains("PasskeySessionKey->size()", index);
+            Assert.Contains("ItemKey->size()", index);
             Assert.Contains("model Device", index);
             Assert.DoesNotContain("type this", index);
         }

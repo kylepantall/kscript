@@ -263,10 +263,6 @@ namespace KScript.Syntax
             Token t = Peek();
             if (t.IsWord("not") || t.Is("!"))
             {
-                if (t.Is("!"))
-                {
-                    Error(t.Span, "Use 'not' instead of '!'.");
-                }
                 Advance();
                 ExprNode operand = ParseNot();
                 return new UnaryNode { Operator = "not", Operand = operand, Span = TextSpan.FromBounds(t.Span.Start, operand.Span.End) };
@@ -403,16 +399,20 @@ namespace KScript.Syntax
 
                 if (t.Is("->"))
                 {
-                    if (textMode && !(Peek(1).Kind == TokenKind.Identifier && Peek(1).Span.Start == t.Span.End))
+                    Token bang = Peek(1);
+                    bool negate = bang.Is("!") && bang.Span.Start == t.Span.End;
+                    Token name = Peek(negate ? 2 : 1);
+                    int nameStart = negate ? bang.Span.End : t.Span.End;
+                    if (textMode && !(name.Kind == TokenKind.Identifier && name.Span.Start == nameStart))
                     {
                         return node;
                     }
                     Advance();
-                    Token name = Peek();
+                    if (negate) Advance();
                     if (name.Kind != TokenKind.Identifier)
                     {
                         Error(name.Span.Length > 0 ? name.Span : t.Span, "Expected a method name after '->'.");
-                        return new MethodCallNode { Target = node, Name = string.Empty, NameSpan = new TextSpan(t.Span.End, 0), Span = TextSpan.FromBounds(node.Span.Start, t.Span.End) };
+                        return new MethodCallNode { Target = node, Name = string.Empty, NameSpan = new TextSpan(nameStart, 0), Span = TextSpan.FromBounds(node.Span.Start, nameStart) };
                     }
                     Advance();
                     ArgumentList args = null;
@@ -432,6 +432,8 @@ namespace KScript.Syntax
                         ArgumentList = args,
                         Span = TextSpan.FromBounds(node.Span.Start, args?.Span.End ?? name.Span.End),
                     };
+                    if (negate)
+                        node = new UnaryNode { Operator = "not", Operand = node, Span = node.Span };
                     continue;
                 }
 

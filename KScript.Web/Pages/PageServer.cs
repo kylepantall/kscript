@@ -52,6 +52,7 @@ namespace KScript.Pages
         }
 
         public string Root { get; }
+        public KScript.Runtime.ConfigValue StartupConfig { get; set; }
 
         /// <summary>The folder of translation files that /fr/... prefixes are checked against.</summary>
         public string LocalesFolder { get; set; } = "locales";
@@ -375,7 +376,7 @@ namespace KScript.Pages
                     if (error != null) return error;
                     if (route.Locale != null) built[RequestFields.Locale.Name] = route.Locale;
                     PageResult rendered = site.RenderPage == null
-                        ? PageRenderer.RenderFile(new PageContext(site.Root, built), route.File, route.Params)
+                        ? PageRenderer.RenderFile(new PageContext(site.Root, built) { StartupConfig = site.StartupConfig }, route.File, route.Params)
                         : site.RenderPage(route, built);
                     // A page that started a session (KScript.Auth's @csrf_field(), say) sends its cookie.
                     rendered.Cookies.AddRange(KScript.Runtime.RequestHooks.Finish(built));
@@ -387,7 +388,7 @@ namespace KScript.Pages
                     string notFound = Path.Combine(site.Root, "_404.html");
                     if (File.Exists(notFound))
                     {
-                        var ctx = new PageContext(site.Root, await BuildRequestAsync(request));
+                        var ctx = new PageContext(site.Root, await BuildRequestAsync(request)) { StartupConfig = site.StartupConfig };
                         var page = PageRenderer.RenderFile(ctx, "_404.html");
                         page.Status = 404;
                         return page;
@@ -422,7 +423,7 @@ namespace KScript.Pages
             if (route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 404, Body = "Page not found." };
             if (route.Locale != null) request[RequestFields.Locale.Name] = route.Locale;
 
-            var ctx = new PageContext(site.Root, request) { Live = ev };
+            var ctx = new PageContext(site.Root, request) { Live = ev, StartupConfig = site.StartupConfig };
             try
             {
                 return PageRenderer.RenderFile(ctx, route.File, route.Params);

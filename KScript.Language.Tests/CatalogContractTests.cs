@@ -3,6 +3,7 @@ using System.Reflection;
 using KScript.Runtime;
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
+using KScript.Language.Features;
 using KScript.Syntax;
 using KScript.Metadata;
 
@@ -17,10 +18,120 @@ namespace KScript.Language.Tests
     public class CatalogContractTests
     {
         private static readonly LanguageCatalog Catalog = LanguageCatalog.Default;
+        private static readonly LanguageService Editor = new LanguageService();
 
         public static IEnumerable<object[]> AllElements() => Catalog.Elements.Select(e => new object[] { e.Name });
 
         public static IEnumerable<object[]> AllCommands() => Catalog.Commands.Select(c => new object[] { c.Name });
+
+        public static IEnumerable<object[]> AllNativeTypes() => NativeTypes.Names.Select(name => new object[] { name });
+
+        [Theory]
+        [MemberData(nameof(AllCommands))]
+        public void CodeCommandsHaveHoverCompletionSignatureAndRecognition(string name)
+        {
+            CallableInfo command = Catalog.GetCommand(name);
+            string import = command.Package == "KScript.Core" || command.Package == null ? string.Empty : $"import {command.Package}\n";
+            string args = string.Join(", ", Enumerable.Repeat("'x'", command.MinArgs));
+            string text = import + $"echo @{name}({args})\n";
+            int start = text.IndexOf('@');
+            var analysis = Analyzer.AnalyzeFile(text, "catalog.kscript");
+
+            Assert.DoesNotContain(analysis.Diagnostics, d => d.Code is DiagnosticCodes.ArgumentCount or DiagnosticCodes.UnknownCommand or DiagnosticCodes.MissingImport);
+            Assert.Contains("@" + name + "(", Editor.GetHover(analysis, start + 1).Markdown);
+            bool offered = Editor.GetCompletions(analysis, start + 1).Any(item => item.Label == name || item.Label == "@" + name);
+            Assert.Equal(!command.Planned, offered);
+            Assert.Equal(command.Planned, analysis.Diagnostics.Any(d => d.Code == DiagnosticCodes.PlannedFeature));
+            int arguments = start + name.Length + 2;
+            var signature = Editor.GetSignatureHelp(analysis, arguments);
+            Assert.Contains(signature.Signatures, item => item.Label.StartsWith("@" + name + "(", StringComparison.Ordinal));
+
+            if (command.Planned) return;
+            var emptyCall = Analyzer.AnalyzeFile(import + $"echo @{name}()\n", "catalog.kscript");
+            if (command.MinArgs > 0)
+                Assert.Contains(emptyCall.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount);
+            var names = Editor.GetCompletions(emptyCall, arguments, "(").Select(item => item.Label).ToHashSet();
+            foreach (string parameter in command.Signatures.SelectMany(s => s.Parameters).Where(p => !p.Variadic).Select(p => p.Name).Distinct())
+                Assert.Contains(parameter + ":", names);
+        }
+
+        [Theory]
+        [MemberData(nameof(AllNativeTypes))]
+        public void CodeNativeTypesHaveHoverCompletionAndRecognition(string name)
+        {
+            string text = $"fn identity(value: {name}) => $value";
+            int start = text.IndexOf(": ", StringComparison.Ordinal) + 2;
+            var analysis = Analyzer.AnalyzeFile(text, "catalog.kscript");
+
+            Assert.Empty(analysis.Errors);
+            Assert.Contains(NativeTypes.Get(name).Description, Editor.GetHover(analysis, start + 1).Markdown);
+            (string incomplete, int caret) = WithCaret("fn identity(value: ‸) => $value");
+            Assert.Contains(Editor.GetCompletions(Editor.Analyze(incomplete, "catalog.kscript"), caret), item => item.Label == name);
+        }
+
+        [Theory]
+        [MemberData(nameof(AllElements))]
+        public void SpecialStatementsDescribeCodeAndKeepXmlAttributesInXml(string name)
+        {
+            if (CodeStatementHelp.For(name) is not string syntax) return;
+            ElementInfo element = Catalog.GetElement(name);
+            string code = LanguageService.ElementMarkdown(element, code: true);
+            Assert.Contains(syntax, code);
+            Assert.Equal(CodeStatementHelp.Options(element).Any(), code.Contains("| Argument |", StringComparison.Ordinal));
+            if (element.Attributes.Count > 0)
+                Assert.Contains("| Attribute |", LanguageService.ElementMarkdown(element));
+        }
+
+        [Theory]
+        [InlineData("echo(‸) 'Ready'", "format")]
+        [InlineData("error InvalidAge(‸) { age: int }", "status")]
+        public void CodeStatementOptionsUseTheActualArgumentList(string marked, string option)
+        {
+            (string text, int caret) = WithCaret(marked);
+            var analysis = Editor.Analyze(text, "catalog.kscript");
+            Assert.Contains(Editor.GetCompletions(analysis, caret, "("), item => item.Label == option);
+            var signature = Assert.Single(Editor.GetSignatureHelp(analysis, caret).Signatures);
+            Assert.Contains(signature.Parameters, parameter => parameter.Label.StartsWith(option, StringComparison.Ordinal));
+            Assert.DoesNotContain(signature.Parameters, parameter => parameter.Label.StartsWith("name:", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void CodeKeywordHoverMatchesTheStatementTheCheckerAccepts()
+        {
+            const string code = """
+                fn run(items: list) {
+                  for item in $items {
+                    if $item == 0 {
+                      continue
+                    } elif $item == 1 {
+                      break
+                    } else {
+                      echo $item
+                    }
+                  }
+                  while false {
+                    echo 'loop'
+                  }
+                  try {
+                    throw Error(message: 'Oops')
+                  } catch Error as err {
+                    echo $err.message
+                  } finally {
+                    echo 'done'
+                  }
+                  return 1
+                }
+
+                echo @run([])
+                """;
+            var analysis = Editor.Analyze(code, "catalog.kscript");
+            Assert.Empty(analysis.Errors);
+            foreach (string word in new[] { "fn", "for", "if", "continue", "elif", "break", "else", "while", "try", "throw", "catch", "finally", "return" })
+            {
+                int start = code.IndexOf(word, StringComparison.Ordinal);
+                Assert.Contains(CodeStatementHelp.For(word), Editor.GetHover(analysis, start + 1).Markdown);
+            }
+        }
 
         [Fact]
         public void EveryInstalledPackageIsInTheCatalog()

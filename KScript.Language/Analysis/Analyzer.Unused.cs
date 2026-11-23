@@ -133,6 +133,11 @@ namespace KScript.Language.Analysis
             // Middleware named in kscript.json (http.middleware) is called by the server.
             HashSet<string> mentioned = ConfigMentions();
             candidates.RemoveAll(s => mentioned.Contains(s.Name));
+            if (result.Path != null && candidates.Any(s => s.Name == "configure" && s.DeclaringElement.Parent?.Name == "kscript")
+                && IsProjectConfigScript(result.Path))
+            {
+                candidates.RemoveAll(s => s.Name == "configure" && s.DeclaringElement.Parent?.Name == "kscript");
+            }
             foreach (Symbol fn in candidates)
             {
                 ProjectUses uses = project();
@@ -153,6 +158,25 @@ namespace KScript.Language.Analysis
         {
             string first = directory != null ? System.IO.Path.GetRelativePath(directory, uses.Importers[0]).Replace('\\', '/') : uses.Importers[0];
             return uses.Importers.Count == 1 ? first + " imports" : $"{first} and {uses.Importers.Count - 1} other file{(uses.Importers.Count == 2 ? string.Empty : "s")} import";
+        }
+
+        private bool IsProjectConfigScript(string path)
+        {
+            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                string manifest = System.IO.Path.Combine(dir, ProjectConfig.FileName);
+                if (files.ReadText(manifest) is not string json) continue;
+                try
+                {
+                    var project = ProjectConfig.Parse(json, manifest, files.FileExists, files.ReadText);
+                    return KScript.Runtime.ConfigLoader.IsConfiguredScript(project.ConfigOptions(), System.IO.Path.GetFullPath(path));
+                }
+                catch (ProjectConfigException)
+                {
+                    return false;
+                }
+            }
+            return false;
         }
 
         /// <summary>Every string in the nearest kscript.json, and the part of each before a ':' (throttle:30).</summary>

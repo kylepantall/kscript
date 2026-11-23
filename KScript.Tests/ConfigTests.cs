@@ -50,6 +50,80 @@ public sealed class ConfigTests : IDisposable
         Assert.Throws<KScriptException>(() => Run(body, options, setup));
 
     [Fact]
+    public void Projects_without_config_files_only_load_dotenv()
+    {
+        string key = Unique("FROM_ENV");
+        FileOf("kscript.json", "{}");
+        FileOf("config.yaml", "ignored: true");
+        FileOf(".env", $"{key}=ready\n");
+        string output = Run($"<echo>{{@env('{key}')}} {{$env.{key}}} {{$config.ignored ?? 'absent'}}</echo>",
+            setup: host => host.FileRoot = dir);
+        Assert.Equal("ready ready absent\n", output);
+        Assert.Null(Environment.GetEnvironmentVariable(key));
+    }
+
+    [Fact]
+    public void Standalone_code_can_read_dotenv_without_accessing_config()
+    {
+        string key = Unique("STANDALONE");
+        FileOf(".env", $"{key}=yes\n");
+        Assert.Equal("yes yes\n", Run($"<echo>{{@env('{key}')}} {{$env.{key}}}</echo>"));
+        Assert.Null(Environment.GetEnvironmentVariable(key));
+    }
+
+    [Fact]
+    public void Manifest_config_script_uses_the_environment_and_can_read_local_yaml()
+    {
+        string key = Unique("TIMEOUT_LABEL");
+        FileOf("kscript.json", """{"config":{"files":["settings/config.kscript",".env?"],"environment":"production"}}""");
+        FileOf(".env", $"{key}=live\n");
+        FileOf("settings/limits.yaml", "retries: 2");
+        FileOf("settings/config.kscript", $$"""
+            import KScript.IO
+            fn configure(environment: string) {
+              return {
+                timeout: $environment == 'production' ? 8s : 30s
+                label: @env('{{key}}')
+                limits: @read_yaml('limits.yaml')
+              }
+            }
+            """);
+        Assert.Equal("duration 8s live 2\n", Run(
+            "<echo>{$config.timeout->type()} {$config.timeout} {$config.label} {$config.limits.retries}</echo>",
+            setup: host => host.FileRoot = dir));
+        Assert.Null(Environment.GetEnvironmentVariable(key));
+    }
+
+    [Fact]
+    public void Explicit_yaml_supports_expressions_and_literal_braces()
+    {
+        string key = Unique("LITERAL");
+        Env(key, "{ $missing }");
+        FileOf("kscript.json", """{"config":{"files":["app.yaml"],"environment":"production"}}""");
+        FileOf("app.yaml", """
+            timeout: !kscript { 8s }
+            retries: '{ $environment == "production" ? 2 : 0 }'
+            label: 'api-{ $environment }-{{literal}}'
+            external: '${TEST_ENV_NAME}'
+            map: { enabled: true }
+            """.Replace("TEST_ENV_NAME", key, StringComparison.Ordinal));
+        Assert.Equal("duration 8s 2 api-production-{literal} { $missing } true\n",
+            Run("<echo>{$config.timeout->type()} {$config.timeout} {$config.retries} {$config.label} {$config.external} {$config.map.enabled}</echo>"));
+    }
+
+    [Fact]
+    public void Failed_config_reload_preserves_the_previous_settings()
+    {
+        FileOf("kscript.json", """{"config":{"files":["config.kscript"]}}""");
+        FileOf("config.kscript", "fn configure(environment: string) => { value: 42 }");
+        Assert.Equal("42\n", Run("""
+            <import package="KScript.IO" />
+            <do>@write_text('config.kscript', "fn configure(environment: string) => 'invalid'")</do>
+            <try><do>$config->reload()</do><catch type="Config"><echo>{$config.value}</echo></catch></try>
+            """));
+    }
+
+    [Fact]
     public void Config_reads_json_yaml_and_env_files_from_the_script_folder()
     {
         FileOf("config.json", "{ \"name\": \"shop\", \"server\": { \"port\": 8080, \"host\": \"localhost\" } }");

@@ -14,7 +14,7 @@ namespace KScript.Language.Analysis
     public sealed partial class Analyzer
     {
         /// <summary>The fields every caught error has.</summary>
-        private static readonly string[] BaseErrorFields = { "type", "message", "line", "column", "file", "status", "cause" };
+        internal static readonly string[] BaseErrorFields = { "type", "message", "line", "column", "file", "status", "cause" };
 
         /// <summary>The error types this document declares, by name.</summary>
         private readonly Dictionary<string, DeclaredError> declaredErrors = new Dictionary<string, DeclaredError>(StringComparer.Ordinal);
@@ -355,6 +355,12 @@ namespace KScript.Language.Analysis
             if (call.Arguments.Count(a => a.Name == null) > 1)
             {
                 Report(callSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount, $"{id.Name}() takes its fields by name, such as {id.Name}(id: 42), and at most one message.");
+            }
+            if (call.Arguments.FirstOrDefault(argument => argument.Name == null)?.Value is MapNode payload
+                && payload.Entries.Any(entry => entry.Key is "type" or "message" or "cause"))
+            {
+                Report(region.Source.ToSource(payload.Span), DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                    $"A map passed to {id.Name}() becomes its message text. Pass named arguments like {id.Name}(message: 'Oops', cause: $original) or throw the map directly.");
             }
             if (!declared)
             {

@@ -1537,7 +1537,9 @@ namespace KScript.Language.Analysis
                     {
                         AnalyzeExpr(node, region, scope, ExprContext.Value);
                     }
-                    bool isCall = node is CommandCallNode || node is MethodCallNode || node is CallNode || node is PipeNode;
+                    ExprNode effect = node;
+                    while (effect is UnaryNode { Operator: "not" } negation) effect = negation.Operand;
+                    bool isCall = effect is CommandCallNode or MethodCallNode or CallNode or PipeNode;
                     if (!requireEffect || !isCall)
                     {
                         Report(region.Source.ToSource(node.Span), DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,

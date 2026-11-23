@@ -11,9 +11,9 @@
     // Every route logs its request; routes/api{{ ext }} adds the app's own middleware.
     "middleware": ["log"]
   },
-  // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
+  // Load project settings from the listed files.
   "config": {
-    "root": "config"
+    "files": ["config/config{{ ext }}", ".env?"]
   },
   // kscript make writes new scripts and tests in this syntax: kscript (.kscript files) or xml (.ks.xml).
   "make": {
@@ -25,7 +25,7 @@
   },
   "test": {
     "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"],
-    // Tests run with config/config.test.yaml laid over config/config.yaml, so they get their own database.
+    // The config script gives tests their own database.
     "env": "test"
   }
 }

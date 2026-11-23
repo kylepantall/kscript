@@ -181,6 +181,7 @@ namespace KScript.Runtime
         {
             var source = new SourceText(string.Empty);
             var module = new Module(this, path, source, MarkupParser.Parse(source, DocumentKind.Page)) { HasRun = true };
+            ConfigValue.PrepareProject(Host, module.Directory);
             module.ProjectExtensions = ProjectExtensionsFor(module);
             module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
             AddPackage(module, Packages.Core, null);
@@ -701,6 +702,7 @@ namespace KScript.Runtime
             module.Running = true;
             try
             {
+                ConfigValue.PrepareProject(Host, module.Directory);
                 module.ProjectExtensions = ProjectExtensionsFor(module);
                 module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
                 foreach (VariableDefinition v in module.Variables.Values)

@@ -33,6 +33,31 @@ public class ConfigNavigationTests
     }
 
     [Fact]
+    public void ScriptConfigFieldsNavigateWithoutExecutingTheConfig()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "project-settings-script");
+        string path = Path.Combine(dir, "main.kscript");
+        string settings = Path.Combine(dir, "config.kscript");
+        const string config = """
+            fn configure(environment: string) {
+              return { http: { timeout: $environment == 'test' ? 1s : 30s } }
+            }
+            """;
+        const string code = "echo $config.http.timeout";
+        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), """{"config":{"files":["config.kscript"]}}""")
+            .Add(settings, config).Add(path, code);
+        var service = new LanguageService(files: files);
+        var analysis = service.Analyze(code, path);
+        int offset = code.IndexOf(".timeout", StringComparison.Ordinal) + 2;
+        var source = new SourceText(config);
+
+        var location = Assert.Single(service.GetDefinition(analysis, offset));
+        Assert.Equal(settings, location.Path);
+        Assert.Equal("timeout", config[source.GetOffset(location.Start.Line, location.Start.Character)..source.GetOffset(location.End.Line, location.End.Character)]);
+        Assert.Contains("timeout: duration", service.GetHover(analysis, offset).Markdown);
+    }
+
+    [Fact]
     public void LayeredSettingsUseTheLastFileThatActuallySuppliesTheKey()
     {
         string dir = Path.Combine(Path.GetTempPath(), "project-setting-overlay");

@@ -1,0 +1,32 @@
+// The selected environment is passed during config loading.
+fn configure(environment: string) {
+  testing = $environment == 'test'
+{{#unless db is none}}
+{{#if db is sqlite}}
+  default_url = 'sqlite:data/app.sqlite'
+{{/if}}
+{{#if db is postgres}}
+  default_url = 'postgres://{{ snake }}:secret@localhost:5432/{{ snake }}'
+{{/if}}
+{{#if db is mysql}}
+  default_url = 'mysql://{{ snake }}:secret@localhost:3306/{{ snake }}'
+{{/if}}
+  configured_url = @env('DATABASE_URL', default: $default_url)
+  database_url = $testing ? 'sqlite::memory:' : $configured_url
+{{/unless}}
+  return {
+    app: { name: $testing ? '{{ title }} (tests)' : '{{ title }}' }
+{{#if db is none}}
+    notes: { file: $testing ? 'data/test/notes.json' : 'data/notes.json' }
+{{else}}
+    database: {
+      connections: {
+        main: { url: $database_url }
+      }
+    }
+{{/if}}
+{{#if cache}}
+    cache: { store: $testing ? 'memory' : @env('CACHE_STORE', default: 'memory'), ttl: 5m }
+{{/if}}
+  }
+}

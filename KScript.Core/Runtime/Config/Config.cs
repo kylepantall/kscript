@@ -43,6 +43,8 @@ namespace KScript.Runtime
         public string UserFolder { get; set; }
 
         public static readonly string[] DefaultFiles = { "config", ".env" };
+        public static readonly IReadOnlyList<string> ProjectDefaultFiles = new[] { ".env" };
+        internal bool ExplicitProjectFiles { get; init; }
 
         public ConfigOptions Clone() => new ConfigOptions
         {
@@ -54,6 +56,7 @@ namespace KScript.Runtime
             Required = Required.ToList(),
             ExportEnv = ExportEnv,
             UserFolder = UserFolder,
+            ExplicitProjectFiles = ExplicitProjectFiles,
         };
     }
 
@@ -74,6 +77,12 @@ namespace KScript.Runtime
 
         /// <summary>The settings and the sources they came from, later sources winning.</summary>
         public static (Dictionary<string, object> Values, List<ConfigSource> Sources, string Environment) Load(ConfigOptions options, KScriptHost host, string directory)
+        {
+            var loaded = LoadWithEnvironment(options, host, directory);
+            return (loaded.Values, loaded.Sources, loaded.Environment);
+        }
+
+        internal static (Dictionary<string, object> Values, List<ConfigSource> Sources, string Environment, Dictionary<string, string> Env) LoadWithEnvironment(ConfigOptions options, KScriptHost host, string directory)
         {
             string environment = Clean(options.Environment) ?? Clean(System.Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
             if (environment != null && !Regex.IsMatch(environment, @"^[A-Za-z0-9_.\-]+$"))
@@ -129,12 +138,18 @@ namespace KScript.Runtime
                     sources.Add(new ConfigSource { Name = fileName, Path = layer.Path, Kind = "env-file" });
                     continue;
                 }
-                string text = File.ReadAllText(layer.Path);
-                object parsed = layer.Path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? ParseJson(text, fileName) : Yaml.Parse(text, fileName);
+                bool script = IsScript(layer.Path);
+                bool json = layer.Path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+                bool expressions = !script && !json && options.Files != null && !user.Contains(layer.Path);
+                string text = script ? null : File.ReadAllText(layer.Path);
+                object parsed = script ? ConfigEvaluation.RunScript(host, layer.Path, environment, dotenv)
+                    : json ? ParseJson(text, fileName)
+                    : expressions ? ConfigEvaluation.ReadYaml(host, layer.Path, text, environment, dotenv, Lookup)
+                    : Yaml.Parse(text, fileName);
                 if (parsed == null) { sources.Add(new ConfigSource { Name = fileName, Path = layer.Path, Kind = "file" }); continue; }
                 if (parsed is not Dictionary<string, object> map)
                     throw new KScriptException($"{fileName} should hold settings by name (a map), but holds {Values.Describe(parsed)}.", "Config");
-                Merge(values, ToConfig(map, Lookup));
+                Merge(values, ToConfig(map, script || expressions ? null : Lookup));
                 sources.Add(new ConfigSource { Name = fileName, Path = layer.Path, Kind = "file" });
             }
             if (!string.IsNullOrEmpty(options.Prefix))
@@ -158,9 +173,11 @@ namespace KScript.Runtime
             if (absent.Count > 0)
             {
                 string hint = options.Prefix != null ? $", or set {string.Join(", ", absent.Select(a => EnvName(options.Prefix, a)))}" : string.Empty;
-                throw new KScriptException($"These settings are required but not set: {string.Join(", ", absent)}. Add them to {(sources.Count(s => s.Kind != "defaults") > 0 ? string.Join(" or ", sources.Where(s => s.Kind != "defaults" && s.Kind != "environment").Select(s => s.Name)) : "config.yaml")}{hint}.", "Config");
+                string source = string.Join(" or ", sources.Where(s => s.Kind is "file" or "env-file").Select(s => s.Name));
+                if (source.Length == 0) source = options.ExplicitProjectFiles ? "a file listed in kscript.json under config.files" : "config.yaml";
+                throw new KScriptException($"These settings are required but not set: {string.Join(", ", absent)}. Add them to {source}{hint}.", "Config");
             }
-            return (values, sources, environment);
+            return (values, sources, environment, dotenv);
         }
 
         /// <summary>The ordered project sources. The editor uses these same candidates to link a setting to its key.</summary>
@@ -168,7 +185,7 @@ namespace KScript.Runtime
             Func<string, bool> fileExists, out List<string> missing)
         {
             bool defaults = options.Files == null;
-            List<string> names = options.Files ?? ConfigOptions.DefaultFiles.ToList();
+            IReadOnlyList<string> names = options.Files ?? (options.ExplicitProjectFiles ? ConfigOptions.ProjectDefaultFiles : ConfigOptions.DefaultFiles);
 
             // Every layer, in the order it applies: the base files, then the environment's files.
             var layers = new List<(string Path, bool EnvFile)>();
@@ -192,7 +209,8 @@ namespace KScript.Runtime
                     layers.AddRange(EnvironmentCandidates(name, environment).Select(c => Path.Combine(root, c)).Where(fileExists).Select(f => (f, IsEnvFile(f))));
                 }
                 // staging.yaml / staging.json: a file named after the environment.
-                layers.AddRange(Extensions.Select(e => Path.Combine(root, environment + e)).Where(fileExists).Select(f => (f, false)));
+                if (!options.ExplicitProjectFiles)
+                    layers.AddRange(Extensions.Select(e => Path.Combine(root, environment + e)).Where(fileExists).Select(f => (f, false)));
             }
             return layers.Distinct().ToList();
         }
@@ -208,6 +226,29 @@ namespace KScript.Runtime
             return name == ".env" || name.StartsWith(".env.", StringComparison.Ordinal) || name.EndsWith(".env", StringComparison.OrdinalIgnoreCase);
         }
 
+        internal static bool IsScript(string path) =>
+            path.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase);
+
+        internal static bool IsConfiguredScript(ConfigOptions options, string path)
+        {
+            if (!IsScript(path) || options.Files == null) return false;
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            foreach (string entry in options.Files)
+            {
+                string file = entry.Trim().TrimEnd('?').Trim();
+                if (!IsScript(file)) continue;
+                string source = Path.GetFullPath(Path.Combine(options.Root, file));
+                if (path.Equals(source, comparison)) return true;
+                string extension = source.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) ? ".ks.xml" : ".kscript";
+                string stem = source.Substring(0, source.Length - extension.Length) + ".";
+                if (path.StartsWith(stem, comparison) && path.EndsWith(extension, comparison)
+                    && path.Length > stem.Length + extension.Length
+                    && Regex.IsMatch(path.Substring(stem.Length, path.Length - stem.Length - extension.Length), @"^[A-Za-z0-9_.\-]+$"))
+                    return true;
+            }
+            return false;
+        }
+
         private static IEnumerable<string> Candidates(string name) =>
             IsEnvFile(name) || Path.HasExtension(name) ? new[] { name } : Extensions.Select(e => name + e);
 
@@ -216,7 +257,10 @@ namespace KScript.Runtime
         {
             if (name == ".env" || name.EndsWith("/.env", StringComparison.Ordinal)) return new[] { name + "." + environment };
             if (Path.HasExtension(name) && !IsEnvFile(name))
-                return new[] { Path.ChangeExtension(name, null) + "." + environment + Path.GetExtension(name) };
+            {
+                string extension = name.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase) ? ".ks.xml" : Path.GetExtension(name);
+                return new[] { name.Substring(0, name.Length - extension.Length) + "." + environment + extension };
+            }
             if (IsEnvFile(name)) return new[] { name + "." + environment };
             return Extensions.Select(e => name + "." + environment + e);
         }
@@ -246,6 +290,8 @@ namespace KScript.Runtime
         };
 
         private static Dictionary<string, object> ToConfig(Dictionary<string, object> map, Func<string, string> lookup) => (Dictionary<string, object>)ToConfig((object)map, lookup);
+
+        internal static Dictionary<string, object> CopySettings(Dictionary<string, object> map) => ToConfig(map, null);
 
         /// <summary>NAME=value pairs as settings: a prefix is removed, __ nests (DATABASE__HOST is database.host) and names are lower-cased.</summary>
         private static Dictionary<string, object> FromPairs(IEnumerable<KeyValuePair<string, string>> pairs, string prefix, bool requirePrefix)
@@ -362,6 +408,39 @@ namespace KScript.Runtime
             }
         }
 
+        internal static void PrepareProject(KScriptHost host, string directory)
+        {
+            if (host.EvaluatingConfig) return;
+            ConfigValue config = For(host, directory);
+            if (config.options.ExplicitProjectFiles)
+            {
+                config.EnsureLoaded();
+            }
+            else if (host.FileRoot == null && host.Config == null && host.ConfigEnvironment == null)
+            {
+                // A standalone script can use @env() before ever reading $config.
+                var dotenv = new ConfigOptions { ExplicitProjectFiles = true, ExportEnv = false };
+                host.ConfigEnvironment = ConfigLoader.LoadWithEnvironment(dotenv, host, directory).Env;
+            }
+        }
+
+        /// <summary>A request gets the loaded settings and can reload its own copy.</summary>
+        internal void CopyTo(KScriptHost target)
+        {
+            lock (this)
+            {
+                EnsureLoaded();
+                target.ConfigEnvironment = host.ConfigEnvironment;
+                target.Items[HostKey] = new ConfigValue(target, directory, options.Clone())
+                {
+                    IsShared = true,
+                    values = ConfigLoader.CopySettings(values),
+                    sources = sources,
+                    environment = environment,
+                };
+            }
+        }
+
         /// <summary>
         /// The config settings of the project around a folder, for hosts that weren't given any (routes, pages and
         /// tests): its kscript.json "config" section, with files read from the project folder unless config.root
@@ -406,21 +485,32 @@ namespace KScript.Runtime
 
         private void EnsureLoaded()
         {
-            if (values != null) return;
-            var loaded = ConfigLoader.Load(options, host, directory);
+            lock (this)
+            {
+                if (values == null) Load(options);
+            }
+        }
+
+        private void Load(ConfigOptions next)
+        {
+            if (host.EvaluatingConfig)
+                throw new KScriptException("A configuration expression or script cannot read or reload $config while it is being loaded.", "Config");
+            var loaded = ConfigLoader.LoadWithEnvironment(next, host, directory);
             if (IsShared) MoneyExchangeRates.ValidateSettings(loaded.Values);
-            (values, sources, environment) = loaded;
+            if (IsShared) host.ConfigEnvironment = next.ExportEnv ? loaded.Env : null;
+            options = next;
+            (values, sources, environment) = (loaded.Values, loaded.Sources, loaded.Environment);
         }
 
         /// <summary>Reads the settings again with other options (the &lt;config&gt; element).</summary>
         public void Reload(ConfigOptions with)
         {
-            options = with;
-            values = null;
-            EnsureLoaded();
+            lock (this) Load(with);
         }
 
         internal ConfigOptions Options => options;
+
+        internal IEnumerable<string> FileSources => sources.Select(source => source.Path).Where(path => path != null);
 
         public string ToText() => Runtime.Values.ToJson(Values, indented: true);
 
@@ -447,7 +537,8 @@ namespace KScript.Runtime
                     if (!ConfigLoader.TryGet(Values, path, out object r) || r == null)
                     {
                         string where = options.Prefix != null ? $" or set {ConfigLoader.EnvName(options.Prefix, path)}" : string.Empty;
-                        throw new KScriptException($"The setting '{path}' is required but not set. Add it to config.yaml{where}.", "Config");
+                        string source = options.ExplicitProjectFiles ? "a file listed in kscript.json under config.files" : "config.yaml";
+                        throw new KScriptException($"The setting '{path}' is required but not set. Add it to {source}{where}.", "Config");
                     }
                     result = r;
                     return true;

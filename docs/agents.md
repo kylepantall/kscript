@@ -17,7 +17,7 @@ same whenever a file changes, so edits made anywhere (another editor, a coding a
 
 ## Implement a feature in an existing project
 
-Read `kscript.json`, the generated symbol index and one neighboring feature first. The manifest sets the entry point, native sources and generator paths. The index shows which types and operations already exist. Follow the project's configured folders and script format.
+The generated `AGENTS.md` gives coding agents required project conventions and a checklist to run before finishing a change. Read `kscript.json`, the generated symbol index and one neighboring feature first. The manifest sets the entry point, native sources and generator paths. The index shows which types and operations already exist. Follow the project's configured folders and script format. Look up command and method signatures in the generated package reference or MCP.
 
 | When the feature needs | Where the code belongs |
 | --- | --- |
@@ -27,16 +27,16 @@ Read `kscript.json`, the generated symbol index and one neighboring feature firs
 | A route that accepts a JSON body | Use `kscript make route` and `kscript make request`. The route selects the controller. The controller receives `json: RequestType` and the framework validates the body. |
 | Persistent data | Use a model and the project's migrations. Keep shared domain behavior with the type or in a library module. Put rendering in a view or page component. |
 
-For example, suppose a service accepts a passkey session key. Define the key once and use it as the type of the request field.
+Define an item key once and use it as the type of the request field.
 
 ```sh
-kscript make native PasskeySessionKey --base string --normalize '$value->trim()' --pattern '/^passkey_[a-zA-Z]+$/'
-kscript make request RegisterPasskey --fields 'key: PasskeySessionKey'
+kscript make native ItemKey --base string --normalize '$value->trim()' --pattern '/^item_[a-zA-Z]+$/'
+kscript make request CreateItem --fields 'key: ItemKey'
 ```
 
-The default layout puts these files in `natives/passkey-session-key.kscript` and `requests/register-passkey.kscript`. The request can use `PasskeySessionKey` directly. A controller imports the request file and declares `fn store(json: RegisterPasskey)`. A malformed key fails request validation before the controller runs. A worker or CLI command can take `key: PasskeySessionKey` and get the same checks.
+The default layout puts these files in `natives/item-key.kscript` and `requests/create-item.kscript`. The request can use `ItemKey` directly. A controller imports the request file and declares `fn store(json: CreateItem)`. A malformed key fails request validation before the controller runs. A worker or CLI command can take `key: ItemKey` and get the same checks.
 
-Test a valid normalized value, an invalid value, and the feature's observable result. Run `kscript check --warnings-as-errors`, `kscript test`, and `kscript fmt --check`. Handle a known error where the program can recover or report failure. See [project layout and generators](projects.md#where-files-go-the-recommended-layout) and [semantic types](types.md).
+Test a valid normalized value, an invalid value, and the feature's observable result. Handle specific errors where the program can recover or report failure. Run `kscript check --output json --warnings-as-errors`, `kscript test`, and `kscript fmt --check`. Refresh the generated guidance with `kscript agents` and report the verification results. [Project layout and generators](projects.md#where-files-go-the-recommended-layout) · [Semantic types](types.md)
 
 ## Watching
 
