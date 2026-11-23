@@ -107,8 +107,9 @@ public sealed class PublisherDiscoveryTests : IDisposable
     public void BareNameFindsFuturePublicationsAndRestoresOnlyTheRecordedCommit(string repository, bool rootPackage)
     {
         string owner = repository.Split('/')[0];
-        Page(owner, 1, owner + "/.github", owner + "/application", repository);
+        Page(owner, 1, owner + "/.github", owner + "/application", owner + "/broken-workspace", repository);
         github.Manifests[owner + "/application"] = "{ unfinished application config";
+        github.Manifests[owner + "/broken-workspace"] = """{"name":"unrelated","library":"../missing"}""";
         if (rootPackage) github.Manifests[repository] = RootPackage;
         else github.Folders.Add(repository);
 

@@ -5,7 +5,8 @@
   "description": "Settings for kscript serve, kscript check, kscript fmt and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
   "type": "object",
   "additionalProperties": false,
-  "dependencies": { "library": ["name"] },
+  "if": { "required": ["library"], "properties": { "library": { "type": "object" } } },
+  "then": { "required": ["name"] },
   "definitions": {
     "standardReference": {
       "type": "string",
@@ -39,14 +40,29 @@
       }
     },
     "library": {
-      "type": "object",
-      "description": "Metadata used by kscript lib add when installing this folder as a source library.",
-      "additionalProperties": false,
-      "required": ["version", "entry"],
-      "properties": {
-        "version": { "type": "string", "description": "The library's semantic version, such as 1.0.0 or 1.1.0-beta.1." },
-        "entry": { "type": "string", "description": "The public .kscript or .ks.xml file to import, relative to this manifest." }
-      }
+      "description": "Declares an installable library or points to its folder.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "entry"],
+          "properties": {
+            "version": { "type": "string", "description": "The library's semantic version, such as 1.0.0 or 1.1.0-beta.1." },
+            "entry": { "type": "string", "description": "The public .kscript or .ks.xml file to import, relative to this manifest." }
+          }
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "description": "A relative folder containing the library's kscript.json. That manifest declares its name, version, entry and runtime packages.",
+          "not": { "anyOf": [
+            { "pattern": "^/|//|/$|[. ](?:/|$)" },
+            { "pattern": "[\\\\<>:\"|?*\\u0000-\\u001f\\u007f-\\u009f]" },
+            { "pattern": "(?:^|/)(?:\\.[Gg][Ii][Tt](?:/|$)|(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|(?:[Cc][Oo][Mm]|[Ll][Pp][Tt])[1-9¹²³])(?:\\.|/|$))" }
+          ] },
+          "examples": ["libraries/isolink-connect"]
+        }
+      ]
     },
     "standard": {
       "description": "The standard (or standards) whose lint rules and format settings this project starts from; kscript.json's own lint and format settings win over it. Built in: kscript:recommended (the default) and kscript:strict. Anything else is a path, relative to kscript.json, to a standard file or to a folder holding kscript-standard.json. [] uses no standard (style rules off).",

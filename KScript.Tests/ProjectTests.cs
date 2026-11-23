@@ -165,7 +165,13 @@ public class ProjectConfigTests
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
         Assert.Equal("$schema,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test", Keys(props));
-        Assert.Equal("entry,version", Keys(props.GetProperty("library").GetProperty("properties")));
+        var libraryForms = props.GetProperty("library").GetProperty("oneOf").EnumerateArray()
+            .ToDictionary(form => form.GetProperty("type").GetString()!);
+        Assert.Equal("entry,version", Keys(libraryForms["object"].GetProperty("properties")));
+        var folder = libraryForms["string"].GetProperty("examples")[0].GetString();
+        var publisher = Parse(System.Text.Json.JsonSerializer.Serialize(new { library = folder }));
+        Assert.Empty(publisher.Warnings);
+        Assert.Equal(folder, publisher.LibraryFolder);
         var library = Parse("""{ "name": "example", "library": { "version": "0.1.0", "entry": "src/public.kscript" }, "packages": ["KScript.Net"] }""");
         Assert.Empty(library.Warnings);
         Assert.Equal("src/public.kscript", library.Library.Entry);

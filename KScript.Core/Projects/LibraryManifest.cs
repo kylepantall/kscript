@@ -13,6 +13,24 @@ public sealed record LibraryManifest(string Name, string Version, string Entry, 
         return Read(document.RootElement);
     }
 
+    public static LibraryManifest Parse(string json, string path, out string folder)
+    {
+        using var document = ProjectConfig.ParseJson(json, path);
+        folder = ReferencedFolder(document.RootElement);
+        return folder == null ? Read(document.RootElement) : null;
+    }
+
+    /// <summary>A project can point to the folder containing its package's own manifest.</summary>
+    public static string ReferencedFolder(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("library", out var library)
+            || library.ValueKind != JsonValueKind.String) return null;
+        string folder = library.GetString();
+        if (!folder.Split('/').All(LibraryDependency.IsSafePathComponent))
+            throw new ProjectConfigException("library must name a relative package folder inside the project.");
+        return folder;
+    }
+
     public static LibraryManifest Read(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object)

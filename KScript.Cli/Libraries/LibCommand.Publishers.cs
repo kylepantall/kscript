@@ -89,19 +89,45 @@ public static partial class LibCommand
         }
     }
 
+    private static async Task<JsonDocument> ReadPublisherConfig(HttpClient client, string repository, string revision, string folder = null)
+    {
+        string prefix = folder == null ? "" : string.Join('/', folder.Split('/').Select(Uri.EscapeDataString)) + "/";
+        using var response = await client.GetAsync($"https://raw.githubusercontent.com/{repository}/{revision}/{prefix}{ProjectConfig.FileName}");
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(),
+            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+    }
+
+    private static async Task<bool> RootReferencesPin(HttpClient client, Source root, Source pinned, string commit)
+    {
+        if (!root.IsRoot || pinned.Repository != root.Repository || pinned.Ref != "HEAD" || !pinned.CatalogEntry) return false;
+        using var project = await ReadPublisherConfig(client, root.Repository, commit);
+        if (project == null || LibraryManifest.ReferencedFolder(project.RootElement) != pinned.Folder) return false;
+        using var package = await ReadPublisherConfig(client, root.Repository, commit, pinned.Folder);
+        return package != null && LibraryManifest.Read(package.RootElement) != null;
+    }
+
     private static async Task<bool> PublisherRootMatches(HttpClient client, Source root, string name, string revision, bool discovering = false)
     {
-        using var response = await client.GetAsync($"https://raw.githubusercontent.com/{root.Repository}/{revision}/kscript.json");
-        if (response.StatusCode == HttpStatusCode.NotFound) return false;
-        response.EnsureSuccessStatusCode();
-        var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
+        static bool Matches(JsonDocument config, string name)
+        {
+            if (config == null || config.RootElement.ValueKind != JsonValueKind.Object) return false;
+            var manifest = config.RootElement;
+            return manifest.TryGetProperty("name", out var field) && field.ValueKind == JsonValueKind.String
+                && field.GetString() == name && LibraryManifest.Read(manifest) != null;
+        }
+
         try
         {
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(), options);
-            var manifest = document.RootElement;
-            if (manifest.ValueKind != JsonValueKind.Object || !manifest.TryGetProperty("name", out var field)
-                || field.ValueKind != JsonValueKind.String || field.GetString() != name) return false;
-            return LibraryManifest.Read(manifest) != null;
+            using var project = await ReadPublisherConfig(client, root.Repository, revision);
+            if (project == null || project.RootElement.ValueKind != JsonValueKind.Object) return false;
+            string folder;
+            try { folder = LibraryManifest.ReferencedFolder(project.RootElement); }
+            catch (ProjectConfigException) when (discovering) { return false; }
+            if (folder == null) return Matches(project, name);
+            using var package = await ReadPublisherConfig(client, root.Repository, revision, folder);
+            return Matches(package, name);
         }
         catch (JsonException) when (discovering)
         {
