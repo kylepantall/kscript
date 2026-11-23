@@ -189,7 +189,7 @@ namespace KScript.Http
                 p.Method(KType.HttpResponse, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((HttpResponse)t).TryCallMethod(c, m.Name, out object r) ? r : null);
 
             p.Variable("request", KType.Request,
-                "The request being handled: method, path, url, query, form, json (the body read as JSON), input (query, form and json together), headers, cookies, params, ip and route (its name).",
+                "The HTTP request. Inside a matched route it also contains the client ip, parsed json, combined input and route name.",
                 (i, m) => RequestContext.Current(i.Host)?.Request);
         }
 

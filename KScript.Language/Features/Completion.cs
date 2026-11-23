@@ -1050,17 +1050,8 @@ namespace KScript.Language.Features
         /// The catalog's methods for a value of this shape. A list of one native type (semver[]) has that type's list
         /// methods (->latest()) first, on top of a list's.
         /// </summary>
-        private IEnumerable<CallableInfo> BuiltInMethods(TypeShape receiver)
-        {
-            IEnumerable<CallableInfo> methods = Catalog.MethodsFor(receiver.Type);
-            if (TypeInference.TypedListReceiver(receiver) is not string list)
-            {
-                return methods;
-            }
-            List<CallableInfo> own = Catalog.MethodsFor(list).Where(m => m.ReceiverType == list).ToList();
-            var names = new HashSet<string>(own.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
-            return own.Concat(methods.Where(m => !names.Contains(m.Name)));
-        }
+        private IEnumerable<CallableInfo> BuiltInMethods(TypeShape receiver) =>
+            Catalog.MethodsFor(TypeInference.TypedListReceiver(receiver) ?? receiver.Type);
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>
         private TypeShape MethodResult(CallableInfo m, TypeShape receiver) => TypeInference.MethodResult(m, receiver);

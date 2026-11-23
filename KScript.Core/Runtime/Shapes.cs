@@ -65,6 +65,22 @@ namespace KScript.Runtime
 
         internal TypeRef Item => new TypeRef(Name, ListDepth - 1, false, Inline, ArgBase, Args, ArgsText);
 
+        /// <summary>The underlying type after following refinements and rules. Lists give "list".</summary>
+        internal string Root(Scope scope)
+        {
+            TypeRef type = this;
+            while (type.ListDepth == 0)
+            {
+                if (type.ArgBase != null) { type = type.ArgBase; continue; }
+                if (type.IsBuiltIn) return type.Name;
+                object definition = type.Inline ?? (scope != null && scope.TryGet(type.Name, out object value) ? value : null);
+                if (definition is not RefinedType refined) return type.Name;
+                type = refined.Base;
+                scope = refined.Closure;
+            }
+            return "list";
+        }
+
         private TypeRef ListOf() => new TypeRef(Name, ListDepth + 1, false, Inline, ArgBase, Args, ArgsText);
 
         private TypeRef WithArgs(IReadOnlyDictionary<string, object> args, string text) => new TypeRef(Name, 0, false, null, this, args, text.Trim());
@@ -1258,6 +1274,7 @@ namespace KScript.Runtime
                 TypeRef item = type.Item;
                 var result = new List<object>(list.Count);
                 for (int i = 0; i < list.Count; i++) result.Add(Convert(list[i], true, item, $"{path}[{i}]", field, depth + 1));
+                if (result.Count == 0) ListFilters.RememberEmptyType(result, item.Root(scope));
                 return result;
             }
             if (type.Args != null) return MapRefined(value, type.Refined(scope, module), path, field, depth);

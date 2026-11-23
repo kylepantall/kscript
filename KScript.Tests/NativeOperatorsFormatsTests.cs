@@ -64,6 +64,27 @@ public class NativeOperatorsFormatsTests
         Assert.Equal("1.0.0-rc.1", Code("vs: semver[] = ['1.0.0', '1.0.0-rc.1']\necho $vs->min()"));
     }
 
+    [Theory]
+    [InlineData("v: semver[] = []\necho $v->latest() == null", "true")]
+    [InlineData("type Version with [semver] {}\nv: Version[] = []\necho $v->latest() == null", "true")]
+    [InlineData("v: semver[] = []\necho $v === []", "true")]
+    [InlineData("mixed = ['hello', 3]\necho $mixed->only(semver)->only(releases)->to_json()", "[]")]
+    [InlineData(Versions + "echo $versions->only(alphas)->without(betas)->latest() == null", "true")]
+    [InlineData(Versions + "echo $versions->filter(fn(v) => false)->latest() == null", "true")]
+    [InlineData(Versions + "echo $versions->reject(fn(v) => true)->only(releases) === []", "true")]
+    [InlineData(Versions + "echo $versions->without(prereleases)->latest()", "1.0.10")]
+    [InlineData("fees: money[] = []\necho $fees->total() == null", "true")]
+    public void Typed_lists_retain_their_methods_after_filtering(string source, string expected)
+    {
+        Assert.Equal(expected, Code(source));
+    }
+
+    [Fact]
+    public void Only_narrows_to_the_selected_element_type()
+    {
+        Assert.Throws<KScriptException>(() => Code(Versions + "echo $versions->only(string)->latest()"));
+    }
+
     [Fact]
     public void Semver_keeps_its_methods()
     {

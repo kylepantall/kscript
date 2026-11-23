@@ -412,18 +412,6 @@ namespace KScript.Runtime
         }
 
         /// <summary>The built-in type at the bottom of the <c>with</c> chain, such as int or handle. Lists give "list".</summary>
-        internal string Root()
-        {
-            RefinedType t = this;
-            while (true)
-            {
-                if (t.Base.ListDepth > 0) return "list";
-                if (t.Base.Inline is RefinedType inner) { t = inner; continue; }
-                // A base with arguments (uuid(v: 4), Age(max: 9)) comes down to the type before them.
-                TypeRef b = t.Base.Args != null ? t.Base.ArgBase : t.Base;
-                if (!b.IsBuiltIn && t.Closure.TryGet(b.Name, out object found) && found is RefinedType next) { t = next; continue; }
-                return b.Name;
-            }
-        }
+        internal string Root() => Base.Root(Closure);
     }
 }

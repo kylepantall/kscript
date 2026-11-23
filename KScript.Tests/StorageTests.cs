@@ -202,6 +202,27 @@ public sealed class StorageTests : StorageFixture
     }
 
     [Fact]
+    public void ReadJsonMapsExistingFilesAndLeavesMissingFileDefaultsAlone()
+    {
+        const string user = "<type name=\"User\" fields=\"id: int\" />";
+        string output = Run(user + """
+            <let name="data" value="@storage(data)" />
+            <do>$data->write_json('users.json', [{ id: 7 }])</do>
+            <let name="first" value="$data->read_json('users.json', as: User)->first()" />
+            <echo>{ $first->type() } { $first.id }</echo>
+            <echo>{ $data->read_json('missing.json', as: User) == null } { $data->read_json('missing.json', default: 'unknown', as: User) }</echo>
+            """);
+        Assert.Equal("User 7\ntrue unknown\n", output);
+
+        KScriptException error = Fails(user + """
+            <do>@storage(data)->write_json('user.json', { id: 'wrong' })</do>
+            <do>@storage(data)->read_json('user.json', 'fallback', User)</do>
+            """);
+        Assert.Equal("Shape", error.Type);
+        Assert.Contains("$.id: needs an int", error.Message);
+    }
+
+    [Fact]
     public void ListsDeletesAndClears()
     {
         string output = Run("""

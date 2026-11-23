@@ -118,7 +118,9 @@ A plain fact about a value is a field, read with a dot and no brackets: `$file.n
 | On | Before | Now |
 | --- | --- | --- |
 | a list, a map, text | `->length()` | `->count()` |
+| text | `$text->is_empty()` to accept empty or whitespace-only text | Use `$text->is_blank()` for that check. `$text->is_empty()` now tests for zero characters. |
 | a list | `->where(fn)`, `->append(item)` | `->filter(fn)`, `->push(item)` |
+| a list | `$items->count_of($value)` to count strict matches | Use `$items->count_of(fn(x) => $x === $value)` for strict matches. Passing a value now compares with `==`. |
 | a number | `->pow(2)` | `$n ** 2` |
 | a response | `->ok()` | `.is_ok` |
 | an ip | `->private()`, `->loopback()` | `.is_private`, `.is_loopback` |

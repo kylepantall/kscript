@@ -71,8 +71,8 @@ namespace KScript.Runtime
             string l = KType.List;
             p.Method(l, "count", "", "The number of items.", KType.Number, (t, c) =>
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count the items that match, use ->count_of(fn).", "Argument") : (double)L(t).Count);
-            p.Method(l, "count_of", "match", "How many items match: the items for which a function is true, or the items equal to a value.", KType.Number, (t, c) =>
-                c.Arg(0) is ICallable ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count(x => Values.StrictEquals(x, c.Arg(0))));
+            p.Method(l, "count_of", "match", "Counts items for which a function is true, or items equal to a value using ==.", KType.Number, (t, c) =>
+                c.Arg(0) is ICallable ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count(x => Values.LooseEquals(x, c.Arg(0))));
             p.Method(l, "is_empty", "", "True when the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
             p.Method(l, "first", "", "The first item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[0] : null);
             p.Method(l, "last", "", "The last item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[^1] : null);
@@ -83,8 +83,8 @@ namespace KScript.Runtime
                 if (i < 0) i += list.Count;
                 return i >= 0 && i < list.Count ? list[i] : null;
             });
-            p.Method(l, "filter", "fn", "The items for which fn(item, index) is true.", l, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
-            p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => L(t).Where((x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))).ToList());
+            p.Method(l, "filter", "fn", "The items for which fn(item, index) is true.", l, (t, c) => ListFilters.Where(L(t), (x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))));
+            p.Method(l, "reject", "fn", "The items for which fn is false.", l, (t, c) => ListFilters.Where(L(t), (x, i) => !Values.Truthy(Apply(c, c.Fn(0), x, i))));
             p.Method(l, "map", "fn", "A new list with fn(item, index) applied to each item.", l, (t, c) => L(t).Select((x, i) => Apply(c, c.Fn(0), x, i)).ToList());
             p.Method(l, "pluck", "key", "One field from each item, or a map of the selected fields for each item when given a list of keys.", l, Pluck).Info.KeepsBareWords = true;
             p.Method(l, "find", "fn", "The first item for which fn is true, or null.", KType.Any, (t, c) => L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).FirstOrDefault());
@@ -157,7 +157,7 @@ namespace KScript.Runtime
             });
             p.Method(l, "take", "count: number", "The first count items.", l, (t, c) => L(t).Take(c.Int(0)).ToList());
             p.Method(l, "skip", "count: number", "All but the first count items.", l, (t, c) => L(t).Skip(c.Int(0)).ToList());
-            p.Method(l, "unique", "", "The list without duplicates.", l, (t, c) => L(t).Aggregate(new List<object>(), (acc, x) => { if (!acc.Any(y => Values.StrictEquals(x, y))) acc.Add(x); return acc; }));
+            p.Method(l, "unique", "", "The list without duplicates, using strict equality (===).", l, (t, c) => L(t).Aggregate(new List<object>(), (acc, x) => { if (!acc.Any(y => Values.StrictEquals(x, y))) acc.Add(x); return acc; }));
             p.Method(l, "push", "items...", "A new list with items added to the end.", l, (t, c) => L(t).Concat(c.Args).ToList());
             p.Method(l, "prepend", "items...", "A new list with items added to the start.", l, (t, c) => c.Args.Concat(L(t)).ToList());
             p.Method(l, "insert", "index: number, item", "A new list with item inserted at index.", l, (t, c) =>
@@ -305,7 +305,8 @@ namespace KScript.Runtime
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count how often text occurs, use ->count_of(text).", "Argument") : (double)S(t).Length);
             p.Method(s, "count_of", "match", "How many times a piece of text occurs.", KType.Number, (t, c) =>
                 (double)(c.Str(0).Length == 0 ? 0 : (S(t).Length - S(t).Replace(c.Str(0), string.Empty, StringComparison.Ordinal).Length) / c.Str(0).Length));
-            p.Method(s, "is_empty", "", "True when the text is empty or only spaces.", KType.Bool, (t, c) => S(t).Trim().Length == 0);
+            p.Method(s, "is_empty", "", "True when the text has zero characters.", KType.Bool, (t, c) => S(t).Length == 0);
+            p.Method(s, "is_blank", "", "True when the text is empty or contains only whitespace.", KType.Bool, (t, c) => string.IsNullOrWhiteSpace(S(t)));
             p.Method(s, "contains", "text", "True when the text contains this text.", KType.Bool, (t, c) => S(t).Contains(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "starts_with", "text", "True when the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "ends_with", "text", "True when the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));

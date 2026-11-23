@@ -119,6 +119,16 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void StorageJsonReturnsTheRequestedShape()
+        {
+            const string storage = "<import package=\"KScript.Storage\" />\n" + Types;
+            Assert.Equal("User", Show(Open(storage + "<let name=\"r\" value=\"@storage()->read_json('user.json', as: User)\" />"), "r"));
+            Assert.Equal("list<User>", Show(Open(storage + "<let name=\"r\" value=\"@storage() |> read_json('users.json', [], 'User[]')\" />"), "r"));
+            Assert.Contains("User", Labels(storage + "<echo>{ @storage()->read_json('user.json', as: ‸) }</echo>"));
+            AssertClean(Open(storage + "<echo>{ @storage()->read_json('user.json', default: null, as: User).login }</echo>"));
+        }
+
+        [Fact]
         public void RecordFieldsComplete()
         {
             Assert.Equal(new[] { "name", "stars", "owner", "topics", "visibility", "label", "note" },

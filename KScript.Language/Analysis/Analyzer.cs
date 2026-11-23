@@ -124,13 +124,13 @@ namespace KScript.Language.Analysis
                 string package = catalog.PackageOfVariable(builtIn.Key);
                 bool applies = builtIn.Key switch
                 {
-                    "request" => Kind != DocumentKind.Script,
+                    "request" => Kind != DocumentKind.Script || importedPackages.Contains("KScript.Http"),
                     "event" => false, // declared inside <on>
                     _ => Kind == DocumentKind.Script ? package == null || importedPackages.Contains(package) : package != null && pageImports.Contains(package),
                 };
                 if (applies)
                 {
-                    root.Declare(BuiltIn(builtIn.Key), 0);
+                    root.Declare(BuiltIn(builtIn.Key, builtIn.Key == "request" ? RequestContextFields() : null), 0);
                 }
             }
         }
@@ -164,44 +164,10 @@ namespace KScript.Language.Analysis
 
         private string RelativeToHere(string path) => System.IO.Path.GetRelativePath(SiteRoot(), path).Replace('\\', '/');
 
-        private static readonly (string Name, string Type, string Description)[] RequestVariables =
-        {
-            ("json", KType.Any, "The request body read as JSON."),
-            ("body", KType.Any, "The JSON body, or the raw body when it isn't JSON."),
-            ("query", KType.Map, "The query string's values."),
-            ("form", KType.Map, "The posted form's values."),
-            ("input", KType.Map, "Query, form and JSON values together."),
-            ("headers", KType.Map, "The request headers."),
-            ("cookies", KType.Map, "The request cookies."),
-        };
-
-        private void DeclareRequestVariables(MarkupElement e, Scope inner)
-        {
-            int at = e.ContentSpan.Start;
-            inner.Declare(BuiltIn("request"), at);
-            foreach (var (name, type, description) in RequestVariables)
-            {
-                Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = new TypeShape(type), Description = description };
-                result.Symbols.Add(symbol);
-                inner.Declare(symbol, at);
-            }
-            string path = e.GetAttributeValue("path");
-            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(path ?? string.Empty, @"\{(\w+)[?*]?\}"))
-            {
-                Symbol parameter = new Symbol { Name = m.Groups[1].Value, Kind = SymbolKind.BuiltIn, Shape = new TypeShape(KType.String), Description = $"The {{{m.Groups[1].Value}}} part of the path." };
-                result.Symbols.Add(parameter);
-                inner.Declare(parameter, at);
-            }
-        }
-
-        private Symbol BuiltIn(string name)
+        private Symbol BuiltIn(string name, IEnumerable<ValueFieldInfo> extraFields = null)
         {
             (string type, string description) = catalog.BuiltInVariables[name];
-            TypeShape shape = new TypeShape(type);
-            foreach (KeyValuePair<string, ValueFieldInfo> field in catalog.FieldsOf(type))
-            {
-                shape.Fields[field.Key] = new FieldInfo(field.Key, field.Value.Type is null or KType.Any ? TypeShape.Unknown : new TypeShape(field.Value.Type), null, field.Value.Description);
-            }
+            TypeShape shape = ShapeWithFields(type, catalog.FieldsOf(type).Values.Concat(extraFields ?? Enumerable.Empty<ValueFieldInfo>()));
             Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = shape, Description = description };
             result.Symbols.Add(symbol);
             return symbol;
@@ -1643,6 +1609,10 @@ namespace KScript.Language.Analysis
             ElementInfo info = catalog.GetElement("fn");
             Scope body = new Scope(outer, e.Span);
 
+            bool routeHandler = IsRouteHandler(e);
+            if (routeHandler && outer.Lookup("request", e.Span.Start)?.Kind == SymbolKind.BuiltIn)
+                body.Declare(BuiltIn("request", KScript.Http.RouteRequestFields.Matched), e.Span.Start);
+
             MarkupAttribute paramsAttr = e.GetAttribute("params");
             if (paramsAttr?.Value != null)
             {
@@ -1651,7 +1621,10 @@ namespace KScript.Language.Analysis
                 foreach (FunctionParameter p in parameters)
                 {
                     TypeShape inferred = InferredParameterShape(p, e.Span.Start);
-                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, inferred ?? ParameterShape(p, e.Span.Start));
+                    TypeShape shape = inferred ?? (routeHandler && p.Name == "request" && p.Type is null or KType.Map && !p.HasDefault
+                        ? MatchedRequestParameter(p.Type != null)
+                        : ParameterShape(p, e.Span.Start));
+                    Symbol symbol = NewVariable(p.Name, p.Span, e, SymbolKind.Parameter, shape);
                     symbol.TypeFromCalls = inferred != null;
                     body.Declare(symbol, e.Span.Start);
                     declared.Add(symbol);

@@ -132,6 +132,16 @@ public sealed class StyleTests : IDisposable
     }
 
     [Fact]
+    public void Signed_hsl_adjustments_match_stylesheet_commands()
+    {
+        Assert.Equal("#ffffff", Eval("@adjust_lightness('red', 0.5)"));
+        Assert.Equal("#ffffff", Eval("@lighten('red', 0.5)"));
+        Assert.Equal("#cc0000", Eval("@adjust_lightness('red', '-10%')"));
+        Assert.Equal("#cc0000", Eval("@darken('red', '10%')"));
+        Assert.Equal("#ff8080", ScriptRunner.RunBody("<let name=\"brand\" type=\"color\" value=\"'red'\" /><echo>{ $brand->lighten(0.5) }</echo>").TrimEnd());
+    }
+
+    [Fact]
     public void Custom_property_helpers()
     {
         Assert.Equal("var(--brand)", Eval("@css_var('brand')"));

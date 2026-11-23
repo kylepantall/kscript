@@ -73,7 +73,7 @@ The route file runs on every request, before the route is matched. So it can use
 A controller is a plain `fn`. Its parameters are filled in by name:
 
 - Path parameters: `{id}` becomes `$id`.
-- `request`: the whole request.
+- `request` contains the [page request fields](web.md), including `scheme` and `url`. A matched route also supplies `ip`, `json`, `input` and `route` (its name, or `null`).
 - `json`: the body read as JSON (`null` if it wasn't JSON).
 - `body`: the JSON if there was any, otherwise the raw text.
 - `input`: the query, form and JSON fields together.

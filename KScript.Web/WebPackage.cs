@@ -1,4 +1,5 @@
 using KScript.Metadata;
+using KScript.Pages;
 using KScript.Runtime;
 
 using A = KScript.Metadata.AttributeInfo;
@@ -66,7 +67,10 @@ namespace KScript.Web
                 Context = ElementContext.Page,
             });
 
-            p.Variable("request", KType.Request, "The current HTTP request (pages): method, path, query, form, headers, cookies, params, body.", (i, m) => null);
+            foreach (ValueFieldInfo field in RequestFields.Common)
+                p.Field(field.Receiver, field.Name, field.Type, field.Description);
+
+            p.Variable("request", KType.Request, "The current HTTP request on a page.", (i, m) => null);
         }
 
         private static void Page(PackageBuilder p, ElementInfo info) =>

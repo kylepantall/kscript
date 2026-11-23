@@ -277,6 +277,8 @@ public sealed class DocsTests
         DocsSite site = Site.Value;
         string strings = site.Find("/reference/methods/string").Body;
         Assert.Contains("id=\"m-replace\"", strings);
+        Assert.Contains("href=\"/reference/methods/number#m-round\"", strings);
+        Assert.DoesNotContain("/reference/methods/bool#m-not", strings);
         Assert.Contains("Arguments can be named", strings);
 
         string io = site.Find("/reference/io").Body;
@@ -303,6 +305,28 @@ public sealed class DocsTests
         Assert.Contains("Fields", site.Find("/reference/methods/file").Body);
         Assert.Contains("--no-open", site.Find("/cli").Body);
         Assert.Contains("class=\"playground\"", site.Find("/playground").Body);
+    }
+
+    [Theory]
+    [InlineData("email", "string", "lower")]
+    [InlineData("email", "string", "split")]
+    [InlineData("semver[]", "list", "filter")]
+    public void Type_references_link_inherited_methods_to_their_definitions(string type, string definingType, string method)
+    {
+        DocsSite site = Site.Value;
+        string path = "/reference/methods/" + type;
+        string definition = "/reference/methods/" + definingType + "#m-" + method;
+        string html = site.Find(path).Body;
+        Assert.Contains($"Methods from {definingType}", html);
+        Assert.Contains($"href=\"{definition}\"", html);
+        var docs = new KScript.Docs.Mcp.DocsMarkdown(site);
+        string markdown = docs.Page(path, "kscript");
+        Assert.Contains($"## Methods from {definingType}", markdown);
+        Assert.Contains($"(kscript://docs{definition})", markdown);
+
+        int count = site.Catalog.MethodsFor(type).Count(m => !m.Planned);
+        Assert.Contains($"{count} methods", Regex.Match(site.Find("/reference").Body, Regex.Escape($"href=\"{path}\"") + ".*?</span>").Value);
+        Assert.Contains($"]({KScript.Docs.Mcp.DocsMarkdown.UriOf(path)}): {site.Catalog.FieldsOf(type).Count} fields, {count} methods", docs.Page("/reference", "kscript"));
     }
 
     [Fact]

@@ -57,7 +57,7 @@ namespace KScript.IO
             {
                 "read_text" => File.ReadAllText(Path),
                 "read_lines" => File.ReadAllLines(Path).Cast<object>().ToList(),
-                "join" => Checked(call, new FileValue(System.IO.Path.Combine(new[] { Path }.Concat(call.Args.Select(Values.ToStr)).ToArray()))),
+                "join" => Checked(call, new FileValue(IOPackage.JoinPath(call.Args.Prepend(Path)))),
                 "relative_to" => System.IO.Path.GetRelativePath(IOPackage.PathOf(call.Arg(0), call), Path),
                 "to_string" => Path,
                 _ => NoMethod,
@@ -97,7 +97,7 @@ namespace KScript.IO
         {
             ("read_text", "", "The file's text.", KType.String),
             ("read_lines", "", "The file's lines.", KType.List),
-            ("join", "parts...", "A path inside this folder: $dir->join('a', 'b.txt').", KType.File),
+            ("join", "parts...", "A file value for the joined path. Parts can be separate arguments or a list, as in $dir->join(['a', 'b.txt']).", KType.File),
             ("relative_to", "folder", "The path relative to a folder.", KType.String),
         };
     }
@@ -111,6 +111,14 @@ namespace KScript.IO
 
         /// <summary>A path argument (text or a file value) resolved against the script's folder.</summary>
         public static string PathOf(object value, CallContext c) => Resolve(value, c.Host, c.Module?.Directory ?? c.Host.WorkingDirectory);
+
+        internal static string JoinPath(IEnumerable<object> parts)
+        {
+            static IEnumerable<string> Segments(object part) => part is List<object> list
+                ? list.SelectMany(Segments)
+                : new[] { part is FileValue file ? file.Path : Values.ToStr(part) };
+            return Path.Combine(parts.SelectMany(Segments).ToArray());
+        }
 
         private static string Resolve(object value, KScriptHost host, string baseDirectory)
         {
@@ -165,11 +173,8 @@ namespace KScript.IO
             p.Command("files", "folder, pattern?, recursive?: bool", "The files in a folder, as file values. pattern is a wildcard like '*.txt'.", KType.List,
                 c => List(c, Directory.EnumerateFiles), "<for each=\"f\" in=\"@files('.', '*.log')\"><echo>{$f.name}</echo></for>");
             p.Command("folders", "folder, pattern?, recursive?: bool", "The folders in a folder, as file values.", KType.List, c => List(c, Directory.EnumerateDirectories));
-            p.Command("join_path", "base, parts...", "Joins a folder and the parts below it with the right separator. Parts may be a list: @join_path(base: $folder, ['archive', $name]).", KType.String, c =>
-            {
-                static IEnumerable<object> Flatten(object a) => a is List<object> list ? list.SelectMany(Flatten) : new[] { a };
-                return System.IO.Path.Combine(c.Args.SelectMany(Flatten).Select(a => a is FileValue f ? f.Path : Values.ToStr(a)).ToArray());
-            });
+            p.Command("join_path", "base, parts...", "Joins a folder and the parts below it with the right separator. Parts may be a list: @join_path(base: $folder, ['archive', $name]).", KType.String,
+                c => JoinPath(c.Args));
             p.Command("full_path", "path", "The absolute path.", KType.String, c => PathOf(c.Need(0), c));
             p.Command("cwd", "", "The folder kscript was run from.", KType.String, c => c.Host.WorkingDirectory);
             p.Command("home", "", "The user's home folder.", KType.String, c => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));

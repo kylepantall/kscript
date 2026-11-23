@@ -55,6 +55,14 @@ namespace KScript.Language.Tests
             }
         }
 
+        [Fact]
+        public void String_completion_includes_numeric_methods_but_excludes_boolean_methods()
+        {
+            var methods = MethodsAfter("echo '123'->‸", "types.kscript");
+            Assert.Contains("round", methods);
+            Assert.DoesNotContain("not", methods);
+        }
+
         [Theory]
         [InlineData("echo @today()->json()", "->json() works on strings, but this value is a date. To write it as JSON text, use ->to_json().")]
         [InlineData("echo @today()->upper()", "->upper() works on strings, but this value is a date. Use ->to_string()->upper() to work on its text.")]

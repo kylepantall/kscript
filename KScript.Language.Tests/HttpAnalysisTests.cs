@@ -112,6 +112,51 @@ namespace KScript.Language.Tests
             Assert.Contains("people.show", labels);
         }
 
+        [Theory]
+        [InlineData("<p>{ $request.‸ }</p>", "page.html", false)]
+        [InlineData("<p>{ $request.‸ }</p>", "_404.html", false)]
+        [InlineData("<p>{ $request.‸ }</p>", "views/people/show.html", true)]
+        [InlineData("import KScript.Http\nRoutes {\n  Get(path: '/') {\n    return $request.‸\n  }\n}", "routes.kscript", true)]
+        public void RequestFieldsMatchTheContext(string text, string file, bool route)
+        {
+            int offset = text.IndexOf('‸');
+            string path = Path.Combine(Site, file);
+            DocumentAnalysis analysis = Service.Analyze(text.Remove(offset, 1), path);
+            var fields = Service.GetCompletions(analysis, offset).Select(i => i.Label).ToHashSet();
+            foreach (string field in new[] { "url", "scheme", "path", "params", "query" })
+            {
+                Assert.Contains(field, fields);
+                TestHelpers.AssertClean(Service.Analyze(text.Replace("‸", field), path));
+            }
+            foreach (string field in new[] { "json", "input", "ip", "route" })
+            {
+                Assert.Equal(route, fields.Contains(field));
+                DocumentAnalysis read = Service.Analyze(text.Replace("‸", field), path);
+                if (route) TestHelpers.AssertClean(read);
+                else Assert.Contains(read.Diagnostics, d => d.Code == DiagnosticCodes.UnknownMethod && d.Message.Contains("'" + field + "'"));
+            }
+        }
+
+        [Theory]
+        [InlineData("fn save() => $request.‸", "controllers/notes.kscript", true)]
+        [InlineData("fn save(request: map) => $request.‸", "controllers/notes.kscript", true)]
+        [InlineData("fn stamp(request: map, next: fn) => $request.‸", "middleware/stamp.kscript", true)]
+        [InlineData("Routes(middleware: stamp) {\n  fn stamp(request: map, next: fn) => $request.‸\n}", "routes.kscript", true)]
+        [InlineData("Routes {\n  value = $request.‸\n}", "routes.kscript", false)]
+        public void MatchedFieldsAreAvailableInsideHandlerFunctions(string source, string file, bool matched)
+        {
+            string text = "import KScript.Http\n" + source;
+            string path = Path.Combine(Site, file);
+            int offset = text.IndexOf('‸');
+            DocumentAnalysis analysis = Service.Analyze(text.Remove(offset, 1), path);
+            var fields = Service.GetCompletions(analysis, offset).Select(i => i.Label).ToHashSet();
+            Assert.Contains("url", fields);
+            Assert.Equal(matched, fields.Contains("input"));
+            Assert.Equal(matched, fields.Contains("json"));
+            var diagnostics = Service.Analyze(text.Replace("‸", "input"), path).Diagnostics;
+            Assert.Equal(!matched, diagnostics.Any(d => d.Message.Contains("no field 'input'")));
+        }
+
         [Fact]
         public void RoutesBelongInsideRoutes()
         {

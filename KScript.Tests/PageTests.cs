@@ -468,6 +468,23 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void Live_event_fields_describe_the_page_url()
+    {
+        using var site = new TempSite(("index.html", Counter));
+        string state = Attr(site.Render("index.html").Body, "data-ks-state");
+        string json = Values.ToJson(new Dictionary<string, object>
+        {
+            ["page"] = "/index?page=2", ["block"] = "c", ["handler"] = 0d, ["state"] = state,
+        });
+        var request = new Dictionary<string, object> { ["scheme"] = "https", ["path"] = "/_ks/live", ["url"] = "/_ks/live" };
+        Assert.Equal(200, PageServer.HandleLive(new PageSite(site.Root), json, request).Status);
+        Assert.Equal("https", request["scheme"]);
+        Assert.Equal("/index", request["path"]);
+        Assert.Equal("/index?page=2", request["url"]);
+        Assert.Equal("2", ((Dictionary<string, object>)request["query"])["page"]);
+    }
+
+    [Fact]
     public void Tampered_state_is_rejected()
     {
         using var site = new TempSite(("index.html", Counter));
