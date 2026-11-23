@@ -33,19 +33,19 @@ const fixtures = [
   },
   {
     file: 'refined-parameter.kscript',
-    fixedOutput: 'PASSKEY_LOGIN',
+    fixedOutput: 'KEY_ALPHA',
     diagnostics: [{ code: 'KS5005', severity: 1, anchor: 'null', message: /key/ }],
-    fix: (text) => text.replace('@describe_key(null)', "@describe_key('passkey_login')"),
+    fix: (text) => text.replace('@describe_key(null)', "@describe_key('key_alpha')"),
   },
   {
-    file: 'passkey-interpolation.kscript',
-    fixedOutput: 'passkey_login',
+    file: 'refined-string-interpolation.kscript',
+    fixedOutput: 'key_alpha',
     diagnostics: [
-      { code: 'KS6004', severity: 2, anchor: 'kind: string', token: 'kind', message: /never used/ },
-      { code: 'KS5012', severity: 1, anchor: 'passkey_{$kind}', message: /PasskeySessionKey/ },
+      { code: 'KS6004', severity: 2, anchor: 'label: string', token: 'label', message: /never used/ },
+      { code: 'KS5012', severity: 1, anchor: 'key_{$label}', message: /PrefixedKey/ },
     ],
-    fix: (text) => text.replace('= passkey_{$kind}', '= "passkey_{$kind}"'),
-    binding: { use: '$kind}', declaration: 'kind: string', name: 'kind' },
+    fix: (text) => text.replace('= key_{$label}', '= "key_{$label}"'),
+    binding: { use: '$label}', declaration: 'label: string', name: 'label' },
   },
 ];
 
@@ -98,9 +98,14 @@ async function exerciseGuards(runCli, file) {
 module.exports = async function diagnosticFiles(connection, runCli, diagnosticsAfter, position) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kscript-diagnostic-files-'));
   try {
-    fs.cpSync(path.join(__dirname, 'fixtures', 'diagnostics'), dir, { recursive: true });
+    // Mirror the relative imports so these files use the runnable suite's type declaration.
+    const repo = path.resolve(__dirname, '../../..');
+    const fixturesPath = 'editors/vscode/test/fixtures/diagnostics';
+    for (const relative of [fixturesPath, 'samples/scripts/tests/language/types/prefixed-key.kscript']) {
+      fs.cpSync(path.join(repo, relative), path.join(dir, relative), { recursive: true });
+    }
     for (const fixture of fixtures) {
-      const file = path.join(dir, fixture.file);
+      const file = path.join(dir, fixturesPath, fixture.file);
       const uri = pathToFileURL(file).href;
       const text = fs.readFileSync(file, 'utf8');
       const fixed = fixture.fix(text);
@@ -108,7 +113,7 @@ module.exports = async function diagnosticFiles(connection, runCli, diagnosticsA
       const cli = await checkFile(runCli, file, fixture.diagnostics.length);
       if (fixture.fixedOutput) {
         await assert.rejects(() => runCli([file]), (error) =>
-          error.code === 3 && /Shape:.*PasskeySessionKey/.test(error.stderr), fixture.file + ' rejects the value at runtime');
+          error.code === 3 && /Shape:.*PrefixedKey/.test(error.stderr), fixture.file + ' rejects the value at runtime');
       }
       const published = await diagnosticsAfter(connection, 'didOpen', {
         textDocument: { uri, languageId: 'kscript-code', version: 1, text },

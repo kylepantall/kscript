@@ -1,5 +1,0 @@
-type PasskeySessionKey with [string] {
-  min: 8
-  normalize: $value->trim()
-  pattern: /^passkey_[a-zA-Z]+$/
-}

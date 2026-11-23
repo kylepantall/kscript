@@ -245,7 +245,7 @@ Run `kscript test samples/scripts/tests/language/checkout-workflow.test.kscript`
 
 Run `kscript test samples/scripts/tests/language/dispatch-workflow.test.kscript` to follow incoming JSON through typed records, team-name normalization, priority sorting and queue selection. The same policy handles an unknown team by selecting a fallback or propagating the lookup error. [Dispatch script](../samples/scripts/tests/language/dispatch-workflow.test.kscript)
 
-The [passkey suite](../samples/scripts/tests/language/passkey-values.test.kscript) checks bare static keys, quoted interpolation, trimming and pattern failures. The [license issuer suite](../samples/scripts/tests/language/license-issuer-guards.test.kscript) exercises three validation guards and checks what the caller sees on success and failure.
+The [refined string suite](../samples/scripts/tests/language/refined-string-values.test.kscript) checks bare static keys, quoted interpolation, trimming and pattern failures. The [license issuer suite](../samples/scripts/tests/language/license-issuer-guards.test.kscript) exercises three validation guards and checks what the caller sees on success and failure.
 
 ## In the editor
 

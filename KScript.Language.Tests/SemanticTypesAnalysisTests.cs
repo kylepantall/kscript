@@ -14,44 +14,39 @@ namespace KScript.Language.Tests
 
         private static DocumentAnalysis Code(string code) => Analyze(code, "types.kscript");
 
-        private const string TrimmedKey = """
-            type PasskeySessionKey with [string] {
-              min: 8
-              normalize: $value->trim()
-              pattern: /^passkey_[a-zA-Z]+$/
-            }
-            """;
+        private static string PrefixedKeyDeclaration => File.ReadAllText(Path.Combine(AppContext.BaseDirectory,
+            "samples", "scripts", "tests", "language", "types", "prefixed-key.kscript"));
 
         [Fact]
         public void ImportedTrimmedKeyReportsAnUnquotedInterpolationAtTheFullRawValue()
         {
-            string folder = Path.GetFullPath("passkey-project");
+            string folder = Path.GetFullPath("prefixed-key-project");
             string file = Path.Combine(folder, "client.kscript");
             const string client = """
-                import "key.kscript"
+                import "prefixed-key.kscript"
                 fn key_for(kind: string) {
                   echo $kind
-                  key: PasskeySessionKey = passkey_{$kind}
+                  key: PrefixedKey = key_{$kind}
                   return $key
                 }
-                echo @key_for('login')
+                echo @key_for('alpha')
                 """;
-            var files = new MemoryFiles().Add(Path.Combine(folder, "key.kscript"), TrimmedKey).Add(file, client);
+            var files = new MemoryFiles().Add(Path.Combine(folder, "prefixed-key.kscript"), PrefixedKeyDeclaration).Add(file, client);
             var service = new LanguageService(files: files);
             DocumentAnalysis analysis = service.Analyze(client, file);
             Diagnostic bad = AssertSingle(analysis, DiagnosticCodes.InvalidTypedValue);
-            Assert.Equal("passkey_{$kind}", analysis.Source[bad.Span]);
-            Assert.Contains("must match /^passkey_[a-zA-Z]+$/", bad.Message);
+            Assert.Equal("key_{$kind}", analysis.Source[bad.Span]);
+            Assert.Contains("must match /^key_[a-zA-Z]+$/", bad.Message);
             Assert.Contains("double quotes", bad.Message);
-            AssertClean(service.Analyze(client.Replace("= passkey_{$kind}", "= \"passkey_{$kind}\""), file));
+            AssertClean(service.Analyze(client.Replace("= key_{$kind}", "= \"key_{$kind}\""), file));
         }
 
         [Fact]
         public void PlainTrimChecksRulesOnTheTrimmedText()
         {
-            AssertClean(Code(TrimmedKey + "\nkey: PasskeySessionKey = '  passkey_Login  '\necho $key"));
-            Diagnostic bad = AssertSingle(Code(TrimmedKey + "\nkey: PasskeySessionKey = '    abc    '\necho $key"), DiagnosticCodes.InvalidTypedValue);
-            Assert.Contains("at least 8", bad.Message);
+            AssertClean(Code(PrefixedKeyDeclaration + "\nkey: PrefixedKey = '  key_Alpha  '\necho $key"));
+            Diagnostic bad = AssertSingle(Code(PrefixedKeyDeclaration + "\nkey: PrefixedKey = '    abc    '\necho $key"), DiagnosticCodes.InvalidTypedValue);
+            Assert.Contains("at least 5", bad.Message);
             Assert.DoesNotContain("double quotes", bad.Message);
         }
 
@@ -68,11 +63,11 @@ namespace KScript.Language.Tests
         public void AnImplicitProjectTypeCanUseItsOwnTrimImplementation()
         {
             string root = Path.GetFullPath("custom-trim-project");
-            const string client = "key: PasskeySessionKey = raw_{$id}\necho $key";
+            const string client = "key: PrefixedKey = raw_{$id}\necho $key";
             var files = new MemoryFiles()
                 .Add(Path.Combine(root, "kscript.json"), "{}")
-                .Add(Path.Combine(root, "lib", "custom.kscript"), "extend string { override fn trim() => 'passkey_Label' }")
-                .Add(Path.Combine(root, "natives", "passkey-session-key.kscript"), "import \"../lib/custom.kscript\"\n" + TrimmedKey)
+                .Add(Path.Combine(root, "lib", "custom.kscript"), "extend string { override fn trim() => 'key_Beta' }")
+                .Add(Path.Combine(root, "natives", "prefixed-key.kscript"), "import \"../lib/custom.kscript\"\n" + PrefixedKeyDeclaration)
                 .Add(Path.Combine(root, "main.kscript"), client);
             AssertClean(new LanguageService(files: files).Analyze(client, Path.Combine(root, "main.kscript")));
         }

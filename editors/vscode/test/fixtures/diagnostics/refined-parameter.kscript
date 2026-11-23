@@ -1,5 +1,5 @@
-import "types/passkey-session-key.kscript"
+import "../../../../../samples/scripts/tests/language/types/prefixed-key.kscript"
 
-fn describe_key(key: PasskeySessionKey) => $key->upper()
+fn describe_key(key: PrefixedKey) => $key->upper()
 
 echo @describe_key(null)

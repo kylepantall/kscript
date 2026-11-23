@@ -1,8 +1,0 @@
-import "types/passkey-session-key.kscript"
-
-fn session_key_for(kind: string) {
-  session_key: PasskeySessionKey = passkey_{$kind}
-  return $session_key
-}
-
-echo @session_key_for('login')

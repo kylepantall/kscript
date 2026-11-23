@@ -1,0 +1,8 @@
+import "../../../../../samples/scripts/tests/language/types/prefixed-key.kscript"
+
+fn key_for(label: string) {
+  key: PrefixedKey = key_{$label}
+  return $key
+}
+
+echo @key_for('alpha')

@@ -1,0 +1,5 @@
+type PrefixedKey with [string] {
+  min: 5
+  normalize: $value->trim()
+  pattern: /^key_[a-zA-Z]+$/
+}
