@@ -128,6 +128,10 @@ namespace KScript.Language.Analysis
                 case IdentifierNode id when result.PatternLiteralTypes.TryGetValue(region.Source.ToSource(id.Span.Start), out Symbol literalType):
                     return literalType.Shape.Instance;
 
+                case BinaryNode or MemberNode when result.PatternLiteralWords.TryGetValue(region.Source.ToSource(node.Span), out Symbol wordType):
+                    // my-post, 1.4.2: words a pattern type reads.
+                    return wordType.Shape.Instance;
+
                 case MemberNode member:
                 {
                     TypeShape target = Infer(member.Target, region);

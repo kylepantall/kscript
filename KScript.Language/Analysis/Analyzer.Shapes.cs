@@ -51,7 +51,7 @@ namespace KScript.Language.Analysis
                 TypeShape instance = rootShape != null && !model
                     ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element }
                     : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep", Kind = model ? KType.Record : null };
-                var literalPattern = !model && refinedRoot == "string" && e.GetAttribute("pattern") != null ? RulesOf(e)?.Pattern : null;
+                var literalPattern = !model && KScript.Runtime.PatternLiterals.ReadsWords(refinedRoot) && e.GetAttribute("pattern") != null ? RulesOf(e)?.Pattern : null;
                 var declaredType = new TypeShape(KType.Type)
                 {
                     Name = name,

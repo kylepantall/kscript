@@ -12,6 +12,9 @@ namespace KScript.Runtime
 
         internal bool Contains(string name) => types.ContainsKey(name);
 
+        /// <summary>True when any pattern type is visible, so words need looking up at all.</summary>
+        internal bool Any => types.Count > 0;
+
         internal PatternLiteralScope With(IEnumerable<KeyValuePair<string, object>> variables)
         {
             Dictionary<string, RefinedType> changed = null;
@@ -19,7 +22,7 @@ namespace KScript.Runtime
             {
                 // A variable holding a type is not a new declaration of that type.
                 RefinedType declared = value as RefinedType;
-                if (declared?.Name == name && declared.Rules.Pattern != null && declared.Root() == "string")
+                if (declared?.Name == name && declared.Rules.Pattern != null && PatternLiterals.ReadsWords(declared.Root()))
                     (changed ??= new(types, StringComparer.Ordinal))[name] = declared;
                 else if (Contains(name))
                     (changed ??= new(types, StringComparer.Ordinal)).Remove(name);
