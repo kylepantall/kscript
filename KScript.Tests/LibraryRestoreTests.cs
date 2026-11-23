@@ -59,6 +59,79 @@ public sealed class LibraryRestoreTests : IDisposable
     private static string Config(string dir) => Path.Combine(dir, "kscript.json");
 
     [Theory]
+    [InlineData("orimovo/roots", "libraries/roots")]
+    [InlineData("orimovo/roots@roots", "libraries/roots")]
+    [InlineData("orimovo/roots@roots", "SDK sources/kscript")]
+    public void RepositoryLibraryReferenceInstallsAndRestoresOnlyThePackage(string selector, string folder)
+    {
+        const string repo = "orimovo/roots";
+        const string package = """{"name":"roots","library":{"version":"1.2.3","entry":"client.kscript"},"packages":["KScript.Math"]}""";
+        string workspace = JsonSerializer.Serialize(new { name = "development", library = folder });
+        string raw = $"https://raw.githubusercontent.com/{repo}/{Pin}/";
+        string head = $"https://api.github.com/repos/{repo}/commits/HEAD";
+        string archive = $"https://codeload.github.com/{repo}/zip/{Pin}";
+        github.Routes[head] = JsonSerializer.SerializeToUtf8Bytes(new { sha = Pin });
+        if (folder == "libraries/roots")
+            github.Routes[$"https://api.github.com/repos/{repo}/contents/libraries/roots?ref={Pin}"] = Encoding.UTF8.GetBytes("[]");
+        github.Routes[raw + "kscript.json"] = Encoding.UTF8.GetBytes(workspace);
+        github.Routes[raw + string.Join('/', folder.Split('/').Select(Uri.EscapeDataString)) + "/kscript.json"] = Encoding.UTF8.GetBytes(package);
+        github.Routes[archive] = Archive(
+            ("kscript.json", workspace), ("tests/example.test.kscript", "echo 'repository test'"),
+            (folder + "/kscript.json", package), (folder + "/client.kscript", "fn value() => 42"));
+
+        void CheckInstall(string project)
+        {
+            string installed = Path.Combine(project, "lib", "roots");
+            Assert.Equal(new[] { ".kscript-lib.json", "client.kscript", "kscript.json" },
+                Directory.GetFileSystemEntries(installed).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+            Assert.Equal(package, File.ReadAllText(Config(installed)));
+            Assert.Equal("fn value() => 42", File.ReadAllText(Path.Combine(installed, "client.kscript")));
+            var receipt = JsonNode.Parse(File.ReadAllText(Path.Combine(installed, ".kscript-lib.json")));
+            Assert.Equal("1.2.3", (string)receipt["version"]);
+            Assert.Equal("client.kscript", (string)receipt["entry"]);
+            Assert.Equal("KScript.Math", (string)receipt["packages"][0]);
+            Assert.Equal(Pin, (string)receipt["commit"]);
+        }
+
+        var added = Run(root, "add", selector);
+        Assert.True(added.Code == ExitCodes.Ok, added.Error);
+        CheckInstall(root);
+        string saved = File.ReadAllText(Config(root));
+        github.Routes.Remove(head);
+        github.Requests.Clear();
+        var alternate = Run(root, "add", selector == repo ? repo + "@roots" : repo);
+        Assert.True(alternate.Code == ExitCodes.Ok, alternate.Error);
+        Assert.Equal(saved, File.ReadAllText(Config(root)));
+        Assert.All(github.Requests, url => Assert.StartsWith(raw, url));
+        string clone = Directory.CreateDirectory(Path.Combine(root, "clone")).FullName;
+        File.Copy(Config(root), Config(clone));
+        github.Requests.Clear();
+        var restored = Run(clone, "restore");
+        Assert.True(restored.Code == ExitCodes.Ok, restored.Error);
+        Assert.All(github.Requests, url => Assert.Contains(Pin, url));
+        CheckInstall(clone);
+    }
+
+    [Theory]
+    [InlineData("HEAD", "libraries/another-package")]
+    [InlineData("feature", "libraries/roots")]
+    public void DirectRepositoryDoesNotReplaceAnotherFolderOrBranchPin(string revision, string folder)
+    {
+        string source = Direct + "/tree/" + revision + "/libraries/roots";
+        string config = JsonSerializer.Serialize(new { libraries = new { roots = new { source, commit = Pin } } });
+        File.WriteAllText(Config(root), config);
+        string raw = $"https://raw.githubusercontent.com/acme/roots/{Pin}/kscript.json";
+        github.Routes[raw] = JsonSerializer.SerializeToUtf8Bytes(new { library = folder });
+
+        var result = Run(root, "add", Direct);
+        Assert.NotEqual(ExitCodes.Ok, result.Code);
+        Assert.Contains("different source", result.Error);
+        Assert.Equal(config, File.ReadAllText(Config(root)));
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "roots")));
+        Assert.Equal(revision == "HEAD" ? new[] { raw } : Array.Empty<string>(), github.Requests);
+    }
+
+    [Theory]
     [InlineData("orimovo/client-collection", true)]
     [InlineData("waggr-gb/libraries", false)]
     public void AnOfficialPinAndItsReceiptResolveBareNamesWithoutDiscovery(string repository, bool rootPackage)

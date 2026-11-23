@@ -211,6 +211,34 @@ public sealed class LibCommandTests : IDisposable
         Assert.Equal(ExitCodes.Ok, Add("org/toolkit").Code);
     }
 
+    [Theory]
+    [InlineData("../sdk", "kscript.json", "{}")]
+    [InlineData("/sdk", "kscript.json", "{}")]
+    [InlineData("sdk", null, null)]
+    [InlineData("sdk", "kscript.json", "{}")]
+    [InlineData("sdk", "kscript.json", """{"library":"nested"}""")]
+    [InlineData("sdk", "KScript.json", """{"name":"library","library":{"version":"1.0.0","entry":"index.kscript"}}""")]
+    public void InvalidLibraryReferencesCannotInstallAFallbackEntry(string folder, string childFile, string childConfig)
+    {
+        string workspace = JsonSerializer.Serialize(new { library = folder });
+        var files = new List<(string, string, int)>
+        {
+            ("kscript.json", workspace, 0),
+            ("index.kscript", "echo 'project'", 0),
+            ("sdk/index.kscript", "echo 'fallback'", 0),
+            ("sdk/nested/kscript.json", """{"name":"library","library":{"version":"1.0.0","entry":"index.kscript"}}""", 0),
+            ("sdk/nested/index.kscript", "echo 'nested'", 0)
+        };
+        if (childFile != null) files.Add(("sdk/" + childFile, childConfig, 0));
+        github.Archive = Archive(files.ToArray());
+
+        var result = Add("org/library");
+        Assert.Equal(ExitCodes.Failed, result.Code);
+        Assert.NotEmpty(result.Error);
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "library")));
+        Assert.False(File.Exists(Path.Combine(root, "kscript.json")));
+    }
+
     [Fact]
     public void TheTemplateLibrariesCanBeInstalledAndUsedWithoutGeneratingAProject()
     {

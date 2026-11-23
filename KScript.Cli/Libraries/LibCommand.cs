@@ -208,7 +208,8 @@ namespace KScript.Cli
             {
                 if (!project.Libraries.TryGetValue(candidate.Name, out var dependency)) continue;
                 var pinned = Source.FromDependency(dependency);
-                if (bareName || pinned.Url == candidate.Url || source.Named && pinned.IsRoot && pinned.Repository == source.Repository)
+                if (bareName || pinned.Url == candidate.Url || source.Named && pinned.IsRoot && pinned.Repository == source.Repository
+                    || await RootReferencesPin(client, candidate, pinned, dependency.Commit))
                 {
                     if (!bareName && source.Named && pinned.IsRoot) pinned = pinned with { RootPackageName = candidate.Name };
                     return await Install(client, pinned, dependency.Commit, libraryFolder, project.SiteRoot,
@@ -308,9 +309,15 @@ namespace KScript.Cli
             Directory.CreateDirectory(stage);
             try
             {
+                LibraryManifest manifest = ArchiveManifest(archive, folder, out string packageFolder);
+                if (packageFolder != null)
+                {
+                    folder = folder.Length == 0 ? packageFolder : folder + "/" + packageFolder;
+                    manifest = ArchiveManifest(archive, folder, out _);
+                    if (manifest == null)
+                        throw new InvalidDataException($"{folder}/{ProjectConfig.FileName} must declare the package entry and version.");
+                }
                 var scripts = Extract(archive, folder, archiveRepo, stage);
-                string config = Path.Combine(stage, ProjectConfig.FileName);
-                LibraryManifest manifest = File.Exists(config) ? LibraryManifest.Load(config) : null;
                 if (source.RootPackageName != null && manifest?.Name != source.RootPackageName)
                     throw new InvalidDataException($"The manifest in {source.Repository} must declare the library name '{source.RootPackageName}'.");
                 string entry = EntryFor(stage, scripts, manifest);
@@ -421,6 +428,48 @@ namespace KScript.Cli
             return file.FullName[(slash + 1)..];
         }
 
+        private static LibraryManifest ArchiveManifest(ZipArchive archive, string folder, out string packageFolder)
+        {
+            packageFolder = null;
+            string path = folder.Length == 0 ? ProjectConfig.FileName : folder + "/" + ProjectConfig.FileName;
+            ZipArchiveEntry config = null;
+            foreach (var file in archive.Entries)
+            {
+                if (ArchivePath(file) != path) continue;
+                if (config != null) throw new InvalidDataException($"Duplicate library manifest: {path}");
+                CheckArchiveEntry(file, path);
+                config = file;
+            }
+            if (config == null) return null;
+            if (config.Length > SizeLimit) throw new InvalidDataException("The library exceeds 64 MiB.");
+            using var content = new MemoryStream();
+            CopyEntry(config, content, new byte[81920]);
+            content.Position = 0;
+            using var reader = new StreamReader(content);
+            return LibraryManifest.Parse(reader.ReadToEnd(), path, out packageFolder);
+        }
+
+        private static void CheckArchiveEntry(ZipArchiveEntry file, string relative)
+        {
+            int kind = (file.ExternalAttributes >> 16) & 0xf000;
+            if ((file.ExternalAttributes & (int)FileAttributes.ReparsePoint) != 0 || (kind != 0 && kind != 0x8000 && kind != 0x4000))
+                throw new InvalidDataException($"Unsupported link or special file: {relative}");
+        }
+
+        private static void CopyEntry(ZipArchiveEntry file, Stream output, byte[] buffer)
+        {
+            using var input = file.Open();
+            long remaining = file.Length;
+            while (remaining > 0)
+            {
+                int read = input.Read(buffer, 0, (int)Math.Min(remaining, buffer.Length));
+                if (read == 0) throw new InvalidDataException($"Incomplete library file: {file.FullName}");
+                output.Write(buffer, 0, read);
+                remaining -= read;
+            }
+            if (input.ReadByte() != -1) throw new InvalidDataException($"Incorrect size for library file: {file.FullName}");
+        }
+
         private static List<string> Extract(ZipArchive archive, string folder, string repository, string stage)
         {
             var scripts = new List<string>();
@@ -438,25 +487,14 @@ namespace KScript.Cli
                 if (relative.Length == 0) continue;
                 if (!relative.Split('/').All(IsSafePathComponent) || relative.Split('/')[0].Equals(Receipt, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"Invalid library path: {relative}");
-                int kind = (file.ExternalAttributes >> 16) & 0xf000;
-                if ((file.ExternalAttributes & (int)FileAttributes.ReparsePoint) != 0 || (kind != 0 && kind != 0x8000 && kind != 0x4000))
-                    throw new InvalidDataException($"Unsupported link or special file: {relative}");
+                CheckArchiveEntry(file, relative);
                 if (file.FullName.EndsWith('/')) continue;
                 if (file.Length > SizeLimit - total) throw new InvalidDataException("The library exceeds 64 MiB.");
                 total += file.Length;
                 string target = Path.Combine(stage, relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(target));
-                using var input = file.Open();
                 using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write);
-                long remaining = file.Length;
-                while (remaining > 0)
-                {
-                    int read = input.Read(buffer, 0, (int)Math.Min(remaining, buffer.Length));
-                    if (read == 0) throw new InvalidDataException($"Incomplete library file: {relative}");
-                    output.Write(buffer, 0, read);
-                    remaining -= read;
-                }
-                if (input.ReadByte() != -1) throw new InvalidDataException($"Incorrect size for library file: {relative}");
+                CopyEntry(file, output, buffer);
                 if (ScriptFiles.IsScript(relative)) scripts.Add(relative);
             }
             if (!foundFolder && folder.Length > 0) throw new InvalidDataException($"Folder {folder}/ was not found in {repository}.");

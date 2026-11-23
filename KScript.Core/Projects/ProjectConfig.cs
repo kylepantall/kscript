@@ -514,6 +514,9 @@ namespace KScript.Projects
         /// <summary>Source package metadata when this project is published as an installable library.</summary>
         public LibraryManifest Library { get; private set; }
 
+        /// <summary>The relative folder with the package manifest when this project publishes a nested library.</summary>
+        public string LibraryFolder { get; private set; }
+
         /// <summary>The source libraries installed by this project, keyed by directory name.</summary>
         public IReadOnlyDictionary<string, LibraryDependency> Libraries { get; private set; } = System.Collections.ObjectModel.ReadOnlyDictionary<string, LibraryDependency>.Empty;
 
@@ -825,7 +828,8 @@ namespace KScript.Projects
                             ReadApp(prop.Value, config);
                             break;
                         case "library":
-                            config.Library = LibraryManifest.Read(doc.RootElement);
+                            config.LibraryFolder = LibraryManifest.ReferencedFolder(doc.RootElement);
+                            if (config.LibraryFolder == null) config.Library = LibraryManifest.Read(doc.RootElement);
                             break;
                         case "make":
                             ReadMake(prop.Value, config);
