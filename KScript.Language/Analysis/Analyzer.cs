@@ -708,6 +708,9 @@ namespace KScript.Language.Analysis
             CheckAttributes(e, info);
             ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
+            if (info.Name == "guard" && !GuardLeaves(e))
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
+                    "The guard's failure block must leave with return, throw, break, continue or exit.");
             NoteResourceUses(e, info, scope);
             CheckElse(e, previous, markupMode);
             RequirePackage(info.Package, e.NameSpan, $"<{e.Name}>");

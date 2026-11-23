@@ -1070,7 +1070,7 @@ namespace KScript.Language.Formatting
         private static bool StartsWithContinuation(string text, int p)
         {
             while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
-            if (CastSyntax.StartsLine(text, p)) return true;
+            if (CastSyntax.StartsLine(text, p) || ExpressionParser.StartsArrowCatch(text, p)) return true;
             if (LeadingContinuations.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0)) return true;
             foreach (string w in WordContinuations)
             {

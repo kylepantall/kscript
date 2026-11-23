@@ -79,6 +79,6 @@ public sealed class ReleaseFeatureCoverageTests
     public void A_comment_after_an_operator_keeps_the_statement_going()
     {
         string path = Path.Combine(Path.GetTempPath(), "comment.kscript");
-        Assert.Equal("3\n", Run("total = 1 + /* tax */\n  2\necho \"$total\"\n", path: path));
+        Assert.Equal("3\n", Run("total = 1 + /* tax */\n  2\necho \"{ $total }\"\n", path: path));
     }
 }

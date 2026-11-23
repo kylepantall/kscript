@@ -100,6 +100,9 @@ namespace KScript.Language.Features
         public List<SemanticToken> GetSemanticTokens(DocumentAnalysis analysis)
         {
             List<SemanticToken> tokens = new List<SemanticToken>();
+            var bareQuoted = analysis.BareQuotedReferences;
+            foreach (TextSpan span in bareQuoted)
+                tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
             var money = analysis.MoneyLiterals.Values.Distinct().ToDictionary(span => span.Start);
             Dictionary<int, SymbolReference> references = new Dictionary<int, SymbolReference>();
             foreach (SymbolReference r in analysis.References)
@@ -115,7 +118,7 @@ namespace KScript.Language.Features
                 // The lexer returns one token for a quoted string or slash path. The parser has already
                 // distinguished its executable parts from literal text (including SQL and escaped braces).
                 HashSet<int> interpolated = new HashSet<int>();
-                List<TextSpan> codeSpans = region.CodeSpans.ToList();
+                List<TextSpan> codeSpans = region.CodeSpans.Where(span => !bareQuoted.Contains(region.Source.ToSource(span))).ToList();
                 foreach (LiteralNode literal in nodes.OfType<LiteralNode>().Where(l => l.Template?.Expressions.Any() == true))
                 {
                     List<TemplateSegment> parts = literal.Template.Segments;
@@ -128,7 +131,7 @@ namespace KScript.Language.Features
                         {
                             tokens.Add(new SemanticToken(region.Source.ToSource(part.Span), SemanticTokenType.String, SemanticTokenModifiers.None));
                         }
-                        else if (part.Node != null)
+                        else if (part.Node != null && !bareQuoted.Contains(region.Source.ToSource(part.Span)))
                         {
                             codeSpans.Add(part.Node.Span);
                         }
@@ -232,9 +235,14 @@ namespace KScript.Language.Features
 
             // Names declared in attributes (name="x", each="p", params="a, b") and function references.
             HashSet<int> covered = new HashSet<int>(tokens.Select(t => t.Span.Start));
-            foreach (SymbolReference r in analysis.References)
+            TextSpan[] suppressed = bareQuoted.OrderBy(span => span.Start).ToArray();
+            int suppressedIndex = 0;
+            foreach (SymbolReference r in analysis.References.OrderBy(reference => reference.Span.Start))
             {
-                if (covered.Contains(r.Span.Start) || covered.Contains(r.Span.Start - 1))
+                while (suppressedIndex < suppressed.Length && suppressed[suppressedIndex].End <= r.Span.Start)
+                    suppressedIndex++;
+                if (covered.Contains(r.Span.Start) || covered.Contains(r.Span.Start - 1)
+                    || (suppressedIndex < suppressed.Length && suppressed[suppressedIndex].Contains(r.Span.Start)))
                 {
                     continue;
                 }

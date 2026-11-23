@@ -16,7 +16,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData(Slug + "post = my-first-post\necho $post")]
         [InlineData(Slug + "echo [my-post, other-post]")]
-        [InlineData(Slug + "fn show(s: string) => \"<$s>\"\necho @show(my-post)\necho @show(s: my-post)")]
+        [InlineData(Slug + "fn show(s: string) => \"<{$s}>\"\necho @show(my-post)\necho @show(s: my-post)")]
         [InlineData(Slug + "echo my-post == my-post")]
         [InlineData("type Ver with [string] { pattern: /^\\d+\\.\\d+\\.\\d+$/ }\nv = 1.4.2\necho $v")]
         [InlineData("type Host with [domain] { pattern: /^[a-z]+\\.corp\\.com$/ }\nh = api.corp.com\necho $h")]

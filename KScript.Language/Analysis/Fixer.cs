@@ -21,6 +21,7 @@ namespace KScript.Language.Analysis
             DiagnosticCodes.OneSpelling,
             DiagnosticCodes.TypeForm,
             DiagnosticCodes.DurationUnit,
+            DiagnosticCodes.BareStringInterpolation,
         };
 
         /// <summary>

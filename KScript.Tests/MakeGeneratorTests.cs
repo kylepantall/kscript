@@ -342,10 +342,10 @@ public sealed class MakeGeneratorTests : IDisposable
             echo "{ @people.all()->count() }"
             first = @cache.remember('x', fn() => 42)
             second = @cache.remember('x', fn() => 0)
-            echo "$first $second"
+            echo "{ $first } { $second }"
             @cache.forget('x')
             echo "{ @cache.remember('x', fn() => 7) }"
-            echo "{ Repo({ name: 'k', stargazers_count: 3 }).stars } { Size.large } $max_items { @total(5) }"
+            echo "{ Repo({ name: 'k', stargazers_count: 3 }).stars } { Size.large } { $max_items } { @total(5) }"
             echo "{ NewPerson({ name: 'Sam', age: 9 }).age }"
             locale(set: "fr")
             echo "{ @t('items', { count: 2 }) }"
@@ -401,7 +401,7 @@ public sealed class MakeGeneratorTests : IDisposable
             who: Username = @Joan
             tier: Tier = gold
             fn off(p: Percent, l: Level) => $p * $l
-            echo "$sku $who $tier { @off(15, 2) } { $site.path }"
+            echo "{ $sku } { $who } { $tier } { @off(15, 2) } { $site.path }"
             try {
               bad: Sku = zzz-0001
             } catch err {

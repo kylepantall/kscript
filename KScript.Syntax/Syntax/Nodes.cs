@@ -203,6 +203,17 @@ namespace KScript.Syntax
         public override IEnumerable<ExprNode> Children => new[] { Left, Right };
     }
 
+    public sealed class CatchExpressionNode : ExprNode
+    {
+        public ExprNode Protected { get; internal set; }
+        public ExprNode Fallback { get; internal set; }
+        public string ErrorType { get; internal set; }
+        public TextSpan ErrorTypeSpan { get; internal set; }
+        public string Binding { get; internal set; } = "err";
+        public TextSpan BindingSpan { get; internal set; }
+        public override IEnumerable<ExprNode> Children => new[] { Protected, Fallback };
+    }
+
     public sealed class ConditionalNode : ExprNode
     {
         public ExprNode Condition { get; internal set; }

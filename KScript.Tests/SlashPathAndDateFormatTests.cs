@@ -43,7 +43,7 @@ public class SlashPathAndDateFormatTests
     [InlineData("echo \"{ $p->is_within('/My Apps') } { $p->is_within(/My) } { $p->is_within('/my apps') } { $p->is_within(/) }\"", "true false false true")]
     [InlineData("echo \"{ $p + 'Later' } { ($p + '..')->type() }\"", "/My Apps/Notes/Today/Later slash_path")]
     [InlineData("echo \"{ /a/b == '/a/b/' } { /a == /b }\"", "true false")]
-    [InlineData("for part at i in /home/joan/downloads {\n  echo \"$i $part { $part->type() }\"\n}", "0 /home slash_path\n1 /joan slash_path\n2 /downloads slash_path")]
+    [InlineData("for part at i in /home/joan/downloads {\n  echo \"{$i} {$part} { $part->type() }\"\n}", "0 /home slash_path\n1 /joan slash_path\n2 /downloads slash_path")]
     public void PathsHaveFieldsAndMethods(string code, string expected) =>
         Assert.Equal(expected, Code("p: slash_path = '/My Apps/Notes/Today'\n" + code));
 
@@ -55,20 +55,20 @@ public class SlashPathAndDateFormatTests
     [InlineData("sub = 'a/b'\necho /docs/$sub", "/docs/a/b")]
     [InlineData("note = { id: 7 }\np: slash_path = /notes/$note.id\necho $p", "/notes/7")]
     [InlineData("note = { path: 'home' }\nwhere: slash_path = $note.path\necho $where", "/home")]
-    [InlineData("id = 3\nfn go(to: slash_path) => \"go $to\"\necho @go(/x/$id)", "go /x/3")]
+    [InlineData("id = 3\nfn go(to: slash_path) => \"go {$to}\"\necho @go(/x/$id)", "go /x/3")]
     public void BarePathsFillInValues(string code, string expected) => Assert.Equal(expected, Code(code));
 
     [Theory]
     [InlineData("echo \"{ /^ab$/i->type() } { /blog/->type() } { 10 / 2 }\"", "regex regex 5")]
     [InlineData("x = 6\ny = 3\necho $x/$y", "2")]
     [InlineData("echo /docs/start->type()", "slash_path")]
-    [InlineData("fn open(at: slash_path) => \"$at\"\necho \"{ @open(/blog/) } { @open('/a b/c') } { @open(a/b) }\"", "/blog /a b/c /a/b")]
+    [InlineData("fn open(at: slash_path) => \"{$at}\"\necho \"{ @open(/blog/) } { @open('/a b/c') } { @open(a/b) }\"", "/blog /a b/c /a/b")]
     public void BarePathsAndRegexesAndDivisionDontClash(string code, string expected) => Assert.Equal(expected, Code(code));
 
     [Theory]
-    [InlineData("fn f(x: semver) => \"$x\"\necho @f(1.4.2-beta.1)", "1.4.2-beta.1")]
-    [InlineData("fn f(x: ip) => \"$x\"\necho @f(10.0.0.1)", "10.0.0.1")]
-    [InlineData("fn f(x: cidr) => \"$x\"\necho @f(10.0.0.0/8)", "10.0.0.0/8")]
+    [InlineData("fn f(x: semver) => \"{$x}\"\necho @f(1.4.2-beta.1)", "1.4.2-beta.1")]
+    [InlineData("fn f(x: ip) => \"{$x}\"\necho @f(10.0.0.1)", "10.0.0.1")]
+    [InlineData("fn f(x: cidr) => \"{$x}\"\necho @f(10.0.0.0/8)", "10.0.0.0/8")]
     [InlineData("echo 1.5 + 1", "2.5")]
     public void DottedValuesWorkAsArgumentsOfTypesThatReadText(string code, string expected) => Assert.Equal(expected, Code(code));
 

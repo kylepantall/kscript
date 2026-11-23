@@ -67,6 +67,7 @@ namespace KScript.Language.Analysis
         public List<Symbol> Symbols { get; } = new List<Symbol>();
         public List<SymbolReference> References { get; } = new List<SymbolReference>();
         public List<ExpressionRegion> Regions { get; } = new List<ExpressionRegion>();
+        internal HashSet<TextSpan> BareQuotedReferences { get; } = new HashSet<TextSpan>();
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
 

@@ -14,7 +14,6 @@ namespace KScript.Runtime
             ("updateContent", "Use <set name=\"...\" value=\"...\" />.", "set"),
             ("temp", "Use <let> inside the block that needs it; KScript 2 variables are scoped.", "let"),
             ("defm", "Use <let name=\"...\"> with a map literal { key: value }.", "let"),
-            ("guard", "Use <const name=\"...\" value=\"...\" />.", null),
             ("array", "Use <let name=\"...\" value=\"['a', 'b']\" /> with a list literal.", null),
             ("aecho", "Use <echo>{ $list->join(', ') }</echo>.", null),
             ("ainsert", "Use <set name=\"list\" value=\"$list->push($item)\" />.", null),

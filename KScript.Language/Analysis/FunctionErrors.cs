@@ -8,7 +8,7 @@ namespace KScript.Language.Analysis;
 /// <summary>Known error types that can leave a call. Unresolved or dynamic calls carry no inferred contract.</summary>
 internal sealed class FunctionErrors
 {
-    private readonly ILookup<MarkupElement, (Symbol Callee, TextSpan Span)> calls;
+    private readonly ILookup<MarkupElement, (Symbol Callee, TextSpan Span, IReadOnlyList<string> Handlers)> calls;
     private readonly Dictionary<string, string> parents = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<MarkupElement, ExprNode> thrown = new();
     private readonly HandlerRecovery recovery;
@@ -27,7 +27,7 @@ internal sealed class FunctionErrors
             typeHandlers[owner] = TypeHandlers(owner, types, new HashSet<MarkupElement>()).ToArray();
         var functionsByEnd = analysis.References.Where(r => !r.IsDeclaration && r.Symbol.Kind == SymbolKind.Function)
             .ToLookup(r => r.Span.End);
-        var resolved = new List<(MarkupElement Element, Symbol Callee, TextSpan Span)>();
+        var resolved = new List<(MarkupElement Element, Symbol Callee, TextSpan Span, IReadOnlyList<string> Handlers)>();
         foreach (var region in analysis.Regions)
         {
             if (region.Element == null) continue;
@@ -35,11 +35,11 @@ internal sealed class FunctionErrors
             IEnumerable<ExprNode> expressions = region.Parse != null ? region.Parse.Nodes
                 : region.Template?.Expressions.Select(segment => segment.Node) ?? Array.Empty<ExprNode>();
             foreach (var root in expressions)
-                foreach (TextSpan call in InvocationNames(root))
+                foreach (var call in InvocationNames(root, region, Array.Empty<string>()))
                 {
-                    var span = region.Source.ToSource(call);
+                    var span = region.Source.ToSource(call.Name);
                     foreach (var reference in functionsByEnd[span.End])
-                        resolved.Add((region.Element, reference.Symbol, reference.Span));
+                        resolved.Add((region.Element, reference.Symbol, reference.Span, call.Handlers));
                 }
         }
         foreach (var element in analysis.Markup.DescendantElements().Where(e => e.Name == "call"))
@@ -47,9 +47,9 @@ internal sealed class FunctionErrors
             if (element.GetAttribute("fn")?.Value is not DecodedText target) continue;
             int end = target.ToSource(target.Value.TrimEnd().Length);
             foreach (var reference in functionsByEnd[end])
-                resolved.Add((element, reference.Symbol, reference.Span));
+                resolved.Add((element, reference.Symbol, reference.Span, Array.Empty<string>()));
         }
-        calls = resolved.ToLookup(call => call.Element, call => (call.Callee, call.Span));
+        calls = resolved.ToLookup(call => call.Element, call => (call.Callee, call.Span, call.Handlers));
     }
 
     // Runtime type handlers try the receiver's own clauses first, then its bases left to right.
@@ -62,17 +62,23 @@ internal sealed class FunctionErrors
                 foreach (var handler in TypeHandlers(parent, types, seen)) yield return handler;
     }
 
-    private static IEnumerable<TextSpan> InvocationNames(ExprNode node)
+    private IEnumerable<(TextSpan Name, IReadOnlyList<string> Handlers)> InvocationNames(ExprNode node, ExpressionRegion region, IReadOnlyList<string> handlers)
     {
         if (node == null || node is LambdaNode) yield break;
         switch (node)
         {
-            case CommandCallNode { ArgumentList: not null } command: yield return command.NameSpan; break;
-            case MethodCallNode method: yield return method.NameSpan; break;
-            case CallNode call: yield return call.Callee.Span; break;
+            case CatchExpressionNode attempt:
+                var protectedHandlers = recovery.MayDecline(attempt, region)
+                    ? handlers : handlers.Append(attempt.ErrorType ?? ErrorTypes.Root).ToArray();
+                foreach (var span in InvocationNames(attempt.Protected, region, protectedHandlers)) yield return span;
+                foreach (var span in InvocationNames(attempt.Fallback, region, handlers)) yield return span;
+                yield break;
+            case CommandCallNode { ArgumentList: not null } command: yield return (command.NameSpan, handlers); break;
+            case MethodCallNode method: yield return (method.NameSpan, handlers); break;
+            case CallNode call: yield return (call.Callee.Span, handlers); break;
         }
         foreach (var child in node.Children)
-            foreach (var span in InvocationNames(child)) yield return span;
+            foreach (var span in InvocationNames(child, region, handlers)) yield return span;
     }
 
     internal static void Infer(DocumentAnalysis analysis, IReadOnlyDictionary<string, string> importedParents)
@@ -120,7 +126,7 @@ internal sealed class FunctionErrors
         // An invalid call or throw already has a more precise diagnostic; its effects aren't established.
         if (analysis.Diagnostics.Any(d => (d.Severity == DiagnosticSeverity.Error || d.Code == DiagnosticCodes.UnknownErrorType)
             && statement.Span.ContainsStrict(d.Span.Start))) return;
-        var site = calls[statement].Where(call => call.Callee.EscapingErrors.Any(escaping.Contains)).Take(2).ToArray();
+        var site = calls[statement].Where(call => Unhandled(call.Callee, call.Handlers).Any(escaping.Contains)).Take(2).ToArray();
         var span = site.Length == 1 ? site[0].Span : statement.NameSpan;
         if (span.Length == 0) span = statement.Span;
         string names = string.Join(", ", escaping.OrderBy(name => name, StringComparer.Ordinal));
@@ -131,7 +137,7 @@ internal sealed class FunctionErrors
     private HashSet<string> Visit(MarkupElement element, IReadOnlyCollection<string> caught, string binding)
     {
         var errors = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var call in calls[element]) errors.UnionWith(call.Callee.EscapingErrors);
+        foreach (var call in calls[element]) errors.UnionWith(Unhandled(call.Callee, call.Handlers));
         if (element.Name == "expect_error" || element.Name == "expect" && element.GetAttribute("throws") != null)
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (element.Name == "throw")
@@ -178,6 +184,9 @@ internal sealed class FunctionErrors
         }
         errors.UnionWith(raised);
     }
+
+    private IEnumerable<string> Unhandled(Symbol callee, IReadOnlyList<string> handlers) =>
+        callee.EscapingErrors.Where(error => !handlers.Any(handler => Matches(error, handler)));
 
     private bool Matches(string name, string handler)
     {

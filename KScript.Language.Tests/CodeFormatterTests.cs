@@ -189,6 +189,15 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void IndentsArrowCatchContinuations()
+        {
+            Assert.Equal(Lines(
+                "fn recover() => @load()",
+                "  catch Validation =>",
+                "  $err.message"), Fmt("fn recover() => @load()\ncatch Validation =>\n$err.message"));
+        }
+
+        [Fact]
         public void IndentsArgumentListsAndArrays()
         {
             string input = "x = call(\n1,\n2\n)\nlist = [\n1,\n2,\n]\n";

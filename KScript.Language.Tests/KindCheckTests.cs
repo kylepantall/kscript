@@ -95,7 +95,7 @@ namespace KScript.Language.Tests
         [InlineData("name = 'Joan'\nx = $name - 1\nname = 5\n")]
         [InlineData("x = @now() - @now()\n")]
         [InlineData("fn half(n) {\n  return $n / 2\n}\necho @half(4)\n")]
-        [InlineData("n = 3\nx = \"$n\" - 1\n")] // filled-in text may be a number
+        [InlineData("n = 3\nx = \"{$n}\" - 1\n")] // filled-in text may be a number
         public void ArithmeticThatMayWorkIsLeftAlone(string text)
         {
             Assert.Empty(Check(text));

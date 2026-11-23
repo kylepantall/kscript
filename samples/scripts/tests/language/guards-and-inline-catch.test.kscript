@@ -1,0 +1,71 @@
+fn save_age(age: int, enabled: bool) {
+  guard $enabled else {
+    return 'Skipped'
+  }
+
+  throw if $age < 0 {
+    type: 'Validation'
+    message: "Age cannot be negative: { $age }"
+  }
+
+  return 'Saved'
+}
+
+fn a(value: int) {
+  throw if $value < 0 {
+    type: 'Validation'
+    message: 'a failed'
+  }
+  return $value
+}
+
+fn b() {
+  throw Validation "b failed"
+}
+
+fn inline_fallback() => @b() catch Validation => 7
+
+fn declaration_fallback() => @b() catch Validation {
+  return 8
+}
+
+describe(name: 'Guards and inline catches') {
+  test(name: 'a failed guard returns before the rest of the function') {
+    expect(value: @save_age(-1, false), same: 'Skipped')
+    expect(value: @save_age(1, true), same: 'Saved')
+  }
+
+  test(name: 'catch returns its fallback with the original error in scope') {
+    result = @save_age(-1, true) catch => $err.message
+    expect(value: $result, same: 'Age cannot be negative: -1')
+    typed = @save_age(-2, true) catch Validation as problem => $problem.message
+    expect(value: $typed, same: 'Age cannot be negative: -2')
+  }
+
+  test(name: 'a successful expression skips its fallback') {
+    expect(value: @save_age(1, true) catch => $err.message, same: 'Saved')
+  }
+
+  test(name: 'an unmatched error reaches the caller') {
+    expect(
+      value: @save_age(-1, true) catch NotFound => 'Missing',
+      throws: Validation
+    )
+  }
+
+  test(name: 'postfix catch covers the whole expression unless grouped') {
+    expect(value: @a(5) + @b() catch => 0, same: 0)
+    expect(value: @a(5) + (@b() catch => 0), same: 5)
+    expect(value: @a(-5) + @b() catch Validation => 0, same: 0)
+    expect(value: @a(-5) + (@b() catch => 0), throws: Validation)
+  }
+
+  test(name: 'arrow and block handlers both work in expression-bodied functions') {
+    expect(value: @inline_fallback(), same: 7)
+    expect(value: @declaration_fallback(), same: 8)
+  }
+
+  test(name: 'a null fallback propagates the original error') {
+    expect(value: @b() catch => null, throws: Validation)
+  }
+}

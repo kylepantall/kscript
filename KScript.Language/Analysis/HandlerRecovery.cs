@@ -34,6 +34,9 @@ internal sealed class HandlerRecovery
         return cache[clause] = Paths(clause.ChildElements, binding) != Exit.Handled;
     }
 
+    internal bool MayDecline(CatchExpressionNode clause, ExpressionRegion region) =>
+        !NonNull(clause.Fallback, clause.Binding, region);
+
     [Flags]
     private enum Exit { Handled = 0, Next = 1, Null = 2 }
 

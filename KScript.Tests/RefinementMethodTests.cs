@@ -72,7 +72,7 @@ public sealed class RefinementMethodTests
               normalize: @clean
             }
             key = ChildKey(' login ')
-            echo "[$key]"
+            echo "[{ $key }]"
             echo "[{ $state.saved }]"
             echo "[{ ChildKey($state.saved) }]"
             """);

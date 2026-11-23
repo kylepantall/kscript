@@ -153,7 +153,7 @@
     "keywords": {
       "patterns": [
         {
-          "match": "(?<![\\w$@.-])(if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
+          "match": "(?<![\\w$@.-])(if|guard|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
           "name": "keyword.control.flow.kscript"
         },
         {
@@ -174,7 +174,7 @@
     "element": {
       "patterns": [
         {
-          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
+          "begin": "(?:^|(?<=[{;]))\\s*(?!(?:if|guard|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)\\s*(\\()",
           "beginCaptures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -207,7 +207,7 @@
           ]
         },
         {
-          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
+          "match": "(?:^|(?<=[{;]))\\s*(?!(?:if|guard|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue|fn|const|import|from|as|echo|let|set|and|or|not|is|true|false|null)(?![\\w-]))([A-Za-z_][\\w.:-]*)(?=\\s*(?:\\\"|\\{|$))",
           "captures": {
             "1": {
               "name": "entity.name.tag.kscript"
@@ -218,6 +218,10 @@
     },
     "expression": {
       "patterns": [
+        {
+          "name": "keyword.control.kscript",
+          "match": "(?<![\\w$@.-])(try|catch)(?![\\w-])"
+        },
         {
           "include": "#typeAnnotation"
         },
@@ -290,12 +294,6 @@
         },
         {
           "include": "#interpolation"
-        },
-        {
-          "include": "#textVariable"
-        },
-        {
-          "include": "#textCall"
         }
       ]
     },

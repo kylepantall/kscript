@@ -90,7 +90,7 @@ namespace KScript.Syntax
 
         public static readonly HashSet<string> Keywords = new HashSet<string>(StringComparer.Ordinal)
         {
-            "and", "or", "not", "eq", "ne", "lt", "le", "gt", "ge", "in", "step", "true", "false", "null", "fn", "match",
+            "and", "or", "not", "eq", "ne", "lt", "le", "gt", "ge", "in", "step", "true", "false", "null", "fn", "match", "catch",
         };
 
         private readonly string text;

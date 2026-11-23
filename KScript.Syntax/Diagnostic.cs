@@ -171,6 +171,9 @@ namespace KScript.Syntax
         /// <summary>A length of time written without its unit (<c>timeout: 30</c>) or in quotes (<c>ttl: '10m'</c>); a duration is <c>30s</c>.</summary>
         public const string DurationUnit = "KS6018";
 
+        /// <summary>A reference in a .kscript double-quoted string should be enclosed in interpolation braces.</summary>
+        public const string BareStringInterpolation = "KS6019";
+
         /// <summary>Where a code is explained: its section of docs/errors.md.</summary>
         public static string HelpUrl(string code) =>
             "https://github.com/kylepantall/kscript/blob/master/docs/errors.md#" + (code ?? string.Empty).ToLowerInvariant();

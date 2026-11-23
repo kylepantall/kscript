@@ -503,7 +503,7 @@ namespace KScript.Language.Agents
             }
             match $count {
               0 => echo 'Nothing to do'
-              _ => echo "$count open"
+              _ => echo "{$count} open"
             }
             try {
               @write_json('done.json', $tasks->filter(fn(t) => $t.done))
@@ -520,7 +520,8 @@ namespace KScript.Language.Agents
 
         internal const string Rules = """
             - `$name` reads a variable; `name = value` sets it. `@name(...)` calls a fn or command; `$x->name(...)` calls a method; `$x.name` reads a field (a plain fact: `$response.status`, `$file.size`); `$x |> name()` pipes.
-            - Text: `"Hi { $name }"` or `"Hi $name"`; `{{ }}` for literal braces. Lambdas: `fn(x) => $x * 2`.
+            - Text: write `"Hi { $name }"` with braces around expressions and `{{ }}` for literal braces. Lambdas: `fn(x) => $x * 2`.
+            - Errors: use `guard $ready else { return }` for preconditions. Recover a value with `@load() catch FileNotFound => 'Missing'`. Share a handler across callers with `catch FileNotFound { return 'Missing' }` after a function. A null fallback propagates the original error.
             - Operators: `== !=` (loose) `=== !==` (strict) `< <= > >=` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.

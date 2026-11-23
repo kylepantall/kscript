@@ -75,12 +75,12 @@ name = $other        // right: another variable
 
 ## KS2005
 
-**Single quotes keep text as written.** `"Double quotes"` fill in `$name` and `{ }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes.
+**Single quotes keep text as written.** `"Double quotes"` evaluate expressions in `{ }`, such as `{ $name }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes and adds interpolation braces.
 
 ```kscript wrong
 name = 'Joan'
 greeting = 'Hello $name'         // warning: holds the text "Hello $name"
-greeting = "Hello $name"         // right: Hello Joan
+greeting = "Hello { $name }"     // right: Hello Joan
 label = 'Costs $5'               // fine: $5 is not a variable
 ```
 
@@ -156,8 +156,8 @@ text = @read_text('notes.txt')
 
 ```kscript
 name = 'Joan'
-echo "Hello $nme"    // wrong
-echo "Hello $name"   // right
+echo "Hello { $nme }"    // wrong
+echo "Hello { $name }"   // right
 ```
 
 ## KS4002
@@ -287,7 +287,7 @@ The KS6xxx codes come in two kinds.
 
 **Old spellings are errors.** KS6006, KS6009, KS6010, KS6011, KS6012 and KS6014 each mark a spelling that was replaced by one that is kept. In a `.kscript` file the script doesn't run: the engine stops with the same message `kscript check` gives, and no standard or `lint.rules` setting turns it down. `kscript check --fix` rewrites every one of them. XML scripts keep the forms that are XML's own (`lt` and `ge`, a comma list in an attribute, `fields="x: int, y: int"`), and get a warning where a rule applies to both forms (KS6010).
 
-**Style rules are warnings.** KS6001 to KS6005, KS6007, KS6008, KS6013 and KS6018 are about how a file reads, not whether it runs. They are warnings, and a [standard](standards.md) can turn each one off or make it an error.
+**Style rules are warnings.** KS6001 to KS6005, KS6007, KS6008, KS6013 and KS6018 can be adjusted through a [standard](standards.md).
 
 ## KS6001
 
@@ -354,3 +354,7 @@ Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name:
 ## KS6018
 
 **A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name.
+
+## KS6019
+
+**An unbraced reference inside double quotes.** This is a syntax error. In a `.kscript` file, write `"Hi { $name }"` to mark where an expression starts and ends. Use **Wrap in interpolation braces** or run `kscript check --fix` to update older scripts. Use single quotes to keep characters such as `$` literally.

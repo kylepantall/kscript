@@ -110,7 +110,7 @@ namespace KScript.Syntax.Markup
 
         private static readonly HashSet<string> BlockStatements = new HashSet<string>(StringComparer.Ordinal)
         {
-            "kscript", "let", "set", "do", "echo", "if", "elif", "else", "for", "while", "match", "case", "default", "fn", "return",
+            "kscript", "let", "set", "do", "echo", "if", "guard", "elif", "else", "for", "while", "match", "case", "default", "fn", "return",
             "call", "try", "catch", "finally", "throw", "import", "exit", "break", "continue",
         };
 
@@ -653,6 +653,9 @@ namespace KScript.Syntax.Markup
                     case "elif" when Only("test"):
                     case "while" when Only("test"):
                         WriteBlock(e.Name + " " + Attr("test")?.Trim(), e, indent, chained);
+                        return;
+                    case "guard" when Only("test"):
+                        WriteBlock("guard " + Attr("test")?.Trim() + " else", e, indent, chained);
                         return;
                     case "else" when e.Attributes.Count == 0:
                         WriteBlock("else", e, indent, chained);

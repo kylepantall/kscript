@@ -142,7 +142,7 @@ namespace KScript.Language.Tests
         [InlineData("type Age with [int] { min: 0 }\nfn f(a: Age = 5) => $a\necho @f()")]
         [InlineData("type Who with [handle] {}\nfn f(h: Who = @me) => $h\necho @f()")]
         [InlineData("fn who(h: handle) => $h.name\necho @who(@Sam)\necho @who(h: @Ann)")]
-        [InlineData("h: handle = @a\nok = $h == @a\nno = @b != $h\necho \"$ok $no\"")]
+        [InlineData("h: handle = @a\nok = $h == @a\nno = @b != $h\necho \"{$ok} {$no}\"")]
         [InlineData("u: uuid = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f\necho $u.version")]
         [InlineData("e = joan@example.com\necho $e.domain\necho $e->upper()")]
         [InlineData("r = /ab+/i\necho $r->test('abb')")]
@@ -565,7 +565,7 @@ namespace KScript.Language.Tests
                 s: Sku = ABC-1234
                 u: Username = @joan
                 fn grow(by: Percent) => $by
-                echo "$s $u { @grow(5) }"
+                echo "{$s} {$u} { @grow(5) }"
                 """));
 
             DocumentAnalysis bad = Native("""

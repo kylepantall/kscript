@@ -161,7 +161,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void AnUnfinishedLineIsReportedWhereItIs()
         {
-            const string text = "k = 5 +\nz = 1\necho \"$k $z\"\n";
+            const string text = "k = 5 +\nz = 1\necho \"{ $k } { $z }\"\n";
             Diagnostic d = Assert.Single(Analyze(text).Diagnostics);
             Assert.Equal("Expected an expression after '+'.", d.Message);
             Assert.Equal(0, Analyze(text).Source.GetPosition(d.Span.Start).Line);
@@ -179,8 +179,8 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("echo \"unclosed\nx = 1\necho $x\n", "This text is missing its closing \".")]
-        [InlineData("y = \"unclosed\nx = 1\necho \"$x $y\"\n", "This string is missing its closing \".")]
-        [InlineData("y = 'unclosed\nx = 1\necho \"$x $y\"\n", "This string is missing its closing '.")]
+        [InlineData("y = \"unclosed\nx = 1\necho \"{$x} {$y}\"\n", "This string is missing its closing \".")]
+        [InlineData("y = 'unclosed\nx = 1\necho \"{$x} {$y}\"\n", "This string is missing its closing '.")]
         public void AMissingQuoteEndsWithItsLine(string text, string message)
         {
             DocumentAnalysis a = Analyze(text);
@@ -204,7 +204,7 @@ namespace KScript.Language.Tests
             Assert.Equal(DiagnosticCodes.TextNotFilledIn, d.Code);
             Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
             Assert.StartsWith("$name is not filled in here: single quotes keep text as written. Use double quotes", d.Message);
-            string expected = "name = 'Joan'\nn = 2\ngreeting = \"Hello $name, you have {$n * 2}!\"\necho $greeting\n";
+            string expected = "name = 'Joan'\nn = 2\ngreeting = \"Hello { $name }, you have {$n * 2}!\"\necho $greeting\n";
             Assert.Equal(expected, Fixed(text, d));
             Assert.Empty(Analyze(expected).Diagnostics);
         }
@@ -220,9 +220,9 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("name = 'Joan'\necho \"Hello $name\"\n")]
-        [InlineData("name = 'Joan'\ng = \"Hello $name\"\necho $g\n")]
-        [InlineData("fn greet(who: string) {\n  return \"Hi $who!\"\n}\necho @greet('a')\n")]
+        [InlineData("name = 'Joan'\necho \"Hello {$name}\"\n")]
+        [InlineData("name = 'Joan'\ng = \"Hello {$name}\"\necho $g\n")]
+        [InlineData("fn greet(who: string) {\n  return \"Hi {$who}!\"\n}\necho @greet('a')\n")]
         [InlineData("price = 'It costs $5'\necho $price\n")]
         [InlineData("label = '$nobody is here'\necho $label\n")]
         [InlineData("name = 'Joan'\ntext = 'Hello ' + $name\necho $text\n")]

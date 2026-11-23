@@ -521,8 +521,8 @@ public sealed class DocsTests
     [Fact]
     public void Playground_converts_between_xml_and_kscript()
     {
-        Assert.Equal("x = 1\necho \"$x\"\n", Playground.Convert("<let name=\"x\" value=\"1\" />\n<echo>$x</echo>", "kscript"));
-        Assert.Equal("<let name=\"x\" value=\"1\" />\n<echo>$x</echo>\n", Playground.Convert("x = 1\necho \"$x\"", "xml"));
+        Assert.Equal("x = 1\necho \"{ $x }\"\n", Playground.Convert("<let name=\"x\" value=\"1\" />\n<echo>$x</echo>", "kscript"));
+        Assert.Equal("<let name=\"x\" value=\"1\" />\n<echo>{ $x }</echo>\n", Playground.Convert("x = 1\necho \"{ $x }\"", "xml"));
         Assert.Equal("const max = 10\n", Playground.Convert("<const name=\"max\" value=\"10\" />", "kscript"));
         Assert.Null(Playground.Convert("<echo>", "kscript"));
         Assert.Null(Playground.Convert("if {", "xml"));

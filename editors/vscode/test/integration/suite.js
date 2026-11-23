@@ -81,7 +81,7 @@ async function runsScripts(folder) {
   // New Script opens a script that is ready to run, with the first thing to change selected.
   const fresh = await vscode.commands.executeCommand('kscript.newScript');
   assert.strictEqual(fresh.languageId, 'kscript-code', 'the new script is KScript');
-  assert.ok(fresh.isUntitled && fresh.getText().includes('echo "Hello $name!"'), 'the new script has the starter text');
+  assert.ok(fresh.isUntitled && fresh.getText().includes('echo "Hello {$name}!"'), 'the new script has the starter text');
   assert.strictEqual(fresh.getText(vscode.window.activeTextEditor.selection), 'world', 'the first thing to change is selected');
   await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
 

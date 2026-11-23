@@ -190,7 +190,7 @@ public class ArgumentConventionTests
     [Theory]
     [InlineData("import KScript.Terminal\ninput(to: name) \"Name? \"\necho $name", "import KScript.Terminal\ninput(into: name) \"Name? \"\necho $name")]
     [InlineData("import KScript.Terminal\npicker(into: f, must-exist: false) \"File? \"\necho $f", "import KScript.Terminal\npicker(into: f, must_exist: false) \"File? \"\necho $f")]
-    [InlineData("import KScript.Terminal\nmenu(into: c, options: ['a'], index: i) \"Pick\"\necho \"$c $i\"", "import KScript.Terminal\nmenu(into: c, options: ['a'], at: i) \"Pick\"\necho \"$c $i\"")]
+    [InlineData("import KScript.Terminal\nmenu(into: c, options: ['a'], index: i) \"Pick\"\necho \"{ $c } { $i }\"", "import KScript.Terminal\nmenu(into: c, options: ['a'], at: i) \"Pick\"\necho \"{ $c } { $i }\"")]
     [InlineData("import KScript.UI\nWindow(title: \"t\") {\n  n = 0\n  Button(on-click: { n += 1 }) \"{$n}\"\n}", "import KScript.UI\nWindow(title: \"t\") {\n  n = 0\n  Button(on_click: { n += 1 }) \"{$n}\"\n}")]
     public void CheckFixRenamesAnOldArgument(string code, string expected)
     {

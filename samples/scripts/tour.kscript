@@ -15,16 +15,16 @@ x = 3
 x += 1
 x = 3
 total += $price * $qty
-echo "$x $total"
+echo "{ $x } { $total }"
 const config = { debug: false, retries: 3 }
-echo "Hello, $name! Total: { ($price * $qty)->round(2) }. Use {{ and }} for \
-  braces."
+echo "Hello, { $name }! Total: { ($price * $qty)->round(2) }. Use {{ and }} \
+  for braces."
 
 // Lists, maps, lambdas and pipes
 colours = ['red', 'green', 'blue']
 echo $colours[1]
 person = { name: 'Joan', age: 82 }
-echo "$person.name is { $person['age'] }"
+echo "{ $person.name } is { $person['age'] }"
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 names = $people
   |> filter(fn(p) => $p.age >= 18)
@@ -43,10 +43,10 @@ for i in 0..100 step 5 {
   echo $i
 }
 for item at k in $colours {
-  echo "$k: $item"
+  echo "{ $k }: { $item }"
 }
 for key, value in $config {
-  echo "$key = $value"
+  echo "{ $key } = { $value }"
 }
 while $n < 3 {
   n += 1

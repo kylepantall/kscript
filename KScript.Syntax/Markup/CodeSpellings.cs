@@ -48,7 +48,8 @@ namespace KScript.Syntax.Markup
         }
 
         private static bool MayNeedIt(string code) =>
-            code.Contains("fn(", StringComparison.Ordinal) || ComparisonSymbols.Keys.Any(w => code.Contains(" " + w + " ", StringComparison.Ordinal));
+            code.Contains("fn(", StringComparison.Ordinal) || (code.Contains('"') && (code.Contains('$') || code.Contains('@')))
+                || ComparisonSymbols.Keys.Any(w => code.Contains(" " + w + " ", StringComparison.Ordinal));
 
         private static void Collect(string code, int start, int end, List<TextChange> changes, int depth)
         {
@@ -88,12 +89,28 @@ namespace KScript.Syntax.Markup
                     && TemplateParser.ParseQuoted(code, t.Span.Start + 1, t.Span.End - 1) is Template template)
                 {
                     // "Total: { $n gt 3 ? 'many' : 'few' }": the code inside the braces.
-                    foreach (TemplateSegment segment in template.Expressions.Where(s => s.Kind == TemplateSegmentKind.Interpolation))
+                    foreach (TemplateSegment segment in template.Expressions)
                     {
-                        Collect(code, segment.Span.Start, segment.Span.End, changes, depth + 1);
+                        if (segment.Kind != TemplateSegmentKind.Reference)
+                        {
+                            Collect(code, segment.Span.Start, segment.Span.End, changes, depth + 1);
+                        }
+                        else if (segment.Expression.Success && !RawCommandArgument(tokens, i))
+                        {
+                            changes.Add(new TextChange(new TextSpan(segment.Span.Start, 0), "{ "));
+                            changes.Add(new TextChange(new TextSpan(segment.Span.End, 0), " }"));
+                        }
                     }
                 }
             }
+        }
+
+        private static bool RawCommandArgument(IReadOnlyList<Token> tokens, int at)
+        {
+            int index = at - 1;
+            if (index >= 2 && tokens[index].Is(":")) index -= 2;
+            return index >= 1 && tokens[index].Is("(") && tokens[index - 1].Kind == TokenKind.Command
+                && TemplateParser.KeepsText(tokens[index - 1].Text);
         }
 
         private static bool EndsValue(Token t) => t.Kind switch

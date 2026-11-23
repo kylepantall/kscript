@@ -256,6 +256,7 @@ namespace KScript.Syntax.Markup
                     }
                 case "echo": ParseEcho(parent, start); return;
                 case "if": ParseIf(parent, start); return;
+                case "guard": ParseGuard(parent, start); return;
                 case "while": ParseWhile(parent, start); return;
                 case "for": ParseFor(parent, start); return;
                 case "match": ParseMatch(parent, start); return;
@@ -551,6 +552,17 @@ namespace KScript.Syntax.Markup
             ParseBlock(e);
             Finish(e, start);
             ParseElseChain(parent, allowElif: true);
+        }
+
+        private void ParseGuard(MarkupElement parent, int start)
+        {
+            MarkupElement guard = Begin(parent, "guard", start);
+            AddExpressionAttribute(guard, "test", Stop.Header, beforeWord: "else");
+            SkipSpaces();
+            if (!TryWord("else"))
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MarkupSyntax, "Write else before the guard's failure block.");
+            ParseBlock(guard);
+            Finish(guard, start);
         }
 
         private void ParseElseChain(MarkupElement parent, bool allowElif)
@@ -960,7 +972,7 @@ namespace KScript.Syntax.Markup
             if (Lookahead("=>"))
             {
                 pos += 2;
-                AddExpressionAttribute(e, "value", Stop.Line, beforeCatch: true);
+                AddExpressionAttribute(e, "value", Stop.Line, beforeWord: "catch");
             }
             else
             {
@@ -2008,9 +2020,9 @@ namespace KScript.Syntax.Markup
         private void AddAttribute(MarkupElement e, string name, DecodedText value, TextSpan span, TextSpan? nameSpan = null, char quote = '\0') =>
             e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? new TextSpan(span.Start, 0), Value = value, Span = span, Quote = quote, Owner = e });
 
-        private void AddExpressionAttribute(MarkupElement e, string name, Stop stop, bool beforeCatch = false)
+        private void AddExpressionAttribute(MarkupElement e, string name, Stop stop, string beforeWord = null)
         {
-            (int s, int end) = ReadExpression(stop, beforeCatch: beforeCatch);
+            (int s, int end) = ReadExpression(stop, beforeWord: beforeWord);
             if (end == s)
             {
                 Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the {name} for this {e.Name}.");
@@ -2027,7 +2039,7 @@ namespace KScript.Syntax.Markup
         /// Reads an expression as raw text, keeping brackets and strings balanced. A new line ends it unless a bracket
         /// is open, the line ends with an operator, or the next line starts with one (such as |>).
         /// </summary>
-        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false, bool recoverModelList = false, bool beforeCatch = false)
+        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false, bool recoverModelList = false, string beforeWord = null)
         {
             SkipSpaces();
             int start = pos;
@@ -2112,7 +2124,8 @@ namespace KScript.Syntax.Markup
                 }
                 if (brackets.Count == 0)
                 {
-                    if (beforeCatch && pos > start && char.IsWhiteSpace(text[pos - 1]) && c == 'c' && PeekName() == "catch") break;
+                    if (beforeWord != null && pos > start && char.IsWhiteSpace(text[pos - 1]) && c == beforeWord[0] && PeekName() == beforeWord
+                        && (beforeWord != "catch" || !ExpressionParser.StartsArrowCatch(text, pos))) break;
                     if (c == ';' && stop is Stop.Line or Stop.Rule or Stop.Header or Stop.Arm)
                     {
                         break;
@@ -2302,7 +2315,7 @@ namespace KScript.Syntax.Markup
             {
                 p++;
             }
-            if (CastSyntax.StartsLine(text, p)) return true;
+            if (CastSyntax.StartsLine(text, p) || ExpressionParser.StartsArrowCatch(text, p)) return true;
             if (LeadingContinuations.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0))
             {
                 // "..." would be a spread, but a line starting with '.' is always a continuation here.

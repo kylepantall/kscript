@@ -173,7 +173,7 @@ namespace KScript.Language.Analysis
             // Only offer a rewrite when the text is written exactly as it reads (no escapes or entities inside).
             bool plain = span.Length == literal.Value.Length + 2;
             string rewritten = !plain ? null
-                : IsCode ? (literal.Value.Contains('"') || literal.Value.Contains('\\') ? null : "\"" + literal.Value + "\"")
+                : IsCode ? (literal.Value.Contains('"') || literal.Value.Contains('\\') ? null : CodeSpellings.Normalize("\"" + literal.Value + "\""))
                 : JoinedText(literal.Value);
             string advice = IsCode
                 ? (rewritten != null ? $" Use double quotes to fill it in: {rewritten}." : " Use double quotes to fill it in.")

@@ -30,8 +30,8 @@ public sealed class TypeConstructionTests : DataFixture
     private static KScriptException TypeFails(string code) => Assert.Throws<KScriptException>(() => Runs(code));
 
     [Theory]
-    [InlineData("r = Repo({ name: 'k', stars: '3' })\necho \"$r.name { $r.stars + 1 } { $r->type() }\"", "k 4 Repo\n")]
-    [InlineData("r = Repo(name: 'k')\necho \"$r.name $r.stars\"", "k 0\n")]
+    [InlineData("r = Repo({ name: 'k', stars: '3' })\necho \"{ $r.name } { $r.stars + 1 } { $r->type() }\"", "k 4 Repo\n")]
+    [InlineData("r = Repo(name: 'k')\necho \"{ $r.name } { $r.stars }\"", "k 0\n")]
     [InlineData("r = Repo('{\"name\": \"j\"}')\necho $r.name", "j\n")]
     [InlineData("rs = Repo([{ name: 'a' }, { name: 'b' }])\necho $rs->map(fn(r) => $r.name)->join(',')", "a,b\n")]
     [InlineData("r = { name: 'p' } |> Repo()\necho $r.name", "p\n")]

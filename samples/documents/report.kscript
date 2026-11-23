@@ -22,8 +22,9 @@ Document(
   Contents
 
   Section(title: "Summary") {
-    Paragraph "Life Lab grew every quarter this year. **$total people** signed \
-      up, and visits rose by \( 72\% \) from the first quarter to the last."
+    Paragraph "Life Lab grew every quarter this year. **{ $total } people** \
+      signed up, and visits rose by \( 72\% \) from the first quarter to the \
+      last."
 
     List {
       Item "Visitors went up every quarter (Table [#tab-growth])."
@@ -51,8 +52,9 @@ Document(
 
     Section(title: "By quarter") {
       for q in $quarters {
-        Paragraph "**$q.quarter:** { $q.visitors } visitors, { $q.signups } \
-          sign-ups, a rate of { ($q.signups / $q.visitors * 100)->round(1) }%."
+        Paragraph "**{ $q.quarter }:** { $q.visitors } visitors, \
+          { $q.signups } sign-ups, a rate of \
+          { ($q.signups / $q.visitors * 100)->round(1) }%."
       }
     }
   }

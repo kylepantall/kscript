@@ -37,9 +37,11 @@ namespace KScript.Language.Analysis
                 case LiteralNode literal:
                     if (literal.Template != null)
                     {
-                        // "Hello $name": each part is a value of its own.
+                        // Each interpolation part is a value of its own.
                         foreach (TemplateSegment part in literal.Template.Expressions.Where(p => p.Node != null))
                         {
+                            if (literal.Kind == LiteralKind.String)
+                                CheckQuotedInterpolation(region, part);
                             AnalyzeExpr(part.Node, region, scope, ExprContext.Value);
                         }
                         return;
@@ -146,6 +148,27 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(pipe.Left, region, scope, ExprContext.Value);
                     AnalyzePipeTarget(pipe, region, scope);
                     return;
+
+                case CatchExpressionNode attempt:
+                {
+                    AnalyzeExpr(attempt.Protected, region, scope, ExprContext.Value);
+                    if (attempt.ErrorType is string type)
+                    {
+                        TextSpan typeSpan = region.Source.ToSource(attempt.ErrorTypeSpan);
+                        if (!ReferenceErrorType(type, typeSpan, scope))
+                            Report(typeSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownErrorType, $"Unknown error type '{type}'.");
+                    }
+                    if (attempt.Fallback != null)
+                    {
+                        TextSpan range = region.Source.ToSource(attempt.Fallback.Span);
+                        Scope handler = new Scope(scope, range);
+                        TextSpan binding = attempt.BindingSpan.Length > 0 ? region.Source.ToSource(attempt.BindingSpan) : new TextSpan(range.Start, 0);
+                        TypeShape error = scope.Lookup(attempt.ErrorType ?? string.Empty, range.Start)?.Shape.Instance ?? ErrorShape();
+                        handler.Declare(NewVariable(attempt.Binding, binding, region.Element, SymbolKind.BuiltIn, error), range.Start);
+                        AnalyzeExpr(attempt.Fallback, region, handler, ExprContext.Value);
+                    }
+                    return;
+                }
 
                 case LambdaNode lambda when NormalizerInput(lambda, region) is TypeShape input:
                     AnalyzeLambda(lambda, region, scope, new[] { input });
