@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Language.Features;
+using KScript.Runtime;
 using static KScript.Language.Tests.TestHelpers;
 
 namespace KScript.Language.Tests
@@ -91,6 +92,47 @@ namespace KScript.Language.Tests
                 """);
             Assert.Equal(new[] { "blue sky", "tan" }, values.Select(i => i.Label));
             Assert.Equal("'blue sky'", values[0].InsertText);
+        }
+
+        [Fact]
+        public void UnfinishedContainersStopRequestingTypesBeyondTheEditingDepthLimit()
+        {
+            const int depth = 40;
+            string source = "items: Size" + string.Concat(Enumerable.Repeat("[]", depth)) + " = " + new string('[', depth) + "‸";
+            Assert.DoesNotContain(Values(source), i => i.Label == "small");
+        }
+
+        [Fact]
+        public void FiniteSetsCompareConvertedValuesAndKeepTheNearestSpelling()
+        {
+            var values = Values("""
+                type Original with [country] { one_of: [GB, IE, FR] }
+                type Region with [Original] { one_of: [FRA, GBR, USA, IRL]; not: [IE] }
+                region: Region = ‸
+                """);
+            Assert.Equal(new[] { "FRA", "GBR" }, values.Select(i => i.Label));
+            Assert.Empty(Values("type Dynamic with [string] { one_of: [@compute()] }\nx: Dynamic = ‸"));
+        }
+
+        [Fact]
+        public void IncreasingFiniteMembershipListsDoesNotSquareTheAllocationsForSuggestions()
+        {
+            static long Allocations(int count)
+            {
+                var words = Enumerable.Range(0, count).Select(i => (object)("value" + i)).ToList();
+                var parent = TypeRules.FromOptions(new Dictionary<string, object> { ["one_of"] = words }, out _);
+                var own = TypeRules.FromOptions(new Dictionary<string, object> { ["one_of"] = words, ["min"] = 2.0 }, out _);
+                var levels = new[] { own, parent };
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                var choices = Analyzer.ChoicesFromRules(own, levels, "string");
+                long used = GC.GetAllocatedBytesForCurrentThread() - before;
+                Assert.Equal(count, choices.Count);
+                return used;
+            }
+            Allocations(8);
+            long small = Allocations(128);
+            long large = Allocations(512);
+            Assert.True(large < 8 * small, $"Four times the choices allocated {large} bytes versus {small}.");
         }
 
         [Fact]

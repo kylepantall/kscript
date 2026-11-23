@@ -158,7 +158,10 @@ namespace KScript.Runtime
         /// <summary>Every rule but validate: these need no interpreter, so the editor checks literals with them too.</summary>
         public IEnumerable<string> CheckPlain(object value, Func<object, object> convert) => CheckPlain(value, convert, null);
 
-        private IEnumerable<string> CheckPlain(object value, Func<object, object> convert, Interpreter interpreter)
+        /// <summary>Checks the remaining static rules after an editor has tested one_of and not as sets.</summary>
+        internal bool AcceptsKnownChoice(object value) => !CheckPlain(value, null, null, checkMembership: false).Any();
+
+        private IEnumerable<string> CheckPlain(object value, Func<object, object> convert, Interpreter interpreter, bool checkMembership = true)
         {
             if (MinText != null && Below(value, MinText, out string minMessage)) yield return minMessage;
             if (MaxText != null && Above(value, MaxText, out string maxMessage)) yield return maxMessage;
@@ -177,12 +180,12 @@ namespace KScript.Runtime
                 }
                 if (!matches) yield return $"must match {PatternText}";
             }
-            if (OneOf is List<object> oneOf)
+            if (checkMembership && OneOf is List<object> oneOf)
             {
                 List<object> items = oneOf.Select(convert).ToList();
                 if (!items.Any(o => Values.StrictEquals(o, value))) yield return $"must be one of {string.Join(", ", items.Select(o => o == null ? "null" : Values.ToStr(o)))}";
             }
-            if (Not is List<object> reserved && reserved.Select(convert).Any(o => Values.StrictEquals(o, value))) yield return $"is reserved ('{Values.ToStr(value)}')";
+            if (checkMembership && Not is List<object> reserved && reserved.Select(convert).Any(o => Values.StrictEquals(o, value))) yield return $"is reserved ('{Values.ToStr(value)}')";
             foreach (string problem in OptionProblems(value)) yield return problem;
         }
 

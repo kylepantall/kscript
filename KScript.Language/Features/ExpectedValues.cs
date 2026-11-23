@@ -41,6 +41,7 @@ namespace KScript.Language.Features
         /// <summary>Resolves a value's declared type through unfinished list items, map fields and constructor arguments.</summary>
         private ExpectedValueSlot? ExpectedSlotAt(DocumentAnalysis analysis, int start)
         {
+            const int maxContainerDepth = 32;
             if (AssignmentTypeAt(analysis, start) is string declared) return new ExpectedValueSlot(declared);
             string text = analysis.Source.Text;
             int before = start;
@@ -56,10 +57,11 @@ namespace KScript.Language.Features
             if (!code && !inValue) return null;
             int from = inValue ? attr.Value.SourceSpan.Start : element?.Span.Start ?? text.LastIndexOf('\n', before - 1) + 1;
             List<Token> tokens = Lexer.Tokenize(text, from, before);
-            return tokens.Count == 0 ? null : SlotBefore(tokens.Count);
+            return tokens.Count == 0 ? null : SlotBefore(tokens.Count, 0);
 
-            ExpectedValueSlot? SlotBefore(int index)
+            ExpectedValueSlot? SlotBefore(int index, int depth)
             {
+                if (depth > maxContainerDepth) return null;
                 if (index == 0)
                 {
                     string type = inValue ? element.GetAttributeValue("type") : null;
@@ -72,7 +74,7 @@ namespace KScript.Language.Features
                 if (previous.Is("[") || previous.Is(","))
                 {
                     int open = previous.Is("[") ? index - 1 : EnclosingDelimiter(index - 1);
-                    if (open < 0 || !tokens[open].Is("[") || SlotBefore(open) is not ExpectedValueSlot list) return null;
+                    if (open < 0 || !tokens[open].Is("[") || SlotBefore(open, depth + 1) is not ExpectedValueSlot list) return null;
                     TypeRef type = TypeRef.Parse(list.Type);
                     return type?.ListDepth > 0 ? new ExpectedValueSlot(type.Item.ToString(), list.InMap, true) : null;
                 }
@@ -85,7 +87,7 @@ namespace KScript.Language.Features
                 Token opening = tokens[container];
                 string owner;
                 if (opening.Is("{"))
-                    owner = SlotBefore(container)?.Type;
+                    owner = SlotBefore(container, depth + 1)?.Type;
                 else if (opening.Is("(") && container > 0 && tokens[container - 1].Kind == TokenKind.Identifier
                     && (container < 2 || !tokens[container - 2].Is("->") && !tokens[container - 2].Is(".")))
                     owner = tokens[container - 1].Text;

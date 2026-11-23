@@ -509,12 +509,33 @@ namespace KScript.Language.Analysis
         internal static IReadOnlyList<string> ChoicesFromRules(TypeRules declared, IEnumerable<TypeRules> levels, string root)
         {
             if (declared?.OneOf is not List<object> choices) return null;
-            // Offer the nearest declared order and apply statically known restrictions from every level.
-            // A user validator or normalizer is never executed to obtain editor suggestions.
-            var rules = levels.Where(r => r != null && (r != declared || r.Options.Count > 1)).ToArray();
-            return choices.Where(item => item is string or bool or double)
-                .Where(item => rules.All(rule => !rule.CheckPlain(PlainAs(root, item), value => PlainAs(root, value)).Any()))
-                .Select(Values.ToStr).Distinct(StringComparer.Ordinal).ToArray();
+            if (root == "password") return Array.Empty<string>(); // Passwords do not support membership rules.
+
+            // Scalar suggestions use strict equality after conversion to their common root. Normalize the
+            // finite sets once, retaining the nearest declaration's order and original spelling for display.
+            object ConvertChoice(object item) => PlainAs(root, item);
+            IEnumerable<object> Scalars(IEnumerable<object> items) => items.Where(v => v is string or bool or double);
+
+            var filters = new List<TypeRules>();
+            HashSet<object> allowed = null;
+            var excluded = new HashSet<object>();
+            foreach (TypeRules rule in levels)
+            {
+                if (rule == null) continue;
+                if (rule != declared && rule.OneOf is List<object> parentChoices)
+                {
+                    var converted = Scalars(parentChoices).Select(ConvertChoice);
+                    if (allowed == null) allowed = converted.ToHashSet();
+                    else allowed.IntersectWith(converted);
+                }
+                if (rule.Not != null) excluded.UnionWith(Scalars(rule.Not).Select(ConvertChoice));
+                if (rule.Options.Keys.Any(key => key is not ("one_of" or "not"))) filters.Add(rule);
+            }
+            return Scalars(choices).Where(item =>
+            {
+                object value = ConvertChoice(item);
+                return (allowed == null || allowed.Contains(value)) && !excluded.Contains(value) && filters.All(rule => rule.AcceptsKnownChoice(value));
+            }).Select(Values.ToStr).Distinct(StringComparer.Ordinal).ToArray();
         }
 
         private IEnumerable<TypeRules> StaticRefinementRules(MarkupElement element)
@@ -608,7 +629,7 @@ namespace KScript.Language.Analysis
 
         private static object PlainAs(string root, object item)
         {
-            if (item is string text && SemanticTypeNames.Contains(root) && SemanticTypes.TryConvert(root, text, out object converted, out _))
+            if (item is string text && KScript.Metadata.NativeTypes.IsNative(root) && SemanticTypes.TryConvert(root, text, out object converted, out _))
             {
                 return converted;
             }
