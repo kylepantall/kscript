@@ -35,7 +35,7 @@ namespace KScript.Data
                 Column c = model.Column(f.Name);
                 if (row.TryGetValue(f.Name, out object raw))
                 {
-                    object value = Rows.FromDb(raw, c);
+                    object value = Rows.FromDb(raw, c, call.Interpreter);
                     if (c.Kind == ColumnKind.Json && value is Dictionary<string, object> or List<object>) value = Typed(call, model, f, value);
                     record[f.Name] = value;
                     state.Original[f.Name] = value;
@@ -169,7 +169,7 @@ namespace KScript.Data
                 values.Add((c.Name, new SqlValue(value, c)));
             }
             Column key = model.KeyColumn;
-            record[key.Name] = Rows.FromDb(db.Insert(call.Interpreter, model.Table, values, key), key);
+            record[key.Name] = Rows.FromDb(db.Insert(call.Interpreter, model.Table, values, key), key, call.Interpreter);
             Remember(record);
         }
 
@@ -178,7 +178,7 @@ namespace KScript.Data
         {
             foreach (Column c in model.Columns.Where(c => c.Kind == ColumnKind.Password))
             {
-                if (record.GetValueOrDefault(c.Name) is PasswordValue p) record[c.Name] = new PasswordHash(p.Hash(p.Algorithm));
+                if (Values.Unwrap(record.GetValueOrDefault(c.Name)) is PasswordValue p) record[c.Name] = new PasswordHash(p.Hash(p.Algorithm));
             }
         }
 

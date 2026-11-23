@@ -587,7 +587,7 @@ namespace KScript.Language.Analysis
             MarkupDocument doc = MarkupParser.Parse(other, MarkupParser.KindFromPath(path), path);
             CodeArguments.Normalise(doc, catalog.GetElement);
             Dictionary<string, (FunctionParameter[], ExternalLocation, string)> exports = new Dictionary<string, (FunctionParameter[], ExternalLocation, string)>(StringComparer.Ordinal);
-            foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn" && x.Parent?.Name != "extend"))
+            foreach (MarkupElement fn in doc.DescendantElements().Where(x => x.Name == "fn" && x.Parent?.Name is not ("extend" or "type" or "model" or "job")))
             {
                 MarkupAttribute nameAttr = fn.GetAttribute("name");
                 if (string.IsNullOrWhiteSpace(nameAttr?.ValueText))
@@ -1608,6 +1608,9 @@ namespace KScript.Language.Analysis
         {
             ElementInfo info = catalog.GetElement("fn");
             Scope body = new Scope(outer, e.Span);
+
+            if (e.Parent != null && result.DeclaredTypes.TryGetValue(e.Parent, out TypeShape refined) && refined.RefinementBase != null)
+                DeclareImplicit(body, "this", refined, $"The {refined.Name} this method was called on.", e);
 
             bool routeHandler = IsRouteHandler(e);
             if (routeHandler && outer.Lookup("request", e.Span.Start)?.Kind == SymbolKind.BuiltIn)

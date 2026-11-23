@@ -40,6 +40,13 @@ namespace KScript.Runtime
         /// <summary>A method of a list of the type: <c>$versions->latest()</c>. The handler gets the items.</summary>
         public MethodDefinition Method(string name, string parameters, string description, string returns, Func<List<object>, CallContext, object> handler, string example = null)
         {
+            return WithItems(name, parameters, description, returns, (items, c) =>
+                handler(items.Any(item => item is RefinedValue) ? items.Select(Values.Unwrap).ToList() : items, c), example);
+        }
+
+        // Selectors need the original items, even when two refinements wrap the same native object.
+        internal MethodDefinition WithItems(string name, string parameters, string description, string returns, Func<List<object>, CallContext, object> handler, string example)
+        {
             MethodDefinition def = p.Method(Receiver, name, parameters, description, returns, (t, c) => handler((List<object>)t, c));
             if (example != null) p.Examples((Receiver + "->" + name, example));
             return def;

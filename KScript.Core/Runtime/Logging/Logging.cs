@@ -95,7 +95,7 @@ namespace KScript.Runtime
             sb.Append(Message);
             foreach (var kv in Fields)
             {
-                string value = kv.Value is string s ? s : Values.ToJson(kv.Value);
+                string value = Values.Unwrap(kv.Value) is string s ? s : Values.ToJson(kv.Value);
                 sb.Append(' ').Append(kv.Key).Append('=').Append(value.Length == 0 || value.Any(char.IsWhiteSpace) ? Values.ToJson(value) : value);
             }
             return sb.ToString();
@@ -256,14 +256,14 @@ namespace KScript.Runtime
         /// </summary>
         public void Configure(object section, Interpreter interpreter, Module module)
         {
-            var map = section as Dictionary<string, object>;
+            var map = Values.Unwrap(section) as Dictionary<string, object>;
             if (section != null && map == null)
                 throw new KScriptException($"logging should be a map, such as {{ level: 'debug' }}, but is {Values.Describe(section)}.", "Config");
             lock (gate) configured = true;
             if (map != null && map.TryGetValue("level", out object level) && level != null) Level = LogLevels.Parse(level, "logging.level");
             if (map != null && map.TryGetValue("levels", out object levels) && levels != null)
             {
-                if (levels is not Dictionary<string, object> byCategory)
+                if (Values.Unwrap(levels) is not Dictionary<string, object> byCategory)
                     throw new KScriptException("logging.levels should be a map of category to level, such as { db: 'debug' }.", "Config");
                 foreach (var kv in byCategory) SetCategoryLevel(kv.Key, LogLevels.Parse(kv.Value, $"logging.levels.{kv.Key}"));
             }
@@ -271,7 +271,7 @@ namespace KScript.Runtime
             List<object> list = null;
             if (map != null && map.TryGetValue("providers", out object configuredProviders) && configuredProviders != null)
             {
-                list = configuredProviders as List<object>
+                list = Values.Unwrap(configuredProviders) as List<object>
                     ?? throw new KScriptException("logging.providers should be a list, such as [{ type: 'console' }, { type: 'file', path: 'app.log' }].", "Config");
             }
             if (list == null)
@@ -281,7 +281,7 @@ namespace KScript.Runtime
             }
             for (int i = 0; i < list.Count; i++)
             {
-                if (list[i] is not Dictionary<string, object> options)
+                if (Values.Unwrap(list[i]) is not Dictionary<string, object> options)
                     throw new KScriptException($"logging.providers[{i}] should be a map, such as {{ type: 'file', path: 'app.log' }}.", "Config");
                 Add(options, interpreter, module, $"logging.providers[{i}]");
             }
@@ -402,7 +402,7 @@ namespace KScript.Runtime
         }
 
         /// <summary>yes/no, true/false or on/off, from config or an attribute.</summary>
-        internal static bool Flag(object value) => value is string s ? !(s.Trim().ToLowerInvariant() is "no" or "false" or "off" or "0" or "") : Values.Truthy(value);
+        internal static bool Flag(object value) => Values.Unwrap(value) is string s ? !(s.Trim().ToLowerInvariant() is "no" or "false" or "off" or "0" or "") : Values.Truthy(value);
 
         internal static string Format(LogProviderContext c)
         {
@@ -499,14 +499,14 @@ namespace KScript.Runtime
         public FunctionLogProvider(LogProviderContext c)
         {
             context = c;
-            object fn = c.Get("fn");
+            object fn = Values.Unwrap(c.Get("fn"));
             if (fn is string name)
             {
                 string clean = name.Trim().TrimStart('@', '$');
                 if (c.Module?.Globals == null || !c.Module.Globals.TryGet(clean, out fn))
                     throw new KScriptException($"{c.Where}: there is no function called {clean}. Declare it with <fn name=\"{clean}\" params=\"entry\" ...>.", "Config");
             }
-            function = fn as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn(entry) => ..., but got {Values.Describe(fn)}.", "Config");
+            function = Values.Unwrap(fn) as ICallable ?? throw new KScriptException($"{c.Where}: fn should be a function, such as fn(entry) => ..., but got {Values.Describe(fn)}.", "Config");
         }
 
         public void Write(LogEntry entry) =>
@@ -567,6 +567,7 @@ namespace KScript.Runtime
             LogHub hub = Hub;
             if (!hub.IsEnabled(level, Category)) return;
             var fields = new Dictionary<string, object>(Fields);
+            extra = Values.Unwrap(extra);
             switch (extra)
             {
                 case null:

@@ -110,6 +110,7 @@ namespace KScript.Net
 
         protected override void Register(PackageBuilder p)
         {
+            IsolinkValue.Register(p, IsolinkSession.Connect);
             foreach (var f in ResponseValue.Fields)
                 p.Field(KType.Response, f.Name, f.Type, f.Description);
             foreach (var m in ResponseValue.Methods)
@@ -162,7 +163,7 @@ namespace KScript.Net
             using var request = new HttpRequestMessage(new HttpMethod(method), uri);
 
             string contentType = null;
-            if (options.TryGetValue("headers", out object h) && h is Dictionary<string, object> headers)
+            if (options.TryGetValue("headers", out object h) && Values.Unwrap(h) is Dictionary<string, object> headers)
             {
                 foreach (var kv in headers)
                 {
@@ -172,7 +173,7 @@ namespace KScript.Net
             }
             if (options.TryGetValue("body", out object body) && body != null)
             {
-                bool json = body is Dictionary<string, object> or List<object>;
+                bool json = Values.Unwrap(body) is Dictionary<string, object> or List<object>;
                 request.Content = new StringContent(json ? Values.ToJson(body) : Values.ToStr(body), Encoding.UTF8);
                 request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? (json ? "application/json" : "text/plain; charset=utf-8"));
             }
@@ -207,14 +208,14 @@ namespace KScript.Net
             Dictionary<string, object> options = c.Has(1) && c.Arg(1) != null ? c.Map(1) : new Dictionary<string, object>();
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
             var headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase) { ["user-agent"] = HttpIdentity.Product };
-            if (options.TryGetValue("headers", out object h) && h is Dictionary<string, object> given)
+            if (options.TryGetValue("headers", out object h) && Values.Unwrap(h) is Dictionary<string, object> given)
             {
                 foreach (var kv in given) headers[kv.Key.ToLowerInvariant()] = Values.ToStr(kv.Value);
             }
             string body = string.Empty;
             if (options.TryGetValue("body", out object b) && b != null)
             {
-                bool json = b is Dictionary<string, object> or List<object>;
+                bool json = Values.Unwrap(b) is Dictionary<string, object> or List<object>;
                 body = json ? Values.ToJson(b) : Values.ToStr(b);
                 headers.TryAdd("content-type", json ? "application/json" : "text/plain; charset=utf-8");
             }

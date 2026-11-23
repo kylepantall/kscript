@@ -686,8 +686,7 @@ namespace KScript.Language.Analysis
             }
 
             string arrow = pipe ? "|> " : "->";
-            // An extend block's method (this file's, an import's or the project's) comes first, as when the script runs.
-            Symbol own = result.ExtensionMethod(receiver, name);
+            Symbol own = result.DeclaredMethod(receiver, name);
             if (own != null && own.SourcePath != null)
             {
                 result.References.Add(new SymbolReference(own, nameSpan, false, false));
@@ -707,7 +706,7 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (own != null || receiver.Methods.TryGetValue(name, out own) || TypeInference.ScopeOf(receiver, name) is Symbol scope && (own = scope) != null)
+            if (own != null)
             {
                 // A method the record's <type> declares with <fn>, or a model's scope (which uses the fn it was made from).
                 result.References.Add(new SymbolReference(scopeDeclarations.GetValueOrDefault(own) ?? own, nameSpan, false, false));

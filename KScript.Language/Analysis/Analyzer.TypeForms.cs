@@ -59,7 +59,7 @@ namespace KScript.Language.Analysis
             int positional = call.Arguments.Count(a => a.Name == null) + (piped ? 1 : 0);
             bool named = call.Arguments.Any(a => a.Name != null);
             TypeShape instance = symbol.Shape.Type == KType.Type ? symbol.Shape.Instance : null;
-            bool record = instance?.Type == KType.Map;
+            bool record = instance?.Type == KType.Map && instance.RefinementBase == null;
             if (positional > 1 || (positional == 1 && named) || (!record && symbol.SourcePath == null && positional != 1))
             {
                 Report(region.Source.ToSource(call.Span), DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount, record

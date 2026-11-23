@@ -85,10 +85,10 @@ namespace KScript.Runtime
         }
 
         /// <summary>The native type of a value, or null for a value that isn't one.</summary>
-        public static NativeType Of(object value) => value is IKObject k ? Get(k.TypeName) : null;
+        public static NativeType Of(object value) => Values.Unwrap(value) is IKObject k ? Get(k.TypeName) : null;
 
         /// <summary>The type name an operator side is declared with: number, string, date, a native type's name, ...</summary>
-        public static string TypeOf(object value) => value switch
+        public static string TypeOf(object value) => Values.Unwrap(value) switch
         {
             null => "null",
             double => "number",
@@ -104,6 +104,7 @@ namespace KScript.Runtime
         /// <summary>The value as a side of type <paramref name="type"/> needs it, or null when it isn't one.</summary>
         private static object As(string type, object value)
         {
+            value = Values.Unwrap(value);
             if (TypeOf(value) == type) return value;
             NativeType native = Get(type);
             // Text is parsed, but a value of another native type is never read as this one: $phone + 1 isn't a duration.
@@ -141,7 +142,7 @@ namespace KScript.Runtime
         /// </summary>
         public static string BinaryProblem(string op, object a, object b)
         {
-            if (op == "in" || (op == "+" && (a is string || b is string))) return null;
+            if (op == "in" || (op == "+" && (Values.Unwrap(a) is string || Values.Unwrap(b) is string))) return null;
             NativeType native = Of(a) ?? Of(b);
             if (native == null) return null;
             List<string> takes = NativeTypes.OperatorsFor(op, native.Name).Where(o => o.Left != null && o.Operator != "..").Select(o => o.Display).ToList();
@@ -156,7 +157,7 @@ namespace KScript.Runtime
         {
             result = null;
             if (Of(value)?.Operators.Negation is not NativeOperator neg) return false;
-            result = neg.Run(null, value, null);
+            result = neg.Run(null, Values.Unwrap(value), null);
             return true;
         }
 
@@ -208,7 +209,7 @@ namespace KScript.Runtime
             if (type == null) return false;
             if (type.Iteration.Items == null)
                 throw new KScriptException($"<for> can't loop over {Values.Describe(value)}: {type.Name} values can't be walked.", "Type");
-            items = type.Iteration.Items(value);
+            items = type.Iteration.Items(Values.Unwrap(value));
             return true;
         }
 
@@ -217,7 +218,7 @@ namespace KScript.Runtime
         {
             falsy = false;
             if (Of(value)?.Operators.IsFalsy is not Func<object, bool> test) return false;
-            falsy = test(value);
+            falsy = test(Values.Unwrap(value));
             return true;
         }
 

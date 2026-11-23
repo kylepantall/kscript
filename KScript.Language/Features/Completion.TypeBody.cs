@@ -56,13 +56,10 @@ namespace KScript.Language.Features
             if (BodyWordLine.Match(before) is { Success: true } word)
             {
                 TextSpan span = TextSpan.FromBounds(offset - word.Groups[1].Length, offset);
-                return owner.Name == "model" ? ModelLineCompletions(analysis, owner, span) : TypeLineCompletions(owner, span);
+                return owner.Name == "model" ? ModelLineCompletions(analysis, owner, span)
+                    : TypeLineCompletions(owner, span, analysis.DeclaredTypes.GetValueOrDefault(owner)?.RefinementBase != null);
             }
 
-            if (owner.Name == "model" && BodySettingLine.Match(before) is { Success: true } setting && CodeParser.ModelSettings.Contains(setting.Groups[1].Value))
-            {
-                return ModelSettingValueCompletions(analysis, owner, setting.Groups[1].Value, offset - setting.Groups[2].Length, offset);
-            }
             return null;
         }
 
@@ -78,15 +75,24 @@ namespace KScript.Language.Features
             return items;
         }
 
-        /// <summary>Complete a model header from the parsed option at the caret, including headers and arrays spanning lines.</summary>
-        private List<CompletionItem> ModelHeaderCompletions(DocumentAnalysis analysis, int offset)
+        /// <summary>Complete a model option at the caret, in the header or on a legacy setting line in the body.</summary>
+        private List<CompletionItem> ModelOptionCompletionsAt(DocumentAnalysis analysis, int offset)
         {
             if (analysis.Markup.Syntax != SourceSyntax.Code || analysis.Markup.FindElementAt(offset) is not { Name: "model" } model
-                || offset > model.StartTagSpan.End || model.GetAttribute("name")?.Span.End is not int nameEnd || offset <= nameEnd)
+                || model.GetAttribute("name")?.Span.End is not int nameEnd || offset <= nameEnd)
             {
                 return null;
             }
             string text = analysis.Source.Text;
+            if (offset > model.StartTagSpan.End)
+            {
+                int lineStart = text.LastIndexOf('\n', offset - 1) + 1;
+                Match setting = BodySettingLine.Match(text[lineStart..offset]);
+                if (!setting.Success || !CodeParser.ModelSettings.Contains(setting.Groups[1].Value)
+                    || model.Children.OfType<MarkupComment>().Any(c => offset > c.Span.Start && offset <= c.Span.End))
+                    return null;
+                return ModelSettingValueCompletions(analysis, model, setting.Groups[1].Value, offset - setting.Groups[2].Length, offset);
+            }
             int open = nameEnd;
             while (open < offset && char.IsWhiteSpace(text[open])) open++;
             if (open >= offset || text[open] != '(' || InComment(text, offset)) return null;
@@ -137,11 +143,11 @@ namespace KScript.Language.Features
             return items;
         }
 
-        /// <summary>A new line in a type: the rules it can have and doesn't yet, then fn.</summary>
-        private List<CompletionItem> TypeLineCompletions(MarkupElement type, TextSpan replace)
+        /// <summary>A new line in a type: the rules it can have and a method declaration.</summary>
+        private List<CompletionItem> TypeLineCompletions(MarkupElement type, TextSpan replace, bool refined)
         {
             List<CompletionItem> items = new List<CompletionItem>();
-            foreach (string rule in type.GetAttribute("with") != null ? RefinementRuleLines : RecordRuleLines)
+            foreach (string rule in refined ? RefinementRuleLines : RecordRuleLines)
             {
                 MarkupAttribute set = type.GetAttribute(rule);
                 if (set != null && set.NameSpan.Start != replace.Start)
@@ -213,12 +219,25 @@ namespace KScript.Language.Features
             if (beforeWord > start && text[beforeWord - 1] is '\'' or '"') beforeWord--;
             while (beforeWord > start && char.IsWhiteSpace(text[beforeWord - 1])) beforeWord--;
             bool single = option.ModelFields == ModelFieldKind.Single;
-            if (single ? beforeWord != start : beforeWord <= start || text[beforeWord - 1] is not ('[' or ','))
+            bool startList = !single && wordStart == start;
+            if (startList)
+            {
+                // Before the opening bracket, accepting a field should create a valid list.
+                int next = wordEnd;
+                while (next < text.Length && text[next] is ' ' or '\t') next++;
+                if (text.AsSpan(next).StartsWith("[]", StringComparison.Ordinal))
+                    replace = TextSpan.FromBounds(wordStart, next + 2);
+                else if (model.GetAttribute(setting)?.Value?.SourceSpan is { Length: > 0 } value && value.Start >= offset)
+                    return new List<CompletionItem>();
+                else if (next < text.Length && text[next] is not (',' or ')' or '}' or ';' or '\r' or '\n'))
+                    return new List<CompletionItem>();
+            }
+            else if (single ? beforeWord != start : beforeWord <= start || text[beforeWord - 1] is not ('[' or ','))
                 return new List<CompletionItem>();
 
             // Composite indexes may reuse a column in another group. Exclude only siblings of the current item.
             HashSet<string> listed = new(StringComparer.Ordinal);
-            if (!single)
+            if (!single && !startList)
             {
                 int depth = 0;
                 for (int i = start; i < offset; i++)
@@ -247,6 +266,7 @@ namespace KScript.Language.Features
             return analysis.ModelOptionFields(model, setting).Where(f => !listed.Contains(f.Name)).Select((f, i) => new CompletionItem
             {
                 Label = f.Name, Kind = CompletionKind.Field, Detail = f.DeclaredType ?? f.Shape.Display(), Documentation = f.Description,
+                InsertText = startList ? "[" + f.Name + "]" : null,
                 ReplaceSpan = replace, SortText = i.ToString("D3"),
             }).ToList();
         }

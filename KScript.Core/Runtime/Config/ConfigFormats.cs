@@ -101,6 +101,7 @@ namespace KScript.Runtime
         private static void WriteValue(StringBuilder sb, object value, int indent, int depth)
         {
             if (depth > 200) throw new KScriptException("The value is nested too deeply (or contains itself) to turn into YAML.");
+            value = Values.Unwrap(value);
             switch (value)
             {
                 case Dictionary<string, object> map when map.Count > 0:
@@ -114,7 +115,7 @@ namespace KScript.Runtime
                     foreach (object item in list)
                     {
                         sb.Append(' ', indent).Append('-');
-                        if (item is Dictionary<string, object> m && m.Count > 0)
+                        if (Values.Unwrap(item) is Dictionary<string, object> m && m.Count > 0)
                         {
                             // The first field goes on the dash's line: "- name: Ann".
                             var inner = new StringBuilder();
@@ -135,6 +136,7 @@ namespace KScript.Runtime
 
         private static void WriteNested(StringBuilder sb, object value, int indent, int depth)
         {
+            value = Values.Unwrap(value);
             if (value is Dictionary<string, object> { Count: > 0 } || value is List<object> { Count: > 0 })
             {
                 sb.Append('\n');

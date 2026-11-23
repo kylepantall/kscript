@@ -14,9 +14,6 @@ namespace KScript.Language.Analysis
     {
         private static readonly string[] BuiltInTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "any" };
 
-        /// <summary>The records each &lt;type&gt; element makes, by element.</summary>
-        private readonly Dictionary<MarkupElement, TypeShape> declaredTypes = new Dictionary<MarkupElement, TypeShape>();
-
         /// <summary>
         /// Declares every &lt;type&gt; in the root scope before the walk (the runtime hoists them, and types refer to each
         /// other in any order), then fills in their fields.
@@ -49,7 +46,7 @@ namespace KScript.Language.Analysis
                 TypeShape rootShape = refinedRoot != null ? TypeNamed(refinedRoot, 0) : null;
                 bool model = IsModelElement(e);
                 TypeShape instance = rootShape != null && !model
-                    ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element }
+                    ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element, RefinementBase = rootShape }
                     : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep", Kind = model ? KType.Record : null };
                 var literalPattern = !model && KScript.Runtime.PatternLiterals.ReadsWords(refinedRoot) && e.GetAttribute("pattern") != null ? RulesOf(e)?.Pattern : null;
                 var declaredType = new TypeShape(KType.Type)
@@ -63,15 +60,15 @@ namespace KScript.Language.Analysis
                 };
                 Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, declaredType);
                 root.Declare(symbol, 0);
-                declaredTypes[e] = instance;
+                result.DeclaredTypes[e] = instance;
             }
 
             var filled = new HashSet<MarkupElement>();
-            foreach (KeyValuePair<MarkupElement, TypeShape> type in declaredTypes)
+            foreach (KeyValuePair<MarkupElement, TypeShape> type in result.DeclaredTypes)
             {
                 FillType(type.Key, type.Value, filled);
             }
-            foreach (KeyValuePair<MarkupElement, TypeShape> type in declaredTypes)
+            foreach (KeyValuePair<MarkupElement, TypeShape> type in result.DeclaredTypes)
             {
                 Symbol symbol = result.Symbols.First(s => s.DeclaringElement == type.Key && s.Shape.Instance == type.Value);
                 string description = type.Key.GetAttributeValue("description");
@@ -114,25 +111,38 @@ namespace KScript.Language.Analysis
             {
                 return;
             }
-            if (shape.Type == KType.Map)
+            bool refined = shape.RefinementBase != null;
+            foreach (string baseName in WithNames(e))
             {
-                foreach (string baseName in WithNames(e))
+                string bare = TypeInference.WithoutTypeArguments(baseName);
+                TypeShape baseShape;
+                if (TypeElementNamed(bare) is MarkupElement baseElement && result.DeclaredTypes.TryGetValue(baseElement, out baseShape))
                 {
-                    MarkupElement baseElement = TypeElementNamed(TypeInference.WithoutTypeArguments(baseName));
-                    if (baseElement == null || !declaredTypes.TryGetValue(baseElement, out TypeShape baseShape))
-                    {
-                        continue;
-                    }
                     FillType(baseElement, baseShape, filled);
+                }
+                else
+                {
+                    baseShape = result.RootScope.Lookup(bare, e.Span.Start)?.Shape.Instance;
+                }
+                if (refined && shape.Type == KType.List)
+                {
+                    // The declaration pass has now registered every type a list item can name.
+                    var element = (baseShape ?? TypeNamed(baseName, e.Span.Start))?.Element;
+                    shape.Element = element;
+                    shape.RefinementBase.Element = element;
+                }
+                if (baseShape == null) continue;
+                if (!refined)
+                {
                     foreach (KeyValuePair<string, FieldInfo> f in baseShape.Fields)
                     {
                         shape.Fields[f.Key] = f.Value;
                     }
-                    foreach (KeyValuePair<string, Symbol> m in baseShape.Methods)
-                    {
-                        shape.Methods[m.Key] = m.Value;
-                    }
                 }
+                foreach (KeyValuePair<string, Symbol> method in baseShape.Methods) shape.Methods[method.Key] = method.Value;
+            }
+            if (!refined && shape.Type == KType.Map)
+            {
                 FillFields(e, shape);
                 if (IsModelElement(e))
                 {
@@ -157,6 +167,8 @@ namespace KScript.Language.Analysis
                     DeclarationSpan = span,
                     DeclaringElement = fn,
                     Description = fn.Documentation,
+                    ReturnShape = knownReturns.GetValueOrDefault(fn.Span.Start, TypeShape.Unknown),
+                    MethodLocation = result.Path == null ? null : new ExternalLocation(result.Path, source.GetPosition(span.Start), source.GetPosition(span.End)),
                 };
                 if (fn.GetAttribute("params")?.Value is DecodedText ps)
                 {
@@ -273,7 +285,7 @@ namespace KScript.Language.Analysis
             foreach ((string name, MarkupElement target, bool list, bool belongsTo) in ModelRelations(e).ToList())
             {
                 // A model from another file has no shape here, so its queries' records aren't known.
-                declaredTypes.TryGetValue(target, out TypeShape targetShape);
+                result.DeclaredTypes.TryGetValue(target, out TypeShape targetShape);
                 string targetName = target.GetAttributeValue("name")?.Trim();
                 if (belongsTo)
                 {
@@ -432,7 +444,7 @@ namespace KScript.Language.Analysis
                     CheckInlineField(part, start, fields.Value, seen);
                 }
             }
-            TypeShape instance = declaredTypes.TryGetValue(e, out TypeShape declared) ? declared : null;
+            TypeShape instance = result.DeclaredTypes.TryGetValue(e, out TypeShape declared) ? declared : null;
             if (IsKScriptElementName(e, "model"))
             {
                 if (instance != null)
@@ -441,9 +453,14 @@ namespace KScript.Language.Analysis
                 }
                 CheckDrift(e);
             }
-            bool refined = instance != null && instance.Type != KType.Map;
+            bool refined = instance?.RefinementBase != null;
             foreach (MarkupElement child in e.ChildElements)
             {
+                if (refined && CodeArguments.NormalizeLambdaProblem(child, result.Markup.Syntax == SourceSyntax.Code) is Wording problem)
+                {
+                    Report(TrimmedSpan(child.GetAttribute("type").Value), DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, problem);
+                    continue;
+                }
                 if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn"))
                 {
                     continue;
@@ -484,7 +501,7 @@ namespace KScript.Language.Analysis
             {
                 if (refined)
                 {
-                    DeclareImplicit(typeScope, "value", instance, $"The {instance.Name} being checked.", e);
+                    DeclareImplicit(typeScope, "value", instance.RefinementBase, $"The underlying {instance.RefinementBase.Display()} value.", e);
                 }
                 else
                 {
@@ -529,16 +546,15 @@ namespace KScript.Language.Analysis
             }
             foreach (string n in names)
             {
-                string bare = TypeInference.WithoutTypeArguments(n).TrimEnd('?');
-                if (IsBuiltInTypeName(bare.Replace("[]", string.Empty)))
+                string baseType = TypeInference.WithoutTypeArguments(n).TrimEnd('?');
+                string bare = baseType.Replace("[]", string.Empty);
+                bool list = bare != baseType;
+                if ((list || IsBuiltInTypeName(bare) || IsEnumName(bare)) && names.Count > 1)
                 {
-                    if (names.Count > 1)
-                    {
-                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"A type built on {bare} refines it, so {bare} must be the only type in with [...].");
-                    }
-                    continue;
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"A type built on {baseType} refines it, so {baseType} must be the only type in with [...].");
                 }
-                if (TypeElementNamed(bare) == null)
+                if (IsBuiltInTypeName(bare)) continue;
+                if (TypeElementNamed(bare) == null && !IsEnumName(bare))
                 {
                     int at = with.Value.Value.IndexOf(n, StringComparison.Ordinal);
                     TextSpan nameSpan = at >= 0 ? with.Value.ToSource(new TextSpan(at, n.Length)) : span;
@@ -635,7 +651,7 @@ namespace KScript.Language.Analysis
             }
 
             Scope fieldScope = new Scope(scope, e.Span);
-            TypeShape record = declaredTypes.TryGetValue(e.Parent as MarkupElement ?? e, out TypeShape t) ? t : null;
+            TypeShape record = result.DeclaredTypes.TryGetValue(e.Parent as MarkupElement ?? e, out TypeShape t) ? t : null;
             foreach (FieldInfo f in record?.Fields.Values ?? Enumerable.Empty<FieldInfo>())
             {
                 Symbol symbol = new Symbol { Name = f.Name, Kind = SymbolKind.Parameter, Shape = f.Shape, Description = f.Description ?? $"The {f.Name} field.", DeclaringElement = e, DeclarationSpan = f.Declaration ?? default };

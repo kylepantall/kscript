@@ -29,7 +29,7 @@ namespace KScript.Runtime
         private static string DateFormatOf(object value) =>
             DateFormatType.DotNet(value is NativeText { TypeName: "date_format" } format ? format : (NativeText)Native("date_format", Values.ToStr(value)));
 
-        private static string ErrorName(CallContext c, object type) => type switch
+        private static string ErrorName(CallContext c, object type) => Values.Unwrap(type) switch
         {
             ErrorType t => t.Name,
             string s => s,
@@ -72,7 +72,7 @@ namespace KScript.Runtime
             p.Method(l, "count", "", "The number of items.", KType.Number, (t, c) =>
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count the items that match, use ->count_of(fn).", "Argument") : (double)L(t).Count);
             p.Method(l, "count_of", "match", "Counts items for which a function is true, or items equal to a value using ==.", KType.Number, (t, c) =>
-                c.Arg(0) is ICallable ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, c.Fn(0), x, i))).Count() : (double)L(t).Count(x => Values.LooseEquals(x, c.Arg(0))));
+                Values.Unwrap(c.Arg(0)) is ICallable predicate ? (double)L(t).Where((x, i) => Values.Truthy(Apply(c, predicate, x, i))).Count() : (double)L(t).Count(x => Values.LooseEquals(x, c.Arg(0))));
             p.Method(l, "is_empty", "", "True when the list has no items.", KType.Bool, (t, c) => L(t).Count == 0);
             p.Method(l, "first", "", "The first item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[0] : null);
             p.Method(l, "last", "", "The last item, or null.", KType.Any, (t, c) => L(t).Count > 0 ? L(t)[^1] : null);
@@ -176,7 +176,7 @@ namespace KScript.Runtime
                 if (i >= 0 && i < copy.Count) copy.RemoveAt(i);
                 return copy;
             });
-            p.Method(l, "flatten", "", "Lists inside the list are spread into it.", l, (t, c) => L(t).SelectMany(x => x is List<object> inner ? inner : new List<object> { x }).ToList());
+            p.Method(l, "flatten", "", "Lists inside the list are spread into it.", l, (t, c) => L(t).SelectMany(x => Values.Unwrap(x) is List<object> inner ? inner : new List<object> { x }).ToList());
             p.Method(l, "chunk", "size: number", "The items in lists of size.", l, (t, c) =>
             {
                 int size = Math.Max(1, c.Int(0));
@@ -193,14 +193,14 @@ namespace KScript.Runtime
 
         private static object Pluck(object target, CallContext call)
         {
-            string Key(object value) => value switch
+            string Key(object value) => Values.Unwrap(value) switch
             {
                 string name => name,
                 BareWord { Negated: false } word => word.Name,
                 _ => throw call.Error($"->pluck() needs a field name or list of field names, but got {Values.Describe(value)}.", "Argument"),
             };
 
-            object selector = call.Need(0);
+            object selector = Values.Unwrap(call.Need(0));
             if (selector is List<object> list)
             {
                 var keys = list.Select(Key).Distinct(StringComparer.Ordinal).ToList();
@@ -311,10 +311,10 @@ namespace KScript.Runtime
             p.Method(s, "starts_with", "text", "True when the text starts with this text.", KType.Bool, (t, c) => S(t).StartsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "ends_with", "text", "True when the text ends with this text.", KType.Bool, (t, c) => S(t).EndsWith(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "replace", "old, new", "The text with every old replaced by new. old can be a regex: ->replace(/\\s+/, ' ').", s, (t, c) =>
-                c.Arg(0) is RegexValue rx ? RegexValue.Run(rx, r => r.Replace(S(t), c.Str(1)))
+                Values.Unwrap(c.Arg(0)) is RegexValue rx ? RegexValue.Run(rx, r => r.Replace(S(t), c.Str(1)))
                 : c.Str(0).Length == 0 ? S(t) : S(t).Replace(c.Str(0), c.Str(1), StringComparison.Ordinal));
             p.Method(s, "split", "separator?", "The parts between each separator (or between spaces), as a list. The separator can be a regex: ->split(/\\s*,\\s*/).", KType.List, (t, c) =>
-                (c.Arg(0) is RegexValue rx ? RegexValue.Run(rx, r => r.Split(S(t)))
+                (Values.Unwrap(c.Arg(0)) is RegexValue rx ? RegexValue.Run(rx, r => r.Split(S(t)))
                 : c.Has(0) ? S(t).Split(c.Str(0)) : S(t).Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).Cast<object>().ToList());
             p.Method(s, "lines", "", "The lines of the text, as a list.", KType.List, (t, c) => S(t).Replace("\r\n", "\n").Split('\n').Cast<object>().ToList());
             p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => S(t).Select(ch => (object)ch.ToString()).ToList());

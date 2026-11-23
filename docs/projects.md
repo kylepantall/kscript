@@ -159,6 +159,48 @@ kscript make project my-app --template ../starters/api   # any folder
 }
 ```
 
+## Installing source libraries
+
+`kscript lib add` installs KScript source files from public GitHub repositories. A library name selects the matching folder under `libraries/` on the default branch of `kylepantall/kscript`. For example, install Isolink Connect by name.
+
+```sh
+kscript lib add isolink-connect
+```
+
+Import the installed file from a script in the site root.
+
+```kscript
+import "lib/isolink-connect/index.kscript" as connect
+```
+
+To use a named library from another repository, register that repository in your project. For example, if your team publishes a `slugs` library in `acme/kscript-libraries`, run both commands from the project.
+
+```sh
+kscript repo add acme/kscript-libraries
+kscript lib add acme/kscript-libraries@slugs
+```
+
+The first command also accepts the repository's HTTPS URL. It records the registration in `.kscript/repos/` beside the nearest `kscript.json`, or in the current folder for standalone scripts. Commit the registration to share it with teammates. The second command downloads `libraries/slugs/` from the registered repository's default branch. A script in the site root can then use `import "lib/slugs/index.kscript" as slugs` with the default layout.
+
+For a direct install, `kscript lib add owner/repo` or `kscript lib add https://github.com/owner/repo` selects the entire repository. A GitHub tree URL selects a branch, tag, commit, or folder within it, such as `kscript lib add https://github.com/owner/repo/tree/v1.0.0/libraries/slugs`. Direct installs work without registering a repository.
+
+Named libraries install into `lib/<library-name>/`. Direct installs use `lib/<repository-name>/` for a whole repository or `lib/<folder-name>/` for a selected folder. Set `paths.lib` in the nearest `kscript.json` to choose another folder relative to `serve.root`. Outside a project, the command installs into `lib/` in the current folder. Imports are relative to the script containing them, so a script one level down would use `../lib/isolink-connect/index.kscript`.
+
+The library can include sibling scripts and data files. An `index.kscript` or `index.ks.xml` at its root is the preferred entry point. The command prints an import for a KScript file it found and saves the source URL, commit SHA and entry path in `.kscript-lib.json` inside the installed folder. Commit the folder with your project to share that exact copy. Adding the same source again keeps the installed revision and local edits. To replace it, move the existing folder aside and run `lib add` with the desired tag or commit URL.
+
+### Publishing a named library
+
+On the default branch of your public repository, put each library in its own folder under `libraries/`. Include its entry script and any files that it imports. For the `acme/kscript-libraries@slugs` example, the repository could contain these files.
+
+```text
+libraries/
+  slugs/
+    index.kscript
+    README.md
+```
+
+Declare the library's public functions at the top level of `index.kscript`. Once you push that folder, users can register your repository and install the library by its qualified name.
+
 ## Project settings: kscript.json
 
 `kscript serve`, `kscript check`, `kscript fmt`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:

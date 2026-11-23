@@ -27,6 +27,15 @@ namespace KScript.Syntax.Markup
             $"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file (path=\"sample.json\").",
             $"type {name} needs fields: a block of them (type {name} {{ name: string; age?: int }}), fields: [name: string, age?: int], or a sample file (path: \"sample.json\").");
 
+        /// <summary>In code, a lambda on a normalize rule is parsed as a computed field.</summary>
+        public static Wording NormalizeLambdaProblem(MarkupElement member, bool code)
+        {
+            if (code && member.Name == "field" && member.GetAttributeValue("name") == "normalize"
+                && member.GetAttributeValue("type")?.StartsWith("fn(", StringComparison.Ordinal) == true && member.GetAttribute("value") != null)
+                return "normalize takes an expression with $value already in scope. Write the expression directly, such as normalize: $value->trim().";
+            return null;
+        }
+
         /// <summary>Applies the rule to every argument of every element in a .kscript document.</summary>
         public static void Normalise(MarkupDocument document, Func<string, ElementInfo> lookup)
         {

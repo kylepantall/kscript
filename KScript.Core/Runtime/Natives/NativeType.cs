@@ -161,6 +161,7 @@ namespace KScript.Runtime
         /// <summary>The value of this type <paramref name="value"/> means: itself, or text (or a number, if it takes them) parsed. Null when it doesn't fit.</summary>
         public object Coerce(object value)
         {
+            value = Values.Unwrap(value);
             if (value is IKObject k && k.TypeName == Name) return value;
             if (value is double && TakesNumbers) value = Values.ToStr(value);
             string text = value switch { string s => s, ISemanticText other => other.Text, _ => null };

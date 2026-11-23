@@ -788,7 +788,19 @@ namespace KScript.Runtime
                 }
             }
 
-            // <type> and <error> declarations are hoisted too, so data can be mapped to a type declared further down.
+            // A library can supply the base of a type declared below its import.
+            int firstStatement = 0;
+            if (module.ScriptImports.Count > 0)
+            {
+                for (; firstStatement < nodes.Count; firstStatement++)
+                {
+                    if (nodes[firstStatement] is not MarkupElement import) continue;
+                    if (import.Name != "import") break;
+                    ExecuteElement(import, scope, module, null);
+                }
+            }
+
+            // Type declarations run in source order so a refinement can use an earlier enum or type as its base.
             foreach (MarkupNode node in nodes)
             {
                 if (node is MarkupElement type && IsTypeDeclaration(module, type) && !IsExtension(module, type)) ExecuteElement(type, scope, module, null);
@@ -801,9 +813,9 @@ namespace KScript.Runtime
             }
 
             bool? chain = null;
-            foreach (MarkupNode node in nodes)
+            for (int i = firstStatement; i < nodes.Count; i++)
             {
-                if (node is MarkupElement e)
+                if (nodes[i] is MarkupElement e)
                 {
                     if (IsFunctionDeclaration(module, e) || IsTypeDeclaration(module, e))
                     {
@@ -822,7 +834,7 @@ namespace KScript.Runtime
             e.Name == "extend" && module.DefinitionOf(e)?.Package is CorePackage;
 
         private bool IsTypeDeclaration(Module module, MarkupElement e) =>
-            ((e.Name == "type" || e.Name == "error" || e.Name == "extend") && module.DefinitionOf(e)?.Package is CorePackage)
+            (e.Name is "type" or "enum" or "error" or "extend" && module.DefinitionOf(e)?.Package is CorePackage)
             || module.DefinitionOf(e)?.Hoisted == true
             || (e.Name == "job" && module.DefinitionOf(e)?.Package?.Name == "KScript.Queue");
 

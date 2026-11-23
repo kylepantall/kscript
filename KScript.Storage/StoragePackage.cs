@@ -134,7 +134,7 @@ namespace KScript.Storage
         {
             if (!Directory.Exists(Path)) return new List<object>();
             // A regex (/\.json$/) is matched against each name, folders included; text is a wildcard such as '*.json'.
-            RegexValue regex = call.Arg(0) as RegexValue;
+            RegexValue regex = Values.Unwrap(call.Arg(0)) as RegexValue;
             string pattern = regex == null && call.Has(0) && call.Arg(0) != null ? call.Str(0) : "*";
             var option = call.Bool(1) ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             return Directory.EnumerateFiles(Path, pattern, option)

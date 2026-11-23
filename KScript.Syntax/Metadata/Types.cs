@@ -28,6 +28,7 @@ namespace KScript.Metadata
         public const string Regex = "regex";
 
         public const string Response = "response";
+        public const string IsolinkSession = "isolink_session";
         public const string Chat = "chat";
         public const string Config = "config";
         public const string Logger = "logger";

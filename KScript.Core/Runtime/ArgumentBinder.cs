@@ -93,7 +93,8 @@ namespace KScript.Runtime
         {
             if (info.Signatures.Count == 0) return Plain(call);
             bool simple = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord || a is LatePositional || a is BareList);
-            if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0))) return call;
+            if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0)))
+                return ForNativeParameters(call, info.Signatures[0]);
 
             KScriptException first = null;
             // Give every overload its ordinary flag, enum and field-name meanings before trying inferred literals.
@@ -104,15 +105,35 @@ namespace KScript.Runtime
                     List<Slot> slots = signature.Parameters.Select(Slot.From).ToList();
                     if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error, info.KeepsBareWords, infer: attempt == 1))
                     {
-                        return new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
+                        var bound = new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
                         {
                             ParameterNames = signature.Parameters.Select(p => p.Name).ToList(),
                         };
+                        return ForNativeParameters(bound, signature);
                     }
                     first ??= error;
                 }
             }
             throw first;
+        }
+
+        // A native parameter with a concrete type receives its ordinary .NET representation.
+        // Untyped and any parameters can store or return the caller's value with its own methods.
+        private static CallContext ForNativeParameters(CallContext call, Signature signature)
+        {
+            object[] raw = null;
+            for (int i = 0; i < call.Count; i++)
+            {
+                if (call.Args[i] is not RefinedValue refined) continue;
+                ParameterInfo parameter = i < signature.Parameters.Count ? signature.Parameters[i] : signature.Parameters.LastOrDefault();
+                if (parameter?.Type is null or "any" || (i >= signature.Parameters.Count && !parameter.Variadic)) continue;
+                (raw ??= call.Args.ToArray())[i] = refined.Value;
+            }
+            return raw == null ? call : new CallContext(call.Interpreter, call.Name, raw, call.Named, call.Scope, call.Module, call.IsMethod, call.Skipped)
+            {
+                ParameterNames = call.ParameterNames,
+                Site = call.Site,
+            };
         }
 
         /// <summary>
@@ -374,12 +395,15 @@ namespace KScript.Runtime
                     error = new KScriptException($"{call.Display} needs a value for '{slot.Name}'.", "Argument");
                     return false;
                 }
-                if (has && slot.IsEnum && bound[i] is string text && EnumValue(slot, text) is not string)
+                if (has && slot.IsEnum && Values.Unwrap(bound[i]) is string text)
                 {
-                    error = new KScriptException($"'{text}' isn't " + (slot.TypeName != null ? $"a {slot.TypeName}." : $"a valid {slot.Name} for {call.Display}.") + Hint(text, slot.Values) + $" Use {Or(slot.Values)}.", "Argument");
-                    return false;
+                    if (EnumValue(slot, text) is not string canonical)
+                    {
+                        error = new KScriptException($"'{text}' isn't " + (slot.TypeName != null ? $"a {slot.TypeName}." : $"a valid {slot.Name} for {call.Display}.") + Hint(text, slot.Values) + $" Use {Or(slot.Values)}.", "Argument");
+                        return false;
+                    }
+                    bound[i] = canonical;
                 }
-                if (has && slot.IsEnum && bound[i] is string text2) bound[i] = EnumValue(slot, text2);
             }
 
             // Conversion may execute user normalization and validation. Run it once, after this signature succeeds.

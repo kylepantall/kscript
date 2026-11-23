@@ -186,7 +186,7 @@ namespace KScript.Mathematics
 
         private static List<double> Numbers(CallContext c, List<object> list = null)
         {
-            IEnumerable<object> items = list ?? (c.Count == 1 && c.Arg(0) is List<object> one ? one : c.Args);
+            IEnumerable<object> items = list ?? (c.Count == 1 && Values.Unwrap(c.Arg(0)) is List<object> one ? one : c.Args);
             return items.Select((x, i) => Values.ToNumber(x, $"Item {i + 1} of {c.Display}")).ToList();
         }
 

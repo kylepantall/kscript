@@ -46,17 +46,18 @@ namespace KScript.Runtime
         /// </summary>
         public static TableArguments Read(object rows, object columns, object align, bool header, Func<string, string, Exception> fail)
         {
-            if (rows is not List<object> list)
+            if (Values.Unwrap(rows) is not List<object> list)
                 throw fail($"rows should be a list of rows: maps such as {{ name: 'Ada', age: 36 }}, or lists, not {Values.Describe(rows)}.", "rows");
 
-            List<(string Heading, string Key)> cols = columns switch
+            List<(string Heading, string Key)> cols = Values.Unwrap(columns) switch
             {
                 null => null,
                 Dictionary<string, object> map => map.Select(kv => (kv.Key, Values.ToStr(kv.Value))).ToList(),
                 List<object> keys => keys.Select(k => (Values.ToStr(k), Values.ToStr(k))).ToList(),
                 _ => throw fail("columns should be a list of keys ['name', 'age'] or a map from heading to key { Name: 'name' }.", "columns"),
             };
-            if (cols == null && list.FirstOrDefault() is Dictionary<string, object> first) cols = first.Keys.Select(k => (k, k)).ToList();
+            object firstRow = Values.Unwrap(list.FirstOrDefault());
+            if (cols == null && firstRow is Dictionary<string, object> first) cols = first.Keys.Select(k => (k, k)).ToList();
 
             var table = new TableArguments();
             int skip = 0;
@@ -64,7 +65,7 @@ namespace KScript.Runtime
             {
                 table.Headings = cols.Select(c => c.Heading).ToList();
             }
-            else if (header && list.FirstOrDefault() is List<object> headingRow)
+            else if (header && firstRow is List<object> headingRow)
             {
                 // A list of lists: its first row holds the headings.
                 table.Headings = headingRow.Select(Values.ToStr).ToList();
@@ -72,7 +73,7 @@ namespace KScript.Runtime
             }
             foreach (object row in list.Skip(skip))
             {
-                table.Cells.Add(row switch
+                table.Cells.Add(Values.Unwrap(row) switch
                 {
                     Dictionary<string, object> m when cols != null => cols.Select(c => Path(m, c.Key)).ToList(),
                     Dictionary<string, object> m => m.Values.ToList(),
@@ -81,7 +82,7 @@ namespace KScript.Runtime
                 });
             }
 
-            switch (align)
+            switch (Values.Unwrap(align))
             {
                 case null:
                     break;
@@ -112,7 +113,7 @@ namespace KScript.Runtime
             {
                 object cell = index < row.Count ? row[index] : null;
                 if (cell == null) continue;
-                if (cell is not double) return "left";
+                if (Values.Unwrap(cell) is not double) return "left";
                 any = true;
             }
             return any ? "right" : "left";
@@ -125,7 +126,7 @@ namespace KScript.Runtime
             object at = map;
             foreach (string part in key.Split('.'))
             {
-                if (at is Dictionary<string, object> m && m.TryGetValue(part, out object next)) at = next;
+                if (Values.Unwrap(at) is Dictionary<string, object> m && m.TryGetValue(part, out object next)) at = next;
                 else return null;
             }
             return at;

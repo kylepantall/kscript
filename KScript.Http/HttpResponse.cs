@@ -39,7 +39,7 @@ namespace KScript.Http
         /// Turns what a controller returned into a response: a response stays as it is, nothing is 204 No Content,
         /// text is HTML, and maps, lists, numbers and yes/no are JSON.
         /// </summary>
-        public static HttpResponse From(object value) => value switch
+        public static HttpResponse From(object value) => Values.Unwrap(value) switch
         {
             HttpResponse r => r,
             null => new HttpResponse(204, string.Empty, null),

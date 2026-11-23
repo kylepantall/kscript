@@ -243,6 +243,10 @@ namespace KScript.Language.Features
                 {
                     locations.Add(new SourceLocation(s.SourcePath, new LinePosition(0, 0), new LinePosition(0, 0)));
                 }
+                else if (s.MethodLocation is ExternalLocation method && method.Path != analysis.Path)
+                {
+                    locations.Add(new SourceLocation(method.Path, method.Start, method.End));
+                }
                 else if (s.Kind != SymbolKind.BuiltIn)
                 {
                     locations.Add(new SourceLocation(null, s.DeclarationSpan));

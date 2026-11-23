@@ -1,0 +1,91 @@
+import KScript.Net
+
+/// Run action with a desktop Isolink session. The session closes when action
+/// returns or throws.
+/// @public
+fn with_session(app_id: string, name: string, action: fn, token: string? = null) =>
+  @with_isolink($app_id, $name, $action, token: $token)
+
+/// Get the host's running and reachable flags.
+/// @public
+fn status(session: any) => $session->request('status')
+
+/// List the spaces available to this app.
+/// @public
+fn list_spaces(session: any) => $session->request('spaces.list')
+
+/// Look up an app space by its id.
+/// @public
+fn get_space(session: any, space: string) =>
+  $session->request('spaces.get', { space: $space })
+
+/// Open the app space with this stable key, creating it on first use.
+/// @public
+fn open_space(session: any, key: string, name: string) =>
+  $session->request('spaces.open', { key: $key, name: $name })
+
+/// List all records in a space, or only those of the given type.
+/// @public
+fn list_records(session: any, space: string, type: string? = null) {
+  params = { space: $space }
+  if $type != null {
+    params.type = $type
+  }
+  return $session->request('records.list', $params)
+}
+
+/// Fetch a record by id. A missing record returns null.
+/// @public
+fn get_record(session: any, space: string, id: string) =>
+  $session->request('records.get', { space: $space, id: $id })
+
+/// Apply field edits to a record and return the updated record.
+/// @public
+fn edit_record(
+  session: any,
+  space: string,
+  type: string,
+  id: string,
+  edits: list
+) =>
+  $session->request(
+    'records.edit',
+    { space: $space, type: $type, id: $id, edits: $edits }
+  )
+
+/// Delete a record by id.
+/// @public
+fn delete_record(session: any, space: string, id: string) =>
+  $session->request('records.delete', { space: $space, id: $id })
+
+/// Build an edit that sets a numbered field to a value.
+/// @public
+fn set_value(field: int(min: 1, max: 65535), value: any) => {
+  op: 'setValue',
+  field: $field,
+  value: $value
+}
+
+/// Build an edit that increases a numbered counter.
+/// @public
+fn add_to_counter(field: int(min: 1, max: 65535), by: int(min: 1)) => {
+  op: 'addToCounter',
+  field: $field,
+  by: $by
+}
+
+/// Build an edit that adds items to a numbered set field.
+/// @public
+fn add_to_set(field: int(min: 1, max: 65535), items: list) => {
+  op: 'addToSet',
+  field: $field,
+  items: $items
+}
+
+/// Build an edit that removes items from a numbered set field.
+/// @public
+fn remove_from_set(field: int(min: 1, max: 65535), items: list) => {
+  op: 'removeFromSet',
+  field: $field,
+  items: $items
+}

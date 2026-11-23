@@ -39,7 +39,7 @@ namespace KScript.Runtime
                 if (run.Has("root")) options.Root = run.Template("root");
                 if (run.Has("defaults"))
                 {
-                    options.Defaults = run.Eval("defaults") as Dictionary<string, object>
+                    options.Defaults = Values.Unwrap(run.Eval("defaults")) as Dictionary<string, object>
                         ?? throw run.Error($"<config defaults> needs a map, such as defaults=\"{{ server: {{ port: 8080 }} }}\".", "defaults", "Argument");
                 }
                 if (run.Has("require")) options.Required = List(run.Raw("require"));

@@ -46,8 +46,8 @@ namespace KScript.Runtime
              .Filter("release_candidates", "Versions whose prerelease starts with rc: 1.1.0-rc.1.", v => Tagged(v, "rc"))
              .Filter("betas", "Versions whose prerelease starts with beta: 1.1.0-beta.2.", v => Tagged(v, "beta"))
              .Filter("alphas", "Versions whose prerelease starts with alpha: 2.0.0-alpha.", v => Tagged(v, "alpha"));
-            l.Method("latest", "", "The highest release, leaving out prereleases (null when there is none). ->max() includes prereleases.", "semver",
-                (items, c) => items.Where(v => Pre(v).Length == 0).OrderBy(v => v, Comparer<object>.Create((x, y) => Ordering.Compare(x, y))).LastOrDefault(),
+            l.WithItems("latest", "", "The highest release, leaving out prereleases (null when there is none). ->max() includes prereleases.", "semver",
+                (items, c) => items.Where(v => Pre(Values.Unwrap(v)).Length == 0).OrderBy(Values.Unwrap, Comparer<object>.Create(Ordering.Compare.Invoke)).LastOrDefault(),
                 Let + "<echo>{ $x->latest() }</echo>");
         }
 

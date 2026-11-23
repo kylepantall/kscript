@@ -183,6 +183,22 @@ namespace KScript
                     O("--force", "Replace a file that is already there."),
                 },
                 "kscript convert hello.ks.xml\nkscript convert hello.kscript --syntax xml --stdout", "code-format") { Group = "code", Details = "The original is left as it is. A folder converts every script in it (*.kscript and *.ks.xml, tests too).\nImports, and file names in comments and strings, that point at a converted script are changed to its new name." },
+            new CliCommand("repo", "kscript repo add <owner/repo|github-url>",
+                "Register a GitHub repository that provides named libraries.",
+                Array.Empty<CliOption>(),
+                "kscript repo add acme/kscript-libraries\nkscript lib add acme/kscript-libraries@slugs", "projects")
+            {
+                Group = "build",
+                Details = "Give an owner/repo or its HTTPS GitHub repository URL. The command records the repository in .kscript/repos/ beside the nearest kscript.json, or in the current folder outside a project.",
+            },
+            new CliCommand("lib", "kscript lib add <library|owner/repo@library|owner/repo|github-url>",
+                "Install a KScript source library from GitHub into the project.",
+                Array.Empty<CliOption>(),
+                "kscript lib add isolink-connect\nkscript lib add acme/kscript-libraries@slugs\nkscript lib add https://github.com/owner/repo/tree/main/libraries/example", "projects")
+            {
+                Group = "build",
+                Details = "A library name selects libraries/<name>/ on the default branch of kylepantall/kscript. Use kscript repo add before selecting a library in another repository with owner/repo@library. An owner/repo or HTTPS GitHub URL installs directly from a repository or a tree URL. The command prints the import path for the installed source.",
+            },
             new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
                 "Build programs that run without kscript.",
                 new[]
@@ -231,7 +247,7 @@ namespace KScript
             ("web", new[] { "serve", "routes", "openapi", "css" }),
             ("data", new[] { "db" }),
             ("queue", new[] { "worker", "queue" }),
-            ("build", new[] { "make", "compile" }),
+            ("build", new[] { "make", "repo", "lib", "compile" }),
             ("docs", new[] { "docs", "mcp" }),
             ("tools", new[] { "ide", "lsp", "update", "version" }),
         };

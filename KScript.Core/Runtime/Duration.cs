@@ -25,7 +25,7 @@ namespace KScript.Runtime
         public static bool TrySeconds(object value, out double seconds)
         {
             seconds = 0;
-            switch (value)
+            switch (Values.Unwrap(value))
             {
                 case double d when !double.IsNaN(d) && !double.IsInfinity(d):
                     seconds = d;

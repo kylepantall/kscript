@@ -85,7 +85,7 @@ namespace KScript.Data
         private static string Word(object value, string what)
         {
             if (value is BareWord w) return w.Name;
-            if (value is string s && s.Trim().Length > 0) return s.Trim();
+            if (Values.Unwrap(value) is string s && s.Trim().Length > 0) return s.Trim();
             throw new KScriptException($"{what} needs a column name, such as name or created_at, but got {Values.Describe(value)}.", "Argument");
         }
 
@@ -96,7 +96,7 @@ namespace KScript.Data
             void Add(SqlExpr e) => all = all == null ? e : new SqlBinary("AND", all, e);
             foreach (object a in c.Args)
             {
-                switch (a)
+                switch (Values.Unwrap(a))
                 {
                     case null:
                         continue;
@@ -124,7 +124,7 @@ namespace KScript.Data
             foreach (object a in c.Args)
             {
                 if (a == null) continue;
-                if (a is not Dictionary<string, object> map) throw new KScriptException($"->{method}() takes a map of values, or names and values (name: 'Joan'), not {Values.Describe(a)}.", "Argument");
+                if (Values.Unwrap(a) is not Dictionary<string, object> map) throw new KScriptException($"->{method}() takes a map of values, or names and values (name: 'Joan'), not {Values.Describe(a)}.", "Argument");
                 foreach (KeyValuePair<string, object> kv in map) values[kv.Key] = kv.Value;
             }
             foreach (KeyValuePair<string, object> kv in c.Named) values[kv.Key] = kv.Value;
@@ -285,7 +285,7 @@ namespace KScript.Data
             q.Model == null ? "created_at" : q.Model.Timestamps ? ModelInfo.CreatedAt : q.Model.Key;
 
         private static IEnumerable<object> Flatten(IEnumerable<object> args) =>
-            args.SelectMany(a => a is List<object> list ? (IEnumerable<object>)list : new[] { a }).Where(a => a != null);
+            args.SelectMany(a => Values.Unwrap(a) is List<object> list ? (IEnumerable<object>)list : new[] { a }).Where(a => a != null);
 
         private static readonly QueryMethod[] ModelMethods =
         {
@@ -311,7 +311,7 @@ namespace KScript.Data
                     var values = new Dictionary<string, object>(StringComparer.Ordinal);
                     foreach (object a in c.Args.Skip(1))
                     {
-                        if (a is not Dictionary<string, object> map) throw new KScriptException($"->fake_many() takes a count, then a map of values or names and values, not {Values.Describe(a)}.", "Argument");
+                        if (Values.Unwrap(a) is not Dictionary<string, object> map) throw new KScriptException($"->fake_many() takes a count, then a map of values or names and values, not {Values.Describe(a)}.", "Argument");
                         foreach (KeyValuePair<string, object> kv in map) values[kv.Key] = kv.Value;
                     }
                     foreach (KeyValuePair<string, object> kv in c.Named.Where(kv => kv.Key != "count")) values[kv.Key] = kv.Value;
@@ -441,7 +441,7 @@ namespace KScript.Data
                 object value = call.Interpreter.EvaluateText(DecodedText.Plain(expression, 0), call.Scope, call.Module);
                 w.Append(text.ToString());
                 text.Clear();
-                if (value is List<object> list)
+                if (Values.Unwrap(value) is List<object> list)
                 {
                     // {$ids} in "where id in {$ids}" is a list of parameters.
                     w.Append("(");

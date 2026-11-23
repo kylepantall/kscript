@@ -59,6 +59,9 @@ namespace KScript.Language.Analysis
         /// <summary>For a &lt;type&gt; value (<c>Repo</c>): the shape of the records it makes.</summary>
         public TypeShape Instance { get; init; }
 
+        /// <summary>The raw value exposed as $value when a refinement method runs.</summary>
+        internal TypeShape RefinementBase { get; init; }
+
         /// <summary>The type's directly declared pattern when a bare word can denote an instance.</summary>
         internal KScript.Runtime.RegexValue LiteralPattern { get; init; }
 
@@ -213,6 +216,9 @@ namespace KScript.Language.Analysis
         /// <summary>The element that declares it, if any.</summary>
         public MarkupElement DeclaringElement { get; internal set; }
 
+        /// <summary>A type method's original declaration, retained when its type is imported or inherited.</summary>
+        internal ExternalLocation MethodLocation { get; init; }
+
         public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
 
         /// <summary>For a parameter with no type of its own: true when its type comes from what every call in the file passes.</summary>
@@ -264,8 +270,10 @@ namespace KScript.Language.Analysis
         /// <summary>For a method an extend block adds: the type it extends, such as date.</summary>
         public string ExtensionOf { get; internal set; }
 
+        private string MethodOwner => ExtensionOf ?? (DeclaringElement?.Parent?.Name is "type" or "model" ? DeclaringElement.Parent.GetAttributeValue("name") : null);
+
         public string Signature => Kind == SymbolKind.Function
-            ? $"{(ExtensionOf != null ? ExtensionOf + "->" : Alias != null ? "@" + Alias.Name + "." : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
+            ? $"{(MethodOwner != null ? MethodOwner + "->" : Alias != null ? "@" + Alias.Name + "." : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
             : Alias != null ? Alias.Name + "." + Name : "$" + Name;
 
         /// <summary>The signature with the return type when it is known: <c>@double(x: int): number</c>.</summary>

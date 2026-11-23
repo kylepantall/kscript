@@ -97,7 +97,7 @@ namespace KScript.Runtime
             {
                 if (c.Arg(0) is not List<object> list || list.Count == 0)
                     throw new KScriptException($"->allocate() needs a list of ratios, such as [1, 1, 2], not {Values.Describe(c.Arg(0))}.", "Argument");
-                var ratios = list.Select(r => r is double d && d >= 0 && double.IsFinite(d) ? Factor(d)
+                var ratios = list.Select(r => Values.Unwrap(r) is double d && d >= 0 && double.IsFinite(d) ? Factor(d)
                     : throw new KScriptException($"->allocate() needs ratios that are numbers of 0 or more, not {Values.Describe(r)}.", "Argument")).ToList();
                 if (ratios.Sum() == 0) throw new KScriptException("->allocate() needs at least one ratio above 0.", "Argument");
                 return Allocate(t, ratios);

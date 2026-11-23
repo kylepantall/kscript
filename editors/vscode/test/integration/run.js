@@ -15,6 +15,8 @@ const { runTests } = require('@vscode/test-electron');
   fs.writeFileSync(path.join(workspace, 'hello.ks.xml'), '<kscript>\n  <let name="total" value="1" />\n  <echo>{ $totl }</echo>\n</kscript>\n');
   fs.writeFileSync(path.join(workspace, 'snippets.ks.xml'), '<kscript>\n\n</kscript>\n');
   fs.writeFileSync(path.join(workspace, 'snippets.kscript'), '\n');
+  fs.writeFileSync(path.join(workspace, 'license.kscript'),
+    "import KScript.Data\nmodel License(key: 'key_hash', hidden: [key_hash,]) {\n  key_hash: string\n  owner_id: string\n}\n");
   fs.writeFileSync(path.join(workspace, 'snippets.txt'), '\n');
   // Scripts for the Run command: one that works, one that stops on its second line, and a test file.
   fs.writeFileSync(path.join(workspace, 'writes.kscript'), "import KScript.IO\n@write_text('ran.txt', 'it ran')\n");
