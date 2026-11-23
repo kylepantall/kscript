@@ -381,6 +381,7 @@ namespace KScript.Docs
                 string receiver = method ? $"<span class=\"recv\">{Html.H(c.ReceiverType)}</span>" : string.Empty;
                 string parameters = string.Join(", ", s.Parameters.Select(p => p.Deprecated != null
                     ? $"<del class=\"param\" title=\"Deprecated\">{Html.H(p.Label)}</del>"
+                    : p.Fields.Count > 0 ? $"<a class=\"param\" href=\"#{anchor}-{Html.Slug(p.Name)}\">{Html.H(p.Label)}</a>"
                     : $"<span class=\"param\">{Html.H(p.Label)}</span>"));
                 string signature = $"<code>{receiver}{Html.H(c.Prefix)}<span class=\"name\">{Html.H(c.Name)}</span>({parameters})</code>";
                 sb.Append(c.Deprecated != null ? "<del>" + signature + "</del>" : signature);
@@ -395,7 +396,7 @@ namespace KScript.Docs
             var parametersList = c.Signatures.SelectMany(s => s.Parameters).GroupBy(p => p.Name).Select(g => g.First()).ToList();
             // Parameters only get a table when there is more to say than the signature shows: a type, the values
             // allowed, or a description.
-            bool detailed = parametersList.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null);
+            bool detailed = parametersList.Any(p => p.Type != null || p.Fields.Count > 0 || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null);
             if (detailed)
             {
                 sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Parameter</th><th>Takes</th></tr></thead><tbody>");
@@ -403,7 +404,7 @@ namespace KScript.Docs
                 {
                     string takes = p.Values.Count > 0 ? "one of " + string.Join(" | ", p.Values.Select(v => $"<code>{Html.H(v)}</code>"))
                         : p.IsFlag ? $"a flag: <code>{Html.H(p.Name)}</code> or <code>not {Html.H(p.Name)}</code>"
-                        : p.Type != null ? Html.H(p.Type) : "any value";
+                        : p.Type != null ? TypeLink(p.Type) : "any value";
                     if (p.Variadic) takes += ", any number of them";
                     string notes = p.Optional ? " <span class=\"opt\">optional</span>" : p.Variadic ? string.Empty : " <span class=\"req\">required</span>";
                     if (!string.IsNullOrEmpty(p.Description)) takes += ". " + Describe(p.Description);
@@ -412,6 +413,8 @@ namespace KScript.Docs
                 }
                 sb.Append("</tbody></table></div>");
             }
+            foreach (var parameter in parametersList.Where(p => p.Fields.Count > 0))
+                WriteMapFields(sb, parameter, parameter.Name, anchor + "-" + Html.Slug(parameter.Name));
             if (parametersList.Count > 1)
             {
                 sb.Append($"<p class=\"hint\">Arguments can be named: <code>{Html.H(c.Prefix + c.Name)}({Html.H(string.Join(", ", parametersList.Skip(1).Take(2).Select(p => p.Name + ": …").Prepend("…")))})</code>.</p>");
@@ -425,6 +428,23 @@ namespace KScript.Docs
         }
 
         private const string DeprecatedBadge = " <span class=\"badge deprecated-badge\">deprecated</span>";
+
+        private void WriteMapFields(StringBuilder sb, ParameterInfo parameter, string name, string anchor)
+        {
+            sb.Append($"<h4 id=\"{anchor}\"><a class=\"anchor\" href=\"#{anchor}\">#</a><code>{Html.H(name)}</code> fields</h4>");
+            sb.Append("<div class=\"table\"><table class=\"params\"><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th><th>Example value</th></tr></thead><tbody>");
+            foreach (var field in parameter.Fields)
+            {
+                string id = anchor + "-" + Html.Slug(field.Name);
+                string required = field.Optional ? string.Empty : " <span class=\"req\">required</span>";
+                string value = field.DefaultValue == null ? "—" : $"<code>{Html.H(field.DefaultValue)}</code>";
+                string example = field.Example == null ? "—" : $"<code>{Html.H(field.Example)}</code>";
+                sb.Append($"<tr id=\"{id}-field\"><td><a href=\"#{id}{(field.Fields.Count > 0 ? string.Empty : "-field")}\"><code>{Html.H(field.Name)}</code></a>{required}</td><td>{TypeLink(field.Type)}</td><td>{value}</td><td>{Describe(field.Description)}</td><td>{example}</td></tr>");
+            }
+            sb.Append("</tbody></table></div>");
+            foreach (var field in parameter.Fields.Where(f => f.Fields.Count > 0))
+                WriteMapFields(sb, field, name + "." + field.Name, anchor + "-" + Html.Slug(field.Name));
+        }
 
         /// <summary>Why something is deprecated and what to use instead, or nothing.</summary>
         internal static string DeprecationNote(Deprecation d)

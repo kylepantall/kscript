@@ -110,7 +110,6 @@ namespace KScript.Net
 
         protected override void Register(PackageBuilder p)
         {
-            IsolinkValue.Register(p, IsolinkSession.Connect);
             LoopbackJsonConnection.Register(p);
             foreach (var f in ResponseValue.Fields)
                 p.Field(KType.Response, f.Name, f.Type, f.Description);
@@ -119,10 +118,35 @@ namespace KScript.Net
 
             p.LogProvider("http", "Sends log entries to a web service as a JSON array (url, headers, batch).", c => new HttpLogProvider(c, Client.Value));
 
-            p.Command("api", "url, options?",
-                "Makes an HTTP request and returns the response. options is a map: method, headers, body (a map is sent as JSON), timeout (how long to wait for the answer, such as 30s; default 100s). A path such as '/api/notes' asks the project's own routes, in this process.",
-                KType.Response, Api,
-                "<let name=\"repo\" value=\"@api('https://api.github.com/repos/kylepantall/kscript')->check()->json()\" />");
+            p.Command(new CallableInfo(CallableKind.Command, "api",
+                "Makes an HTTP request and returns the response. Give an absolute HTTP(S) URL or a path such as `'/api/notes'` to call the project's own routes in this process.",
+                new[] { new Signature(
+                    new ParameterInfo("url", type: KType.String, description: "The absolute URL or project route to request."),
+                    new ParameterInfo("options", optional: true, type: KType.Map, description: "Configure this request with the fields below.")
+                    {
+                        Fields = new[]
+                        {
+                            new ParameterInfo("method", optional: true, type: KType.String, description: "HTTP method. KScript converts it to uppercase.")
+                                { DefaultValue = "'GET'", Example = "'POST'" },
+                            new ParameterInfo("headers", optional: true, type: KType.Map, description: "Header names and values. Set `User-Agent` to identify the client or `Content-Type` to override the body format header.")
+                                { DefaultValue = "{ 'User-Agent': 'kscript' }", Example = "{ Accept: 'application/json' }" },
+                            new ParameterInfo("body", optional: true, type: KType.Any, description: "A map or list is sent as JSON with `application/json`. Other non-null values are sent as text with `text/plain; charset=utf-8`.")
+                                { DefaultValue = "null", Example = "{ title: 'Ship it' }" },
+                            new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "Maximum wait for an outbound HTTP(S) request. A number is seconds. In-process requests to project routes ignore this field.")
+                                { DefaultValue = "100s", Example = "30s" },
+                        },
+                    }) })
+            {
+                ReturnType = KType.Response,
+                Example = """
+                    <kscript>
+                      <import package="KScript.Net" />
+                      <let name="url" value="$args->first() ?? 'https://httpbin.org/anything'" />
+                      <let name="reply" value="@api($url, options: { method: 'POST', headers: { Accept: 'application/json' }, body: { title: 'Ship it' }, timeout: 30s })" />
+                      <echo>{ $reply->check().status }</echo>
+                    </kscript>
+                    """,
+            }, Api);
             p.Command("query_string", "map", "A map as a URL query: a=1&b=two.", KType.String, c =>
                 string.Join("&", c.Map(0).Where(kv => kv.Value != null).Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(Values.ToStr(kv.Value)))));
 
@@ -202,7 +226,7 @@ namespace KScript.Net
 
         /// <summary>
         /// @api('/api/notes'): a request to the routes of the script's own project, answered in this process. The
-        /// options are the same; a map or list body is sent as JSON.
+        /// method, headers and body options are used; outbound timeout is inapplicable here.
         /// </summary>
         private static object Local(CallContext c, string url)
         {

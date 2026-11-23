@@ -3,7 +3,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using KScript.Net;
 using KScript.Runtime;
 
 namespace KScript.Tests;
@@ -37,24 +36,11 @@ public sealed class IsolinkSessionTests
         return doc.RootElement.Clone();
     }
 
-    private static IsolinkSession Open(int port, string token = null, TimeSpan? timeout = null) =>
-        IsolinkSession.Connect("example.kscript", "Test App", token, CancellationToken.None, port, timeout ?? Deadline);
-
-    private sealed class LoopbackNetPackage(int port) : KScriptPackage
+    private static void RunImported(int port, StringWriter output, string program)
     {
-        public override string Name => "KScript.Net";
-        public override string Description => "Connect to the test listener.";
-        protected override void Register(PackageBuilder p) =>
-            IsolinkValue.Register(p, (id, name, token, ct) => IsolinkSession.Connect(id, name, token, ct, port, Deadline));
-    }
-
-    private static void RunImported(int port, bool modern, StringWriter output, string program)
-    {
-        var registry = modern ? PackageRegistry.Default : new PackageRegistry();
-        if (!modern) registry.Register(new LoopbackNetPackage(port));
         string sdkFolder = ScriptRunner.RepoFile("libraries", "isolink-connect", "libraries", "isolink-connect");
-        string entry = modern ? KScript.Projects.LibraryManifest.Load(Path.Combine(sdkFolder, "kscript.json")).Entry : "index.kscript";
-        new Interpreter(KScriptHost.ForText(output), registry).RunText(
+        string entry = KScript.Projects.LibraryManifest.Load(Path.Combine(sdkFolder, "kscript.json")).Entry;
+        new Interpreter(KScriptHost.ForText(output)).RunText(
             $"import \"{entry}\" as link\nconst test_port = {port}\n" + program, Path.Combine(sdkFolder, "caller.kscript"));
     }
 
@@ -76,127 +62,10 @@ public sealed class IsolinkSessionTests
         await writer.WriteLineAsync(reply.ToJsonString());
     }
 
-    [Fact]
-    public async Task ConnectsWithConsentAndMatchesRepliesBetweenEvents()
-    {
-        await WithHost(async (reader, writer) =>
-        {
-            await Hello(reader, writer, "remembered");
-            JsonElement edit = await ReadRequest(reader, "records.edit");
-            Assert.Equal("rent", edit.GetProperty("p").GetProperty("id").GetString());
-            await writer.WriteAsync("{\"ev\":\"records.changed\",\"p\":{}}\n{\"id\":");
-            await writer.WriteLineAsync("""2,"r":{"id":"rent","type":"bill","fields":{"1":"Rent"}}}""");
-            await ReadRequest(reader, "records.get");
-            await writer.WriteLineAsync("""{"id":3,"e":{"code":"unknown_space","message":"Unknown space."}}""");
-            await ReadRequest(reader, "spaces.list");
-            await writer.WriteLineAsync("""{"id":4,"r":[]}""");
-            Assert.Null(await reader.ReadLineAsync());
-        }, port =>
-        {
-            using var session = Open(port, "remembered");
-            Assert.Equal("renewed", session.Hello["token"]);
-            var record = new Dictionary<string, object> { ["space"] = "home", ["type"] = "bill", ["id"] = "rent", ["edits"] = new List<object>() };
-            var result = Assert.IsType<Dictionary<string, object>>(session.Request("records.edit", record, default));
-            Assert.Equal("rent", result["id"]);
-            var error = Assert.Throws<KScriptException>(() => session.Request("records.get", record, default));
-            Assert.Equal("unknown_space", error.Fields["code"]);
-            Assert.Throws<KScriptException>(() => session.Request("contacts.list", null, default));
-            Assert.Empty(Assert.IsType<List<object>>(session.Request("spaces.list", null, default)));
-        });
-    }
-
     [Theory]
-    [InlineData("""{"id":1,"e":{"code":"denied","message":"Access denied."}}""")]
-    [InlineData("""{"id":1,"r":{"protocol":2,"mode":"host"}}""")]
-    public async Task RejectedHandshakesCloseTheConnection(string reply)
-    {
-        await WithHost(async (reader, writer) =>
-        {
-            await ReadRequest(reader, "hello");
-            await writer.WriteLineAsync(reply);
-            Assert.Null(await reader.ReadLineAsync());
-        }, port => Assert.Equal("Network", Assert.Throws<KScriptException>(() => Open(port)).Type));
-    }
-
-    [Theory]
-    [InlineData("""{"ev":"closed","p":{"reason":"turned_off"}}""")]
-    [InlineData("""{"id":123,"r":null}""")]
-    [InlineData("oversized")]
-    public async Task ClosedMissingAndOversizedRepliesInvalidateTheSession(string reply)
-    {
-        await WithHost(async (reader, writer) =>
-        {
-            await Hello(reader, writer);
-            await ReadRequest(reader, "status");
-            if (reply == "oversized") await writer.WriteAsync(new string('x', 256 * 1024 + 1));
-            else await writer.WriteLineAsync(reply);
-            Assert.Null(await reader.ReadLineAsync());
-        }, port =>
-        {
-            using var session = Open(port);
-            Assert.Equal("Network", Assert.Throws<KScriptException>(() => session.Request("status", null, default)).Type);
-            KScriptException closed = Assert.Throws<KScriptException>(() => session.Request("status", null, default));
-            Assert.Equal("not_connected", closed.Fields["code"]);
-        });
-    }
-
-    [Fact]
-    public async Task StalledRepliesTimeOutAndDisconnect()
-    {
-        await WithHost(async (reader, writer) =>
-        {
-            await Hello(reader, writer);
-            await ReadRequest(reader, "status");
-            Assert.Null(await reader.ReadLineAsync());
-        }, port =>
-        {
-            using var session = Open(port, timeout: TimeSpan.FromSeconds(1));
-            Assert.Equal("Timeout", Assert.Throws<KScriptException>(() => session.Request("status", null, default)).Type);
-        });
-    }
-
-    [Fact]
-    public async Task CancellingAnInFlightRequestDisconnectsTheClient()
-    {
-        using var cancellation = new CancellationTokenSource();
-        await WithHost(async (reader, writer) =>
-        {
-            await Hello(reader, writer);
-            await ReadRequest(reader, "status");
-            cancellation.Cancel();
-            Assert.Null(await reader.ReadLineAsync());
-        }, port =>
-        {
-            using var session = Open(port);
-            Assert.ThrowsAny<OperationCanceledException>(() => session.Request("status", null, cancellation.Token));
-            Assert.Equal("Network", Assert.Throws<KScriptException>(() => session.Request("status", null, default)).Type);
-        });
-    }
-
-    [Fact]
-    public async Task OversizedRequestsAreRejectedBeforeSending()
-    {
-        await WithHost(async (reader, writer) =>
-        {
-            await Hello(reader, writer);
-            JsonElement status = await ReadRequest(reader, "status");
-            await writer.WriteLineAsync($$"""{"id":{{status.GetProperty("id").GetInt32()}},"r":true}""");
-            Assert.Null(await reader.ReadLineAsync());
-        }, port =>
-        {
-            using var session = Open(port);
-            var fields = new Dictionary<string, object> { ["id"] = new string('あ', 90_000) };
-            Assert.Equal("Argument", Assert.Throws<KScriptException>(() => session.Request("records.edit", fields, default)).Type);
-            Assert.Equal(true, session.Request("status", null, default));
-        });
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task ImportedLibraryOffersRecordOperationsAndClosesAfterTheCallback(bool modern, bool fail)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ImportedLibraryOffersRecordOperationsAndClosesAfterTheCallback(bool fail)
     {
         await WithHost(async (reader, writer) =>
         {
@@ -229,25 +98,23 @@ public sealed class IsolinkSessionTests
                   note = @link.edit_record($session, $space.id, 'note', 'one', [@link.set_value(1, 'hello')])
                   {{(fail ? "throw Validation \"callback failed\"" : "return $note.fields['1']")}}
                 }
-                echo @link.with_session('example.kscript', 'Test App', @run{{(fail ? "" : ", token: 'saved'")}}{{(modern ? ", port: $test_port" : "")}})
+                echo @link.with_session('example.kscript', 'Test App', @run{{(fail ? "" : ", token: 'saved'")}}, port: $test_port)
                 """;
             if (fail)
             {
-                Assert.Contains("callback failed", Assert.Throws<KScriptException>(() => RunImported(port, modern, output, program)).Message);
+                Assert.Contains("callback failed", Assert.Throws<KScriptException>(() => RunImported(port, output, program)).Message);
                 Assert.Equal("true\nrenewed\n", output.ToString());
             }
             else
             {
-                RunImported(port, modern, output, program);
+                RunImported(port, output, program);
                 Assert.Equal("true\nrenewed\nhello\n", output.ToString());
             }
         });
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task ImportedLibraryReadsFiltersAndDeletesAppRecords(bool modern)
+    [Fact]
+    public async Task ImportedLibraryReadsFiltersAndDeletesAppRecords()
     {
         await WithHost(async (reader, writer) =>
         {
@@ -275,7 +142,7 @@ public sealed class IsolinkSessionTests
         }, port =>
         {
             using var output = new StringWriter { NewLine = "\n" };
-            RunImported(port, modern, output, $$"""
+            RunImported(port, output, """
                 fn run(session) {
                   echo $session.token
                   spaces = @link.list_spaces($session)
@@ -293,7 +160,7 @@ public sealed class IsolinkSessionTests
                   removed = @link.delete_record($session, $space.id, $note.id)
                   return $removed == null
                 }
-                echo @link.with_session('example.kscript', 'Test App', @run, token: 'saved'{{(modern ? ", port: $test_port" : "")}})
+                echo @link.with_session('example.kscript', 'Test App', @run, token: 'saved', port: $test_port)
                 """);
             Assert.Equal("saved\nHome\n1\n0\ntrue\n3\ntrue\n", output.ToString());
         });

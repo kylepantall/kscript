@@ -176,14 +176,14 @@ Core is available in every script. The other runtime packages in the table ship 
 kscript lib add isolink-connect
 ```
 
-The official repository pins the Isolink SDK as a Git submodule. With KScript v0.14.0, install the same library directly from the SDK repository using these commands.
+The official repository pins the Isolink SDK as a Git submodule. To install directly from the SDK publisher, use these commands.
 
 ```sh
 kscript repo add waggr-gb/isolink-connect
 kscript lib add waggr-gb/isolink-connect@isolink-connect
 ```
 
-The installer prints the import to use from the site root. A manifest-aware CLI selects the SDK's `client.kscript`. KScript v0.14.0 selects its compatibility entry, `index.kscript`.
+The installer prints the import to use from the site root. SDK 0.3 uses the manifest entry `client.kscript` and the generic `@with_loopback_json` transport from `KScript.Net`.
 
 ```kscript
 import "lib/isolink-connect/client.kscript" as connect

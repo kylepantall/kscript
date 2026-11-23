@@ -48,6 +48,30 @@ public sealed class NetTests : IDisposable
 
     private KScriptException Fails(string body, Action<KScriptHost> setup = null) => Assert.Throws<KScriptException>(() => Run(body, setup));
 
+    [Theory]
+    [InlineData("request.ks.xml")]
+    [InlineData("request.kscript")]
+    public void ThePublishedPostExampleRunsInBothFormats(string filename)
+    {
+        var api = KScript.Language.Catalog.LanguageCatalog.Default.GetCommand("api");
+        string code = api.Example;
+        if (filename.EndsWith(".kscript", StringComparison.Ordinal))
+        {
+            var converted = KScript.Syntax.Markup.ScriptConverter.Convert(code, "request.ks.xml");
+            Assert.Empty(converted.Warnings);
+            code = converted.Text;
+        }
+        var output = new StringWriter { NewLine = "\n" };
+        var host = KScriptHost.ForText(output);
+        host.Arguments = new[] { server.Url + "/echo" };
+        new Interpreter(host).RunText(code, Path.Combine(dir, filename));
+        Assert.Equal("201\n", output.ToString());
+        var request = Assert.Single(server.Requests);
+        Assert.Equal("POST", request.Method);
+        Assert.Contains("application/json", request.Headers["Accept"]);
+        Assert.Equal("{\"title\":\"Ship it\"}", request.Body);
+    }
+
     [Fact]
     public void Api_reads_text_json_status_and_headers()
     {
