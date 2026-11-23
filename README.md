@@ -140,7 +140,7 @@ These native packages ship with KScript. Core operations such as `$text->trim()`
 kscript lib add isolink-connect
 ```
 
-With the default layout, a script in the site root imports it with `import "lib/isolink-connect/index.kscript" as connect`. The official repository also provides `integer-math`, `app-cache` and `request-id`. For a library in another public repository, run `kscript repo add owner/repo`, then `kscript lib add owner/repo@library`. See the [official library list and installation guide](docs/projects.md#installing-source-libraries).
+The installer reads the library's `kscript.json`, prints its public import path and records the exact commit in your project's `kscript.json`. Commit that file and run `kscript lib restore` on a fresh checkout. The official repository also provides `integer-math`, `app-cache` and `request-id`. See the [official library list and installation guide](docs/projects.md#installing-source-libraries).
 
 ## Desktop apps, still just KScript
 

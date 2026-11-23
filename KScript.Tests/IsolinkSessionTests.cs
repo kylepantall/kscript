@@ -48,13 +48,14 @@ public sealed class IsolinkSessionTests
             IsolinkValue.Register(p, (id, name, token, ct) => IsolinkSession.Connect(id, name, token, ct, port, Deadline));
     }
 
-    private static void RunImported(int port, StringWriter output, string program)
+    private static void RunImported(int port, bool modern, StringWriter output, string program)
     {
-        var registry = new PackageRegistry();
-        registry.Register(new LoopbackNetPackage(port));
+        var registry = modern ? PackageRegistry.Default : new PackageRegistry();
+        if (!modern) registry.Register(new LoopbackNetPackage(port));
+        string sdkFolder = ScriptRunner.RepoFile("libraries", "isolink-connect", "libraries", "isolink-connect");
+        string entry = modern ? KScript.Projects.LibraryManifest.Load(Path.Combine(sdkFolder, "kscript.json")).Entry : "index.kscript";
         new Interpreter(KScriptHost.ForText(output), registry).RunText(
-            "import \"isolink-connect/index.kscript\" as link\n" + program,
-            ScriptRunner.RepoFile("libraries", "isolink-connect", "libraries", "client.kscript"));
+            $"import \"{entry}\" as link\nconst test_port = {port}\n" + program, Path.Combine(sdkFolder, "caller.kscript"));
     }
 
     private static async Task Hello(StreamReader reader, StreamWriter writer, string token = null, bool issueToken = true)
@@ -191,9 +192,11 @@ public sealed class IsolinkSessionTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ImportedLibraryOffersRecordOperationsAndClosesAfterTheCallback(bool fail)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ImportedLibraryOffersRecordOperationsAndClosesAfterTheCallback(bool modern, bool fail)
     {
         await WithHost(async (reader, writer) =>
         {
@@ -226,23 +229,25 @@ public sealed class IsolinkSessionTests
                   note = @link.edit_record($session, $space.id, 'note', 'one', [@link.set_value(1, 'hello')])
                   {{(fail ? "throw Validation \"callback failed\"" : "return $note.fields['1']")}}
                 }
-                echo @link.with_session('example.kscript', 'Test App', @run{{(fail ? "" : ", token: 'saved'")}})
+                echo @link.with_session('example.kscript', 'Test App', @run{{(fail ? "" : ", token: 'saved'")}}{{(modern ? ", port: $test_port" : "")}})
                 """;
             if (fail)
             {
-                Assert.Contains("callback failed", Assert.Throws<KScriptException>(() => RunImported(port, output, program)).Message);
+                Assert.Contains("callback failed", Assert.Throws<KScriptException>(() => RunImported(port, modern, output, program)).Message);
                 Assert.Equal("true\nrenewed\n", output.ToString());
             }
             else
             {
-                RunImported(port, output, program);
+                RunImported(port, modern, output, program);
                 Assert.Equal("true\nrenewed\nhello\n", output.ToString());
             }
         });
     }
 
-    [Fact]
-    public async Task ImportedLibraryReadsFiltersAndDeletesAppRecords()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ImportedLibraryReadsFiltersAndDeletesAppRecords(bool modern)
     {
         await WithHost(async (reader, writer) =>
         {
@@ -270,7 +275,7 @@ public sealed class IsolinkSessionTests
         }, port =>
         {
             using var output = new StringWriter { NewLine = "\n" };
-            RunImported(port, output, """
+            RunImported(port, modern, output, $$"""
                 fn run(session) {
                   echo $session.token
                   spaces = @link.list_spaces($session)
@@ -288,7 +293,7 @@ public sealed class IsolinkSessionTests
                   removed = @link.delete_record($session, $space.id, $note.id)
                   return $removed == null
                 }
-                echo @link.with_session('example.kscript', 'Test App', @run, token: 'saved')
+                echo @link.with_session('example.kscript', 'Test App', @run, token: 'saved'{{(modern ? ", port: $test_port" : "")}})
                 """);
             Assert.Equal("saved\nHome\n1\n0\ntrue\n3\ntrue\n", output.ToString());
         });

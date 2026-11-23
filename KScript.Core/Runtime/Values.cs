@@ -120,15 +120,26 @@ namespace KScript.Runtime
         public static string ToJson(object value, bool indented = false)
         {
             using var stream = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = indented, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
-            {
-                WriteJson(writer, value, 0);
-            }
+            WriteJson(stream, value, indented);
             return Encoding.UTF8.GetString(stream.ToArray());
         }
 
-        private static void WriteJson(Utf8JsonWriter w, object value, int depth)
+        /// <summary>Writes KScript's JSON representation, optionally bounding the UTF-8 payload while building it.</summary>
+        public static void WriteJson(Stream stream, object value, bool indented = false, int? maxBytes = null)
         {
+            using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = indented, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            WriteJson(writer, value, 0, maxBytes);
+        }
+
+        private static void WriteJson(Utf8JsonWriter w, object value, int depth, int? maxBytes)
+        {
+            // Each UTF-16 code unit needs at least one UTF-8 byte in the finished JSON. Check
+            // individual strings before the writer reserves space, then measure their escaped form.
+            void CheckSize(int additional)
+            {
+                if (maxBytes.HasValue && w.BytesCommitted + w.BytesPending + additional > maxBytes.Value)
+                    throw new KScriptException($"The JSON value exceeds {maxBytes.Value} bytes.", "Argument");
+            }
             if (depth > 200) throw new KScriptException("The value is nested too deeply (or contains itself) to turn into JSON.");
             value = Unwrap(value);
             switch (value)
@@ -138,11 +149,11 @@ namespace KScript.Runtime
                 case double d when double.IsNaN(d) || double.IsInfinity(d): w.WriteNullValue(); break;
                 case double d when d == Math.Floor(d) && Math.Abs(d) < 1e15: w.WriteNumberValue((long)d); break;
                 case double d: w.WriteNumberValue(d); break;
-                case string s: w.WriteStringValue(s); break;
+                case string s: CheckSize(s.Length); w.WriteStringValue(s); break;
                 case DateTime dt: w.WriteStringValue(dt.ToString("o", CultureInfo.InvariantCulture)); break;
                 case List<object> list:
                     w.WriteStartArray();
-                    foreach (var item in list) WriteJson(w, item, depth + 1);
+                    foreach (var item in list) WriteJson(w, item, depth + 1, maxBytes);
                     w.WriteEndArray();
                     break;
                 case Dictionary<string, object> map:
@@ -151,13 +162,19 @@ namespace KScript.Runtime
                     foreach (var kv in map)
                     {
                         if (hidden != null && hidden.Contains(kv.Key)) continue;
+                        CheckSize(kv.Key.Length);
                         w.WritePropertyName(kv.Key);
-                        WriteJson(w, kv.Value, depth + 1);
+                        WriteJson(w, kv.Value, depth + 1, maxBytes);
                     }
                     w.WriteEndObject();
                     break;
-                default: w.WriteStringValue(ToStr(value)); break;
+                default:
+                    string text = ToStr(value);
+                    CheckSize(text.Length);
+                    w.WriteStringValue(text);
+                    break;
             }
+            CheckSize(0);
         }
 
         #endregion

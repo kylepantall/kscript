@@ -9,6 +9,16 @@ public class ProjectConfigTests
 {
     private static ProjectConfig Parse(string json) => ProjectConfig.Parse(json, Path.Combine(Path.GetTempPath(), "proj", ProjectConfig.FileName));
 
+    [Theory]
+    [InlineData("NUL.sdk", "src/real.kscript", "name")]
+    [InlineData("sdk", "con/real.kscript", "library.entry")]
+    public void LibraryPublisherUsesPortableNamesAndEntryPaths(string name, string entry, string field)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(new { name, library = new { version = "1.0.0", entry } });
+        var error = Assert.Throws<ProjectConfigException>(() => Parse(json));
+        Assert.Contains(field, error.Message);
+    }
+
     [Fact]
     public void DefaultsApplyWhenSectionsAreMissing()
     {
@@ -154,7 +164,12 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,config,extensions,format,http,lint,make,name,natives,packages,paths,queue,serve,standard,test", Keys(props));
+        Assert.Equal("$schema,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test", Keys(props));
+        Assert.Equal("entry,version", Keys(props.GetProperty("library").GetProperty("properties")));
+        var library = Parse("""{ "name": "example", "library": { "version": "0.1.0", "entry": "src/public.kscript" }, "packages": ["KScript.Net"] }""");
+        Assert.Empty(library.Warnings);
+        Assert.Equal("src/public.kscript", library.Library.Entry);
+        Assert.Equal(library.Packages, library.Library.Packages);
         Assert.Equal("connections,default,env,failed,queues,worker", Keys(props.GetProperty("queue").GetProperty("properties")));
         Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));

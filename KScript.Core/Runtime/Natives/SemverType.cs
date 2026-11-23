@@ -90,7 +90,7 @@ namespace KScript.Runtime
         private static NativeText Require(string text) => Read(text) is (NativeText v, _) ? v
             : throw new KScriptException($"'{text}' isn't {NativeTypes.Get("semver").WithArticle}: {Read(text).Reason}.", "Value");
 
-        private static (object Value, string Reason) Read(string s)
+        internal static (object Value, string Reason) Read(string s)
         {
             s = s.Trim();
             if (s.StartsWith('v') || s.StartsWith('V')) s = s.Substring(1);

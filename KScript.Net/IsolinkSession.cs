@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Text.Json;
 using KScript.Runtime;
 
@@ -9,12 +8,11 @@ namespace KScript.Net
     /// <summary>A desktop Isolink Connect v1 connection, scoped by the host's interactive app consent.</summary>
     internal sealed class IsolinkSession : IDisposable
     {
-        private const int MaxFrameBytes = 256 * 1024;
         private readonly TcpClient client = new(AddressFamily.InterNetwork);
         private readonly TimeSpan timeout;
         private readonly SemaphoreSlim requests = new(1);
-        private readonly byte[] buffer = new byte[8192];
-        private int offset, available, sequence, closed;
+        private readonly JsonLineFrames frames = new();
+        private int sequence, closed;
 
         private IsolinkSession(TimeSpan timeout) => this.timeout = timeout;
 
@@ -103,18 +101,16 @@ namespace KScript.Net
         private object Exchange(string method, Dictionary<string, object> parameters, CancellationToken ct)
         {
             int id = ++sequence;
-            string json = Values.ToJson(new Dictionary<string, object>
+            var request = new Dictionary<string, object>
             {
                 ["id"] = (double)id, ["m"] = method, ["p"] = parameters ?? new Dictionary<string, object>(),
-            });
-            if (Encoding.UTF8.GetByteCount(json) > MaxFrameBytes)
-                throw new KScriptException("The Isolink request exceeds 256 KiB.", "Argument");
+            };
             NetworkStream stream = client.GetStream();
-            stream.WriteAsync(Encoding.UTF8.GetBytes(json + "\n"), ct).AsTask().GetAwaiter().GetResult();
+            JsonLineFrames.Write(stream, request, ct);
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                using JsonDocument frame = ReadFrame(stream, ct);
+                using JsonDocument frame = frames.Read(stream, ct);
                 JsonElement root = frame.RootElement;
                 if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Expected an Isolink frame object.");
                 if (root.TryGetProperty("ev", out var ev) && ev.ValueKind == JsonValueKind.String)
@@ -134,31 +130,6 @@ namespace KScript.Net
                 }
                 if (root.TryGetProperty("r", out var result)) return Values.FromJson(result);
                 throw new InvalidDataException("The Isolink reply is missing its result.");
-            }
-        }
-
-        private JsonDocument ReadFrame(NetworkStream stream, CancellationToken ct)
-        {
-            using var frame = new MemoryStream();
-            while (true)
-            {
-                if (offset == available)
-                {
-                    available = stream.ReadAsync(buffer, ct).AsTask().GetAwaiter().GetResult();
-                    offset = 0;
-                    if (available == 0) throw new EndOfStreamException("Isolink disconnected before sending its reply.");
-                }
-                int newline = Array.IndexOf(buffer, (byte)'\n', offset, available - offset);
-                int end = newline < 0 ? available : newline;
-                int length = end - offset;
-                if (frame.Length + length > MaxFrameBytes) throw new InvalidDataException("Isolink sent a frame larger than 256 KiB.");
-                frame.Write(buffer, offset, length);
-                offset = end;
-                if (newline >= 0)
-                {
-                    offset++;
-                    return JsonDocument.Parse(frame.GetBuffer().AsMemory(0, (int)frame.Length));
-                }
             }
         }
 

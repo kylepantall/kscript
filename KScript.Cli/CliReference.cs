@@ -191,13 +191,13 @@ namespace KScript
                 Group = "build",
                 Details = "Give an owner/repo or its HTTPS GitHub repository URL. The command records the repository in .kscript/repos/ beside the nearest kscript.json, or in the current folder outside a project.",
             },
-            new CliCommand("lib", "kscript lib add <library|owner/repo@library|owner/repo|github-url>",
-                "Install a KScript source library from GitHub into the project.",
+            new CliCommand("lib", "kscript lib add <library|owner/repo@library|owner/repo|github-url>\nkscript lib restore",
+                "Install a KScript source library or restore the project's pinned libraries.",
                 Array.Empty<CliOption>(),
-                "kscript lib add isolink-connect\nkscript lib add acme/kscript-libraries@slugs\nkscript lib add https://github.com/owner/repo/tree/main/libraries/example", "projects")
+                "kscript lib add isolink-connect\nkscript lib add acme/kscript-libraries@slugs\nkscript lib restore", "projects")
             {
                 Group = "build",
-                Details = "A library name selects libraries/<name>/ on the default branch of kylepantall/kscript. Use kscript repo add before selecting a library in another repository with owner/repo@library. An owner/repo or HTTPS GitHub URL installs directly from a repository or a tree URL. The command prints the import path for the installed source.",
+                Details = "A library name selects libraries/<name>/ on the default branch of kylepantall/kscript. Use kscript repo add before selecting a library in another repository with owner/repo@library. You can also install a GitHub repository or tree URL directly. The installer reads library.entry and library.version when declared and prints the import to use. Commit the consuming project's kscript.json. On a fresh checkout, kscript lib restore installs the commits recorded in its libraries section.",
             },
             new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
                 "Build programs that run without kscript.",

@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using KScript.Cli;
 using KScript.Projects;
 using KScript.Syntax.Markup;
 
@@ -195,51 +194,18 @@ namespace KScript.Scaffolding
         private static string PasskeyConfig(string json, string file, Dictionary<string, string> options, ProjectConfig project)
         {
             string origin = options.GetValueOrDefault("origin") ?? project?.Http.Auth.PasskeyOrigin ?? $"http://localhost:{project?.Serve.Port ?? 8080}";
-            json = SetJsonProperty(json, new[] { "http", "auth", "passkey_origin" }, JsonEncodedString(origin));
+            json = SetJsonProperty(json, new[] { "http", "auth", "passkey_origin" }, JsonConfigEdit.Quote(origin));
             json = SetJsonProperty(json, new[] { "http", "auth", "passkey_signup" }, "true");
             if (options.TryGetValue("rp-id", out string rp))
-                json = SetJsonProperty(json, new[] { "http", "auth", "passkey_rp_id" }, JsonEncodedString(rp));
+                json = SetJsonProperty(json, new[] { "http", "auth", "passkey_rp_id" }, JsonConfigEdit.Quote(rp));
             var config = ProjectConfig.Parse(json, file);
             if (config.Http.Auth.PasskeyOrigin == null)
                 throw new StubException(string.Join(" ", config.Warnings.Where(w => w.Contains("passkey", StringComparison.Ordinal))));
             return json;
         }
 
-        private static string JsonEncodedString(string value) => "\"" + JsonEncodedText.Encode(value).ToString() + "\"";
-
-        // Edit just the named JSONC value. Comments, trailing commas and unrelated settings keep their exact spelling.
-        private static string SetJsonProperty(string json, string[] path, string value)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(json);
-            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
-            reader.Read();
-            for (int depth = 0; depth < path.Length; depth++)
-            {
-                if (reader.TokenType != JsonTokenType.StartObject) throw new StubException("The http and auth settings in kscript.json must be objects.");
-                int insert = (int)reader.BytesConsumed;
-                reader.Read();
-                bool empty = reader.TokenType == JsonTokenType.EndObject;
-                while (reader.TokenType == JsonTokenType.PropertyName && !reader.ValueTextEquals(path[depth]))
-                {
-                    reader.Read();
-                    reader.Skip();
-                    reader.Read();
-                }
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    for (int i = path.Length - 1; i > depth; --i) value = "{ " + JsonEncodedString(path[i]) + ": " + value + " }";
-                    string property = "\n" + new string(' ', (depth + 1) * 2) + JsonEncodedString(path[depth]) + ": " + value + (empty ? "\n" + new string(' ', depth * 2) : ",");
-                    return Encoding.UTF8.GetString(bytes, 0, insert) + property + Encoding.UTF8.GetString(bytes, insert, bytes.Length - insert);
-                }
-                reader.Read();
-                if (depth + 1 < path.Length) continue;
-                int start = (int)reader.TokenStartIndex;
-                reader.Skip();
-                int end = (int)reader.BytesConsumed;
-                return Encoding.UTF8.GetString(bytes, 0, start) + value + Encoding.UTF8.GetString(bytes, end, bytes.Length - end);
-            }
-            throw new InvalidOperationException();
-        }
+        private static string SetJsonProperty(string json, string[] path, string value) =>
+            JsonConfigEdit.SetProperty(json, path, value, () => new StubException("The http and auth settings in kscript.json must be objects."));
 
         /// <summary>The kit's files, by their path inside Scaffolding/Auth.</summary>
         private static List<(string Path, string Source)> Resources()

@@ -1,0 +1,10 @@
+{
+  "name": "request-id",
+  "library": {
+    "version": "0.1.0",
+    "entry": "index.kscript"
+  },
+  "packages": [
+    "KScript.Http"
+  ]
+}

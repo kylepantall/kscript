@@ -29,6 +29,8 @@ namespace KScript.Metadata
 
         public const string Response = "response";
         public const string IsolinkSession = "isolink_session";
+        public const string LoopbackJsonConnection = "loopback_json_connection";
+        public const string LoopbackJsonStream = "loopback_json_stream";
         public const string Chat = "chat";
         public const string Config = "config";
         public const string Logger = "logger";

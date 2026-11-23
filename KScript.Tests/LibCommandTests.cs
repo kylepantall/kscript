@@ -126,6 +126,83 @@ public sealed class LibCommandTests : IDisposable
         Assert.Equal("edited", File.ReadAllText(Path.Combine(installed, "index.kscript")));
     }
 
+    [Theory]
+    [InlineData("org/toolkit", "", false)]
+    [InlineData("toolkit", "libraries/toolkit/", false)]
+    [InlineData("toolkit", "libraries/toolkit/", true)]
+    public void ManifestSelectsThePublicEntryAndRecordsTheDeclaredMetadata(string source, string prefix, bool submodule)
+    {
+        if (submodule) github.Contents = Gitlink("submodule", "https://github.com/org/sdks", UpstreamSha);
+        github.Archive = Archive(
+            (prefix + "kscript.json", """
+                {
+                  // The catalog also publishes this library as toolkit.
+                  "name": "example-sdk",
+                  "library": { "entry": "src/public.kscript", "version": "0.2.0-beta.1" },
+                  "packages": ["KScript.Net"],
+                }
+                """, 0),
+            (prefix + "index.kscript", "fn answer() => 0", 0),
+            (prefix + "src/public.kscript", "fn answer() => 42", 0));
+        var result = Add(source);
+        Assert.True(result.Code == ExitCodes.Ok, result.Error);
+        string installedSha = submodule ? UpstreamSha : Sha;
+        Assert.Contains($"Installed toolkit 0.2.0-beta.1 at {installedSha}", result.Output);
+        Assert.Contains("import \"lib/toolkit/src/public.kscript\"", result.Output);
+        string installed = Path.Combine(root, "lib", "toolkit");
+        using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(installed, ".kscript-lib.json")));
+        var metadata = receipt.RootElement;
+        Assert.Equal("example-sdk", metadata.GetProperty("name").GetString());
+        Assert.Equal("0.2.0-beta.1", metadata.GetProperty("version").GetString());
+        Assert.Equal("src/public.kscript", metadata.GetProperty("entry").GetString());
+        Assert.Equal(new[] { "KScript.Net" }, metadata.GetProperty("packages").EnumerateArray().Select(p => p.GetString()));
+        using var output = new StringWriter();
+        new Interpreter(KScriptHost.ForText(output)).RunText("import \"lib/toolkit/src/public.kscript\" as sdk\necho @sdk.answer()", Path.Combine(root, "main.kscript"));
+        Assert.Equal("42", output.ToString().Trim());
+
+        int requests = github.Requests.Count;
+        github.Status = HttpStatusCode.ServiceUnavailable;
+        File.WriteAllText(Path.Combine(installed, "kscript.json"), "locally edited manifest");
+        Assert.Contains($"Already installed toolkit 0.2.0-beta.1 at {installedSha}", Add(source).Output);
+        Assert.Equal(requests, github.Requests.Count);
+        Assert.Equal("locally edited manifest", File.ReadAllText(Path.Combine(installed, "kscript.json")));
+    }
+
+    [Theory]
+    [InlineData("""{"name":"legacy","packages":["App.Custom"],"standard":"./not-in-the-archive.md"}""")]
+    [InlineData("""{"name":"legacy","app":{"main":"demo.kscript"}}""")]
+    public void OrdinaryProjectSettingsKeepTheLegacyLibraryEntrySelection(string config)
+    {
+        github.Archive = Archive(("kscript.json", config, 0), ("demo.kscript", "echo 'demo'", 0), ("index.ks.xml", "<kscript/>", 0));
+        var result = Add("org/toolkit");
+        Assert.True(result.Code == ExitCodes.Ok, result.Error);
+        Assert.Contains("import \"lib/toolkit/index.ks.xml\"", result.Output);
+        using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "lib", "toolkit", ".kscript-lib.json")));
+        Assert.False(receipt.RootElement.TryGetProperty("version", out _));
+    }
+
+    [Theory]
+    [InlineData("src/other.kscript", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("src/REAL.kscript", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("../outside.kscript", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("/outside.kscript", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("C:\\outside.kscript", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("README.md", "0.2.0", "toolkit", "KScript.Net", "entry")]
+    [InlineData("src/real.kscript", "latest", "toolkit", "KScript.Net", "version")]
+    [InlineData("src/real.kscript", "0.2.0", "../other", "KScript.Net", "name")]
+    [InlineData("src/real.kscript", "0.2.0", "toolkit", "KScript.Missing", "package")]
+    public void BadManifestLeavesTheInstallDirectoryFreeForRetry(string entry, string version, string name, string package, string field)
+    {
+        string config = JsonSerializer.Serialize(new { name, library = new { entry, version }, packages = new[] { package } });
+        github.Archive = Archive(("kscript.json", config, 0), ("src/real.kscript", "echo 'ok'", 0), ("README.md", "SDK", 0));
+        var result = Add("org/toolkit");
+        Assert.Equal(ExitCodes.Failed, result.Code);
+        Assert.Contains(field, result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Directory.GetFileSystemEntries(Path.Combine(root, "lib")));
+        github.Archive = Archive(("index.kscript", "echo 'fixed'", 0));
+        Assert.Equal(ExitCodes.Ok, Add("org/toolkit").Code);
+    }
+
     [Fact]
     public void TheTemplateLibrariesCanBeInstalledAndUsedWithoutGeneratingAProject()
     {

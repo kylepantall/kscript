@@ -5,6 +5,7 @@
   "description": "Settings for kscript serve, kscript check, kscript fmt and the KScript language server. Commands look for kscript.json in the folder they work on and its parents.",
   "type": "object",
   "additionalProperties": false,
+  "dependencies": { "library": ["name"] },
   "definitions": {
     "standardReference": {
       "type": "string",
@@ -15,6 +16,38 @@
   "properties": {
     "$schema": { "type": "string" },
     "name": { "type": "string", "description": "The project's name." },
+    "libraries": {
+      "type": "object",
+      "description": "Installed source libraries by folder name. kscript lib add records the exact revision; kscript lib restore reinstalls it.",
+      "propertyNames": {
+        "description": "A portable folder name. Spaces and punctuation such as + are allowed.",
+        "minLength": 1,
+        "not": { "anyOf": [
+          { "pattern": "^\\.|[. ](?![\\s\\S])" },
+          { "pattern": "[/\\\\<>:\"|?*\\u0000-\\u001f\\u007f-\\u009f]" },
+          { "pattern": "^(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|(?:[Cc][Oo][Mm]|[Ll][Pp][Tt])[1-9¹²³])(?:\\.|(?![\\s\\S]))" }
+        ] }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "commit"],
+        "properties": {
+          "source": { "type": "string", "pattern": "^https://github\\.com/", "description": "Canonical GitHub repository or catalog folder URL recorded by kscript lib add." },
+          "commit": { "type": "string", "maxLength": 40, "pattern": "^[0-9a-f]{40}$", "description": "Full commit SHA of the source repository or catalog. The catalog commit also pins a linked submodule." }
+        }
+      }
+    },
+    "library": {
+      "type": "object",
+      "description": "Metadata used by kscript lib add when installing this folder as a source library.",
+      "additionalProperties": false,
+      "required": ["version", "entry"],
+      "properties": {
+        "version": { "type": "string", "description": "The library's semantic version, such as 1.0.0 or 1.1.0-beta.1." },
+        "entry": { "type": "string", "description": "The public .kscript or .ks.xml file to import, relative to this manifest." }
+      }
+    },
     "standard": {
       "description": "The standard (or standards) whose lint rules and format settings this project starts from; kscript.json's own lint and format settings win over it. Built in: kscript:recommended (the default) and kscript:strict. Anything else is a path, relative to kscript.json, to a standard file or to a folder holding kscript-standard.json. [] uses no standard (style rules off).",
       "default": "kscript:recommended",
@@ -29,7 +62,7 @@
       "description": "Packages every script in the project uses without an <import>. KScript.Core is always imported.",
       "items": {
         "type": "string",
-        "enum": ["KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.Test", "KScript.UI", "KScript.AI"]
+        "enum": ["KScript.Core", "KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.Style", "KScript.Storage", "KScript.Document", "KScript.Data", "KScript.Cache", "KScript.Queue", "KScript.Http", "KScript.Auth", "KScript.Test", "KScript.UI", "KScript.AI"]
       },
       "uniqueItems": true
     },

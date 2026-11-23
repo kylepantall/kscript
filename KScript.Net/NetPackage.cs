@@ -111,6 +111,7 @@ namespace KScript.Net
         protected override void Register(PackageBuilder p)
         {
             IsolinkValue.Register(p, IsolinkSession.Connect);
+            LoopbackJsonConnection.Register(p);
             foreach (var f in ResponseValue.Fields)
                 p.Field(KType.Response, f.Name, f.Type, f.Description);
             foreach (var m in ResponseValue.Methods)
