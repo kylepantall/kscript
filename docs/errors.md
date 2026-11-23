@@ -73,8 +73,6 @@ name = 'Kyle'        // right: text
 name = $other        // right: another variable
 ```
 
-A bare word is a value when one of your types has a `pattern` that matches all of it. See [values without quotes](types.md#values-without-quotes).
-
 ## KS2005
 
 **Single quotes keep text as written.** `"Double quotes"` fill in `$name` and `{ }`. `'Single quotes'` never do, so a variable named inside them is not filled in. The quick fix changes the quotes.
@@ -92,18 +90,6 @@ The same code warns when SQL text is filled in before it reaches `@sql`, because
 query = "select * from users where id = {$id}"   // filled in here
 rows = @sql($query)                              // warning: nothing left to send as a parameter
 rows = @sql("select * from users where id = {$id}")   // right: {$id} is a parameter
-```
-
-## KS2006
-
-**A bare word fits more than one of your types.** A word without quotes is read as the type whose `pattern` matches all of it, so when two types match, KScript can't tell which one you mean. Declare the type. The quick fix offers each one.
-
-```kscript wrong
-type Sku with [string] { pattern: /^[a-z]+-\d+$/ }
-type Ticket with [string] { pattern: /^[a-z]+-\d+$/ }
-
-item = abc-123           // error: fits Sku and Ticket
-item: Sku = abc-123      // right
 ```
 
 ## Statements

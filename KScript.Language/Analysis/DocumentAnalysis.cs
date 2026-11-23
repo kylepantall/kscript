@@ -67,9 +67,6 @@ namespace KScript.Language.Analysis
         public List<Symbol> Symbols { get; } = new List<Symbol>();
         public List<SymbolReference> References { get; } = new List<SymbolReference>();
         public List<ExpressionRegion> Regions { get; } = new List<ExpressionRegion>();
-
-        /// <summary>Bare words read as a declared type because its pattern fits them (<c>key = passkey_abc</c>), by the word's span.</summary>
-        public Dictionary<TextSpan, string> BareWordTypes { get; } = new Dictionary<TextSpan, string>();
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
 

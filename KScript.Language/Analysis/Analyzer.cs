@@ -1512,13 +1512,7 @@ namespace KScript.Language.Analysis
                         filledTexts.Add(assign.Name);
                     }
                     TypeShape shape = Infer(assign.Value, region);
-                    int bareWords = result.BareWordTypes.Count;
                     AnalyzeExpr(assign.Value, region, scope, ExprContext.Value);
-                    if (result.BareWordTypes.Count != bareWords)
-                    {
-                        // key = passkey_abc: analyzing the value found the type the word is.
-                        shape = Infer(assign.Value, region);
-                    }
                     AnalyzeAssignmentTarget(assign, region, scope);
                     TextSpan nameSpan = NameSpanOf(assign, region);
                     int after = region.Source.ToSource(assign.Span.End);

@@ -77,9 +77,6 @@ namespace KScript.Syntax
         /// <summary>A 'single quoted' string that holds <c>$name</c> or <c>{ }</c>: single quotes keep text as written, double quotes fill it in.</summary>
         public const string TextNotFilledIn = "KS2005";
 
-        /// <summary>A bare word that more than one declared type's pattern fits (<c>key = abc</c>), so which type it is has to be written.</summary>
-        public const string AmbiguousBareWord = "KS2006";
-
         public const string UnknownElement = "KS3001";
         public const string RetiredElement = "KS3002";
         public const string UnknownAttribute = "KS3003";

@@ -6,12 +6,6 @@ type Username with [handle] {
   validate: not $value.name->contains('--'), "can't have two dashes in a row"
 }
 
-/// A key for a passkey sign-in session. A word its pattern matches is one, with no type written.
-type SessionKey with [string] {
-  min: 12
-  pattern: /^passkey_[a-z]+$/
-}
-
 type Signup {
   handle: Username
   email: email
@@ -29,6 +23,3 @@ try {
 } catch err {
   echo $err.message
 }
-
-key = passkey_login
-echo "Session key: $key"

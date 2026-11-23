@@ -207,40 +207,6 @@ namespace KScript.Runtime
             return text.Substring(node.Span.Start, node.Span.Length).Trim();
         }
 
-        /// <summary>
-        /// A bare word that names nothing (<c>passkey_abc</c>, <c>my-post</c>), read as the one declared type whose own
-        /// pattern matches all of it, and checked by that type's rules (see <see cref="BareWordTypes"/>). False when no
-        /// type fits, so the word fails as an unknown name; more than one fails here and names them.
-        /// </summary>
-        private bool TryBareWordType(ExprNode node, Scope scope, EvalContext ctx, out object value)
-        {
-            Func<object> typed = BareWordTyping(node, scope, ctx);
-            value = typed?.Invoke();
-            return typed != null;
-        }
-
-        /// <summary>
-        /// The value of the bare word <paramref name="node"/> as the declared type whose pattern fits it, made when it is
-        /// called (an argument may turn out to be a flag instead), or null when no type fits.
-        /// </summary>
-        private Func<object> BareWordTyping(ExprNode node, Scope scope, EvalContext ctx, bool argument = false)
-        {
-            string word = BareWordTypes.WordOf(node, ctx.Origin?.Value, name => scope.TryGet(name, out _)
-                || (ctx.Module != null && ctx.Module.Aliases.ContainsKey(name)) || ErrorTypes.FindExact(name, scope) != null);
-            if (word == null) return null;
-            List<string> types = BareWordTypes.Matching(word, BareWordTypes.InScope(scope));
-            // A word no type fits fails as it always has, at its first name: no part of it (api in api.example.com) is
-            // read as a type on its own.
-            if (types.Count == 0 && !argument && node is not IdentifierNode && node.DescendantsAndSelf().OfType<IdentifierNode>().FirstOrDefault() is IdentifierNode first)
-                return () => throw Fail(first, ctx, UnknownName(first.Name), "Name");
-            if (types.Count == 0) return null;
-            if (types.Count > 1) return () => throw Fail(node, ctx, BareWordTypes.Ambiguous(word, types), "Type");
-            scope.TryGet(types[0], out object type);
-            return () => Shapes.Convert(this, word, TypeRef.Of((RefinedType)type), word, scope, ctx.Module);
-        }
-
-        private static string UnknownName(string name) => $"Unknown name '{name}'. Variables start with $ (${name}) and commands with @ (@{name}(...)).";
-
         /// <summary>Evaluates an expression node.</summary>
         public object Evaluate(ExprNode node, Scope scope, EvalContext ctx)
         {
@@ -265,8 +231,6 @@ namespace KScript.Runtime
 
         private object EvaluateCore(ExprNode node, Scope scope, EvalContext ctx)
         {
-            // my-post, corp.example.com, 1.4.2: words that name nothing, read as the declared type whose pattern fits them.
-            if (node is BinaryNode or MemberNode && TryBareWordType(node, scope, ctx, out object word)) return word;
             switch (node)
             {
                 case LiteralNode lit:
@@ -297,8 +261,7 @@ namespace KScript.Runtime
                     if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType) return declaredType;
                     // So is an error type: catch NotFound, $err->is(NotFound).
                     if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
-                    if (TryBareWordType(node, scope, ctx, out object typedWord)) return typedWord;
-                    throw Fail(node, ctx, UnknownName(id.Name), "Name");
+                    throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 
                 case ListNode list:
                     return list.Items.Select(i => Evaluate(i, scope, ctx)).ToList();
@@ -481,7 +444,7 @@ namespace KScript.Runtime
                 && node.DescendantsAndSelf().OfType<IdentifierNode>().All(i => !scope.TryGet(i.Name, out _))
                 && node.Span.Start >= 0 && node.Span.Start + node.Span.Length <= ctx.Origin.Value.Length)
             {
-                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed) { Typed = BareWordTyping(node, scope, ctx, argument: true) };
+                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
             }
             // posts.tags names a path of names, for a parameter that reads them: ->with(posts.tags).
             if ((node as MemberNode)?.DottedName is string path) return new BareWord(path, false, afterNamed);
@@ -495,7 +458,7 @@ namespace KScript.Runtime
                 && !(!negated && scope.TryGet(id.Name, out object value) && value is IDeclaredType)
                 && !(!negated && ErrorTypes.FindExact(id.Name, null) != null))
             {
-                return new BareWord(id.Name, negated, afterNamed) { Typed = negated ? null : BareWordTyping(id, scope, ctx, argument: true) };
+                return new BareWord(id.Name, negated, afterNamed);
             }
             return null;
         }

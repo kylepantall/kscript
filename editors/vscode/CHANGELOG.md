@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- A bare word that one of your types' `pattern` matches is a value of that type, with no type written: `key = passkey_login` is a `PasskeySessionKey`. The hint shows the type, the type's other rules are checked at the word, and a word two types match is underlined (KS2006) with a fix to declare each.
 - **Check This File** saves and checks a single script and reports its diagnostics in Problems, including when no project is open.
 
 - Project commands use the active workspace folder and stop if its files cannot be saved. Standalone scripts and tests run from their own directory. Workspace symbol search follows folders added or removed during the session.
