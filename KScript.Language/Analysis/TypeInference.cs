@@ -209,11 +209,7 @@ namespace KScript.Language.Analysis
                         TypeShape item = Infer(lambda.Body, region);
                         return item.Type == KType.Any ? new TypeShape(KType.List) : new TypeShape(KType.List) { Element = item };
                     }
-                    if (m.Name == "json" && MappedShape(catalog.GetMethods("json", receiver.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, receiver.Type)), m.Arguments, 0, null, region) is TypeShape asType)
-                    {
-                        return asType;
-                    }
-                    return InferMethod(m.Name, receiver, m.Arguments);
+                    return InferMethod(m.Name, receiver, m.Arguments, region);
                 }
 
                 case PipeNode pipe:
@@ -226,12 +222,7 @@ namespace KScript.Language.Analysis
                             {
                                 return piped.ReturnShape;
                             }
-                            // $text |> json(as: Repo) gives records, as $text->json(as: Repo) does.
-                            if (id.Name == "json" && MappedShape(catalog.GetMethods("json", left.Type).FirstOrDefault(x => KType.AcceptsMethod(x.ReceiverType, x.Name, left.Type)), call.Arguments, 0, null, region) is TypeShape asPiped)
-                            {
-                                return asPiped;
-                            }
-                            return InferMethod(id.Name, left, call.Arguments);
+                            return InferMethod(id.Name, left, call.Arguments, region);
                         case CommandCallNode command:
                             return Infer(command, region);
                         default:
@@ -628,7 +619,7 @@ namespace KScript.Language.Analysis
         internal static Symbol ScopeOf(TypeShape receiver, string name) =>
             (receiver.Kind == KType.Model || receiver.Type == KType.Query) && receiver.Instance != null && receiver.Instance.Scopes.TryGetValue(name, out Symbol scope) ? scope : null;
 
-        private TypeShape InferMethod(string name, TypeShape receiver, IReadOnlyList<ArgumentNode> args)
+        private TypeShape InferMethod(string name, TypeShape receiver, IReadOnlyList<ArgumentNode> args, ExpressionRegion region)
         {
             // A record's relation method (->posts()) or a model's scope: a query of the model's records.
             if ((receiver.Methods.TryGetValue(name, out Symbol own) || (own = ScopeOf(receiver, name)) != null) && own.ReturnShape.Type == KType.Query)
@@ -638,6 +629,20 @@ namespace KScript.Language.Analysis
             if (receiver.Type == KType.List)
             {
                 if (name == "pluck" && args.Count == 1) return PluckedShape(receiver.Element, args[0].Value);
+                if (name == "only" && args.Count == 1)
+                {
+                    string elementType = args[0].Value switch
+                    {
+                        IdentifierNode id => id.Name,
+                        LiteralNode { Kind: LiteralKind.String } text => text.Value,
+                        _ => null,
+                    };
+                    if (KScript.Runtime.ListFilters.IsTypeName(elementType))
+                    {
+                        TypeShape element = TypeNamed(elementType, region.Source.ToSource(args[0].Value.Span.Start)) ?? new TypeShape(elementType);
+                        return new TypeShape(KType.List) { Element = element };
+                    }
+                }
                 if (SameShapeListMethods.Contains(name))
                 {
                     return receiver;
@@ -651,6 +656,10 @@ namespace KScript.Language.Analysis
             string type = ReceiverType(name, receiver);
             List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, type)).ToList();
             CallableInfo method = methods.FirstOrDefault(m => args.Count >= m.MinArgs && args.Count <= m.MaxArgs) ?? methods.FirstOrDefault();
+            if (args.Count > 0 && MappedShape(method, args, 0, null, region) is TypeShape mapped)
+            {
+                return mapped;
+            }
             if (method != null && ModelResult(method, receiver) is TypeShape records)
             {
                 return records;

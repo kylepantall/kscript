@@ -20,6 +20,19 @@ public sealed class DocsConventionTests
 {
     private static readonly string Root = CliConventionTests.RepoRoot();
 
+    [Theory]
+    [InlineData("README.md", true)]
+    [InlineData("docs/language.md", false)]
+    public void Package_indexes_match_the_built_in_registry(string file, bool includesCore)
+    {
+        string guide = File.ReadAllText(Path.Combine(Root, file));
+        var names = Regex.Matches(guide, @"^\|\s*`(KScript\.\w+)`\s*\|", RegexOptions.Multiline)
+            .Select(match => match.Groups[1].Value);
+        var expected = KScript.Runtime.PackageRegistry.BuiltIn.Select(p => p.Name)
+            .Where(name => includesCore || name != "KScript.Core");
+        Assert.Equal(expected.Order(StringComparer.Ordinal), names.Order(StringComparer.Ordinal));
+    }
+
     /// <summary>The Markdown files a reader learns from.</summary>
     public static IEnumerable<object[]> Guides()
     {

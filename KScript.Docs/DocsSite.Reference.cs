@@ -30,7 +30,7 @@ namespace KScript.Docs
             [KType.File] = "File values, from `@file()`, `@files()` and `@folders()`.",
             [KType.Config] = "`$config`: settings from config files, `.env` files and the environment.",
             [KType.Logger] = "`$log`: structured logging.",
-            [KType.Response] = "HTTP responses, from `@get()`, `@post()` and the other KScript.Net requests.",
+            [KType.Response] = "HTTP responses returned by `@api($url)` in KScript.Net.",
             [KType.Chat] = "Conversations with a language model, from `@chat()`.",
             [KType.HttpResponse] = "Responses made by controllers and middleware: `@response()`, `@view()`, `@redirect()`.",
         };
@@ -39,7 +39,7 @@ namespace KScript.Docs
 
         private static string PackageSlug(string package) => "/reference/" + (package.StartsWith("KScript.", StringComparison.Ordinal) ? package.Substring(8) : package).ToLowerInvariant();
 
-        private static string TypeSlug(string type) => "/reference/methods/" + type;
+        internal static string TypeSlug(string type) => "/reference/methods/" + type;
 
         internal static string ElementAnchor(ElementInfo e) => "el-" + Html.Slug(e.Name);
 
@@ -80,6 +80,10 @@ namespace KScript.Docs
             Catalog.MemberTypes
                 .OrderBy(t => Array.IndexOf(TypeOrder, t) is int i && i >= 0 ? i : 50).ThenBy(t => t, StringComparer.Ordinal);
 
+        // In completion, "any" also means the receiver is unknown. Its reference page lists the methods every value has.
+        internal IEnumerable<CallableInfo> ReferenceMethods(string type) =>
+            Catalog.MethodsFor(type).Where(m => !m.Planned && (type != KType.Any || m.ReceiverType == KType.Any));
+
         private static bool CanRun(string package) => package == "KScript.Core" || Playground.Packages.Contains(package);
 
         private void AddReference()
@@ -94,7 +98,7 @@ namespace KScript.Docs
             index.Append("</div><h2 id=\"methods\">Methods by type</h2><div class=\"cards\">");
             foreach (string type in MethodTypes)
             {
-                int count = Catalog.Methods.Count(m => !m.Planned && m.ReceiverType == type);
+                int count = ReferenceMethods(type).Count();
                 int fieldCount = Catalog.FieldsOf(type).Count;
                 index.Append($"<a class=\"card\" href=\"{TypeSlug(type)}\"><strong>{Html.H(type)}</strong><span>{(fieldCount > 0 ? $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}, " : "")}{count} method{(count == 1 ? "" : "s")}. {Html.Inline(TypeDescriptions.GetValueOrDefault(type, string.Empty))}</span></a>");
             }
@@ -192,7 +196,7 @@ namespace KScript.Docs
 
         private void AddTypePage(string type)
         {
-            var methods = Catalog.Methods.Where(m => !m.Planned && m.ReceiverType == type).ToList();
+            var methods = ReferenceMethods(type).ToList();
             string path = TypeSlug(type);
             var sb = new StringBuilder();
             sb.Append($"<h1>{Html.H(type)} fields and methods</h1>");
@@ -211,7 +215,7 @@ namespace KScript.Docs
             }
             var page = new DocPage { Path = path, Title = type + " methods", NavTitle = type, Section = "Methods by type", Description = description ?? $"Methods of {type} values." };
             if (fields.Count > 0) page.Toc.Add((2, "fields", "Fields"));
-            foreach (var group in methods.GroupBy(m => m.Package).OrderBy(g => g.Key == "KScript.Core" ? 0 : 1))
+            foreach (var group in methods.Where(m => m.ReceiverType == type).GroupBy(m => m.Package).OrderBy(g => g.Key == "KScript.Core" ? 0 : 1))
             {
                 string id = "from-" + Html.Slug(group.Key);
                 sb.Append($"<h2 id=\"{id}\">From {Html.H(group.Key)}</h2>");
@@ -222,6 +226,20 @@ namespace KScript.Docs
                     sb.Append(CallableEntry(m, path));
                     page.Toc.Add((3, MethodAnchor(m), "->" + m.Name));
                 }
+            }
+            foreach (var group in methods.Where(m => m.ReceiverType != type).GroupBy(m => m.ReceiverType).OrderBy(g => g.Key, StringComparer.Ordinal))
+            {
+                string id = "inherited-" + Html.Slug(group.Key);
+                string heading = "Methods from " + group.Key;
+                page.Toc.Add((2, id, heading));
+                sb.Append($"<h2 id=\"{id}\">{Html.H(heading)}</h2><ul>");
+                foreach (CallableInfo method in group.OrderBy(m => m.Name, StringComparer.Ordinal))
+                {
+                    string label = Html.H(method.Labels.First());
+                    if (method.Deprecated != null) label = $"<del>{label}</del>";
+                    sb.Append($"<li><a href=\"{TypeSlug(group.Key)}#{MethodAnchor(method)}\"><code>{label}</code></a></li>");
+                }
+                sb.Append("</ul>");
             }
             page.Body = sb.ToString();
             Add(page);

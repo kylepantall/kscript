@@ -306,6 +306,16 @@ labels = $people->pluck(['name'])     // [{ name: 'Joan' }, { name: 'Sam' }]
 
 A missing map key gives `null`. Typed records keep their usual field checks. An empty input list gives `[]`, and `pluck([])` gives one empty map per input item. Repeated keys appear once, in the requested order.
 
+On a list, `contains(value)`, `index_of(value)`, `remove(value)` and `count_of(value)` compare with `==`. For example, `[1, '1']->count_of(1)` gives `2`. `unique()` uses strict equality (`===`), so `[1, '1']->unique()` keeps both items.
+
+`is_empty()` means zero characters on a string, zero items on a list, or zero keys on a map. If you used `$text->is_empty()` to accept whitespace-only input, use `$text->is_blank()` to keep that behavior.
+
+| Text | `->is_empty()` | `->is_blank()` |
+| --- | --- | --- |
+| `''` | `true` | `true` |
+| `'   '` | `false` | `true` |
+| `'hello'` | `false` | `false` |
+
 A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
 
 ```kscript
@@ -318,7 +328,7 @@ echo "{ $day.year } { $day.weekday } { $file.name } { $file.size }"
 
 So `$response.status`, `$file.size`, `$url.host` and `$e.status` are fields, and anything that takes arguments or does work is a method: `$response->json()`, `$file->read_text()`, `$day->format('yyyy')`. A name that answers true or false starts with `is_` or `has_`: `$response.is_ok`, `$ip.is_private`, `$list->is_empty()`, `$map->has(key)`.
 
-A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(500ms)`, `@api($url, timeout: 30s)`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
+A length of time is a duration: a number and a unit with no quotes, such as `500ms`, `30s`, `10m`, `2h`, `1d` or `1w`, joined for more (`1h30m`). Everything that takes a length of time takes one: `wait(500ms)`, `@api($url, options: { timeout: 30s })`, `$cache->set(key, value, ttl: 10m)`. A plain number is always seconds.
 
 The editor completes the fields and methods for each type and shows what they do. `$text->json()` and `$value->to_json()` convert to and from JSON.
 
@@ -590,14 +600,16 @@ import slugify from "lib/strings.kscript"
 | `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@random_bytes(16, format: 'hex')` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
-| `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`.status` `.is_ok` `->json()` `.text` `->check()`), `@download(url, to)`, `@query_string` |
+| `KScript.Net` | Sends HTTP requests with `@api(url, options: { method, headers, body, timeout })`. The response has `.status`, `.is_ok`, `.text`, `->json()` and `->check()`. Also provides `@download(url, to)` and `@query_string`. A path such as `'/api/notes'` asks the project's own routes. See [Calling your own API](http.md#calling-your-own-api). |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
-| `KScript.Web` | The elements of `kscript serve` pages (below). Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
+| `KScript.Web` | Renders pages with layouts, components and live blocks for `kscript serve`. Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.AI` | `@llm(prompt, system, schema, tools, model, max_tokens)`, `llm(into, system, schema, tools, model, max_tokens)`, `@chat(system)` with `->ask()` `.history` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |
-| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast_color`, `@css_var`, `@css_vars`; `@stylesheet(path, vars)` (see [Stylesheets](stylesheets.md)). |
+| `KScript.Style` | Stylesheets written in KScript (`.ks.css`, `.ks.scss`, `.ks.sass`); `@up`, `@down`, `@between`, `@rem`, `@fluid`, `@adjust_lightness`, `@lighten`, `@darken`, `@mix`, `@alpha`, `@contrast_color`, `@css_var`, `@css_vars`; `@stylesheet(path, vars)` (see [Stylesheets](stylesheets.md)). |
 | `KScript.Http` | Routes, controllers and middleware for `kscript serve`: a `Routes { }` file holds `Get` `Post` `Put` `Patch` `Delete` `Any` `Route` `Resource` `Group` `Middleware`. Controllers use `@view`, `@response`, `@redirect`, `@abort` and `@route`. See [Routes, controllers and middleware](http.md). |
 | `KScript.Storage` | The app's own folders, in the right place on each platform: `@storage(config)` (also `data`, `cache`, `state`, `logs`) with `->read` `->read_json` `->write` `->write_json` `->append` `->list` `->delete` `->folder` `->path_of`, plus `@app_name()` and `@app_folders()`. See [App folders](storage.md). |
 | `KScript.Cache` | `$cache` (in memory) and `@cache(file)` with `->get` `->set` `->remember(key, fn, ttl: 10m)` `->has` `->remove` `->increment` `->ttl` `->keys` `->clear`. See [Caching](cache.md). |
+| `KScript.Data` | Stores records with `model`, queries them with a query builder, and manages schema changes with `Migration` and `kscript db migrate`. See [Databases](data.md). |
+| `KScript.Queue` | Declares background work with `job`, queues it with `->dispatch()` and runs it with `kscript worker`. See [Queues and jobs](queues.md). |
 | `KScript.Auth` | Sign-in for `kscript serve` apps: `@register`, `@attempt`, `@login`, `@logout`, `@user()`, `@is_signed_in()`, `$session` (`->get` `->set` `->flash` …), `@users()`, `@csrf_field()`, `@reset_token`, `@reset_password`, `@api_token`, and the `auth` and `guest` middleware. See [Sign-in](auth.md). |
 | `KScript.Document` | `Document(template: paper, to: "paper.pdf") { }` with `Section`, `Paragraph`, `List`, `Table`, `Figure`, `Math`, `Bibliography` and more; `Letter` and `Invoice`; `->save` `->pages` `->words` `->markdown` `->latex` `->html`. See [Documents](documents.md). |
 | `KScript.UI` | Desktop windows: a `Window { }` block opens one. `Column` `Row` `Grid` `Text` `Button` `TextBox` `CheckBox` `Select` `Slider` `Box` `Spacer` `Timer`, `@close_window()`. See [Desktop apps](desktop.md). |
@@ -623,7 +635,7 @@ Statements and their arguments follow one set of rules in every package, and `ks
 | Rule | Examples |
 | --- | --- |
 | A statement that does something, or declares something, is a lower `snake_case` word. | `input`, `table`, `before_each`, `expect_error`, `log_provider` |
-| A statement that describes a thing in a tree (a window, a route table, a document) is `PascalCase`. Only KScript.UI, KScript.Http and KScript.Document have these. | `Button`, `Routes`, `Get`, `Section` |
+| Statements that describe a window, route table or document in KScript.UI, KScript.Http and KScript.Document use `PascalCase`. In KScript.Data, `Migration` and its schema steps also use `PascalCase`. | `Button`, `Routes`, `Get`, `Section`, `Migration`, `CreateTable` |
 | Arguments are `snake_case`. No name has a hyphen. | `max_tokens`, `must_exist`, `on_click`, `new_page` |
 | `into:` is the variable that receives a result. | `input(into: name)`, `llm(into: reply)`, `capture(into: out)` |
 | `to:` is where something goes: a file, a URL, a controller. It never names a variable. | `Get(path: /, to: @home)`, `Post(path: /notes, to: @notes.add)` |

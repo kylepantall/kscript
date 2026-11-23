@@ -116,10 +116,11 @@ import "lib/strings.kscript" // your own functions
 | `KScript.Core` | The language itself, always there: variables, loops, `match`, functions, errors, strings, lists, maps, JSON and dates |
 | `KScript.Terminal` | Prompts, menus, confirmations, file pickers, colours |
 | `KScript.IO` | Files, folders and paths |
-| `KScript.Net` | HTTP requests and downloads |
+| `KScript.Net` | Sends HTTP requests and downloads files |
+| `KScript.Http` | Handles incoming requests with routes, controllers and middleware |
 | `KScript.Math` | Maths, random numbers and statistics |
 | `KScript.Markdown` | Markdown to HTML |
-| `KScript.Web` | Pages, layouts, components and `<live>` blocks for `kscript serve` |
+| `KScript.Web` | Renders pages with layouts, components and `<live>` blocks for `kscript serve` |
 | `KScript.Test` | Tests for `kscript test` |
 | `KScript.UI` | Native desktop windows, which `kscript compile` turns into Mac, Windows and Linux apps |
 | `KScript.AI` | Language models: `@llm`, `@chat` and `llm`, with Claude |

@@ -248,6 +248,8 @@ namespace KScript.Language.Tests
         public void AListOfOneNativeTypeHasItsListMethods()
         {
             Assert.Equal("semver", ShapeOf(Versions + "x = $v->latest()\necho $x\n", "x").Type);
+            Assert.Empty(Check("mixed = [3, 'hello']\necho $mixed->only(semver)->only(releases)->latest()\n"));
+            Assert.Equal("string", ShapeOf(Versions + "x = $v->only(string)\necho $x\n", "x").Element?.Type);
             Assert.Equal("money", ShapeOf("m: money[] = ['GBP 9.50', 'GBP 0.50']\nx = $m->total()\necho $x\n", "x").Type);
             TypeShape kept = ShapeOf(Versions + "x = $v->only(releases)\necho $x\n", "x");
             Assert.Equal("semver", kept.Element?.Type);

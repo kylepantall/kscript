@@ -62,9 +62,11 @@ namespace KScript.Style
                 KType.String, Fluid, "h1 { font-size: {@fluid(28, 48)}; }");
 
             // Colours.
-            p.Command("lighten", "color, amount", "A lighter colour: amount is 0 to 1 (or a percentage such as '10%') of lightness added.", KType.String,
+            p.Command("adjust_lightness", "color, amount", "Adds a signed amount to HSL lightness and returns CSS colour text. Use 0.1 to add ten percentage points or '-10%' to subtract ten.", KType.String,
+                c => Adjust(c, +1), "@adjust_lightness('red', '-10%')");
+            p.Command("lighten", "color, amount", "Adds to HSL lightness, as @adjust_lightness(color, amount) does. The amount can be a fraction (0.1) or a percentage ('10%').", KType.String,
                 c => Adjust(c, +1));
-            p.Command("darken", "color, amount", "A darker colour: amount is 0 to 1 (or '10%') of lightness taken away.", KType.String,
+            p.Command("darken", "color, amount", "Subtracts from HSL lightness. For example, @darken('red', '10%') gives the same CSS as @adjust_lightness('red', '-10%').", KType.String,
                 c => Adjust(c, -1));
             p.Command("mix", "color, other, amount?", "The colour part way to the other: amount is how far (0 to 1, default 0.5, which is halfway).", KType.String, c =>
             {

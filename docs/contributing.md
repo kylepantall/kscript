@@ -19,6 +19,7 @@ To build a single-file `kscript` binary for your machine:
 ```sh
 dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o out
+```
 
 ## Repository layout
 
@@ -26,8 +27,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | --- | --- |
 | `KScript.Syntax/` | The parser shared by the interpreter and the editor tools: markup, expressions, `{ }` templates, and the metadata types elements and commands are described with. |
 | `KScript.Core/` | The interpreter (`Runtime/`), the KScript.Core package (variables, control flow, functions, errors, `<echo>`, value methods), the package system and `kscript.json` (`Projects/`). |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/`, `KScript.Auth/` | Packages: each registers its elements, commands and methods, with their documentation. |
-| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/`, `KScript.Document/` | Packages: each registers its elements, commands and methods, with their documentation. |
+| `KScript.Terminal/`, `KScript.Math/`, `KScript.IO/`, `KScript.Net/`, `KScript.Markdown/`, `KScript.AI/`, `KScript.Style/`, `KScript.Storage/`, `KScript.Cache/`, `KScript.Auth/`, `KScript.Data/`, `KScript.Queue/`, `KScript.Document/` | Each package registers its elements, commands and methods with their documentation. |
 | `KScript.Web/` | The `kscript serve` page engine (`Pages/`) and the KScript.Web package. |
 | `KScript.Http/` | Routes, controllers and middleware: the KScript.Http package, the route table (`Routing.cs`), request handling (`HttpApp`) and the built-in middleware. |
 | `KScript.UI/` | Desktop windows: the KScript.UI package, the redraw model (`UISession`) and the Avalonia host that shows it on macOS, Windows and Linux. |
@@ -96,7 +96,7 @@ KScript.Cache registers argument 'max-age' on 'cache': arguments are snake_case 
 
 Each registration is checked on its own:
 
-- **Elements.** A name is PascalCase or snake_case, with no hyphen. PascalCase is for the packages whose elements describe things (`Conventions.ThingPackages`: KScript.UI, KScript.Http, KScript.Document) and for the steps written inside a migration in KScript.Data (`Conventions.ThingsInside`); every other element is an action in snake_case. A name in `Retired` can't come back.
+- **Elements.** A name is PascalCase or snake_case, with no hyphen. KScript.UI, KScript.Http and KScript.Document describe things with PascalCase elements (`Conventions.ThingPackages`). In KScript.Data, `Migration` and its steps, such as `CreateTable`, use PascalCase (`Conventions.ThingsInside`). Other elements use snake_case. A name in `Retired` can't come back.
 - **Arguments.** snake_case, each listed once. `to` is a destination and never declares a variable; `into` always does; an argument that declares a variable is called `name`, `into`, `as`, `each` or `at` (never `index`). A file is `path` (not `src`, `file`, `filename`, `source` or `sample`). A list is a list kind or `NameList = true`, never text "separated by commas". An argument that names a function shows `@name` in its description. An argument renamed in `Retired.RenamedAttributes` can't come back.
 - **Commands, methods and parameters.** snake_case. Something that returns `bool` is named `is_x` or `has_x`, unless it is in `Conventions.VerbQuestions` (`contains`, `starts_with`, ...) and takes an argument, or in `Conventions.ActionsThatReport` (`remove`, `save`, ...); and an `is_x` or `has_x` returns `bool`. `count` takes no arguments and there is no `length`. Keyed things use `get`, `set`, `has` and `remove` (no `put`, `forget`, ...), and only the logger has `flush`. A description doesn't call its command another name for something ("the same as", "alias"). Nothing in `Retired.Commands` or `RetiredMembers` comes back.
 - **Fields.** snake_case; a `bool` field is `is_x` or `has_x` (or `exists`) and the other way round; `count` and `length` are never fields.
@@ -138,7 +138,7 @@ Every package follows the same rules, so what you learn in one works in the next
 
 **Things kept by key use `get`, `set`, `has` and `remove`.** `clear` empties the whole thing. `delete` is for files and records (`$storage->delete(name)`, `$record->delete()`, `kscript queue delete`). `flush` only ever means "write out what is being held back" (`$log->flush()`). Storage reads and writes files, so it keeps `read`, `write` and `delete`.
 
-**A length of time is a duration.** `wait(duration: 500ms)`, `Timer(every: 100ms)`, `test(timeout: 5s)`, `@api($url, timeout: 30s)`, `job(timeout: 5m)`, `$cache->set(key, value, ttl: 10m)`. A duration is written as a number and a unit with no quotes: `ms`, `s`, `m`, `h`, `d` or `w`, and they can be joined (`1h30m`). A plain number is always seconds. There are no `ms:` or `seconds:` arguments. Declare an attribute as a duration with `new A(name, K.Expression, ...) { Type = Duration.TypeName }` and a parameter as `name?: duration`, and read it with `run.Seconds(name)` or `Duration.Seconds(value, what)`.
+**A length of time is a duration.** `wait(duration: 500ms)`, `Timer(every: 100ms)`, `test(timeout: 5s)`, `@api($url, options: { timeout: 30s })`, `job(timeout: 5m)`, `$cache->set(key, value, ttl: 10m)`. A duration is written as a number and a unit with no quotes: `ms`, `s`, `m`, `h`, `d` or `w`, and they can be joined (`1h30m`). A plain number is always seconds. There are no `ms:` or `seconds:` arguments. Declare an attribute as a duration with `new A(name, K.Expression, ...) { Type = Duration.TypeName }` and a parameter as `name?: duration`, and read it with `run.Seconds(name)` or `Duration.Seconds(value, what)`.
 
 **A table takes the same arguments everywhere.** The terminal's `table` and a document's `Table` both take `rows` (a list of maps, or a list of lists whose first row is the headings), `columns` (a list of keys, or a map from heading to key), `align` (a list of `left`, `center` or `right`) and `header: false` for no heading row. Both read them with `TableArguments`.
 

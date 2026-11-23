@@ -82,7 +82,7 @@ namespace KScript.Metadata
             {
                 return true;
             }
-            if ((receiver == Number || receiver == Bool) && actual == String)
+            if (receiver == Number && actual == String)
             {
                 return true;
             }

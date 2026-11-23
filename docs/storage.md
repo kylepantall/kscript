@@ -59,7 +59,7 @@ A folder value has these methods. Names are paths inside the folder, with `/` be
 | Method | What it does |
 | --- | --- |
 | `->read(name, default: …)` | The file's text, or the default (`null`) when the file isn't there. |
-| `->read_json(name, default: …)` | The file read as JSON, or the default. |
+| `->read_json(name, default?, as?: type)` | Reads the file as JSON. With `as:`, checks its shape and turns objects into records. A missing file returns the supplied default, or `null` if omitted. |
 | `->write(name, text)` | Writes the file. It is written beside the old one and then moved into place, so a crash never leaves half a file. |
 | `->write_json(name, value)` | Writes the value as indented JSON, the same safe way. |
 | `->append(name, text)` | Adds text to the end of the file. |
@@ -71,6 +71,18 @@ A folder value has these methods. Names are paths inside the folder, with `/` be
 | `->clear()` | Deletes everything in the folder and returns how many files there were. |
 
 The value also has the fields `.app`, `.kind` and `.path` (the folder's own full path), and it prints as its path.
+
+To validate saved settings, supply their type. A missing file returns the default exactly as supplied. Here the default is a `Settings` record as well.
+
+```kscript
+import KScript.Storage
+
+type Settings {
+  theme: string
+}
+settings = @storage(config)->read_json('settings.json', default: Settings({ theme: 'light' }), as: Settings)
+echo $settings.theme
+```
 
 ```kscript
 import KScript.Storage

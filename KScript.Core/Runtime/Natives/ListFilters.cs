@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using KScript.Metadata;
 
 namespace KScript.Runtime
@@ -9,6 +10,28 @@ namespace KScript.Runtime
     /// </summary>
     internal static class ListFilters
     {
+        // An empty list has no item to inspect. Keep its known element type alongside the ordinary list value.
+        private static readonly ConditionalWeakTable<List<object>, NativeType> EmptyListTypes = new();
+
+        internal static NativeType ElementTypeOf(List<object> items)
+        {
+            if (items.Count == 0) return EmptyListTypes.TryGetValue(items, out NativeType declared) ? declared : null;
+            NativeType first = NativeTypeRegistry.Of(items[0]);
+            return first != null && items.All(x => x is IKObject k && k.TypeName == first.Name) ? first : null;
+        }
+
+        internal static void RememberEmptyType(List<object> empty, string elementType)
+        {
+            if (NativeTypeRegistry.Get(elementType) is NativeType type) EmptyListTypes.Add(empty, type);
+        }
+
+        internal static List<object> Where(List<object> items, Func<object, int, bool> predicate, string elementType = null)
+        {
+            List<object> result = items.Where(predicate).ToList();
+            if (result.Count == 0) RememberEmptyType(result, elementType ?? ElementTypeOf(items)?.Name);
+            return result;
+        }
+
         public static void Register(KScriptPackage.PackageBuilder p)
         {
             const string Let = "<let name=\"loads\" value=\"[1, 'two', 3]\" />\n";
@@ -38,13 +61,13 @@ namespace KScript.Runtime
             };
         }
 
-        private static bool IsTypeName(string what) => Values.IsDeclarable(what) || what is "int" or "float" or "date" or "null" or "error";
+        internal static bool IsTypeName(string what) => Values.IsDeclarable(what) || what is "null" or "error";
 
         private static List<object> Filter(List<object> items, string what, bool keep, CallContext c)
         {
-            if (IsTypeName(what)) return items.Where(x => IsOfType(x, what) == keep).ToList();
-            NativeType type = items.Count > 0 && items.All(x => x is IKObject k && k.TypeName == ((IKObject)items[0]).TypeName) ? NativeTypeRegistry.Of(items[0]) : null;
-            if (type?.ListFilter(what) is Func<object, bool> test) return items.Where(x => test(x) == keep).ToList();
+            if (IsTypeName(what)) return Where(items, (x, _) => IsOfType(x, what) == keep, keep ? what : null);
+            NativeType type = ElementTypeOf(items);
+            if (type?.ListFilter(what) is Func<object, bool> test) return Where(items, (x, _) => test(x) == keep, type.Name);
             string filters = type != null && type.ListFilters.Count > 0
                 ? $" The filters for a list of {type.Name} values are {string.Join(", ", type.ListFilters.Select(f => f.Name))}."
                 : items.Count > 0 && NativeTypeRegistry.Of(items[0]) is NativeType { ListFilters.Count: > 0 } first ? $" Filters such as {string.Join(", ", first.ListFilters.Select(f => f.Name))} work when every item is {first.Info.WithArticle}." : string.Empty;

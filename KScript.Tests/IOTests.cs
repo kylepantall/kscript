@@ -90,6 +90,15 @@ public sealed class IOTests : IDisposable
         string sep = Path.DirectorySeparatorChar.ToString();
         Assert.Equal($"a{sep}b{sep}c.txt\n", Run("<echo>{ @join_path('a', 'b', 'c.txt') }</echo>"));
         Assert.Equal($"{P("x")}\n", Run($"<echo>{{ @join_path(@file('.'), 'x') }}</echo>"));
+        string output = Run("""
+            <let name="base" value="@file('.')" />
+            <let name="parts" value="['a', 'b']" />
+            <let name="path" value="@join_path(base: $base, $parts, 'c.txt')" />
+            <let name="file" value="$base->join($parts, 'c.txt')" />
+            <echo>{ $path->type() } { $file->type() } { $file.path == $path } { $file.path }</echo>
+            """);
+        Assert.Equal($"string file true {P("a", "b", "c.txt")}\n", output);
+        Assert.Equal("Permission", Fails("<do>@file('.')->join(['..', 'outside.txt'])</do>", host => host.FileRoot = dir).Type);
         Assert.Contains("needs at least 1 argument", Fails("<echo>{ @join_path() }</echo>").Message);
     }
 

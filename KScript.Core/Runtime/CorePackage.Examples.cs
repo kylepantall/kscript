@@ -122,6 +122,7 @@ namespace KScript.Runtime
                 ("string->count", "'hello'->count()"),
                 ("string->count_of", "'banana'->count_of('a')"),
                 ("string->is_empty", "''->is_empty()"),
+                ("string->is_blank", "'   '->is_blank()"),
                 ("string->contains", "'hello world'->contains('world')"),
                 ("string->starts_with", "'kscript.json'->starts_with('kscript')"),
                 ("string->ends_with", "'notes.txt'->ends_with('.txt')"),

@@ -373,7 +373,7 @@ namespace KScript.Pages
                 {
                     var (built, error) = await ReadPageRequestAsync(request, live);
                     if (error != null) return error;
-                    if (route.Locale != null) built["locale"] = route.Locale;
+                    if (route.Locale != null) built[RequestFields.Locale.Name] = route.Locale;
                     PageResult rendered = site.RenderPage == null
                         ? PageRenderer.RenderFile(new PageContext(site.Root, built), route.File, route.Params)
                         : site.RenderPage(route, built);
@@ -411,15 +411,16 @@ namespace KScript.Pages
                 return new PageResult { Status = 409, ContentType = "text/plain; charset=utf-8", Body = ex.Message };
             }
 
-            // The handler sees the same $request.query and path as the page it came from.
+            // Rebuild the page URL and query; the scheme comes from the HTTP request.
             var uri = new Uri(new Uri("http://localhost"), page);
-            request["path"] = uri.AbsolutePath;
-            request["query"] = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)
+            request[RequestFields.Path.Name] = uri.AbsolutePath;
+            request[RequestFields.Url.Name] = uri.PathAndQuery;
+            request[RequestFields.Query.Name] = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)
                 .ToDictionary(q => q.Key, q => (object)q.Value.ToString());
 
             var route = site.Resolve(uri.AbsolutePath);
             if (route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 404, Body = "Page not found." };
-            if (route.Locale != null) request["locale"] = route.Locale;
+            if (route.Locale != null) request[RequestFields.Locale.Name] = route.Locale;
 
             var ctx = new PageContext(site.Root, request) { Live = ev };
             try
@@ -486,16 +487,16 @@ namespace KScript.Pages
 
             return new Dictionary<string, object>
             {
-                ["method"] = request.Method,
-                ["scheme"] = request.Scheme,
-                ["path"] = request.Path.Value ?? "/",
-                ["url"] = (request.Path.Value ?? "/") + request.QueryString.Value,
-                ["query"] = query,
-                ["form"] = form,
-                ["headers"] = headers,
-                ["cookies"] = cookies,
-                ["body"] = body,
-                ["params"] = new Dictionary<string, object>(),
+                [RequestFields.Method.Name] = request.Method,
+                [RequestFields.Scheme.Name] = request.Scheme,
+                [RequestFields.Path.Name] = request.Path.Value ?? "/",
+                [RequestFields.Url.Name] = (request.Path.Value ?? "/") + request.QueryString.Value,
+                [RequestFields.Query.Name] = query,
+                [RequestFields.Form.Name] = form,
+                [RequestFields.Headers.Name] = headers,
+                [RequestFields.Cookies.Name] = cookies,
+                [RequestFields.Body.Name] = body,
+                [RequestFields.Params.Name] = new Dictionary<string, object>(),
             };
         }
 

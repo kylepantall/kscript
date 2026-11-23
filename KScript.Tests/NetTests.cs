@@ -88,7 +88,7 @@ public sealed class NetTests : IDisposable
         Assert.Contains("answered 404 Not Found", missing.Message);
         Assert.Equal(404.0, missing.Fields["status"]);
         Assert.Contains("isn't JSON", Fails($"<do>@api('{server.Url}/missing')->json()</do>").Message);
-        var timeout = Fails($"<do>@api('{server.Url}/slow', {{ timeout: 0.2 }})</do>");
+        var timeout = Fails($"<do>@api('{server.Url}/slow', options: {{ timeout: 200ms }})</do>");
         Assert.Equal("Timeout", timeout.Type);
         Assert.Contains("didn't answer within 0.2 seconds", timeout.Message);
         Assert.Equal("Network", Fails($"<do>@api('http://localhost:{TestServer.FreePort()}/')</do>").Type);

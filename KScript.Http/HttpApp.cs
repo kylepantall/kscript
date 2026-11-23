@@ -142,12 +142,10 @@ namespace KScript.Http
         /// </summary>
         public RouteTable LoadRoutes()
         {
-            var request = new Dictionary<string, object>
-            {
-                ["method"] = "GET", ["path"] = "/", ["url"] = "/", ["query"] = new Dictionary<string, object>(), ["form"] = new Dictionary<string, object>(),
-                ["headers"] = new Dictionary<string, object>(), ["cookies"] = new Dictionary<string, object>(), ["body"] = string.Empty,
-                ["params"] = new Dictionary<string, object>(), ["json"] = null, ["input"] = new Dictionary<string, object>(), ["ip"] = "127.0.0.1",
-            };
+            var request = new Dictionary<string, object>();
+            Complete(request);
+            request[RouteRequestFields.Json.Name] = null;
+            request[RouteRequestFields.Input.Name] = new Dictionary<string, object>();
             RouteTable table = null;
             OnBigStack(() =>
             {
@@ -247,7 +245,7 @@ namespace KScript.Http
 
             var (map, error) = await PageServer.ReadPageRequestAsync(request, live);
             if (error != null) return error;
-            map["ip"] = request.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+            map[RouteRequestFields.Ip.Name] = request.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
             return Handle(map);
         }
 
@@ -307,17 +305,18 @@ namespace KScript.Http
 
         private static void Complete(Dictionary<string, object> request)
         {
-            request.TryAdd("method", "GET");
-            request.TryAdd("path", "/");
-            request.TryAdd("url", request["path"]);
-            request.TryAdd("query", new Dictionary<string, object>());
-            request.TryAdd("form", new Dictionary<string, object>());
-            request.TryAdd("headers", new Dictionary<string, object>());
-            request.TryAdd("cookies", new Dictionary<string, object>());
-            request.TryAdd("body", string.Empty);
-            request.TryAdd("ip", "127.0.0.1");
-            request["params"] = new Dictionary<string, object>();
-            request["method"] = Values.ToStr(request["method"]).ToUpperInvariant();
+            request.TryAdd(RequestFields.Method.Name, "GET");
+            request.TryAdd(RequestFields.Scheme.Name, "http");
+            request.TryAdd(RequestFields.Path.Name, "/");
+            request.TryAdd(RequestFields.Url.Name, request[RequestFields.Path.Name]);
+            request.TryAdd(RequestFields.Query.Name, new Dictionary<string, object>());
+            request.TryAdd(RequestFields.Form.Name, new Dictionary<string, object>());
+            request.TryAdd(RequestFields.Headers.Name, new Dictionary<string, object>());
+            request.TryAdd(RequestFields.Cookies.Name, new Dictionary<string, object>());
+            request.TryAdd(RequestFields.Body.Name, string.Empty);
+            request.TryAdd(RouteRequestFields.Ip.Name, "127.0.0.1");
+            request[RequestFields.Params.Name] = new Dictionary<string, object>();
+            request[RequestFields.Method.Name] = Values.ToStr(request[RequestFields.Method.Name]).ToUpperInvariant();
         }
 
         private PageResult HandleHere(Dictionary<string, object> request)
@@ -343,7 +342,7 @@ namespace KScript.Http
                 Route route = match.Route ?? match.PathRoute;
                 ctx.Route = route;
                 foreach (var kv in match.Parameters) ((Dictionary<string, object>)request["params"])[kv.Key] = kv.Value;
-                request["route"] = route.Name;
+                request[RouteRequestFields.Route.Name] = route.Name;
 
                 Func<Dictionary<string, object>, object> answer;
                 if (match.Route != null)
@@ -438,14 +437,14 @@ namespace KScript.Http
                     return false;
                 }
             }
-            request["json"] = json;
+            request[RouteRequestFields.Json.Name] = json;
             var input = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (string part in new[] { "query", "form" })
             {
                 if (request[part] is Dictionary<string, object> values) foreach (var kv in values) input[kv.Key] = kv.Value;
             }
             if (json is Dictionary<string, object> fields) foreach (var kv in fields) input[kv.Key] = kv.Value;
-            request["input"] = input;
+            request[RouteRequestFields.Input.Name] = input;
             return true;
         }
 
@@ -492,11 +491,11 @@ namespace KScript.Http
             var available = new Dictionary<string, object>(parameters, StringComparer.Ordinal)
             {
                 ["request"] = request,
-                ["json"] = request["json"],
+                ["json"] = request[RouteRequestFields.Json.Name],
                 ["body"] = request["json"] ?? request["body"],
                 ["query"] = request["query"],
                 ["form"] = request["form"],
-                ["input"] = request["input"],
+                ["input"] = request[RouteRequestFields.Input.Name],
                 ["headers"] = request["headers"],
                 ["cookies"] = request["cookies"],
             };

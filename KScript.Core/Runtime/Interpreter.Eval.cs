@@ -1097,9 +1097,9 @@ namespace KScript.Runtime
             if (target is ErrorValue && module.Methods.TryGetValue("error:" + name, out method)) return true;
             // A package's records (a model's) have its methods as well as maps'.
             if (target is Record record && record.Type.RecordKind != null && module.Methods.TryGetValue(record.Type.RecordKind + ":" + name, out method)) return true;
-            // A list of one native type has that type's list methods too: $versions->without(prereleases).
-            if (target is List<object> { Count: > 0 } items && items[0] is IKObject first && NativeTypeRegistry.Get(first.TypeName) != null
-                && items.All(x => x is IKObject k && k.TypeName == first.TypeName) && module.Methods.TryGetValue(first.TypeName + "[]:" + name, out method)) return true;
+            // A list of one native type has that type's list methods too: $versions->latest().
+            if (target is List<object> items && ListFilters.ElementTypeOf(items) is NativeType elementType
+                && module.Methods.TryGetValue(elementType.Name + "[]:" + name, out method)) return true;
             if (module.Methods.TryGetValue(type + ":" + name, out method)) return true;
             if (target is string s && Values.TryNumber(s, out _) && module.Methods.TryGetValue("number:" + name, out method)) return true;
             // An email, handle, uuid or regex is text too, so the string methods that make sense for it work on it.

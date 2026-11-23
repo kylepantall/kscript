@@ -75,16 +75,22 @@ namespace KScript.Docs.Mcp
             if (path.StartsWith("/reference/methods/", StringComparison.Ordinal))
             {
                 string type = path.Substring("/reference/methods/".Length);
-                var methods = Catalog.Methods.Where(m => !m.Planned && m.ReceiverType == type).OrderBy(m => m.Name, StringComparer.Ordinal).ToList();
+                if (!Catalog.MemberTypes.Contains(type, StringComparer.Ordinal)) return null;
+                var methods = Site.ReferenceMethods(type).OrderBy(m => m.Name, StringComparer.Ordinal).ToList();
                 var fields = Catalog.FieldsOf(type);
-                if (methods.Count == 0 && fields.Count == 0) return null;
                 var sb = new StringBuilder($"# {type} fields and methods\n\nA field is a plain fact, read with a dot and no brackets (`$value.name`). A method takes arguments or does work: call it with `->` (`$value->name(arguments)`), or pipe the value in with `|>`.\n");
                 if (fields.Count > 0)
                 {
                     sb.Append("\n## Fields\n\n");
                     foreach (var f in fields.Values.OrderBy(f => f.Name, StringComparer.Ordinal)) sb.Append($"- `.{f.Name}` ({f.Type ?? "any"}): {f.Description}\n");
                 }
-                foreach (CallableInfo m in methods) sb.Append('\n').Append(Callable(m, format, level: 2));
+                foreach (CallableInfo m in methods.Where(m => m.ReceiverType == type)) sb.Append('\n').Append(Callable(m, format, level: 2));
+                foreach (var group in methods.Where(m => m.ReceiverType != type).GroupBy(m => m.ReceiverType).OrderBy(g => g.Key, StringComparer.Ordinal))
+                {
+                    sb.Append($"\n## Methods from {group.Key}\n\n");
+                    foreach (CallableInfo m in group)
+                        sb.Append($"- [`{m.Labels.First()}`]({UriOf(DocsSite.TypeSlug(group.Key))}#{DocsSite.MethodAnchor(m)}){(m.Deprecated != null ? " (deprecated)" : string.Empty)}\n");
+                }
                 return sb.ToString();
             }
             string package = Catalog.Packages.Keys.FirstOrDefault(p => PackagePath(p) == path);
@@ -152,7 +158,7 @@ namespace KScript.Docs.Mcp
                 sb.Append($"- [{p.Key}]({UriOf(PackagePath(p.Key))}): {p.Value}\n");
             sb.Append("\n## Methods by type\n\n");
             foreach (string type in Catalog.MemberTypes.OrderBy(t => t, StringComparer.Ordinal))
-                sb.Append($"- [{type}]({UriOf("/reference/methods/" + type)}): {Catalog.FieldsOf(type).Count} fields, {Catalog.Methods.Count(m => !m.Planned && m.ReceiverType == type)} methods\n");
+                sb.Append($"- [{type}]({UriOf("/reference/methods/" + type)}): {Catalog.FieldsOf(type).Count} fields, {Site.ReferenceMethods(type).Count()} methods\n");
             sb.Append($"\n`{ImportLine("KScript.IO", format)}` imports a package; KScript.Core is always there.\n");
             return sb.ToString();
         }

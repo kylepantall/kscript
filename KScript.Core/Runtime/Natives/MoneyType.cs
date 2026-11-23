@@ -68,8 +68,8 @@ namespace KScript.Runtime
 
         protected override void DeclareListMembers(NativeListMembers l)
         {
-            l.Method("total", "", "The amounts added, in one currency: ['GBP 9.50', 'GBP 0.50'] gives GBP 10.00.", "money", (items, c) =>
-                items.Skip(1).Aggregate(items[0], (sum, x) => Of(Amount(sum) + Amount(Same(sum, x, "add")), sum)),
+            l.Method("total", "", "The amounts added, in one currency: ['GBP 9.50', 'GBP 0.50'] gives GBP 10.00. An empty list gives null.", "money", (items, c) =>
+                items.Skip(1).Aggregate(items.FirstOrDefault(), (sum, x) => Of(Amount(sum) + Amount(Same(sum, x, "add")), sum)),
                 "<let name=\"x\" type=\"money[]\" value=\"['GBP 9.50', 'GBP 0.50']\" />\n<echo>{ $x->total() }</echo>");
         }
 

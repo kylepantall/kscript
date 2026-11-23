@@ -230,6 +230,27 @@ public class HttpAppTests
     }
 
     [Fact]
+    public async Task PageAndMatchedRouteRequestsSupplyTheirDeclaredFields()
+    {
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext().Request;
+        http.Method = "GET";
+        http.Scheme = "https";
+        http.Path = "/whoami";
+        http.QueryString = new Microsoft.AspNetCore.Http.QueryString("?page=2");
+        var request = await PageServer.BuildRequestAsync(http);
+        Assert.Equal(RequestFields.Common.Select(f => f.Name).Order(), request.Keys.Order());
+        Assert.Equal("/whoami?page=2", request["url"]);
+        Assert.Equal("https", request["scheme"]);
+
+        using var site = Site(Routes);
+        Assert.Equal(200, App(site).Handle(request).Status);
+        Assert.All(RouteRequestFields.Matched, f => Assert.Contains(f.Name, request.Keys));
+        Assert.Equal("whoami", request["route"]);
+        Assert.Equal("2", ((Dictionary<string, object>)request["input"])["page"]);
+        Assert.Null(request["json"]);
+    }
+
+    [Fact]
     public void InlineRoutesRedirectsAndMethods()
     {
         using var site = Site(Routes);

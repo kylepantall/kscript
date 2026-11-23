@@ -255,6 +255,8 @@ echo 'hello'->is_a(string)                   // true
 | `semver` | `releases`, `prereleases`, `release_candidates`, `betas`, `alphas` | `->latest()` |
 | `money` | | `->total()` |
 
+An explicitly typed empty list keeps its element type. Filtering also keeps the type when every item is removed. For example, `$mixed->only(semver)->only(releases)` returns `[]` when no versions match. On an empty `semver[]`, `->latest()` returns `null`. On an empty `money[]`, `->total()` returns `null` because there is no currency to sum.
+
 A list of a native type can be written without quotes too, as above: `[1.0.0, 1.1.0-rc.1]`.
 
 ## Values without quotes

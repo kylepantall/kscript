@@ -93,15 +93,28 @@ namespace KScript.Language.Catalog
         /// <summary>Methods with this name, best match for the receiver type first.</summary>
         public IEnumerable<CallableInfo> GetMethods(string name, string receiverType = KType.Any) =>
             methods.Where(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
-                   .OrderBy(m => m.ReceiverType == receiverType ? 0 : KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType) ? 1 : 2);
+                   .OrderBy(m => MethodRank(m, receiverType));
 
         /// <summary>Every type some method is for, such as date, list or response.</summary>
         public IEnumerable<string> MethodReceivers => methods.Select(m => m.ReceiverType).Distinct(StringComparer.Ordinal);
 
+        /// <summary>Applicable methods, once per name. A native list (such as semver[]) also has every list method.</summary>
         public IEnumerable<CallableInfo> MethodsFor(string receiverType) =>
-            methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiverType))
-                   .GroupBy(m => m.Name, StringComparer.OrdinalIgnoreCase)
-                   .Select(g => g.OrderBy(m => m.ReceiverType == receiverType ? 0 : 1).First());
+            methods.Select(m => (Method: m, Rank: MethodRank(m, receiverType)))
+                   .Where(match => match.Rank < NoMatch)
+                   .GroupBy(match => match.Method.Name, StringComparer.OrdinalIgnoreCase)
+                   .Select(group => group.MinBy(match => match.Rank).Method);
+
+        private const int NoMatch = 3;
+
+        // Follow runtime dispatch: the receiver itself, an applicable list/string/number method, then any.
+        private static int MethodRank(CallableInfo method, string receiverType)
+        {
+            if (method.ReceiverType == receiverType) return 0;
+            if (method.ReceiverType == KType.List && receiverType?.EndsWith("[]", StringComparison.Ordinal) == true) return 1;
+            if (!KType.AcceptsMethod(method.ReceiverType, method.Name, receiverType)) return NoMatch;
+            return method.ReceiverType == KType.Any ? 2 : 1;
+        }
 
         /// <summary>Variables that exist without being declared, such as <c>$args</c> or <c>$request</c> in pages.</summary>
         public IReadOnlyDictionary<string, (string Type, string Description)> BuiltInVariables => builtInVariables;
@@ -276,20 +289,6 @@ namespace KScript.Language.Catalog
         {
             builtInVariables.TryAdd("event", (KType.Map, "The DOM event inside <on>: value, key, target."));
 
-            foreach ((string name, string type, string description) in new[]
-            {
-                ("method", KType.String, "GET, POST..."),
-                ("path", KType.String, "The path, such as /people."),
-                ("query", KType.Map, "Query string values: $request.query.page."),
-                ("form", KType.Map, "Posted form fields: $request.form.email."),
-                ("headers", KType.Map, "Request headers."),
-                ("cookies", KType.Map, "Cookies."),
-                ("params", KType.Map, "Route parameters from [name].html files: $request.params.id."),
-                ("body", KType.String, "The raw body: $request.body->json()."),
-            })
-            {
-                AddField(new ValueFieldInfo(KType.Request, name, type, description));
-            }
             foreach ((string name, string type, string description) in new[]
             {
                 ("type", KType.String, "The error type, such as FileNotFound."),
