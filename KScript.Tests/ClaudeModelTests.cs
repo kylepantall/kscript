@@ -69,6 +69,7 @@ public sealed class ClaudeModelTests : IDisposable
         Assert.StartsWith("/v1/messages", path);
         Assert.Contains("server-side-fallback-2026-07-01", headers["anthropic-beta"]);
         Assert.Equal("test-key", headers["x-api-key"]);
+        Assert.Equal("kscript", headers["User-Agent"]);
         Assert.Equal(ClaudeModel.ApiVersion, headers["anthropic-version"]);
         JsonElement sent = Sent(0);
         Assert.Equal("claude-opus-5-5", sent.GetProperty("model").GetString());

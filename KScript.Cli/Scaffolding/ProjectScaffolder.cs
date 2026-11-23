@@ -114,6 +114,14 @@ namespace KScript.Scaffolding
             }
 
             var rendered = template.Render(values);
+            var kits = ProjectTemplate.RenderLines(template.Makes, values).Select(line => line.Trim()).ToList();
+            if (kits.RemoveAll(kit => string.Equals(kit, "docker", StringComparison.OrdinalIgnoreCase)) > 0)
+            {
+                var project = rendered.TryGetValue("kscript.json", out string config)
+                    ? ProjectConfig.Parse(config, Path.Combine(dir, "kscript.json")) : null;
+                foreach (var (path, content) in DockerMaker.Render(project))
+                    if (!rendered.TryAdd(path, content)) throw new StubException($"The project template already makes the Docker kit's {path}.");
+            }
 
             if (!force)
             {
@@ -142,10 +150,10 @@ namespace KScript.Scaffolding
                 notes.Add("Note: " + line.Trim());
 
             // Kits the template asks for ("make": ["{{#if auth}}auth{{/if}}"]), made in the new project.
-            foreach (string kit in ProjectTemplate.RenderLines(template.Makes, values).Select(k => k.Trim()))
+            foreach (string kit in kits)
             {
                 if (!string.Equals(kit, "auth", StringComparison.OrdinalIgnoreCase))
-                    throw new StubException($"The project template asks for 'make: {kit}', but only auth can be made with a project.");
+                    throw new StubException($"The project template asks for 'make: {kit}', but only auth and docker can be made with a project.");
                 if (dryRun)
                 {
                     notes.Add("Note: --dry-run leaves out the sign-in files (kscript make auth), which are made once the project is.");

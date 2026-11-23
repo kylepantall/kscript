@@ -224,8 +224,10 @@ namespace KScript.Http
         /// </summary>
         public async Task<PageResult> HandleAsync(HttpRequest request)
         {
-            if (!HasRoutes) return null;
             string path = request.Path.Value ?? "/";
+            if (path.StartsWith(PasskeyEndpoints.Prefix, StringComparison.Ordinal))
+                return await PasskeyEndpoints.HandleAsync(this, request);
+            if (!HasRoutes) return null;
             if (path.StartsWith("/_ks/", StringComparison.Ordinal)) return null;
 
             RouteTable table;
@@ -240,12 +242,50 @@ namespace KScript.Http
 
             if (Settings.OpenApi.Enabled && OpenApiPage(path, table) is PageResult docs) return docs;
 
-            if (table.Match(request.Method, path) == null && !IsApiPath(path)) return null;
+            bool live = PageServer.IsLiveRequest(request);
+            if (table.Match(live ? "GET" : request.Method, path) == null && !IsApiPath(path)) return null;
 
-            Dictionary<string, object> map = await PageServer.BuildRequestAsync(request);
+            var (map, error) = await PageServer.ReadPageRequestAsync(request, live);
+            if (error != null) return error;
             map["ip"] = request.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-            map["url"] = request.Path.Value + request.QueryString.Value;
             return Handle(map);
+        }
+
+        internal PageResult RenderFilePage(PageRoute route, Dictionary<string, object> request)
+        {
+            var ctx = new RequestContext(this, request);
+            try
+            {
+                return RestoreLiveRequest(ctx) ?? PageRenderer.RenderFile(ctx.Page, route.File, route.Params);
+            }
+            catch (LiveExpiredException ex)
+            {
+                return Expired(ex);
+            }
+        }
+
+        private static PageResult Expired(LiveExpiredException ex) =>
+            new PageResult { Status = 409, Body = ex.Message, ContentType = "text/plain; charset=utf-8" };
+
+        private static PageResult RestoreLiveRequest(RequestContext ctx)
+        {
+            var request = ctx.Request;
+            if (Values.ToStr(request["method"]) != "POST" || BuiltInMiddleware.Header(request, "x-kscript-live") is not string proof)
+                return null;
+            if (ctx.Auth.SessionId == null) throw new LiveExpiredException();
+            PageLive.Verify(proof, ctx.LiveProofScope);
+            string type = BuiltInMiddleware.Header(request, "content-type");
+            if (!string.Equals(type?.Split(';')[0].Trim(), "application/json", StringComparison.OrdinalIgnoreCase))
+                return new PageResult { Status = 415 };
+            string body = Values.ToStr(request["body"]);
+            if (Encoding.UTF8.GetByteCount(body) > PageServer.MaxLiveBodyBytes) return new PageResult { Status = 413 };
+            try { ctx.Live = PageLive.ParseRequest(body, routed: true).Event; }
+            catch (PageException) { return new PageResult { Status = 400 }; }
+            // Render the original GET again. Event payloads reach only the signed component.
+            request["method"] = "GET";
+            request["body"] = string.Empty;
+            request["form"] = new Dictionary<string, object>();
+            return null;
         }
 
         /// <summary>
@@ -255,6 +295,8 @@ namespace KScript.Http
         public PageResult Handle(Dictionary<string, object> request)
         {
             Complete(request);
+            if (Values.ToStr(request["path"]).StartsWith(PasskeyEndpoints.Prefix, StringComparison.Ordinal))
+                return PasskeyEndpoints.Handle(this, request);
             PageResult result = null;
             OnBigStack(() => result = HandleHere(request));
             // The session (KScript.Auth) is saved once the request is answered, and its cookie sent.
@@ -285,6 +327,8 @@ namespace KScript.Http
             string path = Values.ToStr(request["path"]);
             try
             {
+                if (RestoreLiveRequest(ctx) is PageResult error) return error;
+                method = (string)request["method"];
                 Interpreter interpreter = NewInterpreter(ctx);
                 RunRouteFiles(ctx, interpreter);
 
@@ -329,6 +373,10 @@ namespace KScript.Http
             catch (HttpAbortSignal abort)
             {
                 return ToPage(abort.Response, method);
+            }
+            catch (LiveExpiredException ex)
+            {
+                return Expired(ex);
             }
             catch (KScriptException ex) when (ErrorTypes.StatusOf(ex) is int status)
             {

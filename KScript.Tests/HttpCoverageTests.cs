@@ -9,6 +9,38 @@ namespace KScript.Tests;
 /// <summary>The less common paths through KScript.Http: odd controllers, response methods, mistakes and the server.</summary>
 public class HttpCoverageTests
 {
+    [Fact]
+    public void RelocatedAuthStoresAndConfiguredSqliteFilesStayPrivate()
+    {
+        using var files = new TempSite(("kscript.json", """{"name":"example","config":{"root":"config"}}"""),
+            ("config/config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:files/records.bin\n    archive:\n      driver: sqlite3\n      file: files/archive.bin"),
+            ("volume/public.txt", "asset"));
+        string previousData = Environment.GetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT");
+        string previousStorage = Environment.GetEnvironmentVariable(AppFolders.RootVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT", Path.Combine(files.Root, "volume"));
+            Environment.SetEnvironmentVariable(AppFolders.RootVariable, Path.Combine(files.Root, "apps"));
+            var site = new PageSite(files.Root);
+            HttpServer.ProtectStorage(site, files.Root, new AuthSettings { Folder = "accounts" });
+            HttpServer.ProtectStorage(site, files.Root, new AuthSettings());
+            foreach (string path in new[] { "accounts/users/user.json", "volume/accounts/sessions/session.json",
+                "apps/example/data/auth/users/user.json", "apps/example/state/auth/tokens/token.json",
+                "volume/data/app.sqlite", "volume/files/records.bin", "volume/files/records.bin-wal",
+                "files/records.bin", "volume/files/archive.bin-shm" })
+            {
+                files.Write(path, "private");
+                Assert.Equal(PageRoute.RouteKind.NotFound, site.Resolve("/" + path).Kind);
+            }
+            Assert.Equal(PageRoute.RouteKind.Static, site.Resolve("/volume/public.txt").Kind);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT", previousData);
+            Environment.SetEnvironmentVariable(AppFolders.RootVariable, previousStorage);
+        }
+    }
+
     private static HttpApp App(TempSite site, string kscriptJson = null, StringWriter log = null)
     {
         ProjectConfig project = kscriptJson == null ? null : ProjectConfig.Parse(kscriptJson, Path.Combine(site.Root, "kscript.json"));

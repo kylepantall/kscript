@@ -118,6 +118,20 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void PatternLiteralsAreTableNamesButCannotStandInForAModel()
+        {
+            const string declarations = "import KScript.Data\ntype TableName with [string] { pattern: /^table_[a-z]+$/ }\n";
+            TestHelpers.AssertClean(Code(declarations + "echo $db->has_table(table_users)\necho $db->has_table(name: table_users)"));
+            foreach (string argument in new[] { "table_users", "model: table_users" })
+            {
+                DocumentAnalysis a = Code(declarations + $"echo $db->create_table({argument})");
+                Diagnostic diagnostic = Assert.Single(a.Diagnostics);
+                Assert.Equal(DiagnosticCodes.TypeMismatch, diagnostic.Code);
+                Assert.Contains("needs a model", diagnostic.Message);
+            }
+        }
+
+        [Fact]
         public void TableMethodsReportPlainTypesAndDeclaredWrongVariables()
         {
             DocumentAnalysis a = Code("""

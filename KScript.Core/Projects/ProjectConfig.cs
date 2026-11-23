@@ -409,9 +409,18 @@ namespace KScript.Projects
         /// <summary>Seconds a password reset token works for.</summary>
         public double ResetLifetime { get; set; } = 60 * 60;
 
+        /// <summary>The public origin allowed to register and use passkeys. Null disables passkeys.</summary>
+        public string PasskeyOrigin { get; set; }
+
+        /// <summary>Enables creation of new accounts using a passkey as their first credential.</summary>
+        public bool PasskeySignup { get; set; }
+
+        /// <summary>The relying party domain. Null uses the origin's host.</summary>
+        public string PasskeyRpId { get; set; }
+
         public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
 
-        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime");
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime", "passkey_origin", "passkey_rp_id", "passkey_signup");
     }
 
     public sealed class ProjectConfig
@@ -1255,6 +1264,7 @@ namespace KScript.Projects
                     case "auth":
                         if (!Object(p.Value, "http.auth", config)) break;
                         foreach (var a in p.Value.EnumerateObject()) ReadAuth(a, http, config);
+                        CheckPasskeySettings(http.Auth, config);
                         break;
                     case "throttle":
                         if (!Object(p.Value, "http.throttle", config)) break;
@@ -1313,6 +1323,35 @@ namespace KScript.Projects
             }
         }
 
+        private static void CheckPasskeySettings(AuthSettings auth, ProjectConfig config)
+        {
+            if (auth.PasskeyOrigin == null)
+            {
+                if (auth.PasskeyRpId != null) config.Warnings.Add("http.auth.passkey_rp_id needs http.auth.passkey_origin.");
+                return;
+            }
+            if (!Uri.TryCreate(auth.PasskeyOrigin, UriKind.Absolute, out var origin) ||
+                !(origin.Scheme == "https" || (origin.Scheme == "http" && origin.Host == "localhost")) ||
+                origin.UserInfo.Length > 0 || origin.HostNameType != UriHostNameType.Dns ||
+                origin.AbsolutePath != "/" || origin.Query.Length > 0 || origin.Fragment.Length > 0)
+            {
+                config.Warnings.Add("http.auth.passkey_origin must be an HTTPS origin such as https://accounts.example.com, or http://localhost with an optional port.");
+                auth.PasskeyOrigin = null;
+                return;
+            }
+            auth.PasskeyOrigin = origin.GetLeftPart(UriPartial.Authority);
+            if (auth.PasskeyRpId == null) return;
+            string rp = auth.PasskeyRpId.ToLowerInvariant();
+            if (Uri.CheckHostName(rp) != UriHostNameType.Dns ||
+                !(origin.Host == rp || (rp.Contains('.') && origin.Host.EndsWith("." + rp, StringComparison.Ordinal))))
+            {
+                config.Warnings.Add("http.auth.passkey_rp_id must be the origin's domain or a parent domain.");
+                auth.PasskeyOrigin = null;
+                return;
+            }
+            auth.PasskeyRpId = rp;
+        }
+
         private static void ReadAuth(JsonProperty a, HttpSettings http, ProjectConfig config)
         {
             AuthSettings auth = http.Auth;
@@ -1324,6 +1363,9 @@ namespace KScript.Projects
                 case "home": auth.Home = String(a.Value, name, config) ?? auth.Home; break;
                 case "folder": auth.Folder = String(a.Value, name, config) ?? auth.Folder; break;
                 case "users": auth.Users = String(a.Value, name, config) ?? auth.Users; break;
+                case "passkey_origin": auth.PasskeyOrigin = String(a.Value, name, config); break;
+                case "passkey_signup": auth.PasskeySignup = Bool(a.Value, name, config) ?? false; break;
+                case "passkey_rp_id": auth.PasskeyRpId = String(a.Value, name, config); break;
                 case "cookie": auth.Cookie = String(a.Value, name, config) ?? auth.Cookie; break;
                 case "secure": auth.Secure = Bool(a.Value, name, config) ?? auth.Secure; break;
                 case "csrf": auth.Csrf = Bool(a.Value, name, config) ?? auth.Csrf; break;

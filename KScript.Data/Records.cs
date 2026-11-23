@@ -71,7 +71,7 @@ namespace KScript.Data
         }
 
         /// <summary>Works out the computed fields (<c>label => $first + ' ' + $last</c>) from the stored ones.</summary>
-        private static void Compute(CallContext call, Record record)
+        internal static void Compute(CallContext call, Record record)
         {
             foreach (FieldDefinition f in record.Type.Fields.Where(f => f.Computed))
             {

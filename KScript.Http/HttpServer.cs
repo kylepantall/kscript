@@ -20,8 +20,12 @@ namespace KScript.Http
             var site = new PageSite(siteFolder);
             var app = new HttpApp(site.Root, project, log);
             if (app.ViewsFolder is string views) site.HiddenFolders.Add(views.Split('/', '\\')[0]);
+            string projectRoot = project?.FilePath == null ? site.Root : Path.GetDirectoryName(Path.GetFullPath(project.FilePath));
+            ProtectStorage(site, projectRoot, app.Settings.Auth);
+            site.RenderPage = app.RenderFilePage;
             if (app.HasRoutes)
             {
+                site.IsRoutedPath = path => app.Table().Match("GET", path) != null || app.IsApiPath(path);
                 try
                 {
                     RouteTable table = app.Table();
@@ -37,12 +41,38 @@ namespace KScript.Http
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, "The routes have an error; requests get an error page until it is fixed.", ex);
                 }
             }
-            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> routes = app.HasRoutes ? app.HandleAsync : null;
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> routes = app.HasRoutes || app.Settings.Auth.PasskeyOrigin != null ? app.HandleAsync : null;
             Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> handler = before == null ? routes : async request =>
                 await before(request) ?? (routes == null ? null : await routes(request));
             LocalApi.Install();
             LocalApi.Serve(app);
             return RunAndForget(app, PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started));
+        }
+
+        internal static void ProtectStorage(PageSite site, string projectRoot, AuthSettings settings)
+        {
+            string Relative(string path) => Path.GetRelativePath(site.Root, path).Replace('\\', '/');
+            foreach (string file in Data.DataPackage.LocalDatabaseFiles(projectRoot))
+                foreach (string suffix in new[] { "", "-journal", "-wal", "-shm" })
+                    site.HiddenFiles.Add(Relative(file) + suffix);
+
+            void HideAuthStores(string data, string state)
+            {
+                foreach (var (folder, store) in new[] { (data, "users"), (data, "_passkeys"), (state, "sessions"), (state, "tokens"), (state, "resets") })
+                {
+                    string path = Path.Combine(folder, store);
+                    string inside = Path.GetRelativePath(path, site.Root).Replace('\\', '/');
+                    site.HiddenFolders.Add(!Path.IsPathRooted(inside) && inside != ".." && !inside.StartsWith("../", StringComparison.Ordinal)
+                        ? "." : Relative(path));
+                }
+            }
+            var actual = Auth.AuthApp.StorageFolders(projectRoot, AppFolders.AppNameFor(projectRoot, null), settings);
+            HideAuthStores(actual.Data, actual.State);
+            if (settings.Folder is string configured)
+            {
+                string previous = Path.GetFullPath(configured, projectRoot);
+                HideAuthStores(previous, previous);
+            }
         }
 
         private static async Task<int> RunAndForget(HttpApp app, Task<int> server)

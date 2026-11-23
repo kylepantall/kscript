@@ -55,6 +55,7 @@ namespace KScript.Language.Analysis
             analyzer.ReportDeferred();
             analyzer.CheckSpellings();
             analyzer.CheckNamingStyle();
+            analyzer.CheckDuplicateLiteralPatterns();
             analyzer.CheckUnused(projectWide);
             analyzer.SpeakCode();
             return analyzer.result;
@@ -1513,8 +1514,8 @@ namespace KScript.Language.Analysis
                     {
                         filledTexts.Add(assign.Name);
                     }
-                    TypeShape shape = Infer(assign.Value, region);
                     AnalyzeExpr(assign.Value, region, scope, ExprContext.Value);
+                    TypeShape shape = Infer(assign.Value, region);
                     AnalyzeAssignmentTarget(assign, region, scope);
                     TextSpan nameSpan = NameSpanOf(assign, region);
                     int after = region.Source.ToSource(assign.Span.End);

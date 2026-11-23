@@ -45,6 +45,13 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void IndentsContinuedCastsAndCompletesAnOptionalCastAtTheLineEnd()
+        {
+            string input = Lines("a = $v as", "int", "b = $v", "as int?", "as = 1", "@next()");
+            Assert.Equal(Lines("a = $v as", "  int", "b = $v", "  as int?", "as = 1", "@next()"), Fmt(input));
+        }
+
+        [Fact]
         public void IndentsBlocksByNesting()
         {
             string input = "x = 1\nif $x > 0 {\n      for i in 1..3 {\necho $i\n}\n}\n";

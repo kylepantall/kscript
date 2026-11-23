@@ -24,6 +24,9 @@ namespace KScript.Runtime
         /// <summary>Written after a named argument, so it can only be a flag.</summary>
         public bool AfterNamed { get; }
 
+        /// <summary>Only a plain identifier token may be inferred as a project pattern literal.</summary>
+        internal bool IsIdentifier { get; init; }
+
         public string Source => (Negated ? "not " : string.Empty) + Name;
 
         public override string ToString() => Source;
@@ -70,6 +73,8 @@ namespace KScript.Runtime
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
+            internal string RawItemText { get; init; }
+
             /// <summary>A list of an enum (<c>sizes: Size[]</c>), whose items can be written bare.</summary>
             public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
@@ -88,17 +93,21 @@ namespace KScript.Runtime
             if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0))) return call;
 
             KScriptException first = null;
-            foreach (Signature signature in Ordered(info, call))
+            // Give every overload its ordinary flag, enum and field-name meanings before trying inferred literals.
+            for (int attempt = info.Signatures.Count == 1 ? 1 : 0; attempt <= 1; attempt++)
             {
-                List<Slot> slots = signature.Parameters.Select(Slot.From).ToList();
-                if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error, info.KeepsBareWords))
+                foreach (Signature signature in Ordered(info, call))
                 {
-                    return new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
+                    List<Slot> slots = signature.Parameters.Select(Slot.From).ToList();
+                    if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error, info.KeepsBareWords, infer: attempt == 1))
                     {
-                        ParameterNames = signature.Parameters.Select(p => p.Name).ToList(),
-                    };
+                        return new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
+                        {
+                            ParameterNames = signature.Parameters.Select(p => p.Name).ToList(),
+                        };
+                    }
+                    first ??= error;
                 }
-                first ??= error;
             }
             throw first;
         }
@@ -122,18 +131,24 @@ namespace KScript.Runtime
             BindByName(call, parameters.Select(p => new Slot(p, false)).ToList(), out given, lenient);
 
         /// <summary>
-        /// For calls with no parameter list to bind to (methods of package objects): a bare word there has nothing
-        /// to mean, so it is an error.
+        /// For calls with no parameter list to bind to, bare words can only be pattern literals.
         /// </summary>
         public static CallContext Plain(CallContext call)
         {
-            BareWord bare = call.Args.OfType<BareWord>().FirstOrDefault() ?? call.Named.Values.OfType<BareWord>().FirstOrDefault()
-                ?? call.Args.Concat(call.Named.Values).Select(a => a is LatePositional l ? l.Value : a).OfType<BareList>().Select(l => l.FirstWord).FirstOrDefault();
-            if (bare != null) throw NotAValue(call, bare, null);
-            if (!call.Args.Any(a => a is LatePositional)) return call;
-            return new CallContext(call.Interpreter, call.Name, call.Args.Select(a => a is LatePositional l ? l.Value : a).ToList(), call.Named,
-                call.Scope, call.Module, call.IsMethod, call.Skipped);
+            if (!call.Args.Concat(call.Named.Values).Any(a => a is BareWord or BareList or LatePositional)) return call;
+            object Value(object a) => a switch
+            {
+                BareWord word => Infer(word, call)?.Convert(call.Interpreter) ?? throw NotAValue(call, word, null),
+                BareList list => list.Items.Select(Value).ToList(),
+                LatePositional late => Value(late.Value),
+                _ => a
+            };
+            return new CallContext(call.Interpreter, call.Name, call.Args.Select(Value).ToList(),
+                call.Named.ToDictionary(p => p.Key, p => Value(p.Value)), call.Scope, call.Module, call.IsMethod, call.Skipped);
         }
+
+        private static PatternLiteral Infer(BareWord word, CallContext call) =>
+            word.IsIdentifier ? Interpreter.InferredLiteral(word.Name, call.Scope, call.Module) : null;
 
         private static IEnumerable<Signature> Ordered(CallableInfo info, CallContext call)
         {
@@ -143,7 +158,7 @@ namespace KScript.Runtime
         }
 
         private static bool TryResolve(CallContext call, List<Slot> slots, bool lenient, out object[] args, out HashSet<int> skipped,
-            out Dictionary<string, object> rest, out KScriptException error, bool keepBare = false)
+            out Dictionary<string, object> rest, out KScriptException error, bool keepBare = false, bool infer = true)
         {
             args = null;
             skipped = new HashSet<int>();
@@ -152,6 +167,13 @@ namespace KScript.Runtime
 
             int Index(string name) => slots.FindIndex(s => !s.Variadic && s.Name == name);
             bool variadic = slots.Any(s => s.Variadic);
+            bool hasPatterns = false;
+            PatternLiteral PatternValue(BareWord word, Slot slot)
+            {
+                if (!infer || slot?.IsEnum == true || Infer(word, call) is not PatternLiteral match) return null;
+                hasPatterns = true;
+                return match;
+            }
             var positional = new List<object>();
             var named = new List<KeyValuePair<string, object>>();
             var flags = new HashSet<string>(StringComparer.Ordinal);
@@ -186,6 +208,10 @@ namespace KScript.Runtime
                     named.Add(new KeyValuePair<string, object>(bare.Name, !bare.Negated));
                     flags.Add(bare.Name);
                 }
+                else if (PatternValue(bare, slot) is PatternLiteral match)
+                {
+                    positional.Add(match);
+                }
                 else
                 {
                     error = NotAValue(call, bare, slot, slots);
@@ -199,12 +225,14 @@ namespace KScript.Runtime
                 if (value is BareWord bare)
                 {
                     int index = Index(pair.Key);
-                    string resolved = index >= 0 && !bare.Negated ? EnumValue(slots[index], bare.Name) : null;
+                    Slot slot = index >= 0 ? slots[index] : null;
+                    object resolved = !bare.Negated ? EnumValue(slot, bare.Name) : null;
                     if (resolved == null && keepBare && (index < 0 ? variadic : slots[index].Values == null || slots[index].Values.Count == 0))
                     {
                         named.Add(new KeyValuePair<string, object>(pair.Key, bare));
                         continue;
                     }
+                    resolved ??= PatternValue(bare, slot);
                     if (resolved == null)
                     {
                         error = NotAValue(call, bare, index >= 0 ? slots[index] : null, slots);
@@ -273,6 +301,7 @@ namespace KScript.Runtime
                 if (a is BareWord bare2)
                 {
                     value = !bare2.Negated ? EnumValue(target, bare2.Name) : null;
+                    value ??= PatternValue(bare2, target);
                     if (value == null)
                     {
                         error = NotAValue(call, bare2, target, slots);
@@ -289,17 +318,11 @@ namespace KScript.Runtime
                 skipped.Remove(free);
             }
 
-            // [large, small]: bare words are values of a list-of-enum parameter, and nothing anywhere else.
-            for (int i = 0; i < bound.Count; i++)
+            // A list's declared item type takes priority over pattern inference.
+            List<object> BindList(BareList list, Slot slot, out KScriptException problem)
             {
-                if (!(bound[i] is BareList list)) continue;
-                Slot slot = i < slots.Count ? slots[i] : slots.LastOrDefault(s => s.Variadic);
-                if (keepBare && slot?.IsEnumList != true)
-                {
-                    // The call reads the words itself: [id, name] are columns.
-                    bound[i] = list.Items.ToList();
-                    continue;
-                }
+                problem = null;
+                if (keepBare && slot?.IsEnumList != true) return list.Items.ToList();
                 var items = new List<object>(list.Items.Count);
                 foreach (object item in list.Items)
                 {
@@ -308,29 +331,35 @@ namespace KScript.Runtime
                         items.Add(item);
                         continue;
                     }
-                    string value = slot?.IsEnumList == true && !word.Negated
-                        ? slot.ItemValues.FirstOrDefault(v => string.Equals(v, word.Name.Trim(), StringComparison.OrdinalIgnoreCase))
-                        : null;
+                    object value;
+                    if (slot?.IsEnumList == true)
+                        value = word.Negated ? null : slot.ItemValues.FirstOrDefault(v => string.Equals(v, word.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+                    else if (slot?.RawItemText != null && !word.Negated && (slot.RawItemText == "handle" || !word.Name.StartsWith('@')))
+                        value = word.Name;
+                    else
+                        value = PatternValue(word, null);
                     if (value == null)
                     {
-                        error = slot?.IsEnumList == true
+                        problem = slot?.IsEnumList == true
                             ? new KScriptException($"'{word.Name}' isn't a {slot.TypeName}." + Hint(word.Name, slot.ItemValues) + $" Use {Or(slot.ItemValues)}.", "Argument")
                             : NotAValue(call, word, null);
-                        return false;
+                        return null;
                     }
                     items.Add(value);
                 }
-                bound[i] = items;
+                return items;
+            }
+            for (int i = 0; i < bound.Count; i++)
+            {
+                if (!(bound[i] is BareList list)) continue;
+                Slot slot = i < slots.Count ? slots[i] : slots.LastOrDefault(s => s.Variadic);
+                bound[i] = BindList(list, slot, out error);
+                if (error != null) return false;
             }
             foreach (string key in rest.Where(r => r.Value is BareList).Select(r => r.Key).ToList())
             {
-                if (keepBare)
-                {
-                    rest[key] = ((BareList)rest[key]).Items.ToList();
-                    continue;
-                }
-                error = NotAValue(call, ((BareList)rest[key]).FirstWord, null);
-                return false;
+                rest[key] = BindList((BareList)rest[key], null, out error);
+                if (error != null) return false;
             }
 
             for (int i = 0; i < slots.Count; i++)
@@ -350,7 +379,17 @@ namespace KScript.Runtime
                 if (has && slot.IsEnum && bound[i] is string text2) bound[i] = EnumValue(slot, text2);
             }
 
-            args = bound.ToArray();
+            // Conversion may execute user normalization and validation. Run it once, after this signature succeeds.
+            object Convert(object value)
+            {
+                if (value is PatternLiteral word) return word.Convert(call.Interpreter);
+                if (value is List<object> list && list.Any(item => item is PatternLiteral))
+                    return list.Select(item => item is PatternLiteral w ? w.Convert(call.Interpreter) : item).ToList();
+                return value;
+            }
+            args = hasPatterns ? bound.Select(Convert).ToArray() : bound.ToArray();
+            if (hasPatterns)
+                foreach (string key in rest.Keys.ToList()) rest[key] = Convert(rest[key]);
             return true;
         }
 

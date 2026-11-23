@@ -110,3 +110,9 @@ test('doc comments colour their tags and the parameters they name', async () => 
   const plain = tokens.filter((t) => t.text.includes('@param plain'));
   assert.ok(plain.length === 1 && /comment\.block\.kscript/.test(plain[0].scopes), 'a plain comment has no tags');
 });
+
+test('casts highlight the target in XML expressions', async () => {
+  const tokens = tokenize(await load(), '<kscript><let name="items" value="$raw as Product[]"/></kscript>');
+  assert.match(scopeOf(tokens, 'as'), /keyword\.operator\.word\.kscript/);
+  assert.match(scopeOf(tokens, 'Product'), /entity\.name\.type\.kscript/);
+});

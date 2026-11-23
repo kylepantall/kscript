@@ -100,7 +100,10 @@ namespace KScript.Language.Features
             SymbolReference reference = analysis.ReferenceAt(offset);
             if (reference != null)
             {
-                return new HoverResult(SymbolMarkdown(analysis, reference.Symbol), reference.Span);
+                string markdown = reference.IsPatternLiteral
+                    ? $"```kscript\n{analysis.Source[reference.Span]}: {reference.Symbol.Name}\n```"
+                    : SymbolMarkdown(analysis, reference.Symbol);
+                return new HoverResult(markdown, reference.Span);
             }
 
             if (cursor.Region != null && cursor.InCode)
@@ -126,6 +129,12 @@ namespace KScript.Language.Features
             ExprNode node = NodeAt(region, index);
             switch (node)
             {
+                case CastNode cast when cast.OperatorSpan.Contains(index):
+                    return new HoverResult("**as**\n\nConverts the value to the named type and checks its rules.", region.Source.ToSource(cast.OperatorSpan));
+
+                case CastNode cast when cast.TypeSpan.Contains(index) && InferAt(analysis, region, cast).Type != KType.Any:
+                    return new HoverResult($"`{cast.TypeName}`", region.Source.ToSource(cast.TypeSpan));
+
                 case CommandCallNode c when c.NameSpan.Contains(index):
                 {
                     CallableInfo command = Catalog.GetCommand(c.Name) ?? PackageAliasCommand(analysis, region, c.Name);

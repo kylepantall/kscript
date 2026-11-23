@@ -112,6 +112,14 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void CastsContinueOnEitherSideOfAsAndKeepTheNextStatementSeparate()
+        {
+            var root = Root("a = $value as /* type */\n  int\nb = $value\n  as\tint\nas = 1\nc = as\n@next()\nd = $value as int?\n@next()");
+            Assert.Equal(new[] { "a = $value as /* type */\n  int", "b = $value\n  as\tint", "as = 1", "c = as",
+                "@next()", "d = $value as int?", "@next()" }, root.ChildElements.Select(e => e.SingleText.Value));
+        }
+
+        [Fact]
         public void HeaderBraceOpensTheBlockButBracketsInsideDoNot()
         {
             MarkupElement root = Root("if $m->has({ a: 1 }->keys()[0]) { echo \"yes\" }");

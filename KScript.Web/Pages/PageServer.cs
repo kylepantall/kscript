@@ -73,10 +73,19 @@ namespace KScript.Pages
         }
 
         /// <summary>
-        /// Top-level folders that are never served, such as the views folder of KScript.Http (views are only
+        /// Site-relative folders that are never served, such as the views folder of KScript.Http (views are only
         /// rendered by controllers, with their data).
         /// </summary>
         public HashSet<string> HiddenFolders { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Site-relative private files, including the project's default database.</summary>
+        public HashSet<string> HiddenFiles { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Whether KScript.Http handles this URL itself, including its middleware.</summary>
+        public Func<string, bool> IsRoutedPath { get; set; }
+
+        /// <summary>Renders file pages in the host's request and session context.</summary>
+        public Func<PageRoute, Dictionary<string, object>, PageResult> RenderPage { get; set; }
 
         public PageRoute Resolve(string urlPath)
         {
@@ -85,7 +94,10 @@ namespace KScript.Pages
 
             if (segments.Any(s => s == ".." || s.StartsWith("_", StringComparison.Ordinal) || s.StartsWith(".", StringComparison.Ordinal)))
                 return NotFound();
-            if (segments.Count > 0 && HiddenFolders.Contains(segments[0]))
+            string relative = string.Join("/", segments);
+            if (HiddenFiles.Contains(relative) || HiddenFolders.Any(folder => folder == "." ||
+                    relative.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
+                    relative.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase)))
                 return NotFound();
             // The project's settings file is not part of the site.
             if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
@@ -124,11 +136,24 @@ namespace KScript.Pages
                 {
                     string ext = Path.GetExtension(full).ToLowerInvariant();
                     if (HiddenExtensions.Contains(ext)) return NotFound();
-                    return new PageRoute { Kind = PageExtensions.Contains(ext) ? PageRoute.RouteKind.Page : PageRoute.RouteKind.Static, File = rel };
+                    return CheckPageRoute(new PageRoute { Kind = PageExtensions.Contains(ext) ? PageRoute.RouteKind.Page : PageRoute.RouteKind.Static, File = rel }, relative);
                 }
             }
 
-            return MatchPage(Root, segments, 0, new Dictionary<string, object>()) ?? NotFound();
+            return CheckPageRoute(MatchPage(Root, segments, 0, new Dictionary<string, object>()) ?? NotFound(), relative);
+        }
+
+        private PageRoute CheckPageRoute(PageRoute page, string relative)
+        {
+            if (page.Kind != PageRoute.RouteKind.Page || IsRoutedPath == null) return page;
+            // A physical page has several URLs. A protected controller owns the page at all of them,
+            // including when the legacy /_ks/live endpoint resolves a posted page name.
+            string file = "/" + page.File;
+            foreach (var (name, value) in page.Params) file = file.Replace("[" + name + "]", value.ToString(), StringComparison.Ordinal);
+            string stem = file[..^Path.GetExtension(file).Length];
+            string pretty = stem.EndsWith("/index", StringComparison.OrdinalIgnoreCase) ? stem[..^6] : stem;
+            var aliases = new[] { "/" + relative, file, stem, pretty.Length == 0 ? "/" : pretty };
+            return aliases.Distinct(StringComparer.Ordinal).Any(IsRoutedPath) ? NotFound() : page;
         }
 
         private static PageRoute NotFound() => new PageRoute { Kind = PageRoute.RouteKind.NotFound };
@@ -223,6 +248,7 @@ namespace KScript.Pages
             builder.Logging.ClearProviders();
             builder.WebHost.UseKestrel(o =>
             {
+                o.AddServerHeader = false;
                 if (host == "localhost") o.ListenLocalhost(port);
                 else o.Listen(IPAddress.Parse(host == "*" ? "0.0.0.0" : host), port);
             });
@@ -247,6 +273,7 @@ namespace KScript.Pages
                 }
 
                 http.Response.StatusCode = result.Status;
+                http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
                 foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
                 foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
                 if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
@@ -303,11 +330,16 @@ namespace KScript.Pages
             if (request.Path.Value == "/_ks/live")
             {
                 if (!HttpMethods.IsPost(request.Method)) return new PageResult { Status = 405, Body = "POST only" };
-                using var reader = new StreamReader(request.Body, Encoding.UTF8);
-                return HandleLive(site, await reader.ReadToEndAsync(), await BuildRequestAsync(request));
+                // HttpServer signs every file and controller page for its original URL.
+                if (site.RenderPage != null) return new PageResult { Status = 409, Body = "Reload the page to continue." };
+                var (built, error) = await ReadPageRequestAsync(request, live: true);
+                if (error != null) return error;
+                return HandleLive(site, (string)built["body"], built);
             }
 
             var route = site.Resolve(request.Path.Value);
+            bool live = site.RenderPage != null && IsLiveRequest(request);
+            if (live && route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 409 };
 
             switch (route.Kind)
             {
@@ -339,10 +371,12 @@ namespace KScript.Pages
 
                 case PageRoute.RouteKind.Page:
                 {
-                    var built = await BuildRequestAsync(request);
+                    var (built, error) = await ReadPageRequestAsync(request, live);
+                    if (error != null) return error;
                     if (route.Locale != null) built["locale"] = route.Locale;
-                    var ctx = new PageContext(site.Root, built);
-                    PageResult rendered = PageRenderer.RenderFile(ctx, route.File, route.Params);
+                    PageResult rendered = site.RenderPage == null
+                        ? PageRenderer.RenderFile(new PageContext(site.Root, built), route.File, route.Params)
+                        : site.RenderPage(route, built);
                     // A page that started a session (KScript.Auth's @csrf_field(), say) sends its cookie.
                     rendered.Cookies.AddRange(KScript.Runtime.RequestHooks.Finish(built));
                     return rendered;
@@ -403,20 +437,48 @@ namespace KScript.Pages
         }
 
         /// <summary>The <c>$request</c> map a page sees.</summary>
-        public static async Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request)
+        public static Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request) => BuildRequestAsync(request, null);
+
+        public const int MaxLiveBodyBytes = 1024 * 1024;
+
+        public static bool IsLiveRequest(HttpRequest request) => HttpMethods.IsPost(request.Method) && request.Headers.ContainsKey("X-KScript-Live");
+
+        public static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadPageRequestAsync(HttpRequest request, bool live)
+        {
+            if (!live) return (await BuildRequestAsync(request), null);
+            if (!System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type) ||
+                !string.Equals(type.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+                return (null, new PageResult { Status = 415 });
+            if (request.ContentLength > MaxLiveBodyBytes) return (null, new PageResult { Status = 413 });
+
+            // Content-Length is optional for HTTP/2 and chunked requests. Bound the bytes before decoding.
+            using var bytes = new MemoryStream();
+            var buffer = new byte[8192];
+            int read;
+            while ((read = await request.Body.ReadAsync(buffer, request.HttpContext.RequestAborted)) > 0)
+            {
+                if (bytes.Length + read > MaxLiveBodyBytes) return (null, new PageResult { Status = 413 });
+                bytes.Write(buffer, 0, read);
+            }
+            string body = Encoding.UTF8.GetString(bytes.GetBuffer(), 0, (int)bytes.Length);
+            return (await BuildRequestAsync(request, body), null);
+        }
+
+        private static async Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request, string readBody)
         {
             var query = request.Query.ToDictionary(q => q.Key, q => (object)q.Value.ToString());
             var headers = request.Headers.ToDictionary(h => h.Key.ToLowerInvariant(), h => (object)h.Value.ToString());
             var cookies = request.Cookies.ToDictionary(c => c.Key, c => (object)c.Value);
             var form = new Dictionary<string, object>();
-            string body = string.Empty;
+            string body = readBody ?? string.Empty;
 
-            if (request.HasFormContentType)
+            if (readBody == null && request.HasFormContentType)
             {
                 var f = await request.ReadFormAsync();
                 foreach (var kv in f) form[kv.Key] = kv.Value.ToString();
             }
-            else if (request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding"))
+            else if (readBody == null && (request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding") ||
+                     request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true))
             {
                 using var reader = new StreamReader(request.Body, Encoding.UTF8);
                 body = await reader.ReadToEndAsync();
@@ -427,6 +489,7 @@ namespace KScript.Pages
                 ["method"] = request.Method,
                 ["scheme"] = request.Scheme,
                 ["path"] = request.Path.Value ?? "/",
+                ["url"] = (request.Path.Value ?? "/") + request.QueryString.Value,
                 ["query"] = query,
                 ["form"] = form,
                 ["headers"] = headers,

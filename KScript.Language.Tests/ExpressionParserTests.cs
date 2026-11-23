@@ -51,6 +51,27 @@ namespace KScript.Language.Tests
         [InlineData("($price * $qty)->round(2)", "(-> (* $price $qty) round 2)")]
         [InlineData("'abc'->count()", "(-> 'abc' count)")]
         [InlineData("str.slugify($x)", "(call (. str slugify) $x)")]
+        [InlineData("'1' as int == 1", "(== (as '1' int) 1)")]
+        [InlineData("$s->trim() as ProductName as string", "(as (as (-> $s trim) ProductName) string)")]
+        [InlineData("($a + $b) as string->upper()", "(-> (as (+ $a $b) string) upper)")]
+        [InlineData("$x as int[][][0]", "([] (as $x int[][]) 0)")]
+        [InlineData("$x as string(min: 2)[]?", "(as $x string(min: 2)[]?)")]
+        [InlineData("$x as string[](one_of: ['a', 'b'])", "(as $x string[](one_of: ['a', 'b']))")]
+        [InlineData("$x as bool ? 1 : 2", "(? (as $x bool) 1 2)")]
+        [InlineData("$x as bool?1:2", "(? (as $x bool) 1 2)")]
+        [InlineData("$x as bool?$a:$b", "(? (as $x bool) $a $b)")]
+        [InlineData("$x as bool?[-1]:[2]", "(? (as $x bool) [(- 1)] [2])")]
+        [InlineData("$x as int[]?[0]", "([] (as $x int[]?) 0)")]
+        [InlineData("$x as int? + 1", "(+ (as $x int?) 1)")]
+        [InlineData("$flag ? $x as int? + 1 : 2", "(? $flag (+ (as $x int?) 1) 2)")]
+        [InlineData("$flag ? ($x as bool?-1:1) : 0", "(? $flag (? (as $x bool) (- 1) 1) 0)")]
+        [InlineData("$x as int? + 1 ? 'yes' : 'no'", "(? (+ (as $x int?) 1) 'yes' 'no')")]
+        [InlineData("$x as int..5", "(.. (as $x int) 5)")]
+        [InlineData("$x as /* number */ int + 1", "(+ (as $x int) 1)")]
+        [InlineData("$x as int? ?? 4", "(?? (as $x int?) 4)")]
+        [InlineData("$x as Repo?.name", "(?. (as $x Repo) name)")]
+        [InlineData("$x |> trim() as ProductName", "(as (|> $x (call trim)) ProductName)")]
+        [InlineData("@read(as: { as: as })", "@read(as:{as:as})")]
         // Ranges
         [InlineData("0..10", "(.. 0 10)")]
         [InlineData("0..100 step 5", "(.. 0 100 5)")]
@@ -102,12 +123,29 @@ namespace KScript.Language.Tests
         [InlineData("~people", "no longer used")]
         [InlineData("$a lt", "Expected an expression")]
         [InlineData("and", "found the operator 'and'")]
+        [InlineData("$v as", "Expected a type name")]
+        [InlineData("$v as 12", "Expected a type name")]
+        [InlineData("$v as string(min: 2", "to close the type arguments")]
         public void ReportsSyntaxErrors(string source, string message)
         {
             ParseResult result = ExpressionParser.ParseExpression(source);
             Assert.False(result.Success);
             Assert.Single(result.Errors);
             Assert.Contains(message, result.Errors[0].Message);
+        }
+
+        [Fact]
+        public void CastsExposeTheTypeAndOperatorSpansToTheEditor()
+        {
+            const string code = "@read() as string(min: 2)[]?";
+            var cast = Assert.IsType<CastNode>(ExpressionParser.ParseExpression(code).Root);
+            Assert.Equal(cast.TypeName, code.Substring(cast.TypeSpan.Start, cast.TypeSpan.Length));
+            Assert.Equal("as", code.Substring(cast.OperatorSpan.Start, cast.OperatorSpan.Length));
+            Assert.Same(cast.Value, Assert.Single(cast.Children));
+            const string incomplete = "$value as ";
+            var missing = Assert.IsType<CastNode>(ExpressionParser.ParseExpression(incomplete).Root);
+            Assert.Equal(incomplete.Length, missing.TypeSpan.Start);
+            Assert.Empty(missing.TypeName);
         }
 
         [Theory]

@@ -59,6 +59,7 @@ namespace KScript.Language.Tests
             ArgumentNode a => a.Name != null ? a.Name + ":" + Print(a.Value) : Print(a.Value),
             MemberNode m => "(" + (m.NullSafe ? "?." : ".") + " " + Print(m.Target) + " " + m.Name + ")",
             IndexNode ix => "([] " + Print(ix.Target) + " " + Print(ix.Index) + ")",
+            CastNode c => "(as " + Print(c.Value) + " " + c.TypeName + ")",
             UnaryNode u => "(" + u.Operator + " " + Print(u.Operand) + ")",
             BinaryNode b => "(" + b.Operator + " " + Print(b.Left) + " " + Print(b.Right) + ")",
             ConditionalNode c => "(? " + Print(c.Condition) + " " + Print(c.WhenTrue) + " " + Print(c.WhenFalse) + ")",

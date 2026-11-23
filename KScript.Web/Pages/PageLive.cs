@@ -24,6 +24,9 @@ namespace KScript.Pages
         public Dictionary<string, object> State { get; set; } = new Dictionary<string, object>();
         public Dictionary<string, object> Args { get; set; } = new Dictionary<string, object>();
 
+        internal string StateToken { get; set; }
+        internal string ArgsToken { get; set; }
+
         /// <summary>Current values of inputs with bind="name".</summary>
         public Dictionary<string, object> Binds { get; set; } = new Dictionary<string, object>();
 
@@ -45,23 +48,26 @@ namespace KScript.Pages
             return string.IsNullOrEmpty(secret) ? RandomNumberGenerator.GetBytes(32) : SHA256.HashData(Encoding.UTF8.GetBytes(secret));
         }
 
-        public static string Sign(Dictionary<string, object> values)
+        public static string Sign(Dictionary<string, object> values, string scope = null)
         {
             string json = Values.ToJson(values);
             string payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
             using var hmac = new HMACSHA256(_key);
-            string sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload)));
+            string sig = Convert.ToBase64String(hmac.ComputeHash(SignedBytes(payload, scope)));
             return payload + "." + sig;
         }
 
-        public static Dictionary<string, object> Verify(string token)
+        private static byte[] SignedBytes(string payload, string scope) =>
+            Encoding.UTF8.GetBytes(scope == null ? payload : scope + "\0" + payload);
+
+        public static Dictionary<string, object> Verify(string token, string scope = null)
         {
-            if (string.IsNullOrEmpty(token)) return new Dictionary<string, object>();
+            if (string.IsNullOrEmpty(token)) return scope == null ? new Dictionary<string, object>() : throw new LiveExpiredException();
             int dot = token.LastIndexOf('.');
             if (dot <= 0) throw new LiveExpiredException();
             string payload = token.Substring(0, dot);
             using var hmac = new HMACSHA256(_key);
-            byte[] expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            byte[] expected = hmac.ComputeHash(SignedBytes(payload, scope));
             byte[] actual;
             try { actual = Convert.FromBase64String(token.Substring(dot + 1)); }
             catch (FormatException) { throw new LiveExpiredException(); }
@@ -97,19 +103,21 @@ namespace KScript.Pages
         }
 
         /// <summary>The browser runtime, served at /_ks/live.js. Pages never need to include it themselves.</summary>
-        public static string Script
+        public static string Script => BrowserRuntime.Value;
+
+        private static readonly Lazy<string> BrowserRuntime = new Lazy<string>(() =>
+            "(function () {\n" + ReadScript("model-forms.js") + "\n" + ReadScript("live.js") + "\n}());\n" + ReadScript("passkeys.js"));
+
+        private static string ReadScript(string name)
         {
-            get
-            {
-                var asm = typeof(PageLive).GetTypeInfo().Assembly;
-                using var stream = asm.GetManifestResourceStream("KScript.Pages.live.js");
-                using var reader = new StreamReader(stream);
-                return reader.ReadToEnd();
-            }
+            var asm = typeof(PageLive).GetTypeInfo().Assembly;
+            using var stream = asm.GetManifestResourceStream("KScript.Pages." + name);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
         }
 
         /// <summary>Reads the JSON body the runtime posts to /_ks/live.</summary>
-        public static (string Page, LiveEvent Event) ParseRequest(string json)
+        public static (string Page, LiveEvent Event) ParseRequest(string json, bool routed = false)
         {
             var body = ParseJson(json) as Dictionary<string, object>
                 ?? throw new PageException("Invalid live request.");
@@ -119,11 +127,16 @@ namespace KScript.Pages
             {
                 BlockId = Get("block") ?? throw new PageException("Live request has no block id."),
                 Handler = body.TryGetValue("handler", out var h) && h != null && Values.TryNumber(h, out double hn) ? (int)hn : -1,
-                State = Verify(Get("state")),
-                Args = Verify(Get("args")),
+                StateToken = Get("state"),
+                ArgsToken = Get("args"),
                 Binds = body.TryGetValue("binds", out var b) && b is Dictionary<string, object> bm ? bm : new Dictionary<string, object>(),
                 Event = body.TryGetValue("event", out var e) && e is Dictionary<string, object> em ? em : new Dictionary<string, object>(),
             };
+            if (!routed)
+            {
+                ev.State = Verify(ev.StateToken);
+                ev.Args = Verify(ev.ArgsToken);
+            }
             return (Get("page") ?? "/", ev);
         }
     }

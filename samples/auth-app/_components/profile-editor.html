@@ -1,0 +1,11 @@
+<live id="profile-{$profile.id}">
+  <state name="automatic" value="false" />
+  <state name="preview" value="false" />
+  <p><label><input type="checkbox" bind="automatic"> Save as I type</label></p>
+  <form model-update="edit_profile" key="{$profile.id}" autosave="{$automatic}">
+    <p><label>Bio<br><input name="bio" value="{$profile.bio}" maxlength="160"></label></p>
+    <button>Save profile</button>
+  </form>
+  <p><button type="button" on-click="preview = not $preview">{$preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
+  <if test="$preview"><p>Saved bio: {$profile.bio}</p></if>
+</live>

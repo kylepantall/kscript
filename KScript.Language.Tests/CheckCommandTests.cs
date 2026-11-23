@@ -67,6 +67,22 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void NativeTypeTrailingCommaFailsTheProjectCheckAtTheComma()
+        {
+            Write("kscript.json", "{}");
+            string path = Write(Path.Combine("natives", "passkey-session-key.kscript"), """
+                type PasskeySessionKey with [string] {
+                  min: 8,
+                  normalize: $value->trim()
+                  pattern: /passkey_[a-zA-Z]+$/
+                }
+                """);
+            var (code, output) = Run(false, dir);
+            Assert.Equal(1, code);
+            Assert.Contains($"{path}(2,9): error KS1001: Separate type rules with a newline or a semicolon.", output);
+        }
+
+        [Fact]
         public void WarningsFailOnlyWhenAskedTo()
         {
             Write("warn.ks.xml", "<kscript><echo colour=\"red\">x</echo></kscript>");

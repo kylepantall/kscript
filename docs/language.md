@@ -37,6 +37,8 @@ A `{ }` in double quotes always holds an expression, whatever it opens with: a v
 
 `+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Comparisons are symbols and logic is words: write `and`, `or` and `not`, never `&&`, `||` or `!`. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
+Use `expression as Type` for a checked conversion, for example `$text as int`. The target can also be a declared record, enum or refinement type. [Checked conversions](types.md#checked-conversions-with-as)
+
 ## Control flow
 
 ```kscript
@@ -292,6 +294,17 @@ echo "{ $people->filter(fn(p) => $p.age >= 18)->map(fn(p) => $p.name)->join(', '
 echo "{ $people |> sort_by(fn(p) => $p.name) |> first() }"
 echo "{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }"
 ```
+
+Use `pluck(key)` to read a field from each item in order. Give `pluck` a list of keys to produce one new map per item. Keys can be bare names, quoted strings or variables.
+
+```kscript
+people = [{ name: 'Joan', age: 82 }, { name: 'Sam' }]
+names = $people->pluck(name)          // ['Joan', 'Sam']
+cards = $people->pluck([name, age])   // [{ name: 'Joan', age: 82 }, { name: 'Sam', age: null }]
+labels = $people->pluck(['name'])     // [{ name: 'Joan' }, { name: 'Sam' }]
+```
+
+A missing map key gives `null`. Typed records keep their usual field checks. An empty input list gives `[]`, and `pluck([])` gives one empty map per input item. Repeated keys appear once, in the requested order.
 
 A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
 
@@ -575,7 +588,7 @@ import slugify from "lib/strings.kscript"
 | Package | What it adds |
 | --- | --- |
 | `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
-| `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
+| `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@random_bytes(16, format: 'hex')` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
 | `KScript.Net` | `@api(url, options: { method, headers, body, timeout })` (a path such as `'/api/notes'` asks the project's own routes, see [Calling your own API](http.md#calling-your-own-api)) returning a response (`.status` `.is_ok` `->json()` `.text` `->check()`), `@download(url, to)`, `@query_string` |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
@@ -591,6 +604,17 @@ import slugify from "lib/strings.kscript"
 | `KScript.Test` | `test`, `describe`, `before_each`, `after_each`, `expect`, `expect_error`, `capture`, `@assert`, `@fail`, `@run_script`. Test files import it on their own (see [Testing scripts](testing.md)). |
 
 Using something from a package that isn't imported stops with `input is part of KScript.Terminal. Add import KScript.Terminal at the top of the script.`, and the editor offers to add the import. A package is named only in an `import`: a statement is never written with the `KScript.` prefix (`input`, not `KScript.input`), and nothing is imported silently, `job` and `dispatch` included (`import KScript.Queue`). A project can import packages for every script in `kscript.json` (below).
+
+### Cryptographically secure random bytes
+
+`@random_bytes(count, format: 'hex')` reads entropy from the operating system. Give it a whole byte count from 1 to 65536. Lowercase hex uses two characters per byte. The `base64url` format uses URL-safe characters and omits padding. Both formats are independent of `@random_seed()`.
+
+```kscript
+import KScript.Math
+
+key = @random_bytes(16)                        // 32 hex characters
+url_token = @random_bytes(16, format: 'base64url') // 22 characters
+```
 
 ### Names of statements and arguments
 

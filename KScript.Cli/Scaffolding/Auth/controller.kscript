@@ -1,18 +1,21 @@
 --- make
 to: {{ paths.controllers }}/accounts.kscript
 ---
-// Signing up, in and out, password resets{{#if api}}, API tokens{{/if}} and the account page, made by kscript make auth.
+// Signing up, in and out{{#unless passkeys}}, password resets{{/unless}}{{#if api}}, API tokens{{/if}} and the account page, made by kscript make auth.
 // The routes are in {{ routes_file }}, and the pages in
 // {{ paths.views }}/auth/. KScript.Auth keeps the users, sessions and tokens,
 // and checks the CSRF token every form sends with {! @csrf_field() } (see the
 // Sign-in guide).
 import KScript.Http
 import KScript.Auth
+{{#unless passkeys}}
 import "{{ sign_up_import }}"
+{{/unless}}
 
 /// GET /login
 fn show_login() => @view('auth/login', data: {})
 
+{{#unless passkeys}}
 /// POST /login: a wrong email or password shows the form again. After a few
 /// wrong tries, @attempt makes them wait.
 fn sign_in(form: map) {
@@ -28,9 +31,11 @@ fn sign_in(form: map) {
   return @redirect(@intended())
 }
 
+{{/unless}}
 /// GET /register
 fn show_register() => @view('auth/register', data: {})
 
+{{#unless passkeys}}
 /// POST /register: makes the account and signs it in.
 fn sign_up(form: map) {
   user = null
@@ -44,12 +49,14 @@ fn sign_up(form: map) {
   return @redirect(@intended())
 }
 
+{{/unless}}
 /// POST /logout
 fn sign_out() {
   @logout()
   return @redirect(/)
 }
 
+{{#unless passkeys}}
 /// GET /forgot-password
 fn show_forgot() => @view('auth/forgot-password', data: {})
 
@@ -89,8 +96,15 @@ fn reset(form: map) {
   return @redirect(/account)
 }
 
+{{/unless}}
 /// GET /account
 fn account() => @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()) })
+
+/// Removes a passkey belonging to the current session's user.
+fn delete_passkey(id: string) {
+  @revoke_passkey($id)
+  return @redirect('/account')
+}
 
 /// POST /account/tokens: makes an API token, shown once.
 fn make_token(form: map) {
@@ -106,6 +120,7 @@ fn delete_token(id: string) {
 }
 {{#if api}}
 
+{{#unless passkeys}}
 /// POST {{ api_prefix }}/tokens with a JSON email and password: answers with a
 /// new API token.
 fn issue_token(json: map) {
@@ -116,6 +131,7 @@ fn issue_token(json: map) {
   return @response({ token: @api_token($user, name: $json.device ?? 'api') }, status: 201)
 }
 
+{{/unless}}
 /// GET {{ api_prefix }}/me with Authorization: Bearer <token>
 fn me() => @user()
 {{/if}}

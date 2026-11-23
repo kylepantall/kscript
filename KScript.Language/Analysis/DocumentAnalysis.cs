@@ -74,6 +74,9 @@ namespace KScript.Language.Analysis
         public Dictionary<(Symbol Alias, string Member), ExternalLocation> ExternalMembers { get; } = new Dictionary<(Symbol, string), ExternalLocation>();
         public Scope RootScope { get; internal set; }
 
+        /// <summary>The inferred type for each bare pattern literal, by source offset.</summary>
+        internal Dictionary<int, Symbol> PatternLiteralTypes { get; } = new Dictionary<int, Symbol>();
+
         /// <summary>
         /// The methods extend blocks add, by receiver type then name: this file's, its imports' and the project's
         /// extension files'. External ones have a <see cref="Symbol.SourcePath"/> and an entry in ExternalDeclarations.

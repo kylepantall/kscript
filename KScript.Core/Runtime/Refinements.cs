@@ -44,7 +44,7 @@ namespace KScript.Runtime
         internal DecodedText Normalize { get; set; }
         internal List<Validator> Validators { get; } = new List<Validator>();
 
-        private Regex pattern;
+        internal RegexValue Pattern { get; private set; }
 
         internal string MinText => Text("min");
         internal string MaxText => Text("max");
@@ -100,11 +100,11 @@ namespace KScript.Runtime
             // A regex value or literal (/^[a-z]+$/i) keeps its flags; plain text is the pattern itself.
             if (Options["pattern"] is RegexValue value)
             {
-                pattern = value.Regex;
+                Pattern = value;
                 return null;
             }
             if (!RegexValue.TryParse(PatternText, out RegexValue parsed, out string reason)) return $"pattern {PatternText} isn't a regular expression: {reason}.";
-            pattern = parsed.Regex;
+            Pattern = parsed;
             return null;
         }
 
@@ -146,7 +146,7 @@ namespace KScript.Runtime
         /// </summary>
         internal IEnumerable<string> Check(Interpreter interpreter, object value, Scope closure, Module module, Func<object, object> convert)
         {
-            foreach (string problem in CheckPlain(value, convert)) yield return problem;
+            foreach (string problem in CheckPlain(value, convert, interpreter)) yield return problem;
             foreach (Validator v in Validators)
             {
                 Scope s = closure.Child();
@@ -156,16 +156,20 @@ namespace KScript.Runtime
         }
 
         /// <summary>Every rule but validate: these need no interpreter, so the editor checks literals with them too.</summary>
-        public IEnumerable<string> CheckPlain(object value, Func<object, object> convert)
+        public IEnumerable<string> CheckPlain(object value, Func<object, object> convert) => CheckPlain(value, convert, null);
+
+        private IEnumerable<string> CheckPlain(object value, Func<object, object> convert, Interpreter interpreter)
         {
             if (MinText != null && Below(value, MinText, out string minMessage)) yield return minMessage;
             if (MaxText != null && Above(value, MaxText, out string maxMessage)) yield return maxMessage;
-            if (pattern != null)
+            if (Pattern != null)
             {
                 bool matches;
                 try
                 {
-                    matches = pattern.IsMatch(TextOf(value));
+                    matches = interpreter != null && value is string text
+                        ? interpreter.MatchesRefinement(Pattern, text)
+                        : Pattern.Regex.IsMatch(TextOf(value));
                 }
                 catch (RegexMatchTimeoutException)
                 {
@@ -359,6 +363,8 @@ namespace KScript.Runtime
             Description = description;
             Closure = closure;
             Module = module;
+            if (rules.Normalize == null && rules.Validators.Count == 0 && baseType.Args == null && baseType.ListDepth == 0 && !baseType.Optional)
+                StaticStringRoot = baseType.IsBuiltIn && baseType.Name == "string" ? this : (baseType.Inline as RefinedType)?.StaticStringRoot;
         }
 
         public string Name { get; }
@@ -368,6 +374,8 @@ namespace KScript.Runtime
 
         internal Scope Closure { get; }
         internal Module Module { get; }
+        /// <summary>The terminal string declaration when every rule in the chain is independent of script state.</summary>
+        internal RefinedType StaticStringRoot { get; }
 
         public string TypeName => "type";
 

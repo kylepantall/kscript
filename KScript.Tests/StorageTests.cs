@@ -101,6 +101,24 @@ public sealed class AppFoldersTests : StorageFixture
         Assert.Equal(expected, AppFolders.Folder("Life  Lab", kind, "linux", Env(), Home).Replace('\\', '/'));
 
     [Fact]
+    public void RelativeProjectDataCanLiveOutsideTheServedFolder()
+    {
+        const string variable = "KSCRIPT_PROJECT_DATA_ROOT";
+        string old = Environment.GetEnvironmentVariable(variable);
+        string privateFolder = Path.Combine(Root, "private");
+        try
+        {
+            Environment.SetEnvironmentVariable(variable, privateFolder);
+            Assert.Equal(Path.Combine(privateFolder, "data", "app.sqlite"), AppFolders.ProjectDataPath(Project, "data/app.sqlite"));
+            Assert.Equal(Project, AppFolders.ProjectDataPath(Project, Project));
+            Assert.Throws<KScriptException>(() => AppFolders.ProjectDataPath(Project, "../escape"));
+            Environment.SetEnvironmentVariable(variable, null);
+            Assert.Equal(Path.Combine(Project, "data"), AppFolders.ProjectDataPath(Project, "data"));
+        }
+        finally { Environment.SetEnvironmentVariable(variable, old); }
+    }
+
+    [Fact]
     public void XdgVariablesWinWhenTheyAreAbsolute()
     {
         var env = Env(("XDG_CONFIG_HOME", "/x/config"), ("XDG_DATA_HOME", "/x/data"), ("XDG_CACHE_HOME", "/x/cache"), ("XDG_STATE_HOME", "relative/state"));

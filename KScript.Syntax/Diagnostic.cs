@@ -120,6 +120,9 @@ namespace KScript.Syntax
         /// <summary>A model whose table the migrations don't make as it is now: kscript db diff writes the migration.</summary>
         public const string ModelDrift = "KS5014";
 
+        /// <summary>Two visible text refinements declare the same pattern for unquoted literals.</summary>
+        public const string DuplicateLiteralPattern = "KS5015";
+
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
 

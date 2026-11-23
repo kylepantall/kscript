@@ -120,6 +120,9 @@
             "csrf": { "type": "boolean", "default": true, "description": "False turns off the CSRF check that web routes get when their file imports KScript.Auth." },
             "attempts": { "type": "integer", "minimum": 1, "default": 5, "description": "Failed sign-ins allowed per email and address before @attempt() makes them wait." },
             "lockout": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1m", "description": "How long failed sign-ins are counted over, and how long @attempt() then waits." },
+            "passkey_origin": { "type": "string", "format": "uri", "description": "The public HTTPS origin for passkeys, or http://localhost with an optional development port. Setting this enables passkeys." },
+            "passkey_signup": { "type": "boolean", "default": false, "description": "Allows new accounts to sign up with a passkey. Requires passkey_origin." },
+            "passkey_rp_id": { "type": "string", "description": "An optional relying party domain, such as example.com. Defaults to the passkey origin's hostname." },
             "reset_lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1h", "description": "How long a password reset token works." }
           }
         },

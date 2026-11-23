@@ -83,6 +83,28 @@ public class WebCoverageTests
     }
 
     [Fact]
+    public async Task Passkey_buttons_share_the_browser_runtime_and_keep_their_own_status()
+    {
+        using var site = new TempSite(("index.html", """
+            <body><button passkey="register">Add</button>
+            <button type="button" passkey="login" passkey-redirect="/account">Sign in</button></body>
+            """));
+        var page = await Handle(site, "GET", "/");
+        Assert.Contains("<button type=\"button\" data-ks-passkey=\"register\">Add</button><span role=\"status\" data-ks-passkey-status></span>", page.Body);
+        Assert.Contains("data-ks-passkey=\"login\" data-ks-passkey-redirect=\"/account\"", page.Body);
+        Assert.Equal(2, page.Body.Split("/_ks/live.js").Length);
+        Assert.Contains("navigator.credentials.create", (await Handle(site, "GET", "/_ks/live.js")).Body);
+        Assert.DoesNotContain("/_ks/live.js", Render("<button>Save</button>"));
+    }
+
+    [Theory]
+    [InlineData("<a passkey='login'>Sign in</a>")]
+    [InlineData("<button passkey='register' type='submit'>Add</button>")]
+    [InlineData("<button passkey='update'>Update</button>")]
+    public void Invalid_passkey_buttons_have_a_template_error(string template)
+        => Assert.Contains("passkey", RenderFails(template));
+
+    [Fact]
     public async Task Not_found_pages_and_error_pages()
     {
         using var site = new TempSite(("_404.html", "<h1>Lost: {$request.path}</h1>"), ("bad.html", "<p>{ @nope() }</p>"));
@@ -112,7 +134,8 @@ public class WebCoverageTests
     [Fact]
     public async Task The_server_sends_files_and_error_pages_and_stops()
     {
-        using var site = new TempSite(("index.html", "<p>{ @nope() }</p>"), ("site.txt", "plain text"));
+        using var site = new TempSite(("index.html", "<p>{ @nope() }</p>"), ("site.txt", "plain text"),
+            ("custom.html", """<respond header-server="my-app">custom</respond>"""));
         int port;
         {
             var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
@@ -132,8 +155,11 @@ public class WebCoverageTests
             catch (HttpRequestException) { await Task.Delay(100); }
         }
         Assert.Equal("plain text", text);
-        HttpResponseMessage broken = await http.GetAsync($"http://127.0.0.1:{port}/");
+        using var custom = await http.GetAsync($"http://127.0.0.1:{port}/custom");
+        Assert.Equal("my-app", Assert.Single(custom.Headers.GetValues("Server")));
+        using var broken = await http.GetAsync($"http://127.0.0.1:{port}/");
         Assert.Equal(System.Net.HttpStatusCode.InternalServerError, broken.StatusCode);
+        Assert.Equal("kscript", Assert.Single(broken.Headers.GetValues("Server")));
         Assert.Contains("KScript error", await broken.Content.ReadAsStringAsync());
 
         stop.Cancel();

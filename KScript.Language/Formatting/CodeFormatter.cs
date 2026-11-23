@@ -1004,6 +1004,7 @@ namespace KScript.Language.Formatting
             {
                 return false;
             }
+            if (CastSyntax.ContinuesAfter(line) is bool cast) return cast;
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal)))
             {
                 // A block's own { or a closing } never continue; '-' and '>' as part of -> and => are covered above.
@@ -1045,6 +1046,7 @@ namespace KScript.Language.Formatting
         private static bool StartsWithContinuation(string text, int p)
         {
             while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            if (CastSyntax.StartsLine(text, p)) return true;
             if (LeadingContinuations.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0)) return true;
             foreach (string w in WordContinuations)
             {

@@ -109,6 +109,7 @@ namespace KScript.Language.Features
             foreach (ExpressionRegion region in analysis.Regions)
             {
                 string text = region.Source.Value;
+                List<CastNode> casts = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<CastNode>().ToList();
                 foreach (TextSpan code in region.CodeSpans)
                 {
                     List<Token> list = Lexer.Tokenize(text, code.Start, Math.Min(code.End, text.Length));
@@ -151,7 +152,15 @@ namespace KScript.Language.Features
                                 break;
                             }
                             case TokenKind.Identifier:
-                                if (Lexer.Keywords.Contains(t.Text))
+                                if (references.TryGetValue(span.Start, out SymbolReference literal) && literal.IsPatternLiteral)
+                                {
+                                    tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
+                                }
+                                else if (prev.Text == "as" && casts.Any(c => c.TypeSpan.Start == t.Span.Start))
+                                {
+                                    tokens.Add(new SemanticToken(span, SemanticTokenType.Type, SemanticTokenModifiers.None));
+                                }
+                                else if (Lexer.Keywords.Contains(t.Text) || (t.Text == "as" && casts.Any(c => c.OperatorSpan.Start == t.Span.Start)))
                                 {
                                     tokens.Add(new SemanticToken(span, SemanticTokenType.Keyword, SemanticTokenModifiers.None));
                                 }

@@ -113,6 +113,15 @@ namespace KScript.Auth
             p.Command("user", "", "The signed-in user (a map with id, email and the fields they registered with), or null for a guest. It comes from the session cookie, or from an API token (Authorization: Bearer).",
                 KType.Map, c => AuthRequest.Current(c.Host)?.User,
                 "<if test=\"@user() != null\"><echo>Hello { @user().email }</echo></if>");
+            p.Command("has_passkeys", "", "True when this site has a configured passkey origin.", KType.Bool,
+                c => App(c).Settings.PasskeyOrigin != null,
+                "<if test=\"@has_passkeys()\"><button type=\"button\" passkey=\"login\">Sign in with a passkey</button></if>");
+            p.Command("passkeys", "", "Lists the signed-in session user's passkeys for this site, with each credential's id and creation date.", KType.List,
+                c => Passkeys.List(Need(c)),
+                "<for each=\"key\" in=\"@passkeys()\"><echo>{ $key.created_at }</echo></for>");
+            p.Command("revoke_passkey", "id", "Revokes one of the signed-in session user's passkeys by its id. True when it was removed.", KType.Bool,
+                c => Passkeys.Revoke(Need(c), c.Str(0)),
+                "<do>@revoke_passkey($id)</do>");
             p.Command("is_signed_in", "", "True when someone is signed in (by the session or an API token).", KType.Bool,
                 c => AuthRequest.Current(c.Host)?.User != null,
                 "<if test=\"@is_signed_in()\"><echo>Welcome back</echo></if>");

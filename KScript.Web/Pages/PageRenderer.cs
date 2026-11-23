@@ -50,8 +50,20 @@ namespace KScript.Pages
         /// <summary>Set when re-rendering a &lt;live&gt; block for a browser event.</summary>
         public LiveEvent Live { get; set; }
 
+        /// <summary>For a routed GET view, issues the proof required to replay its route in this session.</summary>
+        public Func<string> RoutedLiveProof { get; set; }
+        private string routeProof;
+        internal string RouteProof => routeProof ??= RoutedLiveProof?.Invoke();
+        internal bool ContainsModelForm;
         internal int LiveCounter;
         internal int IncludeDepth;
+
+        // A model form contains this session's CSRF token and may contain private record values.
+        internal PageResult Finish(PageResult result)
+        {
+            if (ContainsModelForm || routeProof != null) result.Headers["Cache-Control"] = "private, no-store";
+            return result;
+        }
 
         private PageRuntime runtime;
 
@@ -98,6 +110,9 @@ namespace KScript.Pages
 
             /// <summary>Inside a &lt;live&gt; block: the block's scope, where its state lives.</summary>
             public Scope LiveScope;
+            public string ActionScope;
+            public Dictionary<string, object> BoundFields;
+            public HashSet<string> VisibleActions;
 
             /// <summary>The file's packages and imported scripts.</summary>
             public Module Module;
@@ -109,6 +124,7 @@ namespace KScript.Pages
             public RenderState With(bool? markdown = null, Scope liveScope = null) => new RenderState
             {
                 Ctx = Ctx, File = File, Markdown = markdown ?? Markdown, Slot = Slot, LiveScope = liveScope ?? LiveScope, Module = Module, Imports = Imports,
+                ActionScope = ActionScope, BoundFields = BoundFields, VisibleActions = VisibleActions,
             };
         }
 
@@ -130,12 +146,13 @@ namespace KScript.Pages
             try
             {
                 string html = RenderFileInScope(ctx, relativePath, scope, slot: null);
+                if (ctx.Live != null && ctx.RoutedLiveProof != null) throw new LiveExpiredException();
                 if (ctx.Live != null) throw new PageException($"There is no <live id=\"{ctx.Live.BlockId}\"> block on this page any more. Reload the page.");
-                return new PageResult { Body = AddLiveRuntime(html.TrimStart()) };
+                return ctx.Finish(new PageResult { Body = AddLiveRuntime(html.TrimStart()) });
             }
             catch (PageResponseSignal signal)
             {
-                return signal.Result;
+                return ctx.Finish(signal.Result);
             }
         }
 
@@ -149,18 +166,19 @@ namespace KScript.Pages
                 string html = markdown
                     ? RenderMarkdownSource(template, fileName, ctx, scope, null)
                     : RenderSource(template, 1, NewState(ctx, fileName, null, false), scope);
-                return new PageResult { Body = AddLiveRuntime(html.TrimStart()) };
+                return ctx.Finish(new PageResult { Body = AddLiveRuntime(html.TrimStart()) });
             }
             catch (PageResponseSignal signal)
             {
-                return signal.Result;
+                return ctx.Finish(signal.Result);
             }
         }
 
-        /// <summary>Pages with &lt;live&gt; blocks get the small runtime that sends their events to the server.</summary>
+        /// <summary>Live blocks and passkey buttons share one delegated browser runtime.</summary>
         private static string AddLiveRuntime(string html)
         {
-            if (!html.Contains("data-ks-live=\"", StringComparison.Ordinal)) return html;
+            if (!html.Contains("data-ks-live=\"", StringComparison.Ordinal) && !html.Contains("data-ks-passkey=\"", StringComparison.Ordinal)
+                && !html.Contains("data-ks-autosave=\"", StringComparison.Ordinal)) return html;
             const string tag = "<script src=\"/_ks/live.js\" defer></script>";
             int body = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             return body >= 0 ? html.Insert(body, tag + "\n") : html + "\n" + tag;
@@ -354,6 +372,10 @@ namespace KScript.Pages
                     return;
                 }
 
+                case "form" when el.HasAttr("model-update"):
+                    RenderModelForm(el, scope, sb, state);
+                    return;
+
                 case "match":
                     RenderMatch(el, scope, sb, state);
                     return;
@@ -498,18 +520,83 @@ namespace KScript.Pages
             return true;
         }
 
+        private static void RenderModelForm(PageElement el, Scope scope, StringBuilder sb, RenderState state)
+        {
+            state.Ctx.ContainsModelForm = true;
+            string action = ModelFormPath.For(el.Attr("model-update"));
+            string key = el.Attr("key") ?? throw new PageException("<form model-update> needs the record's key.");
+            if (el.HasAttr("action") || el.HasAttr("method"))
+                throw new PageException("<form model-update> chooses its POST action from its binding.");
+
+            var form = new PageElement { Name = "form", Line = el.Line };
+            form.Attributes.Add(new PageAttribute { Name = "method", Value = "post" });
+            form.Attributes.Add(new PageAttribute { Name = "action", Value = action });
+            form.Attributes.Add(new PageAttribute { Name = "data-ks-model-form" });
+            if (el.HasAttr("autosave"))
+            {
+                string value = el.Attr("autosave");
+                object delay = value == null ? true : TryWholeExpression(value, out string expr, out _) ? Eval(expr, scope, state) : value;
+                if (delay is not (null or false))
+                {
+                    double ms = delay is true ? 500 : Duration.Seconds(delay, "autosave") * 1000;
+                    if (!double.IsFinite(ms) || ms < 0 || ms > int.MaxValue)
+                        throw new PageException("autosave needs a nonnegative delay within the browser timer range.");
+                    form.Attributes.Add(new PageAttribute { Name = "data-ks-autosave", Value = Values.ToStr(Math.Round(ms)) });
+                }
+            }
+            form.Attributes.AddRange(el.Attributes.Where(a => a.Name is not ("key" or "model-update" or "autosave")));
+            var request = state.Ctx.Request;
+            string back = request.TryGetValue("url", out object url) || request.TryGetValue("path", out url) ? Values.ToStr(url) : "/";
+            string Hidden(string name, string value) => $"<input type=\"hidden\" name=\"{name}\" value=\"{Values.HtmlEscape(value)}\">";
+            form.Children.Add(new PageText
+            {
+                Raw = true,
+                Text = Hidden("_key", Interpolate(key, scope, state, EscapeMode.None))
+                    + Hidden("_token", state.Ctx.Runtime.CsrfToken()) + Hidden("_return", back),
+            });
+            form.Children.AddRange(el.Children);
+            form.Children.Add(new PageText { Raw = true, Text = "<span data-ks-save-status role=\"status\"></span>" });
+            RenderHtmlElement(form, scope, sb, state);
+        }
+
         private static void RenderHtmlElement(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
             sb.Append('<').Append(el.SourceName ?? el.Name);
+            bool passkeyButton = el.HasAttr("passkey");
+            if (passkeyButton)
+            {
+                if (el.Name != "button" || el.HasAttr("type") && !string.Equals(el.Attr("type"), "button", StringComparison.OrdinalIgnoreCase))
+                    throw new PageException("Use passkey on a <button type=\"button\"> or leave out its type.");
+                if (!el.HasAttr("type")) sb.Append(" type=\"button\"");
+            }
             bool hasHandler = false;
             foreach (var a in el.Attributes)
             {
+                if (a.Name == "passkey")
+                {
+                    string action = Values.ToStr(AttributeValue(a, scope, state));
+                    if (action is not ("login" or "register" or "signup")) throw new PageException("passkey must be login, register or signup.");
+                    sb.Append(" data-ks-passkey=\"").Append(action).Append('"');
+                    continue;
+                }
+                if (a.Name == "passkey-redirect" && passkeyButton)
+                {
+                    sb.Append(" data-ks-passkey-redirect=\"").Append(Values.HtmlEscape(Values.ToStr(AttributeValue(a, scope, state)))).Append('"');
+                    continue;
+                }
                 if (a.Name.StartsWith("on-", StringComparison.Ordinal))
                 {
                     if (state.LiveScope == null || a.HandlerIndex < 0)
                         throw new PageException($"{a.Name} only works inside a <live> block, e.g. <live id=\"counter\">…</live>.");
                     sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(a.HandlerIndex).Append('"');
-                    hasHandler = true;
+                    if (state.ActionScope != null)
+                    {
+                        var locals = LocalVariables(scope, state.LiveScope);
+                        string proof = PageLive.Sign(locals, HandlerScope(state.ActionScope, a));
+                        state.VisibleActions?.Add(proof);
+                        sb.Append(" data-ks-args-").Append(a.HandlerIndex).Append("=\"").Append(Values.HtmlEscape(proof)).Append('"');
+                    }
+                    else hasHandler = true;
                     continue;
                 }
                 if (a.Name == "every" && el.HasAttr("on-tick"))
@@ -523,6 +610,7 @@ namespace KScript.Pages
                 {
                     if (state.LiveScope == null) throw new PageException("bind only works inside a <live> block.");
                     string name = (a.Value ?? string.Empty).Trim().TrimStart('$');
+                    if (state.BoundFields != null) state.BoundFields[name] = true;
                     if (!scope.TryGet(name, out var bound)) throw new PageException($"bind=\"{name}\": ${name} is not defined. Declare it with <state name=\"{name}\" value=\"''\" />.");
                     sb.Append(" data-ks-bind=\"").Append(Values.HtmlEscape(name)).Append('"');
                     if (el.Name == "input" && string.Equals(el.Attr("type"), "checkbox", StringComparison.OrdinalIgnoreCase))
@@ -567,6 +655,7 @@ namespace KScript.Pages
             }
             RenderNodes(el.Children, scope.Child(), sb, state);
             sb.Append("</").Append(el.SourceName ?? el.Name).Append('>');
+            if (passkeyButton) sb.Append("<span role=\"status\" data-ks-passkey-status></span>");
         }
 
         /// <summary>Attribute values for layouts, includes and components: a whole <c>{expr}</c> passes the value itself.</summary>
@@ -638,10 +727,21 @@ namespace KScript.Pages
         {
             if (state.LiveScope != null) throw new PageException("<live> blocks can't be nested.");
             var ctx = state.Ctx;
-            string id = el.Attr("id") ?? $"live-{++ctx.LiveCounter}";
+            string id = el.Attr("id") is string explicitId ? Interpolate(explicitId, scope, state, EscapeMode.None) : $"live-{++ctx.LiveCounter}";
+            string proof = ctx.RouteProof;
+            string actionScope = proof == null ? null : proof + "\0" + state.File + "\0" + id;
+            var boundFields = proof == null ? null : new Dictionary<string, object>();
             var handlers = PageLive.Handlers(el);
             var liveScope = scope.Child();
             bool target = ctx.Live != null && ctx.Live.BlockId == id;
+
+            if (target && actionScope != null)
+            {
+                var envelope = PageLive.Verify(ctx.Live.StateToken, actionScope + "\0state");
+                ctx.Live.State = (Dictionary<string, object>)envelope["values"];
+                var allowed = (Dictionary<string, object>)envelope["binds"];
+                if (ctx.Live.Binds.Keys.Any(k => !allowed.ContainsKey(k))) throw new LiveExpiredException();
+            }
 
             // State: defaults from <state>, or the values the browser sent back.
             var stateNames = new List<string>();
@@ -660,6 +760,13 @@ namespace KScript.Pages
 
             if (target)
             {
+                if (ctx.Live.Handler >= handlers.Count) throw new LiveExpiredException();
+                if (actionScope != null && (ctx.Live.Handler >= 0 || ctx.Live.Binds.Count > 0))
+                {
+                    if (ctx.Live.Handler >= 0)
+                        ctx.Live.Args = PageLive.Verify(ctx.Live.ArgsToken, HandlerScope(actionScope, handlers[ctx.Live.Handler]));
+                    CheckVisibleControls(el, state, liveScope, stateNames, actionScope);
+                }
                 foreach (var kv in ctx.Live.Binds)
                 {
                     if (!stateNames.Contains(kv.Key)) continue;
@@ -668,7 +775,6 @@ namespace KScript.Pages
 
                 if (ctx.Live.Handler >= 0)
                 {
-                    if (ctx.Live.Handler >= handlers.Count) throw new LiveExpiredException();
                     var handlerScope = liveScope.Child();
                     foreach (var kv in ctx.Live.Args) handlerScope.Declare(kv.Key, kv.Value);
                     handlerScope.Declare("event", ctx.Live.Event);
@@ -678,6 +784,8 @@ namespace KScript.Pages
 
             var body = new StringBuilder();
             var inner = state.With(liveScope: liveScope);
+            inner.ActionScope = actionScope;
+            inner.BoundFields = boundFields;
             RenderNodes(el.Children, liveScope, body, inner);
 
             var values = new Dictionary<string, object>();
@@ -691,7 +799,10 @@ namespace KScript.Pages
             string tag = el.Attr("as") ?? "div";
             var html = new StringBuilder();
             html.Append('<').Append(tag).Append(" data-ks-live=\"").Append(Values.HtmlEscape(id)).Append('"');
-            html.Append(" data-ks-state=\"").Append(Values.HtmlEscape(PageLive.Sign(values))).Append('"');
+            string stateToken = proof == null ? PageLive.Sign(values) : PageLive.Sign(
+                new Dictionary<string, object> { ["values"] = values, ["binds"] = boundFields }, actionScope + "\0state");
+            if (proof != null) html.Append(" data-ks-route=\"").Append(Values.HtmlEscape(proof)).Append('"');
+            html.Append(" data-ks-state=\"").Append(Values.HtmlEscape(stateToken)).Append('"');
             foreach (var a in el.Attributes.Where(a => a.Name != "id" && a.Name != "as"))
             {
                 if (a.Value == null) html.Append(' ').Append(a.SourceName ?? a.Name);
@@ -703,10 +814,38 @@ namespace KScript.Pages
             if (target)
             {
                 ctx.Live.Output = html.ToString();
-                throw new PageResponseSignal(new PageResult { Body = html.ToString() });
+                var result = new PageResult { Body = html.ToString() };
+                if (proof != null) result.Headers["X-KScript-Fragment"] = "1";
+                throw new PageResponseSignal(result);
             }
             sb.Append(html);
         }
+
+        // An old screen may contain controls or loop rows the current user can no longer see. Render its
+        // bindings against today's server data before accepting input. Each loop action signs its current
+        // locals. The isolated copy keeps template assignments during this check out of the next render.
+        private static void CheckVisibleControls(PageElement el, RenderState state, Scope liveScope, List<string> stateNames, string actionScope)
+        {
+            var probeScope = liveScope.Child();
+            var values = new Dictionary<string, object>();
+            foreach (string name in stateNames)
+            {
+                liveScope.TryGet(name, out object value);
+                values[name] = value;
+            }
+            foreach (var kv in (Dictionary<string, object>)Values.ParseJson(Values.ToJson(values))) probeScope.Declare(kv.Key, kv.Value);
+            var probe = state.With(liveScope: probeScope);
+            probe.ActionScope = actionScope;
+            probe.BoundFields = new Dictionary<string, object>();
+            probe.VisibleActions = new HashSet<string>(StringComparer.Ordinal);
+            RenderNodes(el.Children, probeScope, new StringBuilder(), probe);
+            var ev = state.Ctx.Live;
+            if ((ev.Handler >= 0 && !probe.VisibleActions.Contains(ev.ArgsToken)) || ev.Binds.Keys.Any(k => !probe.BoundFields.ContainsKey(k)))
+                throw new LiveExpiredException();
+        }
+
+        private static string HandlerScope(string blockScope, PageAttribute handler) =>
+            blockScope + "\0action:" + handler.HandlerIndex + "\0" + handler.Name + "\0" + handler.Value;
 
         /// <summary>Variables declared between a handler's element and its live block, e.g. the loop item.</summary>
         private static Dictionary<string, object> LocalVariables(Scope scope, Scope liveScope)

@@ -1,0 +1,12 @@
+// Written by kscript db diff from the models. Read it, change it if you need
+// to, then run kscript db migrate.
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'profiles') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'user_id', type: string)
+    Field(name: 'bio', type: string, max: 160, default: '')
+    Index(columns: [user_id], unique)
+  }
+}

@@ -3,21 +3,22 @@
 // returns the block's new HTML. Pages never contain JavaScript of their own.
 (function () {
   "use strict";
-  var EVENTS = ["click", "input", "change", "submit", "keydown"];
-  var timers = {};
-  var ticks = {};
+  var EVENTS = ["click", "input", "change", "submit", "keydown", "compositionstart", "compositionend"];
+  var timers = Object.create(null);
+  var ticks = Object.create(null);
 
   // A click needs the same element under the pointer when it goes down and when it comes up. While a button
   // is held, new HTML for its block waits, so a block that redraws often (on-tick) doesn't swallow clicks.
   var pointerDown = false;
-  var pending = {};
+  var pending = Object.create(null);
 
   function flush(id) {
     var p = pending[id];
     if (!p) return;
+    var el = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
+    if (el && modelForms.composingIn(el)) return;
     delete pending[id];
-    var el = document.querySelector('[data-ks-live="' + id + '"]');
-    if (el) swap(el, p.html, p.keepValue);
+    if (el) swap(el, p.html, p.keepValue, p.checkpoint);
   }
 
   document.addEventListener("pointerdown", function () { pointerDown = true; }, true);
@@ -39,10 +40,15 @@
     if (!el) return;
     var every = parseFloat(el.getAttribute("data-ks-every")) || 1000;
     ticks[id] = setTimeout(function () {
-      var current = document.querySelector('[data-ks-live="' + id + '"]');
+      var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
       if (!current || !current.contains(el)) return;
-      send(current, parseInt(el.getAttribute("data-ks-on-tick"), 10), el.getAttribute("data-ks-args"), el, { type: "tick" });
+      var handler = parseInt(el.getAttribute("data-ks-on-tick"), 10);
+      send(current, handler, handlerArgs(el, handler), el, { type: "tick" });
     }, every);
+  }
+
+  function handlerArgs(el, handler) {
+    return el.getAttribute("data-ks-args-" + handler) || el.getAttribute("data-ks-args");
   }
 
   function blockOf(el) { return el && el.closest ? el.closest("[data-ks-live]") : null; }
@@ -58,7 +64,7 @@
   }
 
   // Events for one block run one at a time, each starting from the state the last one returned.
-  var queues = {};
+  var queues = Object.create(null);
 
   function send(block, handler, args, target, domEvent) {
     var id = block.getAttribute("data-ks-live");
@@ -74,15 +80,23 @@
 
     queues[id] = (queues[id] || Promise.resolve()).then(function () {
       flush(id); // start from the newest HTML, even if it was waiting for the pointer
-      var current = document.querySelector('[data-ks-live="' + id + '"]');
+      var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
       if (!current) return;
+      if (current.hasAttribute("data-ks-expired")) {
+        if (!modelForms.keepExpiredDraft(document)) location.reload();
+        return;
+      }
+      var checkpoint = modelForms.checkpoint(current);
       var b = binds(current);
       // The input that fired wins over other inputs bound to the same name.
       if (targetBind) b[targetBind] = targetValue;
       current.setAttribute("aria-busy", "true");
-      return fetch("/_ks/live", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      var route = current.getAttribute("data-ks-route");
+      var headers = { "Content-Type": "application/json" };
+      if (route) headers["X-KScript-Live"] = route;
+      return fetch(route ? location.pathname + location.search : "/_ks/live", {
+        method: "POST", mode: "same-origin", credentials: "same-origin", redirect: "manual",
+        headers: headers,
         body: JSON.stringify({
           page: location.pathname + location.search,
           block: id,
@@ -93,27 +107,37 @@
           event: eventInfo
         })
       }).then(function (res) {
-        if (res.status === 409) { location.reload(); return null; }
+        if (res.status === 409 || res.type === "opaqueredirect" || (route && res.ok && res.headers.get("X-KScript-Fragment") !== "1")) {
+          if (modelForms.keepExpiredDraft(document)) {
+            current.setAttribute("data-ks-expired", "");
+            current.removeAttribute("aria-busy");
+            clearTimeout(ticks[id]);
+            delete pending[id];
+          } else location.reload();
+          return null;
+        }
         return res.text().then(function (html) { return { ok: res.ok, html: html }; });
       }).then(function (r) {
-        var el = document.querySelector('[data-ks-live="' + id + '"]');
+        var el = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
         if (!r || !el) return;
         if (!r.ok) { console.error("KScript:", r.html); el.removeAttribute("aria-busy"); scheduleTick(el); return; }
         // While typing, keep what is in the box; after an action (Add, Reset…) show what the server set.
         var keepValue = handler < 0 || eventInfo.type === "input";
-        if (pointerDown) pending[id] = { html: r.html, keepValue: keepValue };
-        else swap(el, r.html, keepValue);
+        if (pointerDown || modelForms.composingIn(el)) pending[id] = { html: r.html, keepValue: keepValue, checkpoint: checkpoint };
+        else swap(el, r.html, keepValue, checkpoint);
       });
     }).catch(function (err) {
       console.error("KScript:", err);
+      var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
+      if (current) { current.removeAttribute("aria-busy"); scheduleTick(current); }
     });
   }
 
   // Replace the block, keeping focus, caret and what the user is typing.
-  function swap(block, html, keepValue) {
+  function swap(block, html, keepValue, checkpoint) {
     var active = document.activeElement;
     var keep = null;
-    if (active && blockOf(active) === block) {
+    if (active && block.contains(active)) {
       keep = {
         bind: active.getAttribute("data-ks-bind"),
         id: active.id,
@@ -125,14 +149,15 @@
     var tpl = document.createElement("template");
     tpl.innerHTML = html.trim();
     var fresh = tpl.content.firstElementChild;
+    var modelFocus = modelForms.restore(block, fresh, checkpoint, active);
     block.replaceWith(fresh);
     scheduleTick(fresh);
-    if (!keep) return;
-    var el = keep.bind
-      ? fresh.querySelector('[data-ks-bind="' + keep.bind + '"]')
-      : keep.id ? document.getElementById(keep.id) : null;
+    if (!keep || (active.form?.hasAttribute("data-ks-model-form") && !modelFocus)) return;
+    var el = modelFocus || (keep.bind
+      ? fresh.querySelector('[data-ks-bind="' + CSS.escape(keep.bind) + '"]')
+      : keep.id ? document.getElementById(keep.id) : null);
     if (!el) return;
-    if (keepValue && keep.bind && "value" in el && el.type !== "checkbox") el.value = keep.value;
+    if (!modelFocus && keepValue && keep.bind && "value" in el && el.type !== "checkbox") el.value = keep.value;
     el.focus();
     try { if (keep.start != null) el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text input */ }
   }
@@ -140,18 +165,21 @@
   function handle(e) {
     var type = e.type;
     var target = e.target;
+    var block = blockOf(target);
+    if (modelForms.handle(e, block)) return;
+    if (type === "compositionend") setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
+    if (type === "compositionstart" || type === "compositionend" || e.isComposing) return;
     var el = target.closest ? target.closest("[data-ks-on-" + type + "]") : null;
     if (type === "keydown" && !el && e.key === "Enter") {
       el = target.closest ? target.closest("[data-ks-on-enter]") : null;
       if (el) type = "enter";
     }
-    var block = blockOf(target);
     if (!block) return;
 
     if (el) {
       if (type === "submit" || type === "enter" || (type === "click" && el.tagName === "A")) e.preventDefault();
       var handler = parseInt(el.getAttribute("data-ks-on-" + type), 10);
-      var args = el.getAttribute("data-ks-args");
+      var args = handlerArgs(el, handler);
       if (type === "input") {
         clearTimeout(timers[block.getAttribute("data-ks-live")]);
         timers[block.getAttribute("data-ks-live")] = setTimeout(function () { send(blockOf(target) || block, handler, args, target, e); }, 120);

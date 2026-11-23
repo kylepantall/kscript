@@ -9,7 +9,8 @@
     "port": 8080
   },
   "http": {
-    "middleware": ["log"]
+    "middleware": ["log"],
+    "auth": { "passkey_origin": "http://localhost:8080" }
   },
   // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
   "config": {

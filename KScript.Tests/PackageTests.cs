@@ -163,6 +163,34 @@ public class PackageTests
         Assert.Equal(expected, Eval(expression, "KScript.Math"));
     }
 
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(2, 3)]
+    [InlineData(3, 4)]
+    [InlineData(16, 22)]
+    public void RandomBytesReturnTheRequestedEncoding(int count, int base64Length)
+    {
+        string hex = Eval($"@random_bytes({count})", "KScript.Math");
+        Assert.Matches("^[0-9a-f]+$", hex);
+        Assert.Equal(count, Convert.FromHexString(hex).Length);
+        string url = Eval($"@random_bytes(format: 'base64url', count: {count})", "KScript.Math");
+        Assert.Matches("^[A-Za-z0-9_-]+$", url);
+        Assert.Equal(base64Length, url.Length);
+        string padded = url.Replace('-', '+').Replace('_', '/').PadRight((url.Length + 3) / 4 * 4, '=');
+        Assert.Equal(count, Convert.FromBase64String(padded).Length);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("1.5")]
+    [InlineData("65537")]
+    [InlineData("16, format: 'text'")]
+    public void RandomBytesRejectInvalidRequests(string arguments)
+    {
+        Assert.Equal("Argument", Fails($"<echo>{{ @random_bytes({arguments}) }}</echo>", "KScript.Math").Type);
+    }
+
     [Fact]
     public void RandomIsRepeatableWithASeed()
     {

@@ -58,6 +58,9 @@ namespace KScript.Syntax.Markup
             /// <summary>A statement's expression: ends at a new line, ';' or the '}' that closes the block.</summary>
             Line,
 
+            /// <summary>A type rule ends like a statement, or at an outer comma.</summary>
+            Rule,
+
             /// <summary>The head of a block (if, for, while, match, case): also ends at '{'.</summary>
             Header,
 
@@ -147,6 +150,17 @@ namespace KScript.Syntax.Markup
                 else if (fields && RuleLineAhead() is string rule)
                 {
                     ParseRule(parent, rule);
+                    commentTarget = parent;
+                    SkipTrivia(newlines: false);
+                    if (Peek(0) == ',')
+                    {
+                        var comma = new TextSpan(pos++, 1);
+                        bool trailing = AtStatementEnd();
+                        Error(comma, DiagnosticCodes.MarkupSyntax, "Separate type rules with a newline or a semicolon.",
+                            new QuickFix(trailing ? "Remove trailing comma" : "Replace comma with semicolon",
+                                new TextChange(comma, trailing ? string.Empty : ";")));
+                        continue; // Recover at the next member even when two rules were on the same line.
+                    }
                 }
                 else if (fields)
                 {
@@ -1395,11 +1409,11 @@ namespace KScript.Syntax.Markup
                     pos = nameSpan.End;
                     SkipSpaces();
                     pos++;
-                    AddExpressionAttribute(e, "test", Stop.Argument);
-                    if (Peek(0) == ',')
+                    AddExpressionAttribute(e, "test", Stop.Rule);
+                    if (Peek(0) == ',' && RuleValueFollowsComma())
                     {
                         pos++;
-                        SkipSpaces();
+                        SkipTrivia(newlines: true);
                         if (Peek(0) == '\'' || Peek(0) == '"')
                         {
                             // The message is text, as message="..." is in XML: its quotes go.
@@ -1410,7 +1424,7 @@ namespace KScript.Syntax.Markup
                         }
                         else
                         {
-                            AddExpressionAttribute(e, "message", Stop.Line);
+                            AddExpressionAttribute(e, "message", Stop.Rule);
                         }
                     }
                     Finish(e, start);
@@ -1422,7 +1436,7 @@ namespace KScript.Syntax.Markup
                     pos = nameSpan.End;
                     SkipSpaces();
                     pos++;
-                    AddExpressionAttribute(e, "value", Stop.Line);
+                    AddExpressionAttribute(e, "value", Stop.Rule);
                     Finish(e, start);
                     return;
                 }
@@ -1446,7 +1460,8 @@ namespace KScript.Syntax.Markup
             }
             else
             {
-                (int s, int end) = ReadExpression(Stop.Line);
+                bool plainList = rule is "one_of" or "not" && Peek(0) != '[';
+                (int s, int end) = ReadExpression(ModelSettings.Contains(rule) ? Stop.Line : Stop.Rule, plainList);
                 value = TextSpan.FromBounds(s, end);
             }
             if (value.Length == 0)
@@ -1460,6 +1475,24 @@ namespace KScript.Syntax.Markup
                 return;
             }
             AddAttribute(type, rule, DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start), value, nameSpan, '\0');
+        }
+
+        // A bare one_of/not list or validate message can continue after a comma, including on
+        // the next line. A closing delimiter or a new named member means the comma was trailing.
+        private bool RuleValueFollowsComma()
+        {
+            int comma = pos++;
+            SkipTriviaLookingAhead();
+            bool follows = pos < text.Length && Peek(0) is not ('}' or ';') && !Lookahead("fn ") && !Lookahead("fn\t");
+            if (follows && Lexer.IsIdentStart(Peek(0)))
+            {
+                ReadName();
+                if (Peek(0) == '?') pos++;
+                SkipSpaces();
+                follows = Peek(0) != ':' || Lexer.AfterUrlScheme(text, pos + 1);
+            }
+            pos = comma;
+            return follows;
         }
 
         private static string RuleExample(string rule) => rule switch
@@ -1938,7 +1971,7 @@ namespace KScript.Syntax.Markup
         /// Reads an expression as raw text, keeping brackets and strings balanced. A new line ends it unless a bracket
         /// is open, the line ends with an operator, or the next line starts with one (such as |>).
         /// </summary>
-        private (int Start, int End) ReadExpression(Stop stop)
+        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false)
         {
             SkipSpaces();
             int start = pos;
@@ -2016,7 +2049,7 @@ namespace KScript.Syntax.Markup
                 }
                 if (brackets.Count == 0)
                 {
-                    if (c == ';' && stop is Stop.Line or Stop.Header or Stop.Arm)
+                    if (c == ';' && stop is Stop.Line or Stop.Rule or Stop.Header or Stop.Arm)
                     {
                         break;
                     }
@@ -2029,13 +2062,13 @@ namespace KScript.Syntax.Markup
                         // 1 => echo "one", 2 => echo "two": a comma ends an arm's statement.
                         break;
                     }
-                    if (c == ',' && stop == Stop.Argument)
+                    if (c == ',' && (stop == Stop.Argument || stop == Stop.Rule && (!plainRuleList || !RuleValueFollowsComma())))
                     {
                         break;
                     }
                     if (c == '\n' || c == '\r')
                     {
-                        if (stop is Stop.Line && pos > start && ContinuesAfter(start, pos) && !ContinuesBefore(pos) && StatementStartsAfter(pos))
+                        if (stop is Stop.Line or Stop.Rule && pos > start && ContinuesAfter(start, pos) && !ContinuesBefore(pos) && StatementStartsAfter(pos))
                         {
                             // k = 5 + and then a new statement: the value was left unfinished. Stop here, so the
                             // problem is reported on this line and not on the correct line after it.
@@ -2157,6 +2190,7 @@ namespace KScript.Syntax.Markup
                 return true;
             }
             string line = WithoutTrailingComments(text.Substring(start, end - start));
+            if (CastSyntax.ContinuesAfter(line) is bool cast) return cast;
             if (TrailingContinuations.Any(op => line.EndsWith(op, StringComparison.Ordinal))
                 && !(line.EndsWith('/') && Lexer.Tokenize(line) is { Count: > 0 } tokens && tokens[^1].Kind == TokenKind.Regex))
             {
@@ -2188,6 +2222,7 @@ namespace KScript.Syntax.Markup
             {
                 p++;
             }
+            if (CastSyntax.StartsLine(text, p)) return true;
             if (LeadingContinuations.Any(op => string.CompareOrdinal(text, p, op, 0, op.Length) == 0))
             {
                 // "..." would be a spread, but a line starting with '.' is always a continuation here.

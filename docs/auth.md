@@ -88,6 +88,40 @@ fn sign_in(form: map) {
 }
 ```
 
+## Passkeys
+
+To create accounts using passkeys from the first visit, run this in your project.
+
+```sh
+kscript make auth --passkeys
+```
+
+Open `/register` and choose **Create account with a passkey**. KScript creates the account and starts its session after the device verifies the ceremony. Store `@user().id` as a string on records the account owns, such as licenses. Every passkey added on `/account` signs in to that same ID. Add a second passkey before removing the first. An account with a single passkey must keep it.
+
+The generator sets `http.auth.passkey_signup` and uses the configured serve port for localhost. For a deployed app, generate with `--origin https://accounts.example.com`. Add `--rp-id example.com` if you want that parent domain to scope the credentials. Add `--api` for the authenticated identity endpoint. A signed-in user can issue tokens from the account page. This kit has no password registration, sign-in or reset routes.
+
+In a project made with `kscript make auth`, set the public origin in `kscript.json` and restart `kscript serve`. For the default local server, use the following setting.
+
+```json
+{ "http": { "auth": { "passkey_origin": "http://localhost:8080" } } }
+```
+
+Sign in to an existing account, open `/account` and choose **Add a passkey**. Sign out, then choose **Sign in with a passkey** on `/login`. The browser asks you to unlock your passkey. Each successful sign-in starts a fresh KScript session, so existing `auth:session` routes and [model forms](web.md#model-forms) work with it. You can enroll multiple passkeys and remove a lost one from the account page.
+
+For your own pages, put these buttons on the sign-in and signed-in account pages respectively. KScript supplies the browser code and the HTTP endpoints.
+
+```html
+<button type="button" passkey="signup" passkey-redirect="/account">Create account with a passkey</button>
+<button type="button" passkey="login" passkey-redirect="/account">Sign in with a passkey</button>
+<button type="button" passkey="register">Add a passkey</button>
+```
+
+Use `@has_passkeys()` from KScript.Auth to show the controls when the site has enabled them. After sign-in the browser returns to the protected URL that prompted it, or to `http.auth.home`. The optional `passkey-redirect` overrides that destination with a page on the same origin. From a signed-in account page, `@passkeys()` lists that user's credential IDs and creation dates. Call `@revoke_passkey($id)` from a CSRF-protected POST to remove one.
+
+For a custom browser UI, POST `{}` as `application/json` to `/_ks/passkeys/signup/options` for a new account, `/_ks/passkeys/register/options` to add a credential, or `/_ks/passkeys/login/options` to sign in. Use the returned public-key options with the browser's credentials API. POST the resulting credential JSON to `verify` in the same path, from the same origin and session. Verification returns `{"ok":true}` on success and includes the destination in `redirect` for sign-in. Each challenge expires after five minutes and can be verified once, on the process that issued it. Restarting a server discards pending ceremonies. When using several workers, route both steps to the same worker. Accounts and completed credentials persist in the auth store.
+
+For deployment set `passkey_origin` to the exact public HTTPS origin, including a non-default port. The relying party ID defaults to its hostname. To keep credentials scoped to a parent domain you control, set `passkey_rp_id` before enrolling users. Changing the relying party ID requires enrolling new credentials. Back up the `_passkeys` folder alongside your auth user data. Use `@users()->delete(id)` to remove a stored account and its passkeys. If a separate system manages your users, give each account an immutable ID that is never reused.
+
 ## Protecting routes
 
 The `auth` middleware lets signed-in users through and sets `$request.user`. A browser is sent to `http.auth.login` (`/login`) and comes back afterwards. A request that wants JSON (an API route, an `Authorization` header, or `Accept: application/json`) gets a 401 instead. The `guest` middleware is the other way round: it sends people who are signed in to `http.auth.home`.
@@ -276,6 +310,9 @@ Every setting has a safe default, so set only what you want to change. Times are
 | `attempts` | `5` | Failed sign-ins allowed per email and address. |
 | `lockout` | `1m` | How long failures are counted over, and how long `@attempt` then waits. |
 | `reset_lifetime` | `1h` | How long a reset token works. |
+| `passkey_origin` | disabled | The public HTTPS origin that can register and use passkeys. Local development accepts `http://localhost` with an optional port. |
+| `passkey_signup` | `false` | Allow a guest to create a passwordless account by verifying a new passkey. Requires `passkey_origin`. |
+| `passkey_rp_id` | origin hostname | The relying party domain for credentials. |
 | `token_env` | `API_TOKEN` | The environment variable with the shared token the `auth` middleware also accepts. |
 
 The password rules are the `password` type's, under `types` (see [Types and validation](types.md)). `@register`, `@reset_password` and `->set_password` use them, and so do typed fields such as `password: password` in a `type`.

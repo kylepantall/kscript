@@ -100,7 +100,11 @@ namespace KScript.Language.Analysis
                 CheckModelArgument(a.Value, region, slot.Type == ParameterInfo.ModelOrString);
                 return;
             }
-            CheckNumberArgument(a, slot, region);
+            if (slot.Type is "number" or "int" or "float")
+            {
+                CheckNumberArgument(a, slot, region);
+                return;
+            }
             if (pendingRaw.Contains(a))
             {
                 if (slot.RawText == null || slot.RawText == "handle")
@@ -140,10 +144,9 @@ namespace KScript.Language.Analysis
             {
                 CheckLiteralFits(word, slot.Type, region.Source.ToSource(node.Span), null, 0);
             }
-            else if (a.Value is LiteralNode { Kind: LiteralKind.String or LiteralKind.Email or LiteralKind.Uuid or LiteralKind.Url or LiteralKind.SlashPath or LiteralKind.Duration or LiteralKind.Number } literal)
+            else
             {
-                object value = literal.Kind == LiteralKind.Number ? double.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture) : literal.Value;
-                CheckLiteralFits(value, slot.Type, region.Source.ToSource(literal.Span), null, 0);
+                CheckTypedLiteral(a.Value, slot.Type, region.Source, null, 0);
             }
         }
 
@@ -185,9 +188,9 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
-                if (BareWord(a) is var (_, _, node))
+                if (BareWord(a) is var (_, negated, node))
                 {
-                    AnalyzeBareIdentifier(node, region, scope, ExprContext.Argument);
+                    AnalyzeBareIdentifier(node, region, scope, ExprContext.Argument, allowPattern: !negated);
                 }
                 else
                 {
@@ -321,6 +324,16 @@ namespace KScript.Language.Analysis
                         positional++;
                         continue;
                     }
+                    if (!neg && a.Value is IdentifierNode literal && TryPatternLiteral(literal, region))
+                    {
+                        pendingBare.Remove(a);
+                        if (slot is { AcceptsModel: true } modelSlot)
+                        {
+                            ClaimTyped(a, modelSlot, region);
+                        }
+                        filled[positional++] = a;
+                        continue;
+                    }
                     string close = Suggestions.Closest(w, signature.Where(p => !p.Variadic).Select(p => p.Name));
                     if (close != null)
                     {
@@ -419,6 +432,7 @@ namespace KScript.Language.Analysis
             }
             if (!slot.IsEnum)
             {
+                if (a.Value is IdentifierNode literal && TryPatternLiteral(literal, region)) return;
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareIdentifier,
                     $"'{word}' isn't a value. '{slot.Name}' of {display} isn't an enum, so write text in quotes ('{word}') or a variable (${word}).",
                     new[] { new QuickFix($"Quote as '{word}'", new TextChange(span, "'" + word + "'")) });
@@ -427,14 +441,30 @@ namespace KScript.Language.Analysis
             ReportBadValue(display, slot, word, span, quoted: false);
         }
 
+        private void ClaimRawListItems(ArgumentNode argument, string type, ExpressionRegion region, Scope scope, int offset)
+        {
+            string list = type?.TrimEnd('?');
+            if (list?.EndsWith("[]", StringComparison.Ordinal) != true || !pendingBareItems.ContainsKey(argument)) return;
+            string itemType = list[..^2].TrimEnd();
+            if (RawTextKindOf(itemType, scope, offset) == null) return;
+            foreach (IdentifierNode item in pendingBareItems[argument])
+            {
+                CheckLiteralFits(item.Name, itemType, region.Source.ToSource(item.Span), scope, offset);
+            }
+            pendingBareItems.Remove(argument);
+        }
+
         /// <summary>
         /// Bare words in an array on a list-of-enum parameter (<c>@pack([large, small])</c> for <c>sizes: Size[]</c>):
         /// each must be one of the values. On any other parameter they stay pending and are reported as unknown names.
         /// </summary>
         private void ResolveEnumItems(string display, ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
-            if (!slot.IsEnumList || !(a.Value is ListNode))
+            if (a.Value is not ListNode) return;
+            if (!slot.IsEnumList)
             {
+                int offset = region.Source.ToSource(a.Span.Start);
+                ClaimRawListItems(a, slot.Type, region, result.ScopeAt(offset), offset);
                 return;
             }
             List<IdentifierNode> items = pendingBareItems.Remove(a, out List<IdentifierNode> pending) ? pending : new List<IdentifierNode>();

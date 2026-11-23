@@ -45,6 +45,115 @@ public sealed class TypeConstructionTests : DataFixture
         Assert.Equal(printed, Runs(code));
     }
 
+    [Fact]
+    public void CastEvaluatesOnceThenNormalizesAndValidatesTheResult()
+    {
+        string printed = Runs("""
+            type PasskeySessionKey with [string] {
+              min: 8
+              normalize: $value->trim()
+              pattern: /^passkey_[a-zA-Z]+$/
+            }
+            fn key_for(kind) {
+              echo 'called'
+              return " passkey_{$kind} "
+            }
+            key = @key_for('login') as PasskeySessionKey
+            echo $key
+            """);
+        Assert.Equal("called\npasskey_login\n", printed);
+    }
+
+    [Theory]
+    [InlineData("echo '41' as int + 1", "42\n")]
+    [InlineData("echo 'small' as Size", "small\n")]
+    [InlineData("items = [{name: 'arc'}] as Repo[]\necho $items[0].name", "arc\n")]
+    [InlineData("echo null as Age? == null", "true\n")]
+    [InlineData("echo 'ok' as string(min: 2)", "ok\n")]
+    public void CastUsesTheDeclaredTarget(string code, string printed) =>
+        Assert.Equal(printed, Runs(code));
+
+    [Theory]
+    [InlineData("'200' as Age?", "Shape", "150")]
+    [InlineData("[{stars: 1}] as Repo[]", "Shape", "name")]
+    [InlineData("'x' as string(min: 2)", "Shape", "2")]
+    [InlineData("null as MissingType?", "Type", "Unknown type 'MissingType'")]
+    [InlineData("[] as MissingType[]", "Type", "Unknown type 'MissingType'")]
+    [InlineData("[] as string(typo: 1)[]", "Type", "typo")]
+    public void InvalidCastFailsEvenForNullableOrListTargets(string expression, string errorType, string message)
+    {
+        KScriptException error = TypeFails("value = " + expression);
+        Assert.Equal(errorType, error.Type);
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
+    public void ARepeatedTextCastReusesOnlyTheSameInputAndDeclaration()
+    {
+        var interpreter = new Interpreter(KScriptHost.ForText(new StringWriter()));
+        var expression = KScript.Syntax.ExpressionParser.ParseExpression("$input as Key").Root;
+        var scope = new Scope();
+        var baseType = TypeRef.Parse("string");
+        var rules = TypeRules.FromOptions(new Dictionary<string, object> { ["pattern"] = "/key_[a-z]+/" }, out _);
+        scope.Declare("Key", new RefinedType("Key", baseType, rules, null, scope, null));
+        string first = new string("key_login".ToCharArray());
+        scope.Declare("input", first);
+        Assert.Same(first, interpreter.Evaluate(expression, scope, default));
+
+        string repeated = new string(first.ToCharArray());
+        scope.Assign("input", repeated);
+        Assert.NotSame(first, repeated);
+        Assert.Same(first, interpreter.Evaluate(expression, scope, default));
+
+        scope.Assign("input", "invalid");
+        Assert.Equal("Shape", Assert.Throws<KScriptException>(() => interpreter.Evaluate(expression, scope, default)).Type);
+        var strict = TypeRules.FromOptions(new Dictionary<string, object> { ["min"] = 30 }, out _);
+        scope.Declare("Key", new RefinedType("Key", baseType, strict, null, scope, null));
+        scope.Assign("input", repeated);
+        Assert.Equal("Shape", Assert.Throws<KScriptException>(() => interpreter.Evaluate(expression, scope, default)).Type);
+    }
+
+    [Fact]
+    public void RepeatedComputedTextRechecksRulesThatReadState()
+    {
+        string output = Runs("""
+            type Key with [string] {
+              normalize: $value->trim()
+              pattern: /^passkey_[a-z]+$/
+              validate: $allowed, 'disabled'
+            }
+            allowed = true
+            fn make(kind) => " passkey_{$kind} " as Key
+            echo @make('login')
+            allowed = false
+            try {
+              echo @make('login')
+            } catch err {
+              echo $err.type
+            }
+            """);
+        Assert.Equal("passkey_login\nShape\n", output);
+    }
+
+    [Theory]
+    [InlineData("/a|abc/", "abc", true)]
+    [InlineData("/a|abc/", "zabc", false)]
+    [InlineData("/a|abc/", "abcd", false)]
+    [InlineData("/aBc/mi", "ABC", true)]
+    [InlineData("/a|ab # trailing comment/x", "ab", true)]
+    [InlineData("/(?x) a # trailing comment/", "a", true)]
+    public void ARecognizingPatternCoversTheWholeToken(string pattern, string word, bool expected)
+    {
+        Assert.True(RegexValue.TryParse(pattern, out var regex, out _));
+        Assert.Equal(expected, regex.MatchesWholeWord(word));
+    }
+
+    [Fact]
+    public void XmlExpressionsSupportTheSameCast()
+    {
+        Assert.Equal("42\n", ScriptRunner.Run("""<kscript><echo value="'41' as int + 1" /></kscript>"""));
+    }
+
     [Theory]
     [InlineData("Repo({ stars: 1 })", "name")]
     [InlineData("Repo(stars: 'many', name: 'k')", "stars")]

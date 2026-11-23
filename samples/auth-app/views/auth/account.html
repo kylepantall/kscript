@@ -3,10 +3,22 @@
   <h1>Your account</h1>
   <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
   <p>Signed in as <strong>{ $data.user.name ?? $data.user.email }</strong> ({ $data.user.email }).</p>
+  <p><a href="/profile">Edit profile</a></p>
   <form method="post" action="/logout">
     {! @csrf_field() }
     <button>Sign out</button>
   </form>
+
+  <if test="@has_passkeys()">
+    <h2>Passkeys</h2>
+    <button passkey="register" passkey-redirect="/account">Add a passkey</button>
+    <for each="key" in="@passkeys()">
+      <form method="post" action="/account/passkeys/{ $key.id }/delete">
+        {! @csrf_field() }
+        <span>Added { $key.created_at }</span> <button>Remove passkey</button>
+      </form>
+    </for>
+  </if>
 
   <h2>API tokens</h2>
   <p>Programs send a token as <code>Authorization: Bearer &lt;token&gt;</code> to act as you.</p>

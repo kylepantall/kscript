@@ -180,6 +180,9 @@
           }
         },
         {
+          "include": "#cast"
+        },
+        {
           "name": "keyword.operator.word.kscript",
           "match": "\\b(and|or|not|eq|ne|lt|le|gt|ge|in|step)\\b"
         },
@@ -243,6 +246,9 @@
               "name": "entity.name.function.method.kscript"
             }
           }
+        },
+        {
+          "include": "#cast"
         },
         {
           "name": "keyword.operator.word.kscript",
@@ -322,6 +328,9 @@
           }
         },
         {
+          "include": "#cast"
+        },
+        {
           "name": "keyword.operator.word.kscript",
           "match": "\\b(and|or|not|eq|ne|lt|le|gt|ge|in|step)\\b"
         },
@@ -371,6 +380,9 @@
               "name": "entity.name.function.method.kscript"
             }
           }
+        },
+        {
+          "include": "#cast"
         },
         {
           "name": "keyword.operator.word.kscript",
@@ -471,6 +483,9 @@
               "name": "entity.name.function.method.kscript"
             }
           }
+        },
+        {
+          "include": "#cast"
         },
         {
           "name": "keyword.operator.word.kscript",
@@ -663,6 +678,17 @@
           "name": "constant.other.uuid.kscript"
         }
       ]
+    },
+    "cast": {
+      "match": "(?<![\\w$@.-])(as)[ \\t]+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "keyword.operator.word.kscript"
+        },
+        "2": {
+          "name": "entity.name.type.kscript"
+        }
+      }
     }
   }
 }

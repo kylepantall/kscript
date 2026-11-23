@@ -60,6 +60,59 @@ namespace KScript.Language.Tests
             Assert.Equal(element, doc.RootElements.Single().ChildElements.Concat(doc.RootElements).First(e => e.Name != "kscript").Name);
         }
 
+        [Theory]
+        [InlineData("min: 8,\n  normalize: $value->trim()")]
+        [InlineData("min: 8, // a note\r\n  max: 12")]
+        [InlineData("max: 12, /* a note */\n  min: 8")]
+        [InlineData("pattern: /[a-z,]+/,")]
+        [InlineData("pattern: 'x,',")]
+        [InlineData("pattern: /x/ /* note */,")]
+        [InlineData("validate: $value > 0,\n  fn twice() => $value * 2")]
+        [InlineData("normalize: @trim($value),")]
+        [InlineData("one_of: [one, two],")]
+        [InlineData("not: one, two,\n  min: 2")]
+        [InlineData("validate: $value > 0,\n  min: 1")]
+        [InlineData("validate: $value > 0, 'Too small',")]
+        public void ATrailingRuleCommaHasOnePreciseRemoval(string rules)
+        {
+            string code = "type T with [string] { " + rules + " }";
+            MarkupDocument doc = CodeParser.Parse(code);
+            var problem = Assert.Single(doc.Diagnostics);
+            int comma = code.LastIndexOf(',');
+            Assert.Equal("KS1001", problem.Code);
+            Assert.Equal(comma, problem.Span.Start);
+            Assert.Equal(1, problem.Span.Length);
+            var fix = Assert.Single(Assert.Single(problem.Fixes).Changes);
+            Assert.Equal(problem.Span, fix.Span);
+            Assert.Equal(string.Empty, fix.NewText);
+            Assert.Empty(CodeParser.Parse(code.Remove(comma, 1)).Diagnostics);
+        }
+
+        [Fact]
+        public void InlineRuleCommaRecoversAtTheNextRule()
+        {
+            var doc = CodeParser.Parse("type Length with [int] { min: 8, max: 32 }");
+            var problem = Assert.Single(doc.Diagnostics);
+            Assert.Equal(";", Assert.Single(Assert.Single(problem.Fixes).Changes).NewText);
+            var type = doc.RootElements.Single().ChildElements.Single();
+            Assert.Equal("8", type.GetAttributeValue("min"));
+            Assert.Equal("32", type.GetAttributeValue("max"));
+        }
+
+        [Theory]
+        [InlineData("min: 8; max: 12")]
+        [InlineData("one_of: [one, two,]; not: three, four")]
+        [InlineData("one_of: one,\n two")]
+        [InlineData("one_of: https://a.example, https://b.example")]
+        [InlineData("pattern: /a{1,3}[,]/; normalize: @join([$value, ','], ',')")]
+        [InlineData("validate: $value->between(1, 3), 'Needs 1, 2, or 3'")]
+        [InlineData("validate: $value > 0,\n 'Too small'; min: 1")]
+        [InlineData("min: 8 // keep this comma,\n max: 12")]
+        public void CommasInsideRuleValuesKeepTheirMeaning(string rules)
+        {
+            Assert.Empty(CodeParser.Parse("type T with [string] { " + rules + " }").Diagnostics);
+        }
+
         [Fact]
         public void ADocCommentDescribesATypedVariable()
         {

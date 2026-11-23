@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 using KScript.Projects;
@@ -38,12 +40,16 @@ namespace KScript.Scaffolding
             ProjectConfig project = ProjectConfig.FindAndLoad(root);
             string format = ScriptFormat.Resolve(options, project);
             bool api = StubTemplate.IsSet(options.GetValueOrDefault("api"));
+            bool passkeys = StubTemplate.IsSet(options.GetValueOrDefault("passkeys"));
+            if (!passkeys && (options.ContainsKey("origin") || options.ContainsKey("rp-id")))
+                throw new StubException("--origin and --rp-id need --passkeys.");
             var result = new AuthResult();
 
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in options) values[kv.Key.Replace('-', '_')] = kv.Value;
             ScriptFormat.AddValues(values, format);
             values["api"] = api ? "true" : "false";
+            values["passkeys"] = passkeys ? "true" : "false";
             values["paths.controllers"] = Folder(project, "controllers");
             values["paths.views"] = Folder(project, "views");
             values["paths.requests"] = Folder(project, "requests");
@@ -55,6 +61,23 @@ namespace KScript.Scaffolding
             string controllerFile = Join(values["paths.controllers"], "accounts" + values["ext"]);
             string webRoutes = RoutesFile(root, project, api: false, format);
             string apiRoutes = RoutesFile(root, project, api: true, format);
+            var mounted = passkeys ? PasskeyRouteFiles(root, project) : null;
+            if (mounted != null)
+            {
+                var web = mounted.FirstOrDefault(r => !r.Api && r.Prefix.Trim('/').Length == 0);
+                var rest = mounted.FirstOrDefault(r => r.Api);
+                if (project?.Http.Routes != null && (web == null || (api && rest == null)))
+                    throw new StubException("The passkey kit needs an unprefixed web route file in http.routes, and an API route file when --api is used.");
+                webRoutes = web?.File ?? webRoutes;
+                apiRoutes = rest?.File ?? apiRoutes;
+                if (rest != null) values["api_prefix"] = rest.Prefix.TrimEnd('/');
+                // A refresh without --api must keep any generated /me handler still routed to this controller.
+                string prior = Path.Combine(root, apiRoutes);
+                if (force && !api && File.Exists(prior) && KitRoutes(File.ReadAllText(prior), !MarkupParser.IsCodePath(prior))
+                    .Any(r => r.Handler?.TrimStart('@') == "accounts.me"))
+                    api = true;
+                values["api"] = api ? "true" : "false";
+            }
             values["routes_file"] = webRoutes;
             values["controller_import"] = ImportPath(root, webRoutes, controllerFile);
             values["api_controller_import"] = ImportPath(root, apiRoutes, controllerFile);
@@ -82,16 +105,45 @@ namespace KScript.Scaffolding
                 bool xml = existed ? !MarkupParser.IsCodePath(full) : format == ScriptFormat.Xml;
                 bool isApi = name.StartsWith("api", StringComparison.Ordinal);
                 string text = existed ? File.ReadAllText(full).Replace("\r\n", "\n") : RouteMaker.NewRoutesFile(isApi, xml);
-                string[] paths = isApi ? new[] { "/tokens", "/me" } : Paths;
-                // A second run with --force replaces the files, but the routes are already there.
-                if (force && paths.All(p => HasPath(text, p, xml))) continue;
-                if (!force)
-                {
-                    string taken = paths.FirstOrDefault(p => HasPath(text, p, xml));
-                    if (taken != null) throw new StubException($"{file} already has a {taken} route. Remove it, or use --force to add the sign-in routes anyway.");
-                }
+                string[] paths = isApi ? (passkeys ? new[] { "/me" } : new[] { "/tokens", "/me" }) : Paths;
                 var lines = StubTemplate.Render(body, values).Trim('\n').Split('\n').Select(l => l.TrimEnd()).ToList();
                 if (xml) lines = RouteMaker.ToXmlLines(lines);
+                if (passkeys)
+                {
+                    // --force can refresh this kit's files, but an existing handler on the same path
+                    // can still receive requests ahead of the generated one.
+                    string rendered = string.Join("\n", lines);
+                    var expected = KitRoutes(xml ? "<KScript.Routes>\n" + rendered + "\n</KScript.Routes>" : "Routes {\n" + rendered + "\n}", xml);
+                    var reserved = expected.Select(r => r.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    foreach (string legacy in isApi ? new[] { "/tokens" } : new[] { "/forgot-password", "/reset-password", "/reset-password/{token}" })
+                        reserved.Add(legacy);
+                    string prefix = mounted.FirstOrDefault(r => r.File == file)?.Prefix ?? (isApi ? values["api_prefix"] : "");
+                    foreach (var other in mounted.Where(r => r.File != file && r.Prefix.Trim('/') == prefix.Trim('/')))
+                    {
+                        string src = Path.Combine(root, other.File);
+                        if (!File.Exists(src)) continue;
+                        var clash = KitRoutes(File.ReadAllText(src), !MarkupParser.IsCodePath(src)).FirstOrDefault(r => reserved.Contains(r.Path));
+                        if (clash.Path != null) throw new StubException($"{other.File} already has a {clash.Path} route on the same prefix.");
+                    }
+                    var overlap = KitRoutes(text, xml).Where(r => reserved.Contains(r.Path)).ToList();
+                    if (overlap.Count > 0)
+                    {
+                        if (force && overlap.Count == expected.Count && expected.All(overlap.Contains)) continue;
+                        throw new StubException($"{file} already has a {overlap[0].Path} route. Remove the overlapping sign-in routes before adding the passkey kit.");
+                    }
+                }
+                else
+                {
+                    // Preserve the password kit's existing --force behavior on partially overlapping files.
+                    if (force && paths.All(p => HasPath(text, p, xml)))
+                    {
+                        if (!isApi && !text.Contains("accounts.sign_in", StringComparison.Ordinal))
+                            throw new StubException("This project already has different sign-in routes. Remove the existing auth routes before switching sign-in kits.");
+                        continue;
+                    }
+                    string taken = paths.FirstOrDefault(p => HasPath(text, p, xml));
+                    if (!force && taken != null) throw new StubException($"{file} already has a {taken} route. Remove it, or use --force to add the sign-in routes anyway.");
+                }
                 var imports = lines.TakeWhile(l => Regex.IsMatch(l, xml ? @"^\s*<import\b" : @"^\s*import\b")).ToList();
                 var routes = lines.Skip(imports.Count).SkipWhile(l => l.Trim().Length == 0).ToList();
                 imports = imports.Where(i => !text.Split('\n').Any(l => l.Trim() == i.Trim())).ToList();
@@ -101,8 +153,10 @@ namespace KScript.Scaffolding
             // kscript.json: a rule for new passwords, which @register() and @reset_password() check.
             string configFile = project?.FilePath;
             string config = configFile != null ? File.ReadAllText(configFile).Replace("\r\n", "\n") : null;
-            string newConfig = config != null && !Regex.IsMatch(config, @"""types""\s*:") ? AddPasswordRule(config) : null;
+            if (passkeys) configFile ??= Path.Combine(root, "kscript.json");
+            string newConfig = passkeys ? PasskeyConfig(config ?? "{}", configFile, options, project) : config != null && !Regex.IsMatch(config, @"""types""\s*:") ? AddPasswordRule(config) : null;
 
+            if (newConfig == config) newConfig = null;
             if (!dryRun)
             {
                 foreach (var (rel, content) in files)
@@ -123,17 +177,68 @@ namespace KScript.Scaffolding
             foreach (var (file, _, existed) in routeEdits) result.Files.Add((existed ? "Added to" : "Created", file));
             foreach (string rel in files.Keys.OrderBy(f => f.EndsWith(".html", StringComparison.Ordinal) ? 1 : 0).ThenBy(f => f, StringComparer.Ordinal))
                 result.Files.Add(("Created", rel));
-            if (newConfig != null) result.Files.Add(("Added a password rule to", Path.GetRelativePath(root, configFile).Replace('\\', '/')));
+            if (newConfig != null) result.Files.Add((passkeys ? "Configured passkeys in" : "Added a password rule to", Path.GetRelativePath(root, configFile).Replace('\\', '/')));
 
             result.Next.Add("kscript serve, then open /register to make an account and /account to see it.");
-            result.Next.Add("Password reset links are written to the server's log until you email them (see send_reset in " + controllerFile + ").");
-            if (api) result.Next.Add($"POST {values["api_prefix"]}/tokens with {{ \"email\": …, \"password\": … }} gives a token for Authorization: Bearer.");
+            if (passkeys) result.Next.Add("Set http.auth.passkey_origin to your public HTTPS origin before deploying. Add a backup passkey on /account.");
+            else result.Next.Add("Password reset links are written to the server's log until you email them (see send_reset in " + controllerFile + ").");
+            if (api && passkeys) result.Next.Add($"Create a token on /account to call {values["api_prefix"]}/me.");
+            if (api && !passkeys) result.Next.Add($"POST {values["api_prefix"]}/tokens with {{ \"email\": …, \"password\": … }} gives a token for Authorization: Bearer.");
             if (project?.Http.Routes == null)
             {
                 foreach (var (file, _, _) in routeEdits.Where(e => !HttpSettings.DefaultRouteNames.Contains(Regex.Replace(e.File, @"\.(kscript|ks\.xml)$", ""))))
                     result.Next.Add($"kscript serve only finds {file} once kscript.json lists it in http.routes.");
             }
             return result;
+        }
+
+        private static string PasskeyConfig(string json, string file, Dictionary<string, string> options, ProjectConfig project)
+        {
+            string origin = options.GetValueOrDefault("origin") ?? project?.Http.Auth.PasskeyOrigin ?? $"http://localhost:{project?.Serve.Port ?? 8080}";
+            json = SetJsonProperty(json, new[] { "http", "auth", "passkey_origin" }, JsonEncodedString(origin));
+            json = SetJsonProperty(json, new[] { "http", "auth", "passkey_signup" }, "true");
+            if (options.TryGetValue("rp-id", out string rp))
+                json = SetJsonProperty(json, new[] { "http", "auth", "passkey_rp_id" }, JsonEncodedString(rp));
+            var config = ProjectConfig.Parse(json, file);
+            if (config.Http.Auth.PasskeyOrigin == null)
+                throw new StubException(string.Join(" ", config.Warnings.Where(w => w.Contains("passkey", StringComparison.Ordinal))));
+            return json;
+        }
+
+        private static string JsonEncodedString(string value) => "\"" + JsonEncodedText.Encode(value).ToString() + "\"";
+
+        // Edit just the named JSONC value. Comments, trailing commas and unrelated settings keep their exact spelling.
+        private static string SetJsonProperty(string json, string[] path, string value)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            reader.Read();
+            for (int depth = 0; depth < path.Length; depth++)
+            {
+                if (reader.TokenType != JsonTokenType.StartObject) throw new StubException("The http and auth settings in kscript.json must be objects.");
+                int insert = (int)reader.BytesConsumed;
+                reader.Read();
+                bool empty = reader.TokenType == JsonTokenType.EndObject;
+                while (reader.TokenType == JsonTokenType.PropertyName && !reader.ValueTextEquals(path[depth]))
+                {
+                    reader.Read();
+                    reader.Skip();
+                    reader.Read();
+                }
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    for (int i = path.Length - 1; i > depth; --i) value = "{ " + JsonEncodedString(path[i]) + ": " + value + " }";
+                    string property = "\n" + new string(' ', (depth + 1) * 2) + JsonEncodedString(path[depth]) + ": " + value + (empty ? "\n" + new string(' ', depth * 2) : ",");
+                    return Encoding.UTF8.GetString(bytes, 0, insert) + property + Encoding.UTF8.GetString(bytes, insert, bytes.Length - insert);
+                }
+                reader.Read();
+                if (depth + 1 < path.Length) continue;
+                int start = (int)reader.TokenStartIndex;
+                reader.Skip();
+                int end = (int)reader.BytesConsumed;
+                return Encoding.UTF8.GetString(bytes, 0, start) + value + Encoding.UTF8.GetString(bytes, end, bytes.Length - end);
+            }
+            throw new InvalidOperationException();
         }
 
         /// <summary>The kit's files, by their path inside Scaffolding/Auth.</summary>
@@ -175,6 +280,49 @@ namespace KScript.Scaffolding
 
         private static string ImportPath(string root, string routesFile, string target) =>
             Path.GetRelativePath(Path.GetDirectoryName(Path.Combine(root, routesFile))!, Path.Combine(root, target)).Replace('\\', '/');
+
+        private static List<HttpSettings.RouteFile> PasskeyRouteFiles(string root, ProjectConfig project)
+        {
+            if (project?.Http.Routes != null)
+                return project.Http.Routes.Select(r => new HttpSettings.RouteFile
+                {
+                    File = r.File.Replace('\\', '/'), Prefix = r.Prefix ?? string.Empty,
+                    Api = r.Api || Path.GetFileName(r.File) is "api.kscript" or "api.ks.xml",
+                }).ToList();
+
+            var files = new List<HttpSettings.RouteFile>();
+            foreach (string stem in HttpSettings.DefaultRouteNames)
+            {
+                string file = new[] { stem + ".kscript", stem + ".ks.xml" }.FirstOrDefault(f => File.Exists(Path.Combine(root, f)));
+                if (file == null) continue;
+                bool api = Path.GetFileName(stem) == "api";
+                files.Add(new HttpSettings.RouteFile { File = file, Api = api, Prefix = api ? project?.Http.ApiPrefix ?? "/api" : "" });
+            }
+            return files;
+        }
+
+        private static List<(string Path, string Method, string Handler, string Middleware)> KitRoutes(string text, bool xml)
+        {
+            var document = xml ? MarkupParser.Parse(text, DocumentKind.Script) : CodeParser.Parse(text);
+            CodeArguments.Normalise(document, global::KScript.Language.Catalog.LanguageCatalog.Default.GetElement);
+            var routes = new List<(string, string, string, string)>();
+            foreach (var element in document.DescendantElements())
+            {
+                string method = KScript.Metadata.ElementInfo.BareName(element.Name);
+                if (method is not ("Get" or "Post" or "Put" or "Patch" or "Delete" or "Head" or "Options" or "Route" or "Any" or "Resource")) continue;
+                string path = element.GetAttributeValue("path");
+                if (path == null) continue;
+                var middleware = new Stack<string>();
+                for (var node = element; node != null; node = node.Parent)
+                {
+                    if (node.GetAttributeValue("middleware") is string names) middleware.Push(names);
+                    if (KScript.Metadata.ElementInfo.BareName(node.Name) == "Group" && node.GetAttributeValue("prefix") is string prefix)
+                        path = prefix.TrimEnd('/') + "/" + path.TrimStart('/');
+                }
+                routes.Add(("/" + path.Trim('/'), method, element.GetAttributeValue("to"), string.Join(",", middleware)));
+            }
+            return routes;
+        }
 
         private static bool HasPath(string text, string path, bool xml) =>
             Regex.IsMatch(text, xml ? $@"\bpath=""{Regex.Escape(path)}""" : $@"\bpath:\s*""?{Regex.Escape(path)}""?\s*[,)]");
