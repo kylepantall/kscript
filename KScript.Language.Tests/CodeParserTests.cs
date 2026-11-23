@@ -16,6 +16,43 @@ namespace KScript.Language.Tests
 
         private static MarkupElement Root(string text) => Assert.Single(Code(text).RootElements);
 
+        [Fact]
+        public void ConditionalThrowKeepsTheGuardAndErrorFieldsAtTheirOriginalPositions()
+        {
+            const string guard = "$reply->has('e')";
+            const string map = "{\n  type: 'Network'\n  code: $reply.e.code\n  message: 'refused'\n}";
+            string source = $"throw if {guard} {map}\necho 'done'";
+            var root = Root(source);
+            var condition = root.ChildElements.First();
+            Assert.Equal("if", condition.Name);
+            Assert.Equal("if", source.Substring(condition.NameSpan.Start, condition.NameSpan.Length));
+            var test = condition.GetAttribute("test").Value;
+            Assert.Equal(guard, source.Substring(test.SourceSpan.Start, test.SourceSpan.Length));
+            var thrown = Assert.Single(condition.ChildElements);
+            Assert.Equal("throw", thrown.Name);
+            var value = thrown.GetAttribute("value").Value;
+            Assert.Equal(map, value.Value);
+            Assert.Equal(source.IndexOf("$reply.e.code", StringComparison.Ordinal),
+                value.ToSource(map.IndexOf("$reply.e.code", StringComparison.Ordinal)));
+            Assert.Equal("echo", root.ChildElements.Last().Name);
+        }
+
+        [Fact]
+        public void AGuardedRethrowMapsBothKeywordsAndTheGuardToTheSource()
+        {
+            const string source = "throw if $this.fallback->is_blank()\necho 'next'";
+            var root = Root(source);
+            var guard = root.ChildElements.First();
+            var thrown = Assert.Single(guard.ChildElements);
+            Assert.Equal("if", source.Substring(guard.NameSpan.Start, guard.NameSpan.Length));
+            Assert.Equal("throw", source.Substring(thrown.NameSpan.Start, thrown.NameSpan.Length));
+            Assert.Equal(thrown.NameSpan, thrown.Span);
+            Assert.Empty(thrown.Attributes);
+            var condition = guard.GetAttribute("test").Value;
+            Assert.Equal("$this.fallback->is_blank()", source.Substring(condition.SourceSpan.Start, condition.SourceSpan.Length));
+            Assert.Equal("echo", root.ChildElements.Last().Name);
+        }
+
         /// <summary>A compact picture of a tree: elements, attributes and non-blank text, ignoring layout.</summary>
         private static string Shape(MarkupElement e) =>
             e.Name

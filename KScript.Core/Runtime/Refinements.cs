@@ -134,6 +134,9 @@ namespace KScript.Runtime
                     if (!allowNormalize) throw run.Error($"<normalize> only goes in a type made with with=\"...\" from one other type, such as <type name=\"Slug\" with=\"string\">.", null, "Syntax");
                     if (Normalize != null) throw run.Error($"A type can only have one <normalize>.", null, "Syntax");
                     Normalize = e.GetAttribute("value")?.Value ?? throw run.Error($"<normalize> needs a value: value=\"$value->lower()\".", null, "Syntax");
+                    if (run.Interpreter.GetParse(run.Module, Normalize, Interpreter.ParseMode.Expression).Root is LambdaNode lambda
+                        && lambda.Parameters.Count != 1)
+                        throw Interpreter.Located(new KScriptException(CodeArguments.NormalizerArity, "Syntax"), run.Module, Normalize.ToSource(lambda.Span.Start));
                     return true;
                 default:
                     return false;
@@ -390,6 +393,7 @@ namespace KScript.Runtime
         internal Module Module { get; }
         internal RefinedType BaseRefinement { get; }
         internal bool HasMethods { get; }
+        internal IReadOnlyList<TypeCatch> Catches { get; set; } = Array.Empty<TypeCatch>();
 
         internal bool IsA(RefinedType other)
         {

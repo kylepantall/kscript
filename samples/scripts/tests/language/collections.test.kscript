@@ -1,0 +1,61 @@
+describe(name: "Collections and equality") {
+  test(name: "membership, counting and removal agree on numeric text") {
+    values = ['1', 2, 1, '2']
+    expect(value: $values->contains(1), equals: true)
+    expect(value: $values->index_of(1), equals: 0)
+    expect(value: $values->count_of(1), equals: 2)
+    expect(value: $values->remove(1), equals: [2, '2'])
+    expect(value: $values, count: 4)
+  }
+
+  test(name: "unique keeps the first value of each distinct type") {
+    distinct = [1, '1', 1, '1']->unique()
+    expect(value: $distinct, count: 2)
+    expect(value: $distinct[0] === 1, equals: true)
+    expect(value: $distinct[1] === '1', equals: true)
+  }
+
+  test(name: "predicate counts and filters can use the original index") {
+    letters = ['a', 'b', 'c', 'd', 'e']
+    even_index = fn(letter, index) => $index % 2 == 0
+    expect(value: $letters->count_of($even_index), equals: 3)
+    expect(value: $letters->filter($even_index), equals: ['a', 'c', 'e'])
+  }
+
+  test(name: "filter, sort and pluck keep each surviving row together") {
+    rows = [
+      { item: 'pear', qty: 3 },
+      { item: 'apple', qty: 0 },
+      { item: 'fig', qty: 1 },
+    ]
+    labels = $rows
+      |> filter(fn(row) => $row.qty > 0)
+      |> sort_by(fn(row) => $row.qty)
+      |> pluck(item)
+    expect(value: $labels, equals: ['fig', 'pear'])
+    expect(value: $rows[0].item, equals: 'pear')
+  }
+
+  test(name: "projecting missing fields gives null and keeps row order") {
+    rows = [{ id: 1, owner: 'Joan' }, { id: 2 }]
+    expect(value: $rows->pluck(owner), equals: ['Joan', null])
+    cards = $rows->pluck([id, owner])
+    expect(value: $cards[1], equals: { id: 2, owner: null })
+  }
+
+  test(name: "typed filters keep native methods when no versions match") {
+    versions: semver[] = []
+    expect(value: $versions->latest(), equals: null)
+    mixed = ['plain text', 42]
+    releases = $mixed->only(semver)->only(releases)
+    expect(value: $releases, equals: [])
+    expect(value: $releases->latest(), equals: null)
+  }
+
+  test(name: "native release filtering chooses semantic version order") {
+    versions: semver[] = [1.10.0, 2.0.0-rc.1, 1.2.0]
+    releases = $versions->only(releases)
+    expect(value: $releases, count: 2)
+    expect(value: $releases->latest()->to_string(), equals: '1.10.0')
+  }
+}

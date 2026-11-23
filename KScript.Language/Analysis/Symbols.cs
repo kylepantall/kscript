@@ -23,6 +23,9 @@ namespace KScript.Language.Analysis
         /// <summary>The shared "could be anything" shape. It is frozen: give a symbol its own shape before adding fields.</summary>
         public static readonly TypeShape Unknown = new TypeShape(KType.Any, frozen: true);
 
+        // A written "any" opts into runtime dispatch even if a built-in happens to have the same method name.
+        internal static readonly TypeShape ExplicitAny = new TypeShape(KType.Any, frozen: true);
+
         public TypeShape(string type) => Type = type;
 
         private TypeShape(string type, bool frozen)
@@ -219,6 +222,11 @@ namespace KScript.Language.Analysis
         /// <summary>A type method's original declaration, retained when its type is imported or inherited.</summary>
         internal ExternalLocation MethodLocation { get; init; }
 
+        /// <summary>The name used to count calls across files. Two types can declare the same method.</summary>
+        internal string ProjectUseName => MethodLocation != null
+            ? DeclaringElement.Parent.GetAttributeValue("name") + "->" + Name
+            : Name;
+
         public TypeShape Shape { get; internal set; } = TypeShape.Unknown;
 
         /// <summary>For a parameter with no type of its own: true when its type comes from what every call in the file passes.</summary>
@@ -229,6 +237,14 @@ namespace KScript.Language.Analysis
 
         /// <summary>For functions: the shape of what they return, worked out from <c>value</c> or their <c>&lt;return&gt;</c>s.</summary>
         public TypeShape ReturnShape { get; internal set; } = TypeShape.Unknown;
+
+        internal IReadOnlyList<string> EscapingErrors { get; set; } = Array.Empty<string>();
+        internal string DocumentationWithErrors(bool includeParams = true)
+        {
+            if (Doc is DocComment doc) return doc.ToMarkdown(includeParams, EscapingErrors);
+            string errors = DocComment.ThrowsMarkdown(null, EscapingErrors);
+            return errors.Length == 0 ? Description : string.IsNullOrEmpty(Description) ? errors : Description + "\n\n" + errors;
+        }
 
         public string Description { get; internal set; }
 
@@ -328,16 +344,19 @@ namespace KScript.Language.Analysis
         public Scope Parent { get; }
         public TextSpan Span { get; }
         public List<Scope> Children { get; } = new List<Scope>();
+        internal TypeShape Normalizing { get; init; }
 
         /// <summary>Symbols declared directly in this scope, with the offset from which each is visible.</summary>
         public List<(Symbol Symbol, int VisibleFrom)> Symbols { get; } = new List<(Symbol, int)>();
 
         public void Declare(Symbol symbol, int visibleFrom) => Symbols.Add((symbol, visibleFrom));
 
-        public Symbol Lookup(string name, int offset)
+        public Symbol Lookup(string name, int offset, bool includeMethods = false)
         {
             for (Scope s = this; s != null; s = s.Parent)
             {
+                if (includeMethods && s.Normalizing != null && s.Normalizing.Methods.TryGetValue(name, out Symbol method))
+                    return method;
                 for (int i = s.Symbols.Count - 1; i >= 0; i--)
                 {
                     (Symbol sym, int from) = s.Symbols[i];
@@ -351,11 +370,16 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>Every symbol visible at the offset, innermost first, without shadowed duplicates.</summary>
-        public IEnumerable<Symbol> VisibleAt(int offset)
+        public IEnumerable<Symbol> VisibleAt(int offset, bool includeMethods = false)
         {
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
             for (Scope s = this; s != null; s = s.Parent)
             {
+                if (includeMethods && s.Normalizing != null)
+                {
+                    foreach (Symbol method in s.Normalizing.Methods.Values)
+                        if (seen.Add(method.Kind + ":" + method.Name)) yield return method;
+                }
                 for (int i = s.Symbols.Count - 1; i >= 0; i--)
                 {
                     (Symbol sym, int from) = s.Symbols[i];

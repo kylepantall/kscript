@@ -1,0 +1,85 @@
+fn classify(n: int) => match $n {
+  1, 2 => 'small',
+    _ when $n > 5 => 'large',
+    _ => 'other'
+}
+
+fn unexpected_branch() {
+  throw Validation "An unselected branch was evaluated"
+}
+
+describe(name: "Control flow") {
+  test(name: "a grouped match arm, guard and default handle their boundaries") {
+    expect(value: @classify(2), equals: 'small')
+    expect(value: @classify(5), equals: 'other')
+    expect(value: @classify(6), equals: 'large')
+  }
+
+  test(name: "a match statement runs just the first matching arm") {
+    events = []
+    score = 12
+    match $score {
+      _ when $it >= 10 => events = $events->push('ten or more')
+      _ when $it > 0 => events = $events->push('positive')
+      _ => events = $events->push('other')
+    }
+    expect(value: $events, equals: ['ten or more'])
+  }
+
+  test(name: "continue skips an item and break stops the loop") {
+    kept = []
+    for n in 0..10 {
+      if $n == 6 {
+        break
+      }
+      if $n % 2 == 0 {
+        continue
+      }
+      kept = $kept->push($n)
+    }
+    expect(value: $kept, equals: [1, 3, 5])
+  }
+
+  test(name: "loop indices count visits independently of range steps") {
+    visits = []
+    for n at index in 2..9 step 3 {
+      visits = $visits->push([$index, $n])
+    }
+    expect(value: $visits, equals: [[0, 2], [1, 5], [2, 8]])
+  }
+
+  test(name: "while checks its condition before every iteration") {
+    n = 3
+    visits = []
+    while $n > 0 {
+      visits = $visits->push($n)
+      n -= 1
+    }
+    while $n > 0 {
+      @unexpected_branch()
+    }
+    expect(value: $visits, equals: [3, 2, 1])
+  }
+
+  test(name: "and and or skip the right side when the left decides") {
+    ready = true
+    expect(value: $ready or @unexpected_branch(), equals: true)
+    expect(value: (not $ready) and @unexpected_branch(), equals: false)
+  }
+
+  test(name: "null coalescing keeps false and chooses a fallback for null") {
+    flag = false
+    missing = null
+    expect(value: $flag ?? @unexpected_branch(), equals: false)
+    expect(value: $missing ?? 'fallback', equals: 'fallback')
+  }
+
+  test(name: "a conditional expression evaluates only the selected branch") {
+    choose_left = true
+    expect(value: $choose_left ? 'left' : @unexpected_branch(), equals: 'left')
+    expect(
+      value: (not $choose_left) ? @unexpected_branch() : 'right',
+      equals: 'right'
+    )
+  }
+}

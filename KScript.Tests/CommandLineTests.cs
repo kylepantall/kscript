@@ -168,6 +168,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(ExitCodes.Usage, missingRepo.Code);
         Assert.Contains("kscript repo add", missingRepo.Err);
         Assert.Contains("kscript lib add <library|owner/repo@library|owner/repo|github-url>", Kscript("lib", "--help").Out);
+        Assert.Contains("kscript lib restore", Kscript("lib", "restore", "--help").Out);
         var missingLibrary = Kscript("lib", "add");
         Assert.Equal(ExitCodes.Usage, missingLibrary.Code);
         Assert.Contains("kscript lib add", missingLibrary.Err);

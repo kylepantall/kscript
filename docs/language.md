@@ -157,6 +157,8 @@ spawn(fn: @background_job)
 
 Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too, and declare their parameters the same bare way: `by_age = fn(a, b) => $a.age - $b.age`.
 
+A parameter declared as `any` accepts any value. A method call on it uses the value's actual type. For example, `$key->trim()` trims a string, raises an error for a number, and calls the type's own `trim()` when one exists. Write `fn trim_key(key: string) => $key->trim()` for a string normalizer. The editor can then infer a string return type.
+
 ### Named arguments
 
 Any call can name its arguments, in any order: built-in commands, methods, your own `fn` functions and lambdas.
@@ -383,6 +385,24 @@ The editor completes and checks extension methods only where they apply: in a fi
 
 ## Errors
 
+Use `throw if` to raise an error only when a condition holds. Inside its block, write one field per line. KScript evaluates the condition once. It evaluates the fields only when the condition is true, so a successful reply can omit `e` entirely.
+
+```kscript
+fn result(reply: map) {
+  throw if $reply->has('e') {
+    type: 'Network'
+    message: "Host refused: {$reply.e.message}"
+    code: $reply.e.code
+  }
+  return $reply.r
+}
+try {
+  echo @result({ r: 'ready' })
+} catch Network as err {
+  echo "Request failed ({$err['code']}): {$err.message}"
+}
+```
+
 ```kscript
 try {
   data = @read_json($path)
@@ -407,6 +427,38 @@ An error nothing catches is printed as a KScript error, with where it happened a
 ```
 
 kscript shows every failure this way, in scripts, `kscript serve` error pages and all the other commands, never as a .NET exception. A failure that comes from the computer rather than the script gets the error type that fits (`FileNotFound`, `Access`, `IO`, `Network` and so on), and one kscript didn't expect is an `Internal` error, which is a bug worth [reporting](https://github.com/kylepantall/kscript/issues). To see the .NET exception and stack trace behind an error, run with `--debug` (before the script's path: `kscript --debug app.kscript`) or set `KSCRIPT_DEBUG=1`, which also works for `kscript serve` and compiled programs.
+
+### Handlers on functions and types
+
+Place a `catch` after a function or method to handle errors from its call. Place it after a type's closing brace to share a handler across its methods. The nearest matching handler runs first. Return a non-null fallback to recover. Values such as `false`, `0` and `''` all work. A bare `throw`, reaching the end of the handler, or returning a value that evaluates to `null` passes the original error to the next enclosing handler. Its type, message, location, custom fields and cause stay available to the caller.
+
+A handler that only calls `$log->warn($err.message)` records the failure and lets it propagate. An ordinary `try`/`catch` at the call site can handle it and continue with the next statement. The [runnable catch tests](../samples/scripts/tests/language/catch-propagation.test.kscript) exercise both behaviors.
+
+```kscript
+type Directory {
+  fallback: string
+
+  fn lookup(key: string) {
+    throw if $key->is_blank() {
+      type: 'Validation'
+      message: 'A key is required'
+    }
+    return $key
+  } catch Validation {
+    throw if $this.fallback->is_blank()
+    return $this.fallback
+  }
+} catch Validation as err {
+  return $err.message
+}
+
+directory = Directory(fallback: 'guest')
+echo $directory->lookup('')  // guest
+```
+
+Inside a catch, `throw if condition` rethrows the current error when the condition holds. With a nonblank fallback, `lookup` returns it. When the key and fallback are both blank, the same `Validation` error reaches the type handler and it returns `'A key is required'`. Supply a payload block after the condition to create a new error.
+
+Use `/// @throws Network` to document an error that callers may need to handle, including an error from a dynamically chosen function. Hover and signature help show known errors. A helper can let an error reach its caller. At a top-level script statement, `kscript check` and the editor warn when a known error can still escape ([KS5016](errors.md#ks5016)).
 
 ### Error types
 
@@ -460,6 +512,8 @@ No type's name ends in `Error`: they are all errors. (`QueryError` and `Connecti
 A name in `catch` or `throw` that is neither declared nor built in still works (as a kind of `Error`), but the editor warns about it (KS5011), since it is usually a typo.
 
 ## Settings: $config
+
+In the editor, hover over a project JSON or YAML setting such as `$config.passkeys.url` to see its type. Go to Definition on `url` opens the key in the project file that supplies it. This also works inside interpolated strings such as `"{$config.passkeys.url}/{$kind}/finish"`. Go to Definition on `$kind` opens the variable or parameter declaration.
 
 Every script can read settings without an import. `$config` reads `config.json`, `config.yaml` (or `config.yml`) and `.env` from the script's folder the first time it is used:
 

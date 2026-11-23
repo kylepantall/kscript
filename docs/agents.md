@@ -15,6 +15,29 @@ kscript check --output json   # problems as JSON, with fixes as exact text edits
 rewrites `.kscript/agents` and AGENTS.md each time you save a script, and `kscript serve` and `kscript watch` do the
 same whenever a file changes, so edits made anywhere (another editor, a coding agent, `git pull`) are picked up too.
 
+## Implement a feature in an existing project
+
+Read `kscript.json`, the generated symbol index and one neighboring feature first. The manifest sets the entry point, native sources and generator paths. The index shows which types and operations already exist. Follow the project's configured folders and script format.
+
+| When the feature needs | Where the code belongs |
+| --- | --- |
+| An email address, UUID, duration or URL | Give the parameter or field its built-in type. Its constructor and methods implement the format. |
+| A value with an application-specific rule | Use `kscript make native` for a project-wide refinement. Define its normalization, validation and value-specific methods once. Project natives load automatically. |
+| A known group of fields | Use `kscript make type`, import the record, and accept it at the function boundary. For external JSON use `->json(as: Type)`. Keep `map` for data with genuinely open keys. |
+| A route that accepts a JSON body | Use `kscript make route` and `kscript make request`. The route selects the controller. The controller receives `json: RequestType` and the framework validates the body. |
+| Persistent data | Use a model and the project's migrations. Keep shared domain behavior with the type or in a library module. Put rendering in a view or page component. |
+
+For example, suppose a service accepts a passkey session key. Define the key once and use it as the type of the request field.
+
+```sh
+kscript make native PasskeySessionKey --base string --normalize '$value->trim()' --pattern '/^passkey_[a-zA-Z]+$/'
+kscript make request RegisterPasskey --fields 'key: PasskeySessionKey'
+```
+
+The default layout puts these files in `natives/passkey-session-key.kscript` and `requests/register-passkey.kscript`. The request can use `PasskeySessionKey` directly. A controller imports the request file and declares `fn store(json: RegisterPasskey)`. A malformed key fails request validation before the controller runs. A worker or CLI command can take `key: PasskeySessionKey` and get the same checks.
+
+Test a valid normalized value, an invalid value, and the feature's observable result. Run `kscript check --warnings-as-errors`, `kscript test`, and `kscript fmt --check`. Handle a known error where the program can recover or report failure. See [project layout and generators](projects.md#where-files-go-the-recommended-layout) and [semantic types](types.md).
+
 ## Watching
 
 `kscript watch` builds everything the project makes from its code, then rebuilds it a moment after its files stop
@@ -53,7 +76,7 @@ You don't need to tag anything for the docs to be useful. For each function, typ
 - **a type's fields**: their types, defaults, `from` paths, computed fields and any other rule on the field, such as a validation attribute;
 - **an enum's values**;
 - **the first sentence of its `///` doc comment**, and whether it is `@deprecated`;
-- **the errors its body throws** (`throw Validation "..."` gives `throws: Validation`);
+- **the errors that can escape a call**, from explicit throws, resolved calls and `@throws` annotations;
 - **the call graph**: the functions it calls and the functions that call it, across the project's files.
 
 ```text
@@ -113,7 +136,8 @@ show them under each entry:
 - `->push(items...): list` A new list with items added to the end.
   - pitfall: Returns a new list and leaves the old one alone: write items = $items->push($x).
   - e.g. `[1, 2]->push(3, 4)`
-- `@api(url, options?): response` Makes an HTTP request and returns the response.
+- `@api(url: string, options?: map): response` Makes an HTTP request and returns the response.
+  - `options.timeout: duration` Maximum wait for an outbound HTTP(S) request. Example `30s`.
   - prefer: @api($url)->check()->json(as: Type) to fail fast and check the data's shape.
   - pitfall: A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.
 ```

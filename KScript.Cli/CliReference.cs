@@ -189,15 +189,15 @@ namespace KScript
                 "kscript repo add acme/kscript-libraries\nkscript lib add acme/kscript-libraries@slugs", "projects")
             {
                 Group = "build",
-                Details = "Give an owner/repo or its HTTPS GitHub repository URL. The command records the repository in .kscript/repos/ beside the nearest kscript.json, or in the current folder outside a project.",
+                Details = "Give a custom publisher as owner/repo or its HTTPS GitHub URL. The command records the repository in .kscript/repos/ beside the nearest kscript.json, or in the current folder outside a project. The built-in catalog kylepantall/kscript and public repositories under the trusted GitHub owners waggr-gb and orimovo are available in every project.",
             },
-            new CliCommand("lib", "kscript lib add <library|owner/repo@library|owner/repo|github-url>",
-                "Install a KScript source library from GitHub into the project.",
+            new CliCommand("lib", "kscript lib add <library|owner/repo@library|owner/repo|github-url>\nkscript lib restore",
+                "Install a KScript source library or restore the project's pinned libraries.",
                 Array.Empty<CliOption>(),
-                "kscript lib add isolink-connect\nkscript lib add acme/kscript-libraries@slugs\nkscript lib add https://github.com/owner/repo/tree/main/libraries/example", "projects")
+                "kscript lib add isolink-connect\nkscript lib add waggr-gb/isolink-connect@isolink-connect\nkscript lib restore", "projects")
             {
                 Group = "build",
-                Details = "A library name selects libraries/<name>/ on the default branch of kylepantall/kscript. Use kscript repo add before selecting a library in another repository with owner/repo@library. An owner/repo or HTTPS GitHub URL installs directly from a repository or a tree URL. The command prints the import path for the installed source.",
+                Details = "A bare name searches kylepantall/kscript, all public repositories under orimovo and waggr-gb, and repositories registered in this project. Each repository can publish libraries/<name>/ or a matching library manifest at its root. One match installs immediately. For multiple matches, the CLI prints the count and each distinct owner/repo@library name. Rerun lib add with owner/repo@library to install your choice. A qualified name avoids the catalog search and uses GitHub API quota only for the selected publisher. Register another publisher with kscript repo add owner/repo. You can also install a GitHub repository or tree URL directly. The installer prints the import path and records the source and commit in the project's kscript.json. Commit that file so kscript lib restore fetches directly from the recorded repository at that commit.",
             },
             new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
                 "Build programs that run without kscript.",

@@ -69,7 +69,7 @@ namespace KScript.Language.Features
                 signatures.Add(new SignatureInfo
                 {
                     Label = fn.TypedSignature,
-                    Documentation = doc != null ? doc.ToMarkdown(includeParams: false) : fn.Description,
+                    Documentation = fn.DocumentationWithErrors(includeParams: false),
                     Parameters = fn.Parameters.Select(p => (p.Label, WithAccepts(doc?.ParamText(p.Name), p.Type))).ToList(),
                     Details = fn.Parameters.Select(p => (p.Name, ValuesOf(p.Type), p.Type == KType.Bool)).ToList(),
                     ParameterTypes = fn.Parameters.Select(p => p.Type).ToList(),
@@ -111,7 +111,8 @@ namespace KScript.Language.Features
             {
                 case CommandCallNode c:
                 {
-                    Symbol fn = analysis.RootScope.Lookup(c.Name, int.MaxValue);
+                    int offset = region.Source.ToSource(c.NameSpan.Start);
+                    Symbol fn = analysis.ScopeAt(offset).Lookup(c.Name, offset, includeMethods: true);
                     piped = PipeInto(c) != null ? 1 : 0;
                     if (fn?.Kind == SymbolKind.Function)
                     {
@@ -141,7 +142,8 @@ namespace KScript.Language.Features
 
                 case CallNode call when call.Callee is IdentifierNode id:
                 {
-                    Symbol fn = analysis.RootScope.Lookup(id.Name, int.MaxValue);
+                    int offset = region.Source.ToSource(id.Span.Start);
+                    Symbol fn = analysis.ScopeAt(offset).Lookup(id.Name, offset, includeMethods: true);
                     PipeNode pipe = PipeInto(call);
                     piped = pipe != null ? 1 : 0;
                     if (fn?.Kind == SymbolKind.Function)

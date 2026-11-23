@@ -263,7 +263,7 @@ namespace KScript.Docs.Mcp
 
             var parameters = c.Signatures.SelectMany(s => s.Parameters).GroupBy(p => p.Name).Select(g => g.First()).ToList();
             // Parameters get a list when there is more to say than the signature shows, as on the site.
-            if (parameters.Any(p => p.Type != null || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null))
+            if (parameters.Any(p => p.Type != null || p.Fields.Count > 0 || p.Values.Count > 0 || !string.IsNullOrEmpty(p.Description) || p.Deprecated != null))
             {
                 sb.Append("\nParameters:\n");
                 foreach (ParameterInfo p in parameters)
@@ -271,16 +271,40 @@ namespace KScript.Docs.Mcp
                     string takes = p.Values.Count > 0 ? "one of " + string.Join(" | ", p.Values)
                         : p.IsFlag ? $"a flag: `{p.Name}` or `not {p.Name}`"
                         : p.Type ?? "any value";
+                    if (p.Fields.Count > 0 && p.Type != null) takes = TypeReference(p.Type);
                     string kind = (p.Variadic ? "any number" : p.Optional ? "optional" : "required") + (p.Deprecated != null ? ", deprecated" : string.Empty);
                     sb.Append($"- `{p.Name}` ({kind}): {takes}{(string.IsNullOrEmpty(p.Description) ? string.Empty : ". " + p.Description)}{(p.Deprecated != null ? ". " + Deprecated(p.Deprecated).Trim() : string.Empty)}\n");
                 }
             }
+            foreach (var parameter in parameters.Where(p => p.Fields.Count > 0))
+            {
+                sb.Append($"\n**`{parameter.Name}` fields**\n\n");
+                WriteMapFields(sb, parameter, string.Empty);
+            }
+            if (parameters.Any(p => p.Fields.Count > 0) && c.ReturnType != null)
+                sb.Append($"\nReturns {TypeReference(c.ReturnType)}.\n");
             if (parameters.Count > 1)
             {
                 sb.Append($"\nArguments can be named: `{c.Prefix}{c.Name}(…, {string.Join(", ", parameters.Skip(1).Take(2).Select(p => p.Name + ": …"))})`.\n");
             }
             if (c.Example != null) sb.Append(Example(c.Example, format));
             return sb.ToString();
+        }
+
+        /// <summary>Link a type to its methods and fields when the reference has a page for it.</summary>
+        private string TypeReference(string type) => Catalog.MemberTypes.Contains(type)
+            ? $"[`{type}`]({UriOf(DocsSite.TypeSlug(type))})" : $"`{type ?? "any"}`";
+
+        private void WriteMapFields(StringBuilder sb, ParameterInfo owner, string indent)
+        {
+            foreach (var field in owner.Fields)
+            {
+                sb.Append($"{indent}- `{field.Name}` ({TypeReference(field.Type)}, {(field.Optional ? "optional" : "required")}). {field.Description}");
+                if (field.DefaultValue != null) sb.Append($" Default: `{field.DefaultValue}`.");
+                if (field.Example != null) sb.Append($" Example: `{field.Example}`.");
+                sb.Append('\n');
+                if (field.Fields.Count > 0) WriteMapFields(sb, field, indent + "  ");
+            }
         }
 
         /// <summary>A catalog example (XML, or an XML expression shown echoed) in the reader's format.</summary>

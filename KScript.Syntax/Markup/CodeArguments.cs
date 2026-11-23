@@ -24,17 +24,10 @@ namespace KScript.Syntax.Markup
         /// the spelling it writes.
         /// </summary>
         public static Wording TypeNeedsFields(string name) => new Wording(
-            $"<type name=\"{name}\"> needs fields: fields=\"name: string, age?: int\", <field> elements, or a sample file (path=\"sample.json\").",
-            $"type {name} needs fields: a block of them (type {name} {{ name: string; age?: int }}), fields: [name: string, age?: int], or a sample file (path: \"sample.json\").");
+            $"<type name=\"{name}\"> needs fields or methods. Declare <field> or <fn> elements, give fields=\"name: string, age?: int\", or use path=\"sample.json\".",
+            $"type {name} needs fields or methods. Declare fields in the body or with fields: [name: string, age?: int], declare a method with fn, or use path: \"sample.json\".");
 
-        /// <summary>In code, a lambda on a normalize rule is parsed as a computed field.</summary>
-        public static Wording NormalizeLambdaProblem(MarkupElement member, bool code)
-        {
-            if (code && member.Name == "field" && member.GetAttributeValue("name") == "normalize"
-                && member.GetAttributeValue("type")?.StartsWith("fn(", StringComparison.Ordinal) == true && member.GetAttribute("value") != null)
-                return "normalize takes an expression with $value already in scope. Write the expression directly, such as normalize: $value->trim().";
-            return null;
-        }
+        public const string NormalizerArity = "A normalize callback takes exactly one parameter.";
 
         /// <summary>Applies the rule to every argument of every element in a .kscript document.</summary>
         public static void Normalise(MarkupDocument document, Func<string, ElementInfo> lookup)

@@ -312,6 +312,7 @@ namespace KScript.Runtime
         public string Description { get; }
         public ExtraKeys Extra { get; }
         public IReadOnlyList<FieldDefinition> Fields => fields;
+        internal IReadOnlyList<TypeCatch> Catches { get; set; } = Array.Empty<TypeCatch>();
 
         internal Scope Closure { get; }
         internal Module Module { get; }
@@ -351,6 +352,15 @@ namespace KScript.Runtime
 
         /// <summary>The type's own methods (<c>fn</c> inside the type), by name, with its bases' after its own.</summary>
         internal Dictionary<string, MarkupElement> OwnMethods { get; } = new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
+
+        /// <summary>Inherited record methods evaluate their bodies, defaults and catches in the defining module.</summary>
+        internal RecordType MethodOwner(string name, MarkupElement declaration)
+        {
+            foreach (RecordType parent in Bases)
+                if (parent.OwnMethods.TryGetValue(name, out var inherited) && inherited == declaration)
+                    return parent.MethodOwner(name, declaration);
+            return this;
+        }
 
         /// <summary>True when text (a literal such as H4cmW12in) can become a record of this type.</summary>
         internal bool ReadsText => Pattern != null || Parse != null;
@@ -741,6 +751,7 @@ namespace KScript.Runtime
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
             var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module);
             Dictionary<string, string> conflicts = JoinBases(type, with, run);
+            type.Catches = TypeCatch.Collect(run, type.Bases.SelectMany(b => b.Catches), recordFields: true);
             if (run.Has("pattern"))
             {
                 if (!RegexValue.TryParse(PatternOf(run.Element), out RegexValue pattern, out string reason))
@@ -771,7 +782,8 @@ namespace KScript.Runtime
             // A field two bases disagree on is fine once this type declares it itself.
             string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
             if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
-            if (type.Fields.Count == 0) throw run.Error(KScript.Syntax.Markup.CodeArguments.TypeNeedsFields(name), null, "Syntax");
+            if (type.Fields.Count == 0 && type.OwnMethods.Count == 0)
+                throw run.Error(KScript.Syntax.Markup.CodeArguments.TypeNeedsFields(name), null, "Syntax");
             return type;
         }
 
@@ -799,7 +811,7 @@ namespace KScript.Runtime
             var own = new TypeRules();
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (rulesAndMethods && own.TryAddChild(e, run, allowNormalize: false)) continue;
+                if (rulesAndMethods && (e.Name == "catch" || own.TryAddChild(e, run, allowNormalize: false))) continue;
                 if (rulesAndMethods && e.Name == "fn")
                 {
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
@@ -853,6 +865,7 @@ namespace KScript.Runtime
             Dictionary<string, MarkupElement> methods = null;
             foreach (MarkupElement e in run.ChildElements)
             {
+                if (e.Name == "catch") continue;
                 if (e.Name == "fn")
                 {
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
@@ -862,10 +875,10 @@ namespace KScript.Runtime
                     continue;
                 }
                 if (!rules.TryAddChild(e, run, allowNormalize: true))
-                    throw run.Error(CodeArguments.NormalizeLambdaProblem(e, run.Module.IsCode)
-                        ?? Wording.Of($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize> rules or <fn> methods, not <{e.Name}>."), null, "Syntax");
+                    throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize> rules or <fn> methods, not <{e.Name}>.", null, "Syntax");
             }
             var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module, methods);
+            type.Catches = TypeCatch.Collect(run, type.BaseRefinement?.Catches ?? Array.Empty<TypeCatch>(), recordFields: false);
             if (rules.ProblemFor(type.Root(), $"<type name=\"{name}\">") is string problem) throw run.Error(problem, null, "Syntax");
             return type;
         }
@@ -1358,9 +1371,14 @@ namespace KScript.Runtime
             object mapped = inner.Convert(value, true, type.Base, path, field, depth + 1);
             if (normalizeValue && inner.Problems.Count == 0 && type.Rules.Normalize != null)
             {
-                Scope s = type.Closure.Child();
-                s.Declare("value", Values.Unwrap(mapped));
-                mapped = inner.Convert(interpreter.EvaluateText(type.Rules.Normalize, s, type.Module), true, type.Base, path, field, depth + 1);
+                object input = Values.Unwrap(mapped);
+                var s = new Scope(type.Closure) { Normalizing = type.HasMethods ? (type, input) : null };
+                s.Declare("value", input);
+                object normalized = interpreter.EvaluateText(type.Rules.Normalize, s, type.Module);
+                // A rule that returns its input unchanged also works when the input itself is a function.
+                if (!ReferenceEquals(normalized, input) && Values.Unwrap(normalized) is ICallable callback)
+                    normalized = interpreter.Call(callback, new[] { input }, scope: s, module: type.Module);
+                mapped = inner.Convert(normalized, true, type.Base, path, field, depth + 1);
             }
             if (inner.Problems.Count > 0)
             {

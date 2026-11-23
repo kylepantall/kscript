@@ -1,0 +1,4 @@
+type Account {
+  name: string
+  fn label() => $this.name->upper()
+}

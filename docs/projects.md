@@ -161,7 +161,9 @@ kscript make project my-app --template ../starters/api   # any folder
 
 ## Installing source libraries
 
-`kscript lib add` installs KScript source files from public GitHub repositories. A library name selects the matching folder under `libraries/` on the default branch of `kylepantall/kscript`.
+`kscript lib add` installs KScript source files from public GitHub repositories. For a bare name, KScript searches the default branches of its own `kylepantall/kscript` catalog, the trusted public repositories matching `orimovo/*` and `waggr-gb/*`, and repositories registered in your project. In each repository it checks `libraries/<name>/` first. If that folder is absent, a root `kscript.json` can publish the requested name with a `library` section.
+
+A single match installs immediately. If several distinct packages share the name, the CLI prints the number of matches and each qualified `owner/repo@library` name. Choose one and rerun `kscript lib add` with that name to install it. Each `owner/repo@library` appears once, even if its repository is both trusted and registered locally. A separate catalog that pins the library as a Git submodule has its own qualified name and can pin a different revision.
 
 | Official library | What it provides | Runtime package it uses |
 | --- | --- | --- |
@@ -176,20 +178,21 @@ Core is available in every script. The other runtime packages in the table ship 
 kscript lib add isolink-connect
 ```
 
-The official repository pins the Isolink SDK as a Git submodule. With KScript v0.14.0, install the same library directly from the SDK repository using these commands.
+You can select a public repository under either trusted owner explicitly in a fresh project. For example, the Isolink SDK lives in `waggr-gb/isolink-connect`.
 
 ```sh
-kscript repo add waggr-gb/isolink-connect
 kscript lib add waggr-gb/isolink-connect@isolink-connect
 ```
 
-Import the installed file from a script in the site root.
+A qualified install skips discovery across other publishers. Use it if discovery cannot finish or you are close to GitHub’s API limit. It still needs API quota to resolve the selected revision. If GitHub has exhausted the quota, retry after it resets.
+
+The installer prints the import to use from the site root. SDK 0.3 uses the manifest entry `client.kscript` and the generic `@with_loopback_json` transport from `KScript.Net`.
 
 ```kscript
-import "lib/isolink-connect/index.kscript" as connect
+import "lib/isolink-connect/client.kscript" as connect
 ```
 
-To use a named library from another repository, register that repository in your project. For example, if your team publishes a `slugs` library in `acme/kscript-libraries`, run both commands from the project.
+For a publisher outside the built-in catalog and trusted owners, register its specific repository in your project. You can then install by bare name or select that publisher directly. For example, if your team publishes a `slugs` library in `acme/kscript-libraries`, run both commands from the project.
 
 ```sh
 kscript repo add acme/kscript-libraries
@@ -200,9 +203,34 @@ The first command also accepts the repository's HTTPS URL. It records the regist
 
 For a direct install, `kscript lib add owner/repo` or `kscript lib add https://github.com/owner/repo` selects the entire repository. A GitHub tree URL selects a branch, tag, commit, or folder within it, such as `kscript lib add https://github.com/owner/repo/tree/v1.0.0/libraries/slugs`. Direct installs work without registering a repository.
 
-Named libraries install into `lib/<library-name>/`. Direct installs use `lib/<repository-name>/` for a whole repository or `lib/<folder-name>/` for a selected folder. Set `paths.lib` in the nearest `kscript.json` to choose another folder relative to `serve.root`. Outside a project, the command installs into `lib/` in the current folder. Imports are relative to the script containing them, so a script one level down would use `../lib/isolink-connect/index.kscript`.
+Named libraries install into `lib/<library-name>/`. Direct installs use `lib/<repository-name>/` for a whole repository or `lib/<folder-name>/` for a selected folder. Set `paths.lib` in the nearest `kscript.json` to choose another folder relative to `serve.root`. Outside a project, the command installs into `lib/` in the current folder. Imports are relative to the script containing them, so a script one level down would use `../lib/isolink-connect/client.kscript`.
 
-The library can include sibling scripts and data files. An `index.kscript` or `index.ks.xml` at its root is the preferred entry point. The command prints an import for a KScript file it found and saves the source URL, commit SHA and entry path in `.kscript-lib.json` inside the installed folder. Commit the folder with your project to share that exact copy. Adding the same source again keeps the installed revision and local edits. To replace it, move the existing folder aside and run `lib add` with the desired tag or commit URL.
+The installer reads the selected folder's `kscript.json`, validates its library metadata, and prints an import for `library.entry`. For older libraries without a `library` section, it still prefers a root `index.kscript` or `index.ks.xml`. The generated `.kscript-lib.json` receipt inside the installed folder records the source, exact commit and entry path, plus the name, version and runtime packages when declared.
+
+### Restoring a project's libraries
+
+`kscript lib add` records the source URL and full commit under `libraries` in the consuming project's `kscript.json`. If there is no project yet, a successful add creates this file in the current directory. Commit it so teammates and CI can restore the same revisions after cloning.
+
+Both Isolink install commands record the specific SDK repository and commit where the library was found. For example, a project pinned to one revision looks like this.
+
+```json
+{
+  "libraries": {
+    "isolink-connect": {
+      "source": "https://github.com/waggr-gb/isolink-connect/tree/HEAD/libraries/isolink-connect",
+      "commit": "d12745f9989a9523fcb33922f75625f0c1a96766"
+    }
+  }
+}
+```
+
+On a fresh checkout, run the following command from the project or one of its subdirectories.
+
+```sh
+kscript lib restore
+```
+
+Restore reads the pins from the nearest project and fetches each library directly from its recorded publisher at the exact commit. For the example above, it fetches `libraries/isolink-connect/` from `waggr-gb/isolink-connect`. If a team catalog publishes a Git submodule, the recorded catalog commit also fixes the upstream commit. An existing copy at the recorded revision keeps its local edits. To share those edits, commit the modified library files or publish the changes upstream. The installer uses the empty `.kscript/libraries.lock` file to coordinate simultaneous adds. You can ignore it in Git.
 
 ### Publishing a named library
 
@@ -211,11 +239,24 @@ On the default branch of your public repository, put each library in an ordinary
 ```text
 libraries/
   slugs/
+    kscript.json
     index.kscript
     README.md
 ```
 
-Declare the library's public functions at the top level of `index.kscript`. Once you push that folder, users can register your repository and install the library by its qualified name.
+Put the manifest beside the public source. For example, `libraries/slugs/kscript.json` can declare a Core-only library.
+
+```json
+{
+  "name": "slugs",
+  "library": { "version": "1.0.0", "entry": "index.kscript" },
+  "packages": []
+}
+```
+
+`library.version` is a semantic version. `library.entry` is a .kscript or .ks.xml path relative to this file and can point to a nested module. List required native runtime packages such as `KScript.Net` under `packages`, and import them in the source modules that use them. Declare public functions in the entry module. Users can then install your published library by its qualified name.
+
+A repository that publishes a single library can place the same manifest and entry script at its root. Set `name` to the library name users should install. For example, a root manifest named `slugs` in the registered repository `acme/slug-tools` can be installed as `kscript lib add acme/slug-tools@slugs`.
 
 To publish `slugs` from a separate repository, run this in your library catalog and commit both `.gitmodules` and `libraries/slugs`.
 

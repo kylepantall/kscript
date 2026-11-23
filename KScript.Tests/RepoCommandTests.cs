@@ -10,12 +10,27 @@ public sealed class RepoCommandTests : IDisposable
     private int Add(string repository, string cwd = null) =>
         RepoCommand.Run(new[] { "add", repository }, TextWriter.Null, TextWriter.Null, cwd ?? root);
 
-    [Fact]
-    public void DefaultRepositoryIsAvailableWithoutWritingARegistry()
+    [Theory]
+    [InlineData("kylepantall/kscript")]
+    [InlineData("waggr-gb/isolink-connect")]
+    [InlineData("waggr-gb/new-library")]
+    [InlineData("orimovo/another-repository")]
+    public void OfficialRepositoriesAreAvailableWithoutWritingARegistry(string repository)
     {
-        Assert.True(LibraryRepositories.Contains(root, "kylepantall/kscript"));
-        Assert.Equal(0, Add("https://github.com/KylePantall/KScript.git"));
+        Assert.True(LibraryRepositories.Contains(root, repository));
+        Assert.Equal(0, Add($"https://github.com/{repository.ToUpperInvariant()}.git"));
         Assert.Empty(Directory.GetFileSystemEntries(root));
+    }
+
+    [Theory]
+    [InlineData("waggr-gb-labs/isolink-connect")]
+    [InlineData("not-orimovo/sdk")]
+    [InlineData("kylepantall/another-repo")]
+    public void OtherOwnersAndRepositoriesNeedRegistration(string repository)
+    {
+        Assert.False(LibraryRepositories.Contains(root, repository));
+        Assert.Equal(0, Add(repository));
+        Assert.True(LibraryRepositories.Contains(root, repository));
     }
 
     [Fact]
@@ -25,6 +40,20 @@ public sealed class RepoCommandTests : IDisposable
         for (int i = 0; i < 3; i++) Assert.True(LibraryRepositories.Contains(root, $"org/library-{i}"));
         string otherProject = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
         Assert.False(LibraryRepositories.Contains(otherProject, "org/library-0"));
+    }
+
+    [Fact]
+    public void DiscoveryUsesOnlyCanonicalMarkersInThisProject()
+    {
+        Assert.Equal(0, Add("third/catalog"));
+        Assert.Equal(0, Add("another/tools"));
+        string folder = Path.Combine(root, ".kscript", "repos");
+        File.WriteAllText(Path.Combine(folder, "README.md"), "notes");
+        File.WriteAllText(Path.Combine(folder, "BAD@NAME"), "invalid marker");
+        File.WriteAllText(Path.Combine(folder, "owner@repo@subdir"), "invalid marker");
+        if (!OperatingSystem.IsWindows())
+            File.CreateSymbolicLink(Path.Combine(folder, "foreign@catalog"), Path.Combine(folder, "third@catalog"));
+        Assert.Equal(new[] { "another/tools", "third/catalog" }, LibraryRepositories.Registered(root));
     }
 
     [Theory]

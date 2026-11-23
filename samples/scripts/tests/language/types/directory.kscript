@@ -1,0 +1,16 @@
+type Directory {
+  fallback: string
+
+  fn lookup(key: string) {
+    throw if $key->is_blank() {
+      type: 'Validation'
+      message: 'A key is required'
+    }
+    return $key
+  } catch Validation {
+    throw if $this.fallback->is_blank()
+    return $this.fallback
+  }
+} catch Validation as err {
+  return $err.message
+}

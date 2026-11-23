@@ -601,11 +601,10 @@ namespace KScript.Data
         {
             MarkupElement e = Type.OwnMethods[name];
             Scope s = Type.Closure.Child();
-            call.Interpreter.DeclareFunction(e, s, Type.Module);
-            s.TryGet(name, out object fn);
+            var fn = call.Interpreter.DeclareFunction(e, s, Type.Module, Type.Catches, query);
             var all = new List<object> { query };
             all.AddRange(args);
-            return call.Interpreter.Call((ICallable)fn, all, named, call.Scope, call.Module) as Query
+            return call.Interpreter.Call(fn, all, named, call.Scope, call.Module) as Query
                 ?? throw new KScriptException($"The scope {Name}->{name}() must return the query it is given: fn {name}(query) => $query->where(...).", "Type");
         }
 

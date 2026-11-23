@@ -148,19 +148,181 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("value")]
-        [InlineData("$value")]
-        public void RefinementMemberMistakesPointAtTheirOwnSource(string parameter)
+        [InlineData("fn (c)")]
+        [InlineData("fn(c)")]
+        public void NormalizerParametersAndRefinedMethodsKeepTheirTypes(string callback)
         {
-            string code = "type PasskeySessionKey with [string] {\n"
-                + "  min: 8\n"
-                + $"  normalize: fn({parameter}) => $value->trim()\n"
-                + "  pattern: ^/passkey_[a-zA-Z]+$/\n"
-                + "  fn break() { return $value->count() }\n}";
+            var (code, at) = WithCaret($$"""
+                type PasskeySessionKey with [string] {
+                  min: 8
+                  normalize: {{callback}} => $c->tr‸im()
+                  pattern: /^passkey_[a-zA-Z]+$/
+
+                  fn break() {
+                    return $value->count()
+                  }
+                }
+                fn size(key: PasskeySessionKey) => $key->break()
+                echo @size(' passkey_Test ')
+                """);
+            DocumentAnalysis analysis = Service.Analyze(code, "types.kscript");
+            AssertClean(analysis);
+            var methods = Service.GetCompletions(analysis, at);
+            Assert.Contains(methods, i => i.Label == "trim");
+            Assert.DoesNotContain(methods, i => i.Label == "break");
+            var declaration = Assert.Single(Service.GetDefinition(analysis, code.IndexOf("$c->", StringComparison.Ordinal) + 1));
+            Assert.Equal("c", analysis.Source[declaration.Span]);
+            int method = code.IndexOf("->break", StringComparison.Ordinal) + 3;
+            Assert.Contains(Service.GetCompletions(analysis, method), i => i.Label == "break");
+            Assert.Equal("break", analysis.Source[Assert.Single(Service.GetDefinition(analysis, method)).Span]);
+        }
+
+        [Fact]
+        public void RefinementMemberMistakesKeepTheCallbackAndOfferSeparateFixes()
+        {
+            string code = """
+                type PasskeySessionKey with [string] {
+                  min: 8
+                  normalize: fn($value) => $value->trim()
+                  pattern: ^/passkey_[a-zA-Z]+$/
+                  fn break() { return $value->count() }
+                }
+                """;
             DocumentAnalysis analysis = Code(code);
             Assert.Collection(analysis.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).OrderBy(d => d.Span.Start),
-                d => { Assert.Equal($"fn({parameter})", analysis.Source[d.Span]); Assert.Contains("normalize: $value->trim()", d.Message); },
+                d => {
+                    Assert.Equal(DiagnosticCodes.BareDeclaration, d.Code);
+                    Assert.Equal("$value", analysis.Source[d.Span]);
+                    var change = Assert.Single(Assert.Single(d.Fixes).Changes);
+                    Assert.Equal("$", analysis.Source[change.Span]);
+                    Assert.Equal(string.Empty, change.NewText);
+                },
                 d => { Assert.Equal("^/", analysis.Source[d.Span]); Assert.Equal("/^", Assert.Single(Assert.Single(d.Fixes).Changes).NewText); });
+        }
+
+        [Theory]
+        [InlineData("fn() => 'ok'", DiagnosticCodes.ArgumentCount)]
+        [InlineData("fn(a, b) => $a + $b", DiagnosticCodes.ArgumentCount)]
+        [InlineData("fn(c) => $c->push('ok')", DiagnosticCodes.TypeMismatch)]
+        public void NormalizerCallbacksCheckTheirArityAndUnderlyingReceiver(string callback, string error)
+        {
+            AssertSingle(Code($"type Key with [string] {{ normalize: {callback} }}"), error);
+        }
+
+        [Fact]
+        public void ARefinementCanUseANamedNormalizer()
+        {
+            AssertClean(Service.Analyze("""
+                fn trim_key(c: string) => $c->trim()
+                type PasskeySessionKey with [string] { normalize: @trim_key }
+                echo PasskeySessionKey(' passkey_Test ')
+                """, "types.kscript"));
+        }
+
+        [Theory]
+        [InlineData("@trim_key")]
+        [InlineData("@trim_key($value)")]
+        public void NormalizersResolveLaterLocalMethodsBeforeModuleFunctions(string call)
+        {
+            string code = $$"""
+                fn trim_key() => 'global'
+                type PasskeySessionKey with [string] {
+                  normalize: {{call}}
+                  fn trim_key(key: string) => $key->trim()
+                }
+                echo PasskeySessionKey(' passkey_Test ')
+                echo @trim_key()
+                """;
+            var analysis = Service.Analyze(code, "types.kscript");
+            AssertClean(analysis);
+            int local = code.IndexOf(call, StringComparison.Ordinal) + 2;
+            int global = code.LastIndexOf("@trim_key", StringComparison.Ordinal) + 2;
+            Assert.Equal(code.LastIndexOf("fn trim_key", StringComparison.Ordinal) + 3, Assert.Single(Service.GetDefinition(analysis, local)).Span.Start);
+            Assert.Equal(code.IndexOf("fn trim_key", StringComparison.Ordinal) + 3, Assert.Single(Service.GetDefinition(analysis, global)).Span.Start);
+            Assert.Contains("key: string", Assert.Single(Service.GetCompletions(analysis, local), i => i.Label == "trim_key").Detail);
+            Assert.DoesNotContain("key: string", Assert.Single(Service.GetCompletions(analysis, global), i => i.Label == "trim_key").Detail);
+        }
+
+        [Fact]
+        public void NormalizerCanUseAnInheritedMethodWithAnOptionalArgument()
+        {
+            AssertClean(Service.Analyze("""
+                type BaseKey with [string] {
+                  fn trim_key(key: string, suffix: string = '') => $key->trim() + $suffix
+                }
+                type PasskeySessionKey with [BaseKey] { normalize: @trim_key }
+                echo PasskeySessionKey(' passkey_Test ')
+                """, "types.kscript"));
+        }
+
+        [Fact]
+        public void AMethodNamedValueKeepsTheNormalizersInputVariable()
+        {
+            AssertClean(Service.Analyze("""
+                type Key with [string] {
+                  normalize: @value($value)
+                  fn value(text: string) => $text->trim()
+                }
+                echo Key(' ok ')
+                """, "types.kscript"));
+        }
+
+        [Theory]
+        [InlineData("fn trim_key() => 'key'")]
+        [InlineData("fn trim_key(key: string, suffix: string) => $key + $suffix")]
+        public void NamedNormalizerMustAcceptOneArgument(string declaration)
+        {
+            string code = $"type Key with [string] {{ normalize: @trim_key; {declaration} }}";
+            var analysis = Code(code);
+            Assert.Equal("@trim_key", analysis.Source[AssertSingle(analysis, DiagnosticCodes.ArgumentCount).Span]);
+        }
+
+        [Fact]
+        public void LocalNormalizerHelpersStayOutOfModuleCompletions()
+        {
+            var (code, at) = WithCaret("""
+                type Key with [string] {
+                  normalize: @trim_key($value)
+                  fn trim_key(key: string) => $key->trim()
+                }
+                echo @tr‸im_key('outside')
+                """);
+            var analysis = Code(code);
+            AssertSingle(analysis, DiagnosticCodes.UnknownCommand);
+            Assert.DoesNotContain(Service.GetCompletions(analysis, at), i => i.Label == "trim_key");
+        }
+
+        [Fact]
+        public void ProjectReferencesDistinguishAnInheritedHelperFromOtherMethodsAndFunctions()
+        {
+            string folder = Path.GetFullPath("normalizer-project");
+            string file = Path.Combine(folder, "keys.kscript");
+            string client = Path.Combine(folder, "client.kscript");
+            string source = """
+                fn clean() => 'module'
+                type Key with [string] {
+                  normalize: @clean
+                  fn clean(text: string) => $text->trim()
+                }
+                type Other with [string] { fn clean() => $value->upper(); fn secret() => $value }
+                echo @clean()
+                echo Other('x')->clean()
+                """;
+            var files = new MemoryFiles()
+                .Add(Path.Combine(folder, "kscript.json"), "{}")
+                .Add(file, source)
+                .Add(Path.Combine(folder, "sessions.kscript"), "import \"keys.kscript\"\ntype Session with [Key] {}")
+                .Add(client, "import \"sessions.kscript\"\necho Session('x')->clean(' ok ')");
+            var service = new LanguageService(files: files);
+            var analysis = service.Analyze(source, file);
+            var references = service.GetProjectReferences(analysis, source.IndexOf("normalize: @clean", StringComparison.Ordinal) + 13, true);
+            Assert.Equal(3, references.Count);
+            Assert.Contains(references, r => r.Path == client && r.Start.Line == 1);
+            Assert.All(references.Where(r => r.Path == null), r => Assert.InRange(analysis.Source.GetPosition(r.Span.Start).Line, 2, 3));
+            var (import, at) = WithCaret("import ‸ from \"keys.kscript\"");
+            var exported = service.GetCompletions(service.Analyze(import, client), at);
+            Assert.StartsWith("@clean()", Assert.Single(exported, i => i.Label == "clean").Detail);
+            Assert.DoesNotContain(exported, i => i.Label == "secret");
         }
 
         [Fact]

@@ -511,6 +511,12 @@ namespace KScript.Projects
         /// </summary>
         public List<string> Packages { get; set; } = new List<string>();
 
+        /// <summary>Source package metadata when this project is published as an installable library.</summary>
+        public LibraryManifest Library { get; private set; }
+
+        /// <summary>The source libraries installed by this project, keyed by directory name.</summary>
+        public IReadOnlyDictionary<string, LibraryDependency> Libraries { get; private set; } = System.Collections.ObjectModel.ReadOnlyDictionary<string, LibraryDependency>.Empty;
+
         /// <summary>
         /// Where the project's extension files are: folders (everything inside, subfolders too) or globs, relative
         /// to kscript.json. Their <c>extend date { fn ... }</c> blocks apply to every script in the project, as if
@@ -794,6 +800,9 @@ namespace KScript.Projects
                         case "$schema":
                         case "standard":
                             break;
+                        case "libraries":
+                            config.Libraries = LibraryDependency.ReadAll(doc.RootElement);
+                            break;
                         case "name":
                             config.Name = String(prop.Value, "name", config);
                             break;
@@ -814,6 +823,9 @@ namespace KScript.Projects
                             break;
                         case "app":
                             ReadApp(prop.Value, config);
+                            break;
+                        case "library":
+                            config.Library = LibraryManifest.Read(doc.RootElement);
                             break;
                         case "make":
                             ReadMake(prop.Value, config);
@@ -845,7 +857,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, extensions, paths, types, serve, http, queue, lint, test, config, format, make or app).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, extensions, paths, types, serve, http, queue, lint, test, config, format, make, app, library or libraries).");
                             break;
                     }
                 }
@@ -853,7 +865,7 @@ namespace KScript.Projects
             return config;
         }
 
-        private static JsonDocument ParseJson(string json, string full)
+        internal static JsonDocument ParseJson(string json, string full)
         {
             try
             {

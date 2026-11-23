@@ -29,6 +29,13 @@ namespace KScript.Metadata
         /// </summary>
         public IReadOnlyList<string> Values { get; }
 
+        /// <summary>Named fields accepted when this parameter is a map. Each field can describe a nested map.</summary>
+        public IReadOnlyList<ParameterInfo> Fields { get; init; } = Array.Empty<ParameterInfo>();
+
+        /// <summary>The default value and an example value, written as KScript expressions for the reference.</summary>
+        public string DefaultValue { get; init; }
+        public string Example { get; init; }
+
         /// <summary>Set when the parameter is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
 

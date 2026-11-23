@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Projects;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
 
@@ -92,6 +93,11 @@ namespace KScript.Language.Features
                 }
                 MarkupAttribute nameAttr = e.GetAttribute("name");
                 string name = nameAttr?.ValueText?.Trim();
+                // Code arguments wrap a single-quoted literal in an interpolation for the runtime.
+                if (nameAttr is { CodeValue: true, QuotedValue: true }
+                    && TemplateParser.Parse(name, allowBareReferences: false).Segments is
+                        [{ Node: LiteralNode { Kind: LiteralKind.String, Template: null } literal }])
+                    name = literal.Value;
                 if (string.IsNullOrEmpty(name))
                 {
                     continue;
@@ -155,7 +161,7 @@ namespace KScript.Language.Features
                 int uses = analysis.ReferencesTo(fn).Count(r => !r.IsDeclaration);
                 // Other files are only read for a function this file never calls, as the unused check does.
                 bool elsewhere = uses == 0
-                    && (project ??= ProjectUsage.Find(analysis.Path, analysis.Source.Text, Files, Catalog)).Names.Contains(fn.Name);
+                    && (project ??= ProjectUsage.Find(analysis.Path, analysis.Source.Text, Files, Catalog)).Names.Contains(fn.ProjectUseName);
                 string title = uses == 1 ? "1 use" : uses > 1 ? uses + " uses" : elsewhere ? "used in other files" : null;
                 if (title != null)
                 {

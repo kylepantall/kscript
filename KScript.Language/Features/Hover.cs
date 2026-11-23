@@ -168,6 +168,8 @@ namespace KScript.Language.Features
 
                 case MemberNode member when member.NameSpan.Contains(index):
                 {
+                    if (ConfigField(analysis, region, member) is ConfigKey setting)
+                        return new HoverResult($"```kscript\n{setting.Name}: {setting.Type}\n```", region.Source.ToSource(member.NameSpan));
                     TypeShape target = InferAt(analysis, region, member.Target);
                     if (target.Fields.TryGetValue(member.Name, out FieldInfo field))
                     {
@@ -495,7 +497,11 @@ namespace KScript.Language.Features
                 sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Keys.Select(k => "`" + k + "`")));
             }
             DocComment doc = s.Kind is SymbolKind.Function or SymbolKind.Constant or SymbolKind.Variable ? s.Doc : null;
-            if (doc != null)
+            if (s.Kind == SymbolKind.Function && s.DocumentationWithErrors() is { Length: > 0 } functionDoc)
+            {
+                sb.Append("\n\n").Append(functionDoc);
+            }
+            else if (doc != null)
             {
                 sb.Append("\n\n").Append(doc.ToMarkdown());
             }

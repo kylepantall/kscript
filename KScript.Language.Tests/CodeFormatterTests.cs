@@ -65,6 +65,17 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ConditionalThrowPayloadsUseMapSpacingAndIndentation()
+        {
+            Assert.Equal(Lines("throw if $fallback->is_blank() // rethrow", "if $ready {", "  echo 'ok'", "}"),
+                Fmt(Lines("throw if $fallback->is_blank() // rethrow", "if $ready{echo 'ok'}")));
+            Assert.Equal(Lines("throw if $failed { type: 'Network', code: $reply.code }"),
+                Fmt("throw if $failed{type:'Network',code:$reply.code}"));
+            Assert.Equal(Lines("throw if @failed() {", "  type: 'Network',", "  message: 'Request failed'", "  details: {", "    code: $reply.code", "  }", "}"),
+                Fmt(Lines("throw if @failed(){", "type:'Network',", "     message:'Request failed'", "details:{", " code:$reply.code", "}", "}")));
+        }
+
+        [Fact]
         public void UsesTabsAndIndentSize()
         {
             string input = "if yes {\necho 1\n}\n";

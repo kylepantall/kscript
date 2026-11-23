@@ -98,6 +98,105 @@ async function runsScripts(folder) {
   assert.strictEqual(await vscode.commands.executeCommand('kscript.runTestsInFile', tests.uri), 1, 'the file has a failing test');
 }
 
+// Exercise the same refinement through the language client, the file checker, and the test runner.
+async function normalizerEdits(folder) {
+  const doc = await vscode.workspace.openTextDocument(path.join(folder, 'normalizers.test.kscript'));
+  const editor = await vscode.window.showTextDocument(doc);
+  const at = (text, offset = 0) => {
+    const index = doc.getText().indexOf(text);
+    assert.ok(index >= 0, 'fixture contains ' + text);
+    return doc.positionAt(index + offset);
+  };
+  const rangeOf = (text) => new vscode.Range(at(text), at(text, text.length));
+  const command = (name) => vscode.commands.executeCommand(name, doc.uri);
+  const labelsAt = async (position) => {
+    const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, position);
+    return list.items.map((item) => item.label.label || item.label);
+  };
+  const checkAndRun = async () => {
+    assert.strictEqual(await command('kscript.checkFile'), 0, 'Check This File accepts the current normalizer');
+    assert.strictEqual(await command('kscript.run'), 0, 'Run executes the tests on the current normalizer');
+  };
+
+  const helperUse = at('@trim_key($value)', 3);
+  assert.ok((await labelsAt(helperUse)).includes('trim_key'), 'the later local helper is offered in the normalizer');
+  const moduleFunctions = await labelsAt(at('@key_size(', 1));
+  assert.ok(moduleFunctions.includes('key_size'), 'the module function is offered outside the refinement');
+  assert.ok(!moduleFunctions.includes('trim_key'), 'the member stays out of module completions');
+  const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', doc.uri, helperUse);
+  assert.strictEqual(definitions.length, 1);
+  const definition = definitions[0].targetSelectionRange || definitions[0].range;
+  assert.strictEqual(doc.getText(definition), 'trim_key');
+  assert.ok(definition.start.isEqual(at('fn trim_key(', 3)), 'Go to Definition selects the member declaration');
+  const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, helperUse);
+  assert.match(hovers.flatMap((h) => h.contents.map((c) => c.value || c)).join('\n'), /trim_key\(key: string\)/);
+  await checkAndRun();
+
+  const rename = await vscode.commands.executeCommand('vscode.executeDocumentRenameProvider', doc.uri, helperUse, 'clean_key');
+  const edits = rename.get(doc.uri);
+  assert.deepStrictEqual(edits.map((e) => doc.getText(e.range)), ['trim_key', 'trim_key', 'trim_key']);
+  assert.ok(await vscode.workspace.applyEdit(rename), 'Rename updates the declaration, normalizer call and receiver call');
+  assert.ok(await editor.edit((edit) => edit.replace(rangeOf('@clean_key($value)'), '@clean_key')));
+  await checkAndRun();
+
+  // A real edit prompts diagnostics. Ask the provider for the fix, apply it, then run the restored document.
+  assert.ok(await editor.edit((edit) => edit.replace(rangeOf('@clean_key'), '@clean_keey')));
+  const unknown = (editorOnly = false) => vscode.languages.getDiagnostics(doc.uri).find((d) =>
+    (!editorOnly || (d.code && d.code.target)) && String((d.code && d.code.value) || d.code) === 'KS5001' && d.message.includes('@clean_keey'));
+  // Language-server diagnostics link their code to its documentation. The CLI task matcher uses a plain code.
+  const diagnostic = await waitFor(() => unknown(true), 'live diagnostic for the unknown normalizer helper');
+  assert.strictEqual(await command('kscript.checkFile'), 1, 'Check This File rejects the unknown helper');
+  assert.ok((await command('kscript.run')) > 0, 'the test runner also rejects the unknown helper');
+  const actions = await vscode.commands.executeCommand('vscode.executeCodeActionProvider', doc.uri, diagnostic.range, 'quickfix');
+  const fix = actions.find((a) => a.edit && a.edit.get(doc.uri).some((e) => e.newText === 'clean_key'));
+  assert.ok(fix, 'the quick fix offers the scoped helper');
+  assert.ok(await vscode.workspace.applyEdit(fix.edit));
+  assert.ok(doc.getText().includes('normalize: @clean_key\n'), 'the fix preserves the callback reference');
+  await waitFor(() => !unknown(true), 'the live language-server diagnostic to clear after the edit');
+  await checkAndRun();
+  await waitFor(() => !unknown(), 'the fixed diagnostic to disappear from both the editor and file checker');
+}
+
+async function interpolatedLinks(folder) {
+  const { writeFixture, tokensOnLine } = require('../interpolation');
+  const { file, settings, lines } = writeFixture(fs.mkdtempSync(path.join(folder, 'interpolation-')));
+  const doc = await vscode.workspace.openTextDocument(file);
+  await vscode.window.showTextDocument(doc);
+  const syntax = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', doc.uri);
+  assert.ok(syntax.some(t => t.c === 'passkeys' && /meta\.embedded\.expression.*variable\.other\.property/.test(t.t)),
+    'VS Code colors the setting as a property inside the URL expression');
+  const legend = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokensLegend', doc.uri);
+  const semantic = await vscode.commands.executeCommand('vscode.provideDocumentSemanticTokens', doc.uri);
+  const tokens = tokensOnLine(semantic.data, legend.tokenTypes, 1, lines[1]);
+  for (const [text, type] of [['$kind', 'parameter'], ['url', 'property'], ['/finish', 'string']]) {
+    assert.ok(tokens.some(t => t.text === text && t.type === type), 'VS Code semantic highlighting for ' + text);
+  }
+
+  for (const [anchor, destination, line, column] of [
+    ['$kind', file, 1, lines[1].indexOf('kind:')],
+    ['.url', settings, 1, 2],
+  ]) {
+    const position = new vscode.Position(1, lines[1].indexOf(anchor) + 2);
+    const found = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', doc.uri, position);
+    assert.ok(found.some(loc => (loc.uri || loc.targetUri).fsPath === destination &&
+      (loc.range || loc.targetSelectionRange).start.isEqual(new vscode.Position(line, column))), 'Go to Definition on ' + anchor);
+  }
+}
+
+async function declarationHandlers(folder) {
+  const doc = await vscode.workspace.openTextDocument(path.join(folder, 'declaration-catches.test.kscript'));
+  await vscode.window.showTextDocument(doc);
+  const call = doc.getText().indexOf('@fetch_name($mode)');
+  assert.ok(call >= 0);
+  const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, doc.positionAt(call + 3));
+  const info = hovers.flatMap((h) => h.contents.map((c) => c.value || c)).join('\n');
+  assert.match(info, /May throw/);
+  assert.match(info, /Network/);
+  assert.match(info, /NotFound/);
+  assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', doc.uri), 0);
+  assert.strictEqual(await vscode.commands.executeCommand('kscript.runTestsInFile', doc.uri), 0);
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'hello.ks.xml'));
@@ -151,6 +250,9 @@ async function run() {
 
   await snippetsFromOtherExtensions(folder);
   await runsScripts(folder);
+  await normalizerEdits(folder);
+  await declarationHandlers(folder);
+  await interpolatedLinks(folder);
 
   console.log('VS Code integration test passed');
 }

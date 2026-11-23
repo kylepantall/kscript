@@ -333,12 +333,12 @@ namespace KScript.Runtime
                 Example = "<let name=\"text\" value=\"'not json'\" />\n<try>\n  <let name=\"data\" value=\"$text->json()\" />\n  <catch as=\"err\" when=\"$err.type eq 'Json'\">\n    <echo>That isn't JSON: {$err.message}</echo>\n  </catch>\n  <finally><echo>done</echo></finally>\n</try>",
             }, Try);
 
-            p.Element(new ElementInfo("catch", "Handles an error thrown in the <try> around it. `type` picks which errors (and the types that extend them); `as` names the error: $err.type, $err.message, $err.line, $err.status, $err.cause and its fields. A bare <throw /> inside rethrows it.", ContentKind.Statements,
+            p.Element(new ElementInfo("catch", "Handles matching errors in a try block, a function call, or calls to methods of a type or model. The nearest matching handler runs first. The bound error exposes its type, message, location, status, cause and custom fields. A bare throw passes it to the next enclosing handler.", ContentKind.Statements,
                 new A("as", K.DeclareVariable, "A variable for the error. Defaults to err."),
                 new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status == 404`."),
                 new A("type", K.ErrorType, "Only handle errors of these types, or types that extend them: `NotFound`, `[IO, Network]`. Error catches everything."))
             {
-                MustBeInside = new[] { "try" },
+                MustBeInside = new[] { "try", "fn", "type", "model" },
             }, run => null);
 
             p.Element(new ElementInfo("finally", "Runs after the <try> body and any <catch>, whether or not there was an error.", ContentKind.Statements)
@@ -639,29 +639,13 @@ namespace KScript.Runtime
             catch (KScriptException ex)
             {
                 Interpreter.Located(ex, run.Module, run.Element.Span.Start);
-                bool handled = false;
-                foreach (MarkupElement c in catches)
+                try
                 {
-                    Scope scope = run.Scope.Child();
-                    string name = c.GetAttributeValue("as")?.Trim().TrimStart('$') ?? "err";
-                    scope.Declare(name, ex.ToValue());
-                    if (c.GetAttributeValue("type") is string types && !ErrorNames(types).Any(t => ErrorTypes.Matches(ex, t))) continue;
-                    if (c.GetAttribute("when")?.Value is DecodedText when && !Values.Truthy(run.Interpreter.EvaluateText(when, scope, run.Module))) continue;
-                    handled = true;
-                    try
-                    {
-                        using (ErrorTypes.Handle(ex)) run.RunElementChildren(c, scope);
-                    }
-                    finally
-                    {
-                        if (finallies.Count > 0) RunFinally(run, finallies);
-                    }
-                    break;
+                    if (!catches.Any(c => CatchClauses.Handle(run.Interpreter, c, run.Scope, run.Module, ex))) throw;
                 }
-                if (!handled)
+                finally
                 {
                     if (finallies.Count > 0) RunFinally(run, finallies);
-                    throw;
                 }
                 return null;
             }

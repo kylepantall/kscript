@@ -2,6 +2,8 @@
 
 KScript has a test framework built in. Tests are KScript files whose names end in `.test.kscript` or `.test.ks.xml`, usually kept in a `tests/` folder, and `kscript test` runs them.
 
+From the KScript repository, run `kscript test samples/scripts/tests/language` to exercise the language itself. The suite covers normalizers, typed records, native values, dynamic dispatch, collections, functions, control flow and error handlers. CI also checks and formats those scripts, runs them with the interpreter and compares their results with the tests discovered by the language server. [Language test scripts](../samples/scripts/tests/language)
+
 ```kscript
 // tests/strings.test.kscript
 kscript {

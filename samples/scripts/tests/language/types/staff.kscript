@@ -1,0 +1,5 @@
+import "account.kscript"
+
+type Staff with [Account] {
+  level: int = 1
+}

@@ -210,6 +210,8 @@ echo "Hello $name"   // right
 
 **A value is the wrong type for what is done with it.** For example `->upper()` on a number. Convert it first: `$n->to_string()->upper()`.
 
+A callback parameter declared `action: fn` needs a function. Passing `action: null` produces an error on the argument. Pass a reference such as `action: @on_connect` or a lambda such as `action: fn(session) => @read_status($session)`. In a script function, `action: fn? = null` explicitly accepts a missing or null callback.
+
 The same code warns about arithmetic and arguments that can only fail when the script runs:
 
 ```kscript wrong
@@ -272,6 +274,12 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 ## KS5015
 
 **Two visible literal types declare the same pattern.** The checker warns at the declaration or import that brings them together. You can use both types explicitly. If a bare word matches more than one visible pattern, the word itself gets a KS5012 error naming the candidates. See [recognizing a custom literal by its pattern](types.md#recognizing-a-custom-literal-by-its-pattern).
+
+## KS5016
+
+**A known error can escape the script.** The checker reports the error types at the top-level statement that can raise them. A helper may pass an error to its caller. Add a matching `catch` at the level that can handle it. A catch on a function, method or type propagates the error when it falls through or returns `null`. Ordinary `try` blocks can handle an error and continue.
+
+The checker follows resolved function and method calls and their documented `@throws` types. Calls through dynamically selected callbacks may raise additional errors. Test bodies run under the test runner, and `expect_error` handles errors while checking the expected outcome.
 
 ## Style
 

@@ -469,11 +469,33 @@ namespace KScript.Syntax.Markup
                             {
                                 FlushBlank(ref blankRuns);
                             }
-                            WriteElement(e, indent, chained);
+                            if (e.Name != "if" || NextElement(nodes, i)?.Name is "elif" or "else" || !WriteConditionalThrow(e, indent))
+                            {
+                                WriteElement(e, indent, chained);
+                            }
                             previous = e;
                             break;
                     }
                 }
+            }
+
+            private bool WriteConditionalThrow(MarkupElement condition, int indent)
+            {
+                if (condition.Attributes.Count != 1 || condition.GetAttributeValue("test")?.Trim() is not { Length: > 0 } test
+                    || condition.ChildElements.FirstOrDefault() is not { Name: "throw" } error
+                    || condition.Children.Any(c => c != error && c is not MarkupText { IsWhitespace: true })
+                    || error.Children.Any(c => c is not MarkupText { IsWhitespace: true }))
+                    return false;
+                if (error.Attributes.Count == 0)
+                {
+                    Line(indent, "throw if " + test);
+                    return true;
+                }
+                if (error.Attributes.Count != 1 || error.GetAttributeValue("value")?.Trim() is not { Length: > 1 } value || value[0] != '{'
+                    || ExpressionParser.ParseExpression(value) is not { Root: MapNode, Errors.Count: 0 })
+                    return false;
+                Line(indent, "throw if " + test + " " + Reindent(value, Pad(indent)));
+                return true;
             }
 
             private void FlushBlank(ref int blankRuns)
@@ -684,17 +706,21 @@ namespace KScript.Syntax.Markup
                                 WriteDoc(e, indent);
                             }
                             string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim() + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
-                            if (Attr("value") is string value && !e.ChildElements.Any())
-                            {
-                                sb.Append(pad).Append(header).Append(" => ").Append(Reindent(value.Trim(), Pad(indent))).Append('\n');
-                                return;
-                            }
                             scopes.Push();
                             foreach (string p in ParameterNames(Attr("params")))
                             {
                                 scopes.Declare(p);
                             }
-                            WriteBlock(header, e, indent, chained, pushScope: false);
+                            if (Attr("value") is string value && e.ChildElements.All(c => c.Name == "catch"))
+                            {
+                                sb.Append(pad).Append(header).Append(" => ").Append(Reindent(value.Trim(), Pad(indent))).Append('\n');
+                                WriteAttachedCatches(e, indent, expressionBody: true);
+                            }
+                            else
+                            {
+                                WriteBlock(header, e, indent, chained, pushScope: false, children: e.Children.Where(n => n is not MarkupElement { Name: "catch" }).ToList());
+                                WriteAttachedCatches(e, indent);
+                            }
                             scopes.Pop();
                             return;
                         }
@@ -769,13 +795,14 @@ namespace KScript.Syntax.Markup
                                     WriteDoc(normalize, indent + 1);
                                     Line(indent + 1, "normalize: " + Reindent(normalize.GetAttributeValue("value").Trim(), Pad(indent + 1)));
                                 }
-                                else if (node is MarkupElement method)
+                                else if (node is MarkupElement { Name: "fn" } method)
                                 {
                                     WriteElement(method, indent + 1, false);
                                 }
                             }
                             scopes.Pop();
                             Line(indent, "}");
+                            WriteAttachedCatches(e, indent);
                             return;
                         }
                     case "call" when Only("fn", "args", "into") && Attr("fn") != null && !e.Children.Any():
@@ -952,7 +979,7 @@ namespace KScript.Syntax.Markup
             /// <summary>What the body of a .kscript type can hold: fields, validate and normalize rules, fn methods, comments.</summary>
             private static bool IsTypeLine(MarkupNode node)
             {
-                if (IsFieldLine(node))
+                if (node is MarkupElement { Name: "catch" } || IsFieldLine(node))
                 {
                     return true;
                 }
@@ -1063,10 +1090,11 @@ namespace KScript.Syntax.Markup
                 }
             }
 
-            private void WriteBlock(string header, MarkupElement e, int indent, bool chained, bool pushScope = true)
+            private void WriteBlock(string header, MarkupElement e, int indent, bool chained, bool pushScope = true, IReadOnlyList<MarkupNode> children = null)
             {
                 string pad = chained ? string.Empty : Pad(indent);
-                if (!e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)))
+                children ??= e.Children;
+                if (!children.Any(c => !(c is MarkupText t && t.IsWhitespace)))
                 {
                     sb.Append(pad).Append(header).Append(" { }\n");
                     return;
@@ -1076,7 +1104,7 @@ namespace KScript.Syntax.Markup
                 {
                     scopes.Push();
                 }
-                WriteBody(e.Children, indent + 1);
+                WriteBody(children, indent + 1);
                 if (pushScope)
                 {
                     scopes.Pop();
@@ -1125,16 +1153,30 @@ namespace KScript.Syntax.Markup
                 WriteBody(body, indent + 1);
                 scopes.Pop();
                 sb.Append(Pad(indent)).Append('}');
-                foreach (MarkupElement clause in e.ChildElements.Where(c => c.Name is "catch" or "finally"))
+                WriteClauses(e.ChildElements.Where(c => c.Name is "catch" or "finally"), indent);
+            }
+
+            private void WriteAttachedCatches(MarkupElement e, int indent, bool expressionBody = false)
+            {
+                if (!e.ChildElements.Any(c => c.Name == "catch")) return;
+                if (!expressionBody) sb.Length--;
+                WriteClauses(e.ChildElements.Where(c => c.Name == "catch"), indent, expressionBody);
+            }
+
+            private void WriteClauses(IEnumerable<MarkupElement> clauses, int indent, bool newLine = false)
+            {
+                foreach (MarkupElement clause in clauses)
                 {
                     scopes.Push();
+                    sb.Append(newLine ? Pad(indent) : " ");
+                    newLine = false;
                     if (clause.Name == "finally")
                     {
-                        sb.Append(" finally");
+                        sb.Append("finally");
                     }
                     else
                     {
-                        sb.Append(" catch");
+                        sb.Append("catch");
                         string name = clause.GetAttributeValue("as")?.Trim().TrimStart('$');
                         List<string> types = clause.GetAttributeValue("type") is string type ? ErrorTypeNames(type) : null;
                         if (types != null && types.All(t => IsName(t) && char.IsUpper(t[0])) && types.Count > 0)

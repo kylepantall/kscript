@@ -1,0 +1,55 @@
+import "types/directory.kscript"
+
+type StatusProbe {
+  fn read(fallback: any) {
+    throw {
+      type: 'Network'
+      message: 'The desktop refused this request'
+      code: 'denied'
+    }
+  } catch Network {
+    return $fallback
+  }
+} catch Network as err {
+  $log->warn($err.message)
+}
+
+test(name: 'a null fallback logs once and the original error reaches the caller') {
+  log_provider(type: 'memory', replace: true)
+  probe = StatusProbe()
+  expect_error(type: Network, as: original) {
+    $probe->read(null)
+  }
+  expect(value: $original['code'], same: 'denied')
+  expect(value: $original.message, same: 'The desktop refused this request')
+  entries = $log->entries()
+  expect(value: $entries->count(), same: 1)
+  expect(value: $entries[0].message, same: $original.message)
+}
+
+test(name: 'false, zero and empty text are valid recovery values') {
+  probe = StatusProbe()
+  expect(value: $probe->read(false), same: false)
+  expect(value: $probe->read(0), same: 0)
+  expect(value: $probe->read(''), same: '')
+}
+
+test(name: 'a caller can recover locally and continue') {
+  log_provider(type: 'memory', replace: true)
+  probe = StatusProbe()
+  status = 'starting'
+  try {
+    $probe->read(null)
+  } catch Network {
+    status = 'offline'
+  }
+  expect(value: $status, same: 'offline')
+}
+
+test(name: 'a conditional rethrow reaches the type only when the fallback is blank') {
+  with_fallback = Directory(fallback: 'guest')
+  without_fallback = Directory(fallback: ' ')
+  expect(value: $without_fallback->lookup('member'), same: 'member')
+  expect(value: $with_fallback->lookup(''), same: 'guest')
+  expect(value: $without_fallback->lookup(''), same: 'A key is required')
+}

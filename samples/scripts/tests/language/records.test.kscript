@@ -1,0 +1,54 @@
+import "types/account.kscript"
+import "types/staff.kscript"
+import "../../types/repo.kscript"
+
+test(name: 'a record maps nested JSON and converts source field names') {
+  repo = Repo({
+    name: 'demo',
+    owner: { login: 'Jo', id: '42' },
+    stargazers_count: '7',
+    visibility: 'public',
+    updated_at: '2026-01-01'
+  })
+  expect(value: $repo.owner.id, same: 42)
+  expect(value: $repo.stars, same: 7)
+  expect(value: $repo.label, equals: 'demo (7 stars)')
+  expect(value: $repo.topics, equals: [])
+  expect(value: $repo.license, equals: null)
+}
+
+test(name: 'shape errors retain the path into a nested record') {
+  problems = Repo->check({
+    name: 'demo',
+    owner: { login: 'Jo', id: 'many' },
+    stargazers_count: 0,
+    visibility: 'public',
+    updated_at: '2026-01-01'
+  })
+  expect(value: $problems, count: 1)
+  expect(value: $problems[0].path, equals: '$.owner.id')
+}
+
+fn account_label(account: Account) => $account->label()
+
+test(name: 'a derived record satisfies a base parameter') {
+  person = Staff(name: 'Ada')
+  expect(value: @account_label($person), equals: 'ADA')
+  expect(value: $person.level, same: 1)
+  expect(value: Account->is($person), equals: true)
+}
+
+test(name: 'assigning a convertible field keeps the declared field type') {
+  person = Staff(name: 'Ada')
+  person.level = '4'
+  expect(value: $person.level, same: 4)
+}
+
+test(name: 'mapping a list checks every row and preserves its order') {
+  people: Account[] = '[{"name":"Lin"},{"name":"Bo"}]'->json(as: Account)
+  expect(value: $people->map(fn(a) => $a->label()), equals: ['LIN', 'BO'])
+}
+
+test(name: 'a missing required field raises a Shape error at conversion') {
+  expect(value: Account({}), throws: Shape)
+}

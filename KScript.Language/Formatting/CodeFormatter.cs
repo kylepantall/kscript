@@ -135,6 +135,7 @@ namespace KScript.Language.Formatting
             public State[] States;
             public int[] Match;          // for an opener or closer, the index of its partner (or -1)
             public bool[] IsBlock;       // for a '{' or '}': it opens or closes a block of statements
+            public bool[] ThrowPayload;  // for the map after a throw if condition
             public bool[] IsMatch;       // for a block's '{': the block of a match statement, which holds arms
             public bool[] ArmArrow;      // for the '=' of '=>': it ends the pattern of a match statement's arm
             public bool[] InExpression;  // for a code char: some enclosing bracket is ( [ or a map's {
@@ -156,6 +157,7 @@ namespace KScript.Language.Formatting
                 States = new State[text.Length],
                 Match = Enumerable.Repeat(-1, text.Length).ToArray(),
                 IsBlock = new bool[text.Length],
+                ThrowPayload = new bool[text.Length],
                 IsMatch = new bool[text.Length],
                 ArmArrow = new bool[text.Length],
                 InExpression = new bool[text.Length],
@@ -171,6 +173,7 @@ namespace KScript.Language.Formatting
             State state = State.Code;
             Stack<int> open = new Stack<int>();
             int expressionDepth = 0;
+            bool markedThrowPayloads = false;
             bool armOpen = false; // inside a match block, before the => of the arm being read
             for (int i = 0; i < text.Length; i++)
             {
@@ -180,6 +183,22 @@ namespace KScript.Language.Formatting
                     case State.Code:
                         s.States[i] = State.Code;
                         s.InExpression[i] = expressionDepth > 0;
+                        if (!markedThrowPayloads && c == 't' && expressionDepth == 0 && text.AsSpan(i).StartsWith("throw")
+                            && (i == 0 || !Lexer.IsIdentChar(text[i - 1])) && Peek(text, i + 5) is ' ' or '\t')
+                        {
+                            int next = SkipSpaces(text, i + 5);
+                            if (text.AsSpan(next).StartsWith("if") && !Lexer.IsIdentChar(Peek(text, next + 2)))
+                            {
+                                // Only the parser knows where a multiline guard ends. A guard with no
+                                // payload must leave the opening brace of the next statement alone.
+                                foreach (MarkupElement thrown in CodeParser.Parse(text).DescendantElements()
+                                    .Where(e => e.Name == "throw" && e.NameSpan.IsEmpty && e.Parent?.Name == "if"))
+                                {
+                                    if (thrown.GetAttribute("value")?.Value is DecodedText map) s.ThrowPayload[map.SourceSpan.Start] = true;
+                                }
+                                markedThrowPayloads = true;
+                            }
+                        }
                         if (expressionDepth == 0 && open.Count > 0 && s.IsMatch[open.Peek()])
                         {
                             if (c == '\n' || c == ',' || c == ';')
@@ -226,7 +245,7 @@ namespace KScript.Language.Formatting
                         }
                         else if (c == '(' || c == '[' || c == '{')
                         {
-                            bool block = c == '{' && expressionDepth == 0 && OpensBlock(s, text, i);
+                            bool block = c == '{' && expressionDepth == 0 && !s.ThrowPayload[i] && OpensBlock(s, text, i);
                             s.IsBlock[i] = block;
                             s.IsMatch[i] = block && OpensMatch(text, i);
                             if (!block) expressionDepth++;
@@ -627,6 +646,7 @@ namespace KScript.Language.Formatting
                 }
                 if (c == '{' && !s.IsBlock[i] && s.Match[i] > i)
                 {
+                    if (s.ThrowPayload[i] && i > 0 && !char.IsWhiteSpace(text[i - 1])) edits.Insert(i, " ");
                     // Map literals: { a: 1 } with a space inside the braces, when they open and close on one line.
                     int close = s.Match[i];
                     char next = Peek(text, i + 1);
@@ -722,12 +742,16 @@ namespace KScript.Language.Formatting
             string text = s.Text;
             int p = at - 1;
             while (p >= 0 && (text[p] == ' ' || text[p] == '\t')) p--;
+            if (s.InExpression[at] && text[at] == ':' && p >= 0 && text[p] is '\'' or '"' && ClosesString(s, p)) return true;
             if (p < 0 || !(Lexer.IsIdentChar(text[p]) || text[p] == '?')) return false;
             if (text[p] == '?') p--;
             int end = p;
             while (p >= 0 && (Lexer.IsIdentChar(text[p]) || text[p] == '-')) p--;
             if (p == end) return false;
             if (p >= 0 && (text[p] == '$' || text[p] == '@' || text[p] == '.')) return false;
+            while (p >= 0 && text[p] is ' ' or '\t') p--;
+            // A new line separates braced map entries, so there needn't be a comma before this key.
+            if (s.InExpression[at] && text[at] == ':' && p >= 0 && text[p] == '\n') return true;
             while (p >= 0 && char.IsWhiteSpace(text[p])) p--;
             if (p < 0) return false;
             char c = text[p];

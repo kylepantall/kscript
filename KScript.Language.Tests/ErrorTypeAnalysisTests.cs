@@ -54,9 +54,9 @@ namespace KScript.Language.Tests
         private static List<string> Labels(string code, string path = DocPath) => Complete(code, path).Select(i => i.Label).ToList();
 
         [Fact]
-        public void ValidErrorCodeIsClean()
+        public void RethrowingFromTheOutermostCatchWarnsAtTheBoundary()
         {
-            AssertClean(Open(Declarations + """
+            var analysis = Open(Declarations + """
                 fn find(id: int) {
                   throw PersonNotFound(id: $id)
                 }
@@ -75,7 +75,11 @@ namespace KScript.Language.Tests
                   saved = Plain()
                   throw $saved
                 }
-                """));
+                """);
+            var warning = Assert.Single(analysis.Diagnostics);
+            Assert.Equal(DiagnosticCodes.UnhandledError, warning.Code);
+            Assert.Contains("OutOfStock", warning.Message);
+            Assert.Contains("PersonNotFound", warning.Message);
         }
 
         [Theory]
@@ -201,10 +205,135 @@ namespace KScript.Language.Tests
         [InlineData("throw NotFound(id: 1)\n")]
         [InlineData("throw $err\n")]
         [InlineData("throw\n")]
+        [InlineData("throw if $this.fallback->is_blank()\n")]
+        [InlineData("throw if $failed { type: 'Network', message: 'Request failed', code: $reply.e.code }\n")]
+        [InlineData("throw if $failed {\n  type: 'Network'\n  message: 'Request failed'\n  code: $reply.e.code\n}\n")]
         public void CatchAndThrowRoundTrip(string code)
         {
             string xml = ScriptConverter.Convert(code, "a.kscript").Text;
             Assert.Equal(code, ScriptConverter.Convert(xml, "a.ks.xml").Text);
+        }
+
+        [Fact]
+        public void AConditionalThrowChecksAndCompletesItsOriginalSource()
+        {
+            var (code, at) = WithCaret("""
+                reply = { failed: true, e: { code: 503 } }
+                throw if $reply.failed {
+                  type: 'Network'
+                  message: 'Request failed'
+                  code: $reply.e.co‸de
+                }
+                """);
+            var analysis = Open(code);
+            Assert.Equal(DiagnosticCodes.UnhandledError, Assert.Single(analysis.Diagnostics).Code);
+            Assert.Contains(Service.GetCompletions(analysis, at), i => i.Label == "code");
+            Assert.Contains(Service.GetSemanticTokens(analysis), t => analysis.Source[t.Span] == "message" && t.Type == SemanticTokenType.Property);
+            var bad = Open(code.Replace("$reply.e.code", "$typo.e.code"));
+            Assert.Equal("typo", bad.Source[AssertSingle(bad, DiagnosticCodes.UndefinedVariable).Span].TrimStart('$'));
+            Assert.Contains("throw if", Labels("thr‸"));
+            Assert.Contains("if", Labels("throw i‸"));
+        }
+
+        [Fact]
+        public void ConditionalBareThrowHasTheSameEffectsAsAnIfAndOffersARethrowInACatch()
+        {
+            foreach (string guarded in new[] { "throw if true", "if true { throw }" })
+            {
+                var boundary = Assert.Single(Open(guarded).Diagnostics);
+                Assert.Equal(DiagnosticCodes.UnhandledError, boundary.Code);
+                Assert.Contains("Error", boundary.Message);
+            }
+            const string source = "fn recover(stop: bool) { throw Network \"offline\" } catch Network { throw if $stop; return 'ok' }\n@recover(false)";
+            var analysis = Open(source);
+            var warning = Assert.Single(analysis.Diagnostics);
+            Assert.Equal(DiagnosticCodes.UnhandledError, warning.Code);
+            Assert.Contains("Network", warning.Message);
+
+            var (text, at) = WithCaret("try { throw Network \"down\" } catch Network {\n  throw i‸\n}");
+            var snippet = Assert.Single(Service.GetCompletions(Open(text), at), c => c.Label == "if");
+            Assert.Equal("if ${1:condition}", snippet.InsertText);
+        }
+
+        [Fact]
+        public void AnIfThrowFollowedByElseKeepsItsBranchStructure()
+        {
+            const string xml = "<kscript><if test=\"$failed\"><throw value=\"{ message: 'error' }\" /></if><else><echo>ok</echo></else></kscript>";
+            var converted = ScriptConverter.Convert(xml, "a.ks.xml");
+            Assert.StartsWith("if $failed {", converted.Text);
+            Assert.Contains("} else {", converted.Text);
+            Assert.Empty(converted.Warnings);
+        }
+
+        [Fact]
+        public void MethodAndTypeCatchesResolveTheirOwnVariables()
+        {
+            var (code, at) = WithCaret("""
+                type Service {
+                  fallback: string
+                  fn read(key: string) {
+                    throw Network "down"
+                  } catch Network as problem when $key->count() > 0 {
+                    return $this.fallback + $key + $problem.mess‸age
+                  }
+                } catch Network as err {
+                  return $fallback + $err.message
+                }
+                echo Service(fallback: 'offline')->read('remote')
+                """);
+            var analysis = Open(code);
+            AssertClean(analysis);
+            Assert.Contains(Service.GetCompletions(analysis, at), i => i.Label == "message");
+            var outside = Open(code.Replace("$fallback + $err", "$key + $err"));
+            Assert.Contains(outside.Diagnostics, d => d.Code == DiagnosticCodes.UndefinedVariable && d.Message.Contains("$key"));
+        }
+
+        [Theory]
+        [InlineData("fn read() { } ca‸")]
+        [InlineData("type Service { fallback: string } ca‸")]
+        public void CatchCompletesAfterADeclaration(string code)
+        {
+            Assert.Contains("catch", Labels(code));
+        }
+
+        [Fact]
+        public void RefinementCatchSeesTheUnderlyingValueAndReceiver()
+        {
+            AssertClean(Open("""
+                type Key with [string] {
+                  fn read() { throw Network "down" }
+                } catch Network {
+                  return $value->trim() + $this->upper() + $err.message
+                }
+                echo Key('remote')->read()
+                """));
+        }
+
+        [Fact]
+        public void ATypeCanGroupMethodsWithAHandlerWithoutDeclaringFields()
+        {
+            AssertClean(Open("""
+                type Service {
+                  fn read() { throw Network "down" }
+                } catch Network as err {
+                  return $err.message
+                }
+                service = Service()
+                echo $service->read()
+                """));
+            AssertSingle(Open("type Service {} catch Network {}"), DiagnosticCodes.MissingAttribute);
+        }
+
+        [Theory]
+        [InlineData("fn read(key: string) => $key->trim()\ncatch Network as e {\n  return $e.message\n}\n")]
+        [InlineData("type Service {\n  fallback: string\n  fn read() {\n    throw Network \"down\"\n  } catch Network {\n    throw\n  }\n} catch Network as e {\n  return $this.fallback\n}\n")]
+        public void DeclarationCatchesRoundTripWithTheirOwners(string source)
+        {
+            var xml = ScriptConverter.Convert(source, "a.kscript");
+            Assert.Empty(xml.Warnings);
+            var restored = ScriptConverter.Convert(xml.Text, "a.ks.xml");
+            Assert.Empty(restored.Warnings);
+            Assert.Equal(source, restored.Text);
         }
 
         [Fact]

@@ -29,6 +29,10 @@ async function load() {
     onigLib: Promise.resolve({ createOnigScanner: (p) => new oniguruma.OnigScanner(p), createOnigString: (s) => new oniguruma.OnigString(s) }),
     loadGrammar: async (scope) => {
       if (scope === 'source.kscript') return textmate.parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath);
+      if (scope === 'source.kscript-code') {
+        const code = path.join(path.dirname(grammarPath), 'kscript-code.tmLanguage.json');
+        return textmate.parseRawGrammar(fs.readFileSync(code, 'utf8'), code);
+      }
       if (scope === 'source.json') return textmate.parseRawGrammar(JSON.stringify(jsonGrammar), 'json.json');
       return null;
     },
@@ -49,6 +53,17 @@ function tokenize(grammar, source) {
 }
 
 const scopeOf = (tokens, text) => (tokens.find((t) => t.text === text) || { scopes: '' }).scopes;
+
+test('quoted expressions in XML and page interpolation use member and variable scopes', async () => {
+  const tokens = tokenize(await load(), `<kscript><let name="url" value='"{$config.passkeys.url}/{$kind}/finish"' /><echo>{{literal}} {$page.title}</echo></kscript>`);
+  for (const field of ['passkeys', 'url', 'title']) {
+    assert.ok(tokens.some(t => t.text === field && /meta\.(?:interpolation|embedded\.expression)\.kscript .*variable\.other\.property/.test(t.scopes)), field);
+  }
+  assert.match(scopeOf(tokens, '$kind'), /meta\.interpolation\.kscript .*variable\.other/);
+  assert.match(scopeOf(tokens, '/finish'), /string\.quoted\.double\.kscript/);
+  assert.match(scopeOf(tokens, '{{'), /constant\.character\.escape/);
+  assert.doesNotMatch(scopeOf(tokens, 'literal'), /meta\.embedded\.expression/);
+});
 
 test('control flow and declaration tags are coloured like keywords', async () => {
   const grammar = await load();

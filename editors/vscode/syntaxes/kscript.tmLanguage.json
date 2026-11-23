@@ -31,6 +31,9 @@
       "include": "#entity"
     },
     {
+      "include": "source.kscript-code#escapedBraces"
+    },
+    {
       "include": "#interpolation"
     },
     {
@@ -58,7 +61,7 @@
               }
             },
             {
-              "match": "(?:^|\\G)\\s*(@(?:returns?|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
+              "match": "(?:^|\\G)\\s*(@(?:returns?|throws|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
               "captures": {
                 "1": {
                   "name": "storage.type.class.doc.kscript"
@@ -148,6 +151,9 @@
           "include": "#entity"
         },
         {
+          "include": "source.kscript-code#escapedBraces"
+        },
+        {
           "include": "#interpolation"
         },
         {
@@ -163,6 +169,9 @@
         {
           "name": "variable.other.kscript",
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "source.kscript-code#member"
         },
         {
           "name": "entity.name.function.command.kscript",
@@ -219,6 +228,12 @@
           "include": "#entity"
         },
         {
+          "include": "source.kscript-code#text"
+        },
+        {
+          "include": "source.kscript-code#escapedBraces"
+        },
+        {
           "include": "#interpolation"
         },
         {
@@ -231,6 +246,9 @@
         {
           "name": "variable.other.kscript",
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "source.kscript-code#member"
         },
         {
           "name": "entity.name.function.command.kscript",
@@ -275,8 +293,7 @@
           "match": "'[^']*'"
         },
         {
-          "name": "string.quoted.double.kscript",
-          "match": "\"[^\"]*\""
+          "include": "source.kscript-code#text"
         }
       ]
     },
@@ -311,6 +328,9 @@
         {
           "name": "variable.other.kscript",
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "source.kscript-code#member"
         },
         {
           "name": "entity.name.function.command.kscript",
@@ -365,6 +385,9 @@
         {
           "name": "variable.other.kscript",
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "source.kscript-code#member"
         },
         {
           "name": "entity.name.function.command.kscript",
@@ -456,6 +479,9 @@
           "include": "#entity"
         },
         {
+          "include": "source.kscript-code#escapedBraces"
+        },
+        {
           "include": "#interpolation"
         },
         {
@@ -468,6 +494,9 @@
         {
           "name": "variable.other.kscript",
           "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "include": "source.kscript-code#member"
         },
         {
           "name": "entity.name.function.command.kscript",

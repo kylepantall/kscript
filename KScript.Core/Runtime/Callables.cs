@@ -170,6 +170,8 @@ namespace KScript.Runtime
             Closure = closure;
             Module = module;
             Description = description;
+            catches = element.ChildElements.Where(e => e.Name == "catch").ToArray();
+            body = catches.Length == 0 ? element.Children : element.Children.Where(n => n is not MarkupElement { Name: "catch" }).ToArray();
         }
 
         public string Name { get; }
@@ -180,6 +182,10 @@ namespace KScript.Runtime
         internal EvalContext ValueContext { get; }
         internal Scope Closure { get; }
         public Module Module { get; }
+        private readonly MarkupElement[] catches;
+        private readonly IReadOnlyList<MarkupNode> body;
+        internal IReadOnlyList<TypeCatch> TypeCatches { get; init; }
+        internal object Receiver { get; init; }
 
         /// <summary>A default written as raw text for the parameter's type: who: handle = @guest, size: Size = medium.</summary>
         private string RawDefault(Parameter p)
@@ -191,8 +197,41 @@ namespace KScript.Runtime
 
         public object Call(CallContext call)
         {
-            Interpreter interpreter = call.Interpreter;
             Scope scope = Closure.Child();
+            try
+            {
+                try
+                {
+                    return InvokeWithFunctionCatches(call, scope);
+                }
+                catch (KScriptException error) when (TypeCatches is { Count: > 0 })
+                {
+                    foreach (var handler in TypeCatches)
+                    {
+                        Scope receiverScope = CatchClauses.BindReceiver(handler.Closure, Receiver, handler.RecordFields);
+                        CatchClauses.HandleDeclaration(call.Interpreter, handler.Clause, receiverScope, handler.Module, error);
+                    }
+                    throw;
+                }
+            }
+            catch (ReturnSignal r) { return r.Value; }
+        }
+
+        private object InvokeWithFunctionCatches(CallContext call, Scope scope)
+        {
+            try { return Invoke(call, scope); }
+            catch (KScriptException error) when (catches.Length > 0)
+            {
+                Interpreter.Located(error, Module, Element.NameSpan.Start);
+                foreach (var clause in catches)
+                    CatchClauses.HandleDeclaration(call.Interpreter, clause, scope, Module, error);
+                throw;
+            }
+        }
+
+        private object Invoke(CallContext call, Scope scope)
+        {
+            Interpreter interpreter = call.Interpreter;
             var enums = new Dictionary<string, EnumType>();
             var enumLists = new Dictionary<string, EnumType>();
             Dictionary<string, string> rawItems = null;
@@ -251,14 +290,7 @@ namespace KScript.Runtime
                 return interpreter.Evaluate(ValueExpression, scope, ValueContext);
             }
 
-            try
-            {
-                interpreter.ExecuteChildren(Element, scope, Module);
-            }
-            catch (ReturnSignal r)
-            {
-                return r.Value;
-            }
+            interpreter.ExecuteNodes(body, scope, Module);
             return null;
         }
 

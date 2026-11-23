@@ -875,6 +875,8 @@ namespace KScript.Syntax
                 Expect(":", $"after the key '{key.Text}'");
                 ExprNode value = ParseExpr();
                 map.Entries.Add(new MapEntryNode { Key = key.Text, KeySpan = key.Span, Value = value, Span = TextSpan.FromBounds(key.Span.Start, value.Span.End) });
+                // A new key on its own line separates braced map entries. Type arguments keep their commas.
+                if (closing == "}" && StartsLine(Peek()) && Peek(1).Is(":")) continue;
                 if (!Peek().Is(","))
                 {
                     break;

@@ -29,6 +29,29 @@ namespace KScript.Language.Tests
         public void ValidNamedArgumentsAreClean(string body) => AssertClean(Analyze(Script(body)));
 
         [Fact]
+        public void NullCallbacksAreRejectedOnNativeAndUserCalls()
+        {
+            var analysis = Service.Analyze("""
+                import KScript.Net
+                fn handler(connection: any) => $connection
+                fn fallback(action: fn = @handler) => $action(1)
+                fn optional(action: fn? = null) => $action
+                fn use_callback(action: fn) => $action(1)
+                @with_loopback_json(47231, action: null)
+                missing = null
+                @use_callback($missing)
+                @fallback(null)
+                @optional(null)
+                callback = @handler
+                @use_callback($callback)
+                @use_callback(fn(x) => $x)
+                """, "callbacks.kscript");
+            var problems = analysis.Diagnostics.Where(d => d.Code == DiagnosticCodes.TypeMismatch).ToArray();
+            Assert.Equal(new[] { "null", "$missing", "null" }, problems.Select(d => analysis.Source[d.Span]));
+            Assert.All(problems, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+        }
+
+        [Fact]
         public void UnknownNamesSuggestTheParameter()
         {
             DocumentAnalysis a = Analyze(Script(IO + "<echo>{ @known_folder(nme: 'downloads') }</echo>"));

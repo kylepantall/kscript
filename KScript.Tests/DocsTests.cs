@@ -17,6 +17,38 @@ public sealed class DocsTests
 {
     private static readonly Lazy<DocsSite> Site = new Lazy<DocsSite>(() => DocsSite.Build());
 
+    [Fact]
+    public void ApiOptionsHaveNavigableFieldsAndExamplesInBothReferences()
+    {
+        var site = Site.Value;
+        var api = site.Catalog.GetCommand("api");
+        var options = api.Signatures.Single().Parameters.Single(p => p.Name == "options");
+        Assert.Equal(KType.Map, options.Type);
+        Assert.Equal(new[] { "method", "headers", "body", "timeout" }, options.Fields.Select(f => f.Name));
+        string html = site.Find("/reference/net").Body;
+        Assert.Contains("href=\"#cmd-api-options\"", html);
+        Assert.Contains("id=\"cmd-api-options\"", html);
+        Assert.Contains("href=\"/reference/methods/response\"", html);
+        var markdown = new KScript.Docs.Mcp.DocsMarkdown(site);
+        foreach (string format in new[] { "kscript", "xml" })
+        {
+            string page = markdown.Callable(api, format);
+            Assert.Contains("kscript://docs/reference/methods/map", page);
+            Assert.Contains("kscript://docs/reference/methods/response", page);
+            foreach (var field in options.Fields)
+            {
+                Assert.Contains($"id=\"cmd-api-options-{field.Name}-field\"", html);
+                Assert.Contains(field.DefaultValue, WebUtility.HtmlDecode(html));
+                Assert.Contains(field.Description, page);
+                Assert.Contains(field.Example, page);
+                Assert.Contains(field.DefaultValue, page);
+            }
+            Assert.Contains("method: 'POST'", page);
+            Assert.Contains(format == "xml" ? "<import package=\"KScript.Net\"" : "import KScript.Net", page);
+        }
+        Assert.Contains("In-process requests to project routes ignore this field", html);
+    }
+
     private static readonly Regex TryBox = new Regex(@"<div class=""try""[^>]*>", RegexOptions.Compiled);
     private static readonly Regex DataAttribute = new Regex(@"data-(xml|kscript)=""([^""]*)""", RegexOptions.Compiled);
     private static readonly Regex InputAttribute = new Regex(@"data-input=""([^""]*)""", RegexOptions.Compiled);

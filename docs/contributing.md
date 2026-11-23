@@ -7,7 +7,6 @@ KScript is open source, and contributions are welcome. This page covers building
 KScript targets .NET 8 and runs on Windows, Linux and macOS. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download), then:
 
 ```sh
-git submodule update --init   # fetch pinned SDKs for integration tests
 dotnet build KScript.sln
 dotnet test KScript.sln
 
@@ -38,6 +37,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
+| `libraries/` | KScript source libraries published by `kylepantall/kscript`. The Isolink SDK lives in a separate repository under the trusted publisher `waggr-gb`. See [waggr-gb/isolink-connect](https://github.com/waggr-gb/isolink-connect). |
 | `editors/vscode/` | The VS Code extension. |
 | `samples/scripts/` | Sample scripts. Every sample is a `.kscript` file. |
 | `samples/xml/` | The scripts of `samples/scripts/` in the XML form: the one set of samples kept in XML. |
@@ -48,6 +48,19 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 ## Tests and CI
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
+
+Add runnable language examples to `samples/scripts/tests/language`. Run `kscript test samples/scripts/tests/language` for their runtime results and `kscript check samples/scripts/tests/language --warnings-as-errors` for diagnostics. The VS Code extension tests also open these scripts through the language server. They exercise completion, navigation, test discovery and edits to unsaved buffers.
+
+After a Release build, run the editor suites from `editors/vscode`.
+
+```sh
+npm ci
+npm test
+npm run smoke -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+npm run test:vscode -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+```
+
+`smoke` starts the server and sends JSON-RPC requests. `test:vscode` runs the extension in VS Code. On headless Linux, prefix the latter command with `xvfb-run -a`.
 
 Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 

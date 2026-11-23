@@ -7,6 +7,89 @@ public sealed class RefinementMethodTests
     private static string Run(string code) =>
         ScriptRunner.Run(code, path: Path.Combine(Path.GetTempPath(), "refinement-methods.kscript"));
 
+    [Theory]
+    [InlineData("fn (c) => $c->trim()")]
+    [InlineData("fn(c) => $c->trim()")]
+    [InlineData("@trim_key")]
+    [InlineData("$trim_key_callback")]
+    public void NormalizerCallbacksReceiveTheInputBeforeValidationAndTypedMethodCalls(string normalizer)
+    {
+        string printed = Run($$"""
+            fn trim_key(text: string, suffix: string = '') => $text->trim() + $suffix
+            trim_key_callback = @trim_key
+            type PasskeySessionKey with [string] {
+              min: 8
+              normalize: {{normalizer}}
+              pattern: /^passkey_[a-zA-Z]+$/
+              fn break() {
+                return $value->count()
+              }
+            }
+            fn key_length(key: PasskeySessionKey) => $key->break()
+            key = PasskeySessionKey('  passkey_Login  ')
+            echo $key
+            echo $key->break()
+            echo @key_length($key)
+            echo @key_length(' passkey_test ')
+            """);
+        Assert.Equal("passkey_Login\n13\n13\n12\n", printed);
+    }
+
+    [Theory]
+    [InlineData("@trim_key($value)")]
+    [InlineData("@trim_key")]
+    public void NormalizersCanCallTheirOwnLaterMethodInPreferenceToAModuleFunction(string normalizer)
+    {
+        string printed = Run($$"""
+            fn trim_key(key: string) => 'global'
+            type PasskeySessionKey with [string] {
+              min: 8
+              normalize: {{normalizer}}
+              pattern: /^passkey_[a-zA-Z]+$/
+              fn trim_key(key: string) => $key->trim()
+            }
+            key = PasskeySessionKey(' passkey_login ')
+            echo $key
+            echo $key->trim_key(' other ')
+            echo PasskeySessionKey->check(' passkey_abc123 ')->count()
+            echo @trim_key('outside')
+            """);
+        Assert.Equal("passkey_login\nother\n1\nglobal\n", printed);
+    }
+
+    [Fact]
+    public void AnInheritedNormalizerCannotLeakAReceiverThatSkipsNormalization()
+    {
+        string printed = Run("""
+            state = {}
+            type Key with [string] {
+              fn clean(text: string) {
+                state.saved = $this
+                return $text->trim()
+              }
+            }
+            type ChildKey with [Key] {
+              normalize: @clean
+            }
+            key = ChildKey(' login ')
+            echo "[$key]"
+            echo "[{ $state.saved }]"
+            echo "[{ ChildKey($state.saved) }]"
+            """);
+        Assert.Equal("[login]\n[ login ]\n[login]\n", printed);
+    }
+
+    [Fact]
+    public void IdentityNormalizationPreservesAFunctionAsTheInput()
+    {
+        string printed = Run("""
+            type Callback with [fn] { normalize: $value }
+            callback: Callback = fn(x) => $x + 1
+            echo $callback(3)
+            """);
+        Assert.Equal("4\n", printed);
+    }
+
     [Fact]
     public void MethodsUseTheirClosureAndTheNormalizedReceiver()
     {
