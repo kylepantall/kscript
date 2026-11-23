@@ -1,0 +1,69 @@
+type ManifestLine {
+  lot: string(min: 1)
+  units: int(min: 1)
+}
+
+fn read_manifest(lines: string[]) {
+  accepted = []
+  rejected = []
+  seen = []
+  for raw at index in $lines {
+    row = $index + 1
+    try {
+      entry: ManifestLine = $raw->json(as: ManifestLine)
+      throw if $entry.lot in $seen {
+        type: 'Conflict'
+        message: "Duplicate lot {$entry.lot}"
+        row: $row
+      }
+      accepted = $accepted->push($entry)
+      seen = $seen->push($entry.lot)
+    } catch Json as err {
+      rejected = $rejected->push({ row: $row, problem: $err.type })
+    } catch Shape as err {
+      rejected = $rejected->push({ row: $row, problem: $err.type })
+    }
+  }
+  return { accepted: $accepted, rejected: $rejected }
+}
+
+describe(name: 'Reading a line-delimited shipment manifest') {
+  test(name: 'accepted entries are typed and their quantities are converted') {
+    result = @read_manifest(['{"lot":"a","units":"3"}'])
+    expect(value: $result.accepted[0]->type(), same: 'ManifestLine')
+    expect(value: $result.accepted[0].units, same: 3)
+    expect(value: $result.rejected, same: [])
+  }
+
+  test(name: 'a syntax error and a shape error are attributed to their input rows') {
+    result = @read_manifest([
+      '{broken',
+      '{"lot":"a","units":2}',
+      '{"lot":"b","units":0}',
+      '{"lot":"c","units":1}'
+    ])
+    expect(value: $result.accepted->pluck(lot), same: ['a', 'c'])
+    expect(
+      value: $result.rejected,
+      same: [{ row: 1, problem: 'Json' }, { row: 3, problem: 'Shape' }]
+    )
+  }
+
+  test(name: 'a rejected row does not reserve a lot identifier') {
+    result = @read_manifest(['{"lot":"z"}', '{"lot":"z","units":4}'])
+    expect(value: $result.rejected, same: [{ row: 1, problem: 'Shape' }])
+    expect(value: $result.accepted->pluck(lot), same: ['z'])
+  }
+
+  test(name: 'duplicate accepted lots escape the two recoverable error handlers') {
+    expect_error(type: Conflict, as: err) {
+      @read_manifest(['{"lot":"a","units":1}', '{}', '{"lot":"a","units":2}'])
+    }
+    expect(value: $err['row'], same: 3)
+    expect(value: $err.message, same: 'Duplicate lot a')
+  }
+
+  test(name: 'empty input yields two empty lists') {
+    expect(value: @read_manifest([]), same: { accepted: [], rejected: [] })
+  }
+}

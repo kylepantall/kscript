@@ -1,0 +1,12 @@
+import "../lib/licenses.kscript"
+
+if $args->count() != 1 {
+  throw Validation "Supply one product name"
+}
+if @env('KSCRIPT_TEST_ISSUER_CONTEXT') != 'portal' {
+  throw Validation "Run the portal wrapper"
+}
+if @env('KSCRIPT_TEST_DATABASE_URL', '')->trim() == '' {
+  throw Validation "Configure the database"
+}
+echo @issue_license($args[0])

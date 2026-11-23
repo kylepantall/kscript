@@ -1,0 +1,1 @@
+fn issue_license(product: string) => "issued: {$product}"

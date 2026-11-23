@@ -55,7 +55,7 @@ namespace KScript.Language.Analysis
                     Instance = instance,
                     Kind = model ? KType.Model : null,
                     LiteralPattern = literalPattern,
-                    LiteralRules = literalPattern == null ? null : StaticRefinementRules(e).ToArray(),
+                    LiteralRules = literalPattern == null ? null : StaticRefinementRules(e, null).Select(level => level.Rules).ToArray(),
                     ValueChoices = refinedRoot == null ? null : RefinementChoices(e, refinedRoot),
                 };
                 Symbol symbol = NewVariable(name, span, e, SymbolKind.Constant, declaredType);

@@ -14,6 +14,69 @@ namespace KScript.Language.Tests
 
         private static DocumentAnalysis Code(string code) => Analyze(code, "types.kscript");
 
+        private const string TrimmedKey = """
+            type PasskeySessionKey with [string] {
+              min: 8
+              normalize: $value->trim()
+              pattern: /^passkey_[a-zA-Z]+$/
+            }
+            """;
+
+        [Fact]
+        public void ImportedTrimmedKeyReportsAnUnquotedInterpolationAtTheFullRawValue()
+        {
+            string folder = Path.GetFullPath("passkey-project");
+            string file = Path.Combine(folder, "client.kscript");
+            const string client = """
+                import "key.kscript"
+                fn key_for(kind: string) {
+                  echo $kind
+                  key: PasskeySessionKey = passkey_{$kind}
+                  return $key
+                }
+                echo @key_for('login')
+                """;
+            var files = new MemoryFiles().Add(Path.Combine(folder, "key.kscript"), TrimmedKey).Add(file, client);
+            var service = new LanguageService(files: files);
+            DocumentAnalysis analysis = service.Analyze(client, file);
+            Diagnostic bad = AssertSingle(analysis, DiagnosticCodes.InvalidTypedValue);
+            Assert.Equal("passkey_{$kind}", analysis.Source[bad.Span]);
+            Assert.Contains("must match /^passkey_[a-zA-Z]+$/", bad.Message);
+            Assert.Contains("double quotes", bad.Message);
+            AssertClean(service.Analyze(client.Replace("= passkey_{$kind}", "= \"passkey_{$kind}\""), file));
+        }
+
+        [Fact]
+        public void PlainTrimChecksRulesOnTheTrimmedText()
+        {
+            AssertClean(Code(TrimmedKey + "\nkey: PasskeySessionKey = '  passkey_Login  '\necho $key"));
+            Diagnostic bad = AssertSingle(Code(TrimmedKey + "\nkey: PasskeySessionKey = '    abc    '\necho $key"), DiagnosticCodes.InvalidTypedValue);
+            Assert.Contains("at least 8", bad.Message);
+            Assert.DoesNotContain("double quotes", bad.Message);
+        }
+
+        [Theory]
+        [InlineData("type Placeholder with [string] { normalize: $value->trim(); pattern: /^route_.+$/ }", "Placeholder", "route_{$id}")]
+        [InlineData("type Flexible with [string] { normalize: 'valid'; pattern: /^valid$/ }", "Flexible", "raw_{$id}")]
+        [InlineData("extend string { override fn trim() => 'valid' }\ntype Flexible with [string] { normalize: $value->trim(); pattern: /^valid$/ }", "Flexible", "raw_{$id}")]
+        public void LiteralBracesAndOpaqueNormalizersDoNotProduceFalseErrors(string declarations, string type, string raw)
+        {
+            AssertClean(WithoutUnused(Code($"{declarations}\nkey: {type} = {raw}\necho $key")));
+        }
+
+        [Fact]
+        public void AnImplicitProjectTypeCanUseItsOwnTrimImplementation()
+        {
+            string root = Path.GetFullPath("custom-trim-project");
+            const string client = "key: PasskeySessionKey = raw_{$id}\necho $key";
+            var files = new MemoryFiles()
+                .Add(Path.Combine(root, "kscript.json"), "{}")
+                .Add(Path.Combine(root, "lib", "custom.kscript"), "extend string { override fn trim() => 'passkey_Label' }")
+                .Add(Path.Combine(root, "natives", "passkey-session-key.kscript"), "import \"../lib/custom.kscript\"\n" + TrimmedKey)
+                .Add(Path.Combine(root, "main.kscript"), client);
+            AssertClean(new LanguageService(files: files).Analyze(client, Path.Combine(root, "main.kscript")));
+        }
+
         [Theory]
         [InlineData("cash: money(rates: { EUR: 0 }) = 'GBP 1'")]
         [InlineData("type Invoice { price: money(rates: { EUR: 0 }) }")]

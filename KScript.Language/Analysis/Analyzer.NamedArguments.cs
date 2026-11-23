@@ -1,5 +1,6 @@
 using KScript.Metadata;
 using KScript.Language.Catalog;
+using KScript.Runtime;
 using KScript.Syntax;
 using KScript.Syntax.Text;
 
@@ -15,7 +16,8 @@ namespace KScript.Language.Analysis
     {
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
-            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false)
+            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false,
+            bool ScriptParameter = false)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -62,7 +64,7 @@ namespace KScript.Language.Analysis
                     string itemType = p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal) ? p.Type.Substring(0, p.Type.Length - 2).Trim() : null;
                     Symbol item = itemType != null && !KType.Declarable.Contains(itemType) ? scope?.Lookup(itemType, int.MaxValue) : null;
                     return new ParameterSlot(p.Name, !p.HasDefault, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : item?.EnumValues != null ? item.Name : null,
-                        item?.EnumValues, raw, p.Type);
+                        item?.EnumValues, raw, p.Type, ScriptParameter: true);
                 }).ToList(),
             };
 
@@ -107,6 +109,15 @@ namespace KScript.Language.Analysis
             if (slot.AcceptsModel)
             {
                 CheckModelArgument(a.Value, region, slot.Type == ParameterInfo.ModelOrString);
+                return;
+            }
+            if (slot.ScriptParameter && a.Value is LiteralNode { Kind: LiteralKind.Null }
+                && TypeRef.Parse(slot.Type) is { Optional: false } parameterType
+                && parameterType is not { IsSimple: true, IsBuiltIn: true, Name: KType.Any or KType.String })
+            {
+                // Plain string coerces null to empty text. A refinement, record or list goes through shape validation.
+                Report(region.Source.ToSource(a.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    $"The '{slot.Name}' argument needs {slot.Type}, but this value is null.");
                 return;
             }
             if (slot.Type is "number" or "int" or "float")

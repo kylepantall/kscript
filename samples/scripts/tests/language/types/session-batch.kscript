@@ -1,0 +1,7 @@
+import "passkey-session-key.kscript"
+
+type SessionBatch {
+  active: PasskeySessionKey
+  previous?: PasskeySessionKey
+  candidates: PasskeySessionKey[]
+}

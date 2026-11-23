@@ -1,0 +1,13 @@
+fn read_mode(mode: string) {
+  throw if $mode == 'offline' { type: 'Network', message: 'offline' }
+  throw if $mode == 'invalid' { type: 'Validation', message: 'invalid' }
+  return $mode
+}
+
+try {
+  echo @read_mode('offline')
+} catch Network as err when $err.message == 'offline' {
+  echo $err.message
+} catch Validation as err {
+  echo $err.message
+}

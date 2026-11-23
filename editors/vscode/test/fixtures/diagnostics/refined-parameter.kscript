@@ -1,0 +1,5 @@
+import "types/passkey-session-key.kscript"
+
+fn describe_key(key: PasskeySessionKey) => $key->upper()
+
+echo @describe_key(null)

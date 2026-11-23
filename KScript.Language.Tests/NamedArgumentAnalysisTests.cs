@@ -51,6 +51,58 @@ namespace KScript.Language.Tests
             Assert.All(problems, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
         }
 
+        [Theory]
+        [InlineData("key: SessionKey", "@describe(null)")]
+        [InlineData("key: SessionKey", "@describe(key: null)")]
+        [InlineData("key: SessionKey = 'ready'", "@describe(null)")]
+        [InlineData("key: SessionKey[]", "@describe(null)")]
+        [InlineData("key: string(min: 1)", "@describe(null)")]
+        public void SuppliedNullCannotSatisfyAScriptParameterShape(string parameter, string call)
+        {
+            var analysis = Service.Analyze($$"""
+                type SessionKey with [string] { min: 1 }
+                fn describe({{parameter}}) => $key
+                echo {{call}}
+                """, "parameter.kscript");
+            var problem = AssertSingle(analysis, DiagnosticCodes.TypeMismatch);
+            Assert.Equal(DiagnosticSeverity.Error, problem.Severity);
+            Assert.Equal("null", analysis.Source[problem.Span]);
+            Assert.Contains("'key'", problem.Message);
+        }
+
+        [Fact]
+        public void ARecordMethodChecksNullAgainstItsDeclaredParameter()
+        {
+            var analysis = Service.Analyze("""
+                type Badge { serial: int }
+                type Reader { fn read(badge: Badge) => $badge.serial }
+                reader = Reader()
+                echo $reader->read(badge: null)
+                """, "method.kscript");
+            var problem = AssertSingle(analysis, DiagnosticCodes.TypeMismatch);
+            Assert.Equal("null", analysis.Source[problem.Span]);
+            Assert.Contains("Badge", problem.Message);
+        }
+
+        [Fact]
+        public void DefaultsNullableParametersAndRuntimeValuesStillBind()
+        {
+            var analysis = Service.Analyze("""
+                type SessionKey with [string] { min: 1 }
+                fn describe(key: SessionKey = 'ready') => $key
+                fn maybe(key: SessionKey?) => $key
+                fn passthrough(value: any) => $value
+                fn as_text(value: string) => $value
+                fn dynamic_key(value: any) => @describe($value)
+                echo @describe()
+                echo @maybe(null)
+                echo @passthrough(null)
+                echo @as_text(null)
+                echo @dynamic_key('valid')
+                """, "nullable.kscript");
+            AssertClean(analysis);
+        }
+
         [Fact]
         public void UnknownNamesSuggestTheParameter()
         {

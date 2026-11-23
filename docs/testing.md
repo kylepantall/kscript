@@ -245,8 +245,22 @@ Run `kscript test samples/scripts/tests/language/checkout-workflow.test.kscript`
 
 Run `kscript test samples/scripts/tests/language/dispatch-workflow.test.kscript` to follow incoming JSON through typed records, team-name normalization, priority sorting and queue selection. The same policy handles an unknown team by selecting a fallback or propagating the lookup error. [Dispatch script](../samples/scripts/tests/language/dispatch-workflow.test.kscript)
 
+The [passkey suite](../samples/scripts/tests/language/passkey-values.test.kscript) checks bare static keys, quoted interpolation, trimming and pattern failures. The [license issuer suite](../samples/scripts/tests/language/license-issuer-guards.test.kscript) exercises three validation guards and checks what the caller sees on success and failure.
+
 ## In the editor
 
 The language server treats `*.test.kscript` and `*.test.ks.xml` files as importing KScript.Test, so `test`, `expect` and the rest get completion, hover and checking, and the variables of a `for` loop round a test are known inside it. In VS Code, **KScript: Run Tests** runs `kscript test` for the workspace, and test files have a run button in the editor title bar.
 
 `expect`, `@assert` and `capture` also work in ordinary scripts that `import KScript.Test`: a failed check stops the script with an `Assertion` error. `test` and `describe` only work under `kscript test`.
+
+### Comparing checker and editor diagnostics
+
+Use `kscript check path/to/script.kscript --output json` for the diagnostic code, message, severity and source range on disk. In VS Code, **Problems** shows diagnostics for the current buffer, including unsaved edits. Set `"kscript.trace.server": "verbose"` to see the language server's `textDocument/publishDiagnostics` notifications in the trace output. CLI lines and columns start at one. LSP lines and columns start at zero.
+
+From the repository root, after building KScript in Release mode and installing the extension's npm dependencies, run the same protocol checks as CI:
+
+```sh
+node editors/vscode/test/smoke.js KScriptApp/bin/Release/net8.0/KScript.dll
+```
+
+The test opens every language suite and helper. For the [diagnostic fixtures](../editors/vscode/test/fixtures/diagnostics), it checks the expected source spans, compares the server's messages and severities to the CLI report, and verifies that a correction clears the old diagnostics before saving the file.

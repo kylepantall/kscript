@@ -198,6 +198,21 @@ async function dispatchWorkflow(folder) {
   assert.strictEqual(await vscode.commands.executeCommand('kscript.runTestsInFile', doc.uri), 0);
 }
 
+async function licenseGuardWarnings(folder) {
+  const doc = await vscode.workspace.openTextDocument(path.join(folder, 'tools', 'issue-license.kscript'));
+  await vscode.window.showTextDocument(doc);
+  const warnings = await waitFor(() => {
+    const problems = vscode.languages.getDiagnostics(doc.uri);
+    return problems.length === 3 && problems;
+  }, 'three license guard warnings in Problems');
+  assert.deepStrictEqual(warnings.map((d) => {
+    assert.strictEqual(d.severity, vscode.DiagnosticSeverity.Warning);
+    assert.strictEqual(doc.getText(d.range), 'if');
+    assert.match(d.message, /Validation/);
+    return [d.code.value, d.range.start.line + 1];
+  }).sort((a, b) => a[1] - b[1]), [['KS5016', 3], ['KS5016', 6], ['KS5016', 9]]);
+}
+
 async function declarationHandlers(folder) {
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'declaration-catches.test.kscript'));
   await vscode.window.showTextDocument(doc);
@@ -267,6 +282,7 @@ async function run() {
   await runsScripts(folder);
   await normalizerEdits(folder);
   await declarationHandlers(folder);
+  await licenseGuardWarnings(folder);
   await dispatchWorkflow(folder);
   await interpolatedLinks(folder);
 

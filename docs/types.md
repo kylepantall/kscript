@@ -329,7 +329,7 @@ echo $key  // passkey_abc
 
 KScript selects the type before running its normalization and validation. If several types match the word, the checker and runtime name all the candidates. Choose one with `key = passkey_abc as PasskeySessionKey` or a typed assignment such as `key: PasskeySessionKey = passkey_abc`. The checker also warns when visible types declare identical regexes with the same flags. Recognized names, flags, and enum arguments keep their existing meanings.
 
-Quotes keep text as a string. To check a computed value, write `key = "passkey_{$kind}" as PasskeySessionKey`. A repeated word reuses its type lookup while the same declarations are visible. A computed cast evaluates its input on every call. For a short repeated string, KScript can reuse a successful conversion governed entirely by static rules. With a custom normalizer or validator, it runs that code again and can reuse a successful regex match on the resulting text.
+Quotes keep text as a string. To check a computed value, write `key = "passkey_{$kind}" as PasskeySessionKey`. In a typed assignment, `key: PasskeySessionKey = "passkey_{$kind}"` does the same. Without the double quotes, the typed raw text passes the characters `{$kind}` literally to the refinement. A repeated word reuses its type lookup while the same declarations are visible. A computed cast evaluates its input on every call. For a short repeated string, KScript can reuse a successful conversion governed entirely by static rules. With a custom normalizer or validator, it runs that code again and can reuse a successful regex match on the resulting text.
 
 ## Slash paths
 

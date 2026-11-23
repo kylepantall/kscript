@@ -1,0 +1,3 @@
+type TeamAddress with [email(domains: ['example.org'])] {
+  fn mailbox() => $value.local
+}
