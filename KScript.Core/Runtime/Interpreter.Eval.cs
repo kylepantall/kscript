@@ -490,8 +490,9 @@ namespace KScript.Runtime
                 return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed)
                     { IsCompound = PatternLiterals.WordOf(node, ctx.Origin.Value, name => CanBeLiteral(name, scope, ctx.Module)) != null };
             }
-            // posts.tags names a path of names, for a parameter that reads them: ->with(posts.tags).
-            if ((node as MemberNode)?.DottedName is string path) return new BareWord(path, false, afterNamed);
+            // Size.large is an enum member. Unresolved paths such as posts.tags remain names for ->with().
+            if (node is MemberNode member && member.DottedName is string path)
+                return IsEnumMember(member, scope, ctx.Module) ? null : new BareWord(path, false, afterNamed);
             bool negated = false;
             if (node is UnaryNode { Operator: "not", Operand: IdentifierNode inner })
             {
@@ -505,6 +506,18 @@ namespace KScript.Runtime
                 return new BareWord(id.Name, negated, afterNamed) { IsIdentifier = !negated };
             }
             return null;
+        }
+
+        private static bool IsEnumMember(MemberNode member, Scope scope, Module module)
+        {
+            object target = member.Target switch
+            {
+                IdentifierNode type when module?.TryGetAlias(type.Name, out _) != true && scope.TryGet(type.Name, out var local) => local,
+                MemberNode { Target: IdentifierNode alias } type when module?.TryGetAlias(alias.Name, out var ns) == true
+                    && ns.TryGet(type.Name, out var export) => export,
+                _ => null,
+            };
+            return target is EnumType declared && declared.ContainsKey(member.Name);
         }
 
         private bool CanResolve(CommandCallNode reference, Scope scope, EvalContext ctx)

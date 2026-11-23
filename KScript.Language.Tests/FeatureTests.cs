@@ -138,6 +138,29 @@ namespace KScript.Language.Tests
             Assert.Contains("message", Labels(Script("<try><catch as=\"e\"><echo>{ $e.‸ }</echo></catch></try>")));
         }
 
+        [Theory]
+        [InlineData("for item in ['x'] {\n  echo $loop.‸\n}", "test.kscript", true)]
+        [InlineData("<kscript><for each=\"item\" in=\"[1]\"><echo>{ $loop.‸ }</echo></for></kscript>", "test.ks.xml", true)]
+        [InlineData("<for each=\"item\" in=\"[1]\"><p>{ $loop.‸ }</p></for>", "page.html", false)]
+        public void LoopMetadataCompletionMatchesItsRuntime(string text, string path, bool script)
+        {
+            var fields = Complete(text, path).Select(item => item.Label + ": " + item.Detail).OrderBy(item => item);
+            Assert.Equal(script ? new[] { "count: number", "first: bool", "index: number", "last: bool" }
+                : new[] { "first: bool", "index: number" }, fields);
+        }
+
+        [Fact]
+        public void LoopMetadataOnlyShadowsAnOuterVariableInsideTheBody()
+        {
+            const string code = "loop = { items: [1] }\nfor item in $loop.items {\n  echo [$item, $loop.index]\n}\necho $loop.‸";
+            Assert.Equal(new[] { "items" }, Labels(code, "test.kscript"));
+
+            const string unbound = "for item in $loop {\n  echo [$item, $loop.count]\n}\necho $loop";
+            var analysis = Service.Analyze(unbound, "test.kscript");
+            Assert.Equal(new[] { unbound.IndexOf("$loop", StringComparison.Ordinal) + 1, unbound.LastIndexOf("$loop", StringComparison.Ordinal) + 1 },
+                analysis.Diagnostics.Where(d => d.Code == DiagnosticCodes.UndefinedVariable).Select(d => d.Span.Start));
+        }
+
         [Fact]
         public void CompletesKeywordsInExpressions()
         {

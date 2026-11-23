@@ -1614,6 +1614,20 @@ namespace KScript.Language.Analysis
             }
 
             DeclareFromAttribute(e, "at", body, e.ContentSpan.Start, SymbolKind.LoopVariable, new TypeShape(KType.Number));
+            if (body == outer) return;
+
+            var loop = new TypeShape(KType.Map);
+            loop.Fields["index"] = new FieldInfo("index", new TypeShape(KType.Number), null, "The zero-based index of this iteration.");
+            loop.Fields["first"] = new FieldInfo("first", new TypeShape(KType.Bool), null, "Whether this is the first iteration.");
+            // Script loops know the sequence length. PageRenderer walks the sequence as it renders.
+            if (Kind == DocumentKind.Script)
+            {
+                loop.Fields["last"] = new FieldInfo("last", new TypeShape(KType.Bool), null, "Whether this is the last iteration.");
+                loop.Fields["count"] = new FieldInfo("count", new TypeShape(KType.Number), null, "The number of items in the loop.");
+            }
+            var position = new Symbol { Name = "loop", Kind = SymbolKind.LoopVariable, Shape = loop, Description = "The current loop iteration.", DeclaringElement = e };
+            result.Symbols.Add(position);
+            body.Declare(position, e.ContentSpan.Start);
         }
 
         private void AnalyzeFn(MarkupElement e, Scope outer, bool markupMode)

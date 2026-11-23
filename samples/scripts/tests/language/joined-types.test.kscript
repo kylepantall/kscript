@@ -1,0 +1,56 @@
+import "types/account.kscript"
+import "types/seat-allocation.kscript"
+
+type TeamAccount with [Account, SeatAllocation] {
+  plan: string = 'team'
+
+  fn label() => "{$this.name} ({$this.plan})"
+}
+
+fn remaining_seats(allocation: SeatAllocation) => $allocation->available()
+
+describe(name: 'Team account composition') {
+  test(name: 'a joined record supplies defaults from its base and its own declaration') {
+    team = TeamAccount(name: 'Harbour', capacity: 4)
+    expect(value: $team.used, same: 0)
+    expect(value: $team.plan, same: 'team')
+    expect(value: $team->available(), same: 4)
+  }
+
+  test(name: 'the account overrides its label and inherits the allocation method') {
+    team = TeamAccount(name: 'Harbour', capacity: 8, used: 3, plan: 'studio')
+    expect(value: $team->label(), same: 'Harbour (studio)')
+    expect(value: @remaining_seats($team), same: 5)
+    expect(value: Account(name: 'Harbour')->label(), same: 'HARBOUR')
+  }
+
+  test(name: 'both base types recognize a team while a plain account remains distinct') {
+    team = TeamAccount(name: 'North', capacity: 2)
+    expect(value: Account->is($team), same: true)
+    expect(value: SeatAllocation->is(TeamAccount), same: true)
+    expect(value: TeamAccount->is(Account(name: 'North')), same: false)
+  }
+
+  test(name: 'filling every seat still satisfies the inherited validation rule') {
+    team = TeamAccount(name: 'West', capacity: 2, used: 1)
+    team.used = 2
+    expect(value: @remaining_seats($team), same: 0)
+  }
+
+  test(name: 'an overbooked account reports the inherited cross-field error') {
+    data = { name: 'West', capacity: 2, used: 3 }
+    problems = TeamAccount->check($data)
+    expect(value: $problems, count: 1)
+    expect(value: $problems[0].message, contains: 'Seat usage exceeds capacity')
+    expect(value: TeamAccount($data), throws: Shape)
+  }
+
+  test(name: 'a rejected field update preserves the last valid allocation') {
+    team = TeamAccount(name: 'West', capacity: 3, used: 2)
+    expect_error(type: Shape) {
+      team.used = 4
+    }
+    expect(value: $team.used, same: 2)
+    expect(value: $team->available(), same: 1)
+  }
+}

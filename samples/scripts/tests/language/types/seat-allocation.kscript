@@ -1,0 +1,7 @@
+type SeatAllocation {
+  capacity: int(min: 1)
+  used: int(min: 0) = 0
+  validate: $used <= $capacity, 'Seat usage exceeds capacity'
+
+  fn available() => $this.capacity - $this.used
+}

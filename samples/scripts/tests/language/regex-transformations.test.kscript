@@ -1,0 +1,51 @@
+describe(name: "Regular expressions") {
+  test(name: "capture slots keep their positions when an optional part is absent") {
+    ticket = /^(?<project>[A-Z]+)-(\d+)(?:-(?<zone>[a-z]+))?$/
+    full = $ticket->match('OPS-41-west')
+    expect(value: $full.captures, same: ['OPS', '41', 'west'])
+    short = $ticket->match('OPS-41')
+    expect(value: $short.captures, same: ['OPS', '41', null])
+    expect(value: $short.groups.zone, same: null)
+  }
+
+  test(name: "scanning returns all matches with offsets in the original text") {
+    mentions = /@[a-z]+/i
+    found = $mentions->match_all('ask @jo or @KAI')
+    expect(value: $found->pluck(text), same: ['@jo', '@KAI'])
+    expect(value: $found->pluck(index), same: [4, 11])
+    expect(value: $mentions->match_all('no mentions'), same: [])
+  }
+
+  test(name: "a replacement callback can transform each captured label") {
+    tag = /#(?<label>[a-z]+)/
+    caps = fn(hit) => "[{ $hit.groups.label->upper() }]"
+    expect(
+      value: $tag->replace('see #open and #done', $caps),
+      same: 'see [OPEN] and [DONE]'
+    )
+    expect(value: $tag->replace('untagged', $caps), same: 'untagged')
+  }
+
+  test(name: "splitting on different delimiters retains empty end fields") {
+    separators = /\s*[, ;]\s*/
+    expect(
+      value: $separators->split('tea, coffee ; milk,'),
+      same: ['tea', 'coffee', 'milk', '']
+    )
+    expect(value: $separators->split('plain'), same: ['plain'])
+  }
+
+  test(name: "line anchors and case folding find only status lines") {
+    report = ```text
+      title
+      READY 12
+      not ready 5
+      ready 7
+      ```
+    status = /^ready (\d+)$/im
+    numbers = $status
+      ->match_all($report)
+      ->map(fn(hit) => $hit.captures[0] as int)
+    expect(value: $numbers, same: [12, 7])
+  }
+}

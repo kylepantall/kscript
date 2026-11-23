@@ -2,7 +2,16 @@
 
 KScript has a test framework built in. Tests are KScript files whose names end in `.test.kscript` or `.test.ks.xml`, usually kept in a `tests/` folder, and `kscript test` runs them.
 
-From the KScript repository, run `kscript test samples/scripts/tests/language` to exercise the language itself. The suite covers normalizers, typed records, native values, dynamic dispatch, collections, functions, control flow and error handlers. CI also checks and formats those scripts, runs them with the interpreter and compares their results with the tests discovered by the language server. [Language test scripts](../samples/scripts/tests/language)
+From the KScript repository, run `kscript test samples/scripts/tests/language` to exercise the language itself. To try one example, pass its filename instead. The same files appear in VS Code's Test Explorer. CI compares the tests discovered by the language server with the interpreter's results. [Browse all language test scripts](../samples/scripts/tests/language)
+
+| What to try | Runnable examples |
+| --- | --- |
+| Follow argument binding, recursive calls, and variable scope | [Named and piped calls](../samples/scripts/tests/language/call-binding.test.kscript) · [Recursion and scope](../samples/scripts/tests/language/recursion-and-scope.test.kscript) |
+| Step through an expression or a nested loop | [Operator precedence](../samples/scripts/tests/language/expression-operators.test.kscript) · [Ranges and loop metadata](../samples/scripts/tests/language/iteration-boundaries.test.kscript) |
+| Give data a type and validate it at the boundary | [Custom literals](../samples/scripts/tests/language/pattern-literals.test.kscript) · [Records parsed from text](../samples/scripts/tests/language/parsed-records.test.kscript) · [Joined types](../samples/scripts/tests/language/joined-types.test.kscript) |
+| Transform collections and text | [List transformations](../samples/scripts/tests/language/list-transformations.test.kscript) · [Map updates](../samples/scripts/tests/language/map-updates.test.kscript) · [Regular expressions](../samples/scripts/tests/language/regex-transformations.test.kscript) · [Multiline strings](../samples/scripts/tests/language/string-blocks.test.kscript) |
+| Use native values and add methods to a type | [Dates and durations](../samples/scripts/tests/language/dates-and-durations.test.kscript) · [Money and rounding](../samples/scripts/tests/language/money-arithmetic.test.kscript) · [Extension methods](../samples/scripts/tests/language/extension-methods.test.kscript) |
+| Follow an error through nested handlers | [Guarded throws](../samples/scripts/tests/language/guarded-errors.test.kscript) · [Catch propagation](../samples/scripts/tests/language/catch-propagation.test.kscript) |
 
 ```kscript
 // tests/strings.test.kscript
