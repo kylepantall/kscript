@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Words joined by `-`, `+`, `/` or `.`, such as `my-post`, `api.corp.com` and `1.4.2`, are recognised by a type's `pattern` like single words, and so are patterns on types built on `domain`, `semver` and other native types written as words.
 - **Check This File** saves and checks a single script and reports its diagnostics in Problems, including when no project is open.
 
 - Project commands use the active workspace folder and stop if its files cannot be saved. Standalone scripts and tests run from their own directory. Workspace symbol search follows folders added or removed during the session.

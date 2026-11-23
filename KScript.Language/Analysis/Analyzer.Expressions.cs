@@ -26,6 +26,10 @@ namespace KScript.Language.Analysis
                 case ErrorNode _:
                     return;
 
+                case BinaryNode or MemberNode when TryCompoundPatternLiteral(node, region, scope):
+                    // my-post, api.corp.com, 1.4.2: words a pattern type reads.
+                    return;
+
                 case LiteralNode literal:
                     if (literal.Template != null)
                     {

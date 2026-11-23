@@ -231,6 +231,8 @@ namespace KScript.Runtime
 
         private object EvaluateCore(ExprNode node, Scope scope, EvalContext ctx)
         {
+            // my-post, api.corp.com, 1.4.2: words read as the type whose pattern fits them.
+            if (node is BinaryNode or MemberNode && CompoundLiteral(node, scope, ctx) is Func<object> compound) return compound();
             switch (node)
             {
                 case LiteralNode lit:
@@ -427,6 +429,21 @@ namespace KScript.Runtime
             && module?.Commands.ContainsKey(word) != true && module?.Variables.ContainsKey(word) != true
             && module?.Aliases.ContainsKey(word) != true && ErrorTypes.FindExact(word, null) == null;
 
+        /// <summary>
+        /// A word joined by - + / or . (<see cref="PatternLiterals.WordOf"/>): its value as the type whose pattern fits it,
+        /// or, when none fits, the unknown name error at its first name, so no part of it (api in api.corp.com) is read
+        /// as a type on its own. Null when the node isn't such a word.
+        /// </summary>
+        private Func<object> CompoundLiteral(ExprNode node, Scope scope, EvalContext ctx)
+        {
+            if (!scope.PatternTypes().Any) return null;
+            string word = PatternLiterals.WordOf(node, ctx.Origin?.Value, name => CanBeLiteral(name, scope, ctx.Module));
+            if (word == null) return null;
+            if (InferredLiteral(word, scope, ctx.Module) is PatternLiteral literal) return () => literal.Convert(this);
+            IdentifierNode first = node.DescendantsAndSelf().OfType<IdentifierNode>().FirstOrDefault();
+            return first == null ? null : () => throw Fail(first, ctx, $"Unknown name '{first.Name}'. Variables start with $ (${first.Name}) and commands with @ (@{first.Name}(...)).", "Name");
+        }
+
         internal static PatternLiteral InferredLiteral(string word, Scope scope, Module module) =>
             CanBeLiteral(word, scope, module) ? scope.PatternTypes().Resolve(word) : null;
 
@@ -464,7 +481,8 @@ namespace KScript.Runtime
                 && node.DescendantsAndSelf().OfType<IdentifierNode>().All(i => !scope.TryGet(i.Name, out _))
                 && node.Span.Start >= 0 && node.Span.Start + node.Span.Length <= ctx.Origin.Value.Length)
             {
-                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed);
+                return new BareWord(ctx.Origin.Value.Substring(node.Span.Start, node.Span.Length).Trim(), false, afterNamed)
+                    { IsCompound = PatternLiterals.WordOf(node, ctx.Origin.Value, name => CanBeLiteral(name, scope, ctx.Module)) != null };
             }
             // posts.tags names a path of names, for a parameter that reads them: ->with(posts.tags).
             if ((node as MemberNode)?.DottedName is string path) return new BareWord(path, false, afterNamed);
