@@ -121,13 +121,13 @@ namespace KScript.Projects
         /// <summary>The environment used when neither kscript --env nor KSCRIPT_ENV names one.</summary>
         public string Environment { get; set; }
 
-        /// <summary>The base files (default: config, .env).</summary>
+        /// <summary>The base files (default: optional .env).</summary>
         public List<string> Files { get; set; }
 
         /// <summary>Environment variables with this prefix override the files.</summary>
         public string Prefix { get; set; }
 
-        /// <summary>The folder the files are in, relative to kscript.json. Null means each script's own folder.</summary>
+        /// <summary>The folder the files are in, relative to kscript.json. Null means the project folder.</summary>
         public string Root { get; set; }
 
         /// <summary>Settings that must be set.</summary>
@@ -449,8 +449,9 @@ namespace KScript.Projects
         {
             Environment = environment ?? System.Environment.GetEnvironmentVariable("KSCRIPT_ENV") ?? Config.Environment,
             Files = Config.Files,
+            ExplicitProjectFiles = FilePath != null,
             Prefix = Config.Prefix,
-            Root = Config.Root == null ? null : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
+            Root = Config.Root == null ? (FilePath == null ? null : Directory) : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
             Required = Config.Required.ToList(),
             UserFolder = Config.User ? KScript.Runtime.AppFolders.Folder(AppName, "config") : null,
         };

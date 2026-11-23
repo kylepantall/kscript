@@ -18,6 +18,24 @@ public sealed class DocsTests
     private static readonly Lazy<DocsSite> Site = new Lazy<DocsSite>(() => DocsSite.Build());
 
     [Fact]
+    public void ThrowReferenceUsesCodeSyntaxAndOnlyShowsAttributeTableForXml()
+    {
+        var site = Site.Value;
+        string html = site.Find("/reference/core").Body;
+        int start = html.IndexOf("id=\"el-throw\"", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        string entry = html[start..html.IndexOf("</section>", start, StringComparison.Ordinal)];
+        Assert.Contains("table f-xml", entry);
+        Assert.DoesNotContain("table f-ks", entry);
+        var markdown = new KScript.Docs.Mcp.DocsMarkdown(site);
+        var statement = site.Catalog.GetElement("throw");
+        string code = markdown.Element(statement, "kscript");
+        Assert.Contains("throw Error(message:", code);
+        Assert.DoesNotContain("| Attribute |", code);
+        Assert.Contains("| Attribute |", markdown.Element(statement, "xml"));
+    }
+
+    [Fact]
     public void ApiOptionsHaveNavigableFieldsAndExamplesInBothReferences()
     {
         var site = Site.Value;

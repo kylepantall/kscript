@@ -25,7 +25,7 @@ What it makes:
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
 | `desktop.kscript` | The same to-do list as a [desktop app](desktop.md): a `Window { }` block. |
 | `routes/api.kscript`, `controllers/tasks.kscript` | A JSON API for the tasks under `/api` ([KScript.Http](http.md)). While `kscript serve` runs, its docs are at `/_api` ([OpenAPI](http.md#api-docs-openapi)). |
-| `config/config.yaml` | Settings every script and page reads as `$config` (`config.root` in `kscript.json` points there). |
+| `config/config.kscript` | Settings every script and page reads as `$config` (listed in `kscript.json` under `config.files`). |
 | `lib/greeting.kscript`, `scripts/hello.kscript` | A function and a command-line script that uses it. |
 | `tests/tasks.test.kscript`, `tests/greeting.test.kscript` | Tests for the rules and the script, run with `kscript test`. |
 | `.vscode/extensions.json`, `.gitignore` | Asks VS Code to install the KScript extension; keeps built apps (`dist/`) out of git. |
@@ -37,7 +37,7 @@ Scripts, tests, routes and the desktop app are written in the [.kscript format](
 
 ### A bare project: --bare
 
-`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.yaml`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--syntax xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
+`kscript make project my-tool --bare` makes just `kscript.json`, `config/config.kscript`, `main.kscript` (a script) and `tests/main.test.kscript`, plus the VS Code recommendation and the [agent docs](agents.md) (`AGENTS.md`): no pages, desktop app or API. Use it for command-line tools and scripts. `--syntax xml` works here too. `--bare` is short for `--template bare`; `kscript make project --help --bare` lists its options.
 
 Add pieces to a bare project with options, in any mix:
 
@@ -68,8 +68,8 @@ kscript test       # 12 tests, against a database in memory
 | `models/note.kscript` | The `Note` [model](data.md), whose table is made the first time it is used. |
 | `requests/note-input.kscript`, `requests/sign-up.kscript`, `requests/sign-in.kscript` | The typed request bodies, one [type](types.md) per file, that the controllers import. |
 | `middleware/request-id.kscript` | The app's own middleware: every response gets an `X-Request-Id` header. |
-| `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.yaml`. |
-| `config/config.yaml`, `config/config.test.yaml` | Settings: the database (`${DATABASE_URL:-sqlite:data/app.sqlite}`) and cache. `kscript test` lays `config.test.yaml` over them (see `test.env` below), so tests get an empty database in memory. |
+| `lib/cache.kscript` | The app's [cache](cache.md), whose store and time limit come from `config/config.kscript`. |
+| `config/config.kscript` | The config function chooses database and cache settings. It provides an in-memory database for the test environment. |
 | `tests/` | Tests that call the API the way a client would, with `@api(/api/notes)` (see [Calling your own API](http.md#calling-your-own-api)). |
 
 ### A web app with its API: --template fullstack
@@ -82,7 +82,7 @@ The api and fullstack templates take the same options:
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.yaml`. `none` keeps them in a JSON file instead (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
+| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.kscript`. `none` keeps them in a JSON file instead (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
 | `--auth`, `--no-auth` | on (api), off (fullstack) | Sign-in. In the api template: `POST /api/register`, `/api/tokens`, `GET /api/me`, and notes that belong to who is signed in. In the fullstack template it also runs [`kscript make auth`](auth.md) for the sign-in pages; the pages call the API as whoever is viewing them. |
 | `--cache`, `--no-cache` | on | Caches the notes list and answers repeat requests with `304 Not Modified` (the `etag` middleware). |
 | `--docker` | off | Adds a `Dockerfile`, `.dockerignore` and `compose.yaml`, with a Postgres or MySQL service for those databases, and `make up` / `make down`. |
@@ -309,7 +309,7 @@ git submodule add https://github.com/acme/slug-tools.git libraries/slugs
     "exclude": ["tests/slow"],
     "timeout": 10,                          // seconds per test, 0 for no limit
     "packages": ["KScript.Terminal"],       // imported by test files only
-    "env": "test"                           // tests run in this environment, so config/config.test.yaml applies
+    "env": "test"                           // the config function receives this environment during tests
   },
   "format": {
     "indent": 2,           // spaces per level, or "tab"; used by kscript fmt and Format Document
@@ -330,9 +330,9 @@ git submodule add https://github.com/acme/slug-tools.git libraries/slugs
   },
   "config": {
     "environment": "development",           // used when neither --env nor KSCRIPT_ENV names one
-    "files": ["config", ".env"],            // the base files $config reads (the default)
+    "files": ["config/config.kscript", ".env?"], // the sources $config reads
     "prefix": "APP_",                       // APP_DATABASE__HOST overrides database.host
-    "root": "settings",                     // where the files are, relative to kscript.json (default: each script's folder)
+    "root": "settings",                     // where the files are, relative to kscript.json (default: the project folder)
     "required": ["database.host"],          // scripts stop with a clear message when one is missing
     "user": true                            // also read config.json from the app's config folder (KScript.Storage)
   }
@@ -377,7 +377,7 @@ kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/"   # natives/sku.kscript: 
 kscript make module pricing --fns subtotal,total      # lib/pricing.kscript
 kscript make window settings                          # settings.kscript, a desktop window
 kscript make document annual-report                   # documents/annual-report.kscript, a PDF and Word document
-kscript make config staging                           # config/config.staging.yaml
+kscript make config staging                           # config/config.staging.kscript
 kscript make test checkout                            # tests/checkout.test.kscript
 kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
 kscript make extension date --methods json,is_weekend # extensions/date.kscript: extend date { fn json() … }
@@ -448,7 +448,7 @@ Pages stay where they are, because a page's path is its URL. Desktop windows (`m
 }
 ```
 
-The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. Settings files go where `config.root` points, because that's where `$config` reads them. Without `config.root`, they go at the top of the project, unless it already has a `config/` folder. Pages only find components in `_components/`.
+The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. List settings files in `config.files`. Paths are relative to the project folder or to `config.root` when set. Pages only find components in `_components/`.
 
 Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 

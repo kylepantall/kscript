@@ -21,6 +21,8 @@ namespace KScript.Data
         /// <summary>SQLite database files that the HTTP server must keep private, including named connections.</summary>
         public static IEnumerable<string> LocalDatabaseFiles(string folder) => DatabaseSettings.LocalFiles(folder);
 
+        internal static IEnumerable<string> LocalDatabaseFiles(string folder, ConfigValue config) => DatabaseSettings.LocalFiles(folder, config);
+
         public override string Name => "KScript.Data";
 
         public override string Description => "Databases: models, a query builder, transactions and raw SQL, on SQLite, Postgres, MySQL and MariaDB.";

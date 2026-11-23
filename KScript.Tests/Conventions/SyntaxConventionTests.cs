@@ -311,7 +311,6 @@ public class SyntaxConventionTests
     [Theory]
     [InlineData("$a && $b", "Use 'and' instead of '&&'.")]
     [InlineData("$a || $b", "Use 'or' instead of '||'.")]
-    [InlineData("!$a", "Use 'not' instead of '!'.")]
     public void LogicSymbolsAreNamedWithoutMentioningXml(string expression, string message)
     {
         Assert.Equal(message, ExpressionParser.ParseExpression(expression).Errors[0].Message);

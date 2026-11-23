@@ -43,7 +43,8 @@ public sealed partial class LanguageService
                 if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
                 string text = Files.ReadText(path);
                 if (text == null) continue;
-                var key = path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? JsonKey(text, names) : YamlKey(text, names);
+                var key = ConfigLoader.IsScript(path) ? ScriptKey(text, path, names)
+                    : path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? JsonKey(text, names) : YamlKey(text, names);
                 if (!key.Supplied) continue;
                 if (key.Key == null) { found = null; continue; } // A later scalar replaced a map that held this key.
                 var source = new SourceText(text);
@@ -56,6 +57,29 @@ public sealed partial class LanguageService
         {
             return null;
         }
+    }
+
+    private (bool Supplied, KeySpan Key) ScriptKey(string text, string path, IReadOnlyList<string> names)
+    {
+        var analysis = Analyzer.AnalyzeFile(text, path, Files, Catalog);
+        var function = analysis.Markup.RootElements.FirstOrDefault()?.ChildElements
+            .FirstOrDefault(element => element.Name == "fn" && element.GetAttributeValue("name") == "configure");
+        if (function == null) return default;
+        var returns = analysis.Regions.Where(region => region.Element == function && region.Attribute?.Name == "value"
+            || region.Element?.Name == "return" && region.Element.Parent == function).ToArray();
+        if (returns.Length != 1 || returns[0].Nodes.FirstOrDefault() is not MapNode map) return default;
+
+        ExpressionRegion scope = returns[0];
+        for (int index = 0; index < names.Count; index++)
+        {
+            MapEntryNode entry = map.Entries.LastOrDefault(field => names[index].Equals(field.Key, StringComparison.OrdinalIgnoreCase));
+            if (entry == null) return default;
+            if (index == names.Count - 1)
+                return (true, new KeySpan(scope.Source.ToSource(entry.KeySpan), InferAt(analysis, scope, entry.Value).Type));
+            if (entry.Value is not MapNode nested) return (true, null);
+            map = nested;
+        }
+        return default;
     }
 
     private static (bool Supplied, KeySpan Key) JsonKey(string text, IReadOnlyList<string> names)

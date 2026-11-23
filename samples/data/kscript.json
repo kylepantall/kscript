@@ -1,3 +1,4 @@
 {
-  "name": "shop"
+  "name": "shop",
+  "config": { "files": ["config.yaml"] }
 }

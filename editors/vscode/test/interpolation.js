@@ -36,7 +36,7 @@ function writeFixture(directory) {
   ];
   const text = lines.join('\n');
   fs.mkdirSync(path.dirname(settings));
-  fs.writeFileSync(path.join(root, 'kscript.json'), '{"config":{"root":"config"}}');
+  fs.writeFileSync(path.join(root, 'kscript.json'), '{"config":{"files":["config/config.yaml"]}}');
   fs.writeFileSync(settings, 'passkeys:\n  url: https://example.test\n');
   fs.writeFileSync(file, text);
   return { file, settings, text, lines };

@@ -24,6 +24,7 @@ const text = [
   '  <!-- Functions -->',
   '  <fn name="double" params="x: int" value="$x * 2" />',
   '  <let name="d" value="@double($total)" />',
+  '  <echo>{ $total->! }</echo>',
   '</kscript>',
 ].join('\n');
 
@@ -46,6 +47,9 @@ const diagnostics = new Promise((resolve) => {
 
   const completion = await connection.sendRequest('textDocument/completion', { textDocument: { uri }, position: { line: 3, character: 18 } });
   assert.ok(completion.items.some((i) => i.label === 'round'), 'number methods offered after ->');
+  const negated = await connection.sendRequest('textDocument/completion', { textDocument: { uri }, position: { line: 7, character: 19 } });
+  assert.ok(init.capabilities.completionProvider.triggerCharacters.includes('!'), 'completion triggers after !');
+  assert.ok(negated.items.some((i) => i.label === 'is_null'), 'methods offered after ->!');
 
   const hover = await connection.sendRequest('textDocument/hover', { textDocument: { uri }, position: { line: 1, character: 4 } });
   assert.ok(/let/.test(hover.contents.value), 'hover on <let>');
@@ -96,6 +100,24 @@ const diagnostics = new Promise((resolve) => {
   assert.strictEqual(tests.tests[0].children[0].fullName, 'cart › starts empty', 'the tests of a test file');
   const testLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: testUri } });
   assert.deepStrictEqual(testLenses.map((l) => l.command.command), ['kscript.runTestsInFile', 'kscript.runTest', 'kscript.runTest'], 'Run test lenses');
+
+  const errorUri = 'untitled:ErrorConstructor';
+  const errorDiagnostics = new Promise((resolve) => {
+    connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === errorUri) resolve(p.diagnostics); });
+  });
+  connection.sendNotification('textDocument/didOpen', { textDocument: {
+    uri: errorUri, languageId: 'kscript-code', version: 1,
+    text: "fn testing() {\n  throw Error()\n  throw Error({ type: '', message: 'Oops', value: 'No', cause: null })\n}\n",
+  } });
+  assert.ok((await errorDiagnostics).some((d) => d.range.start.line === 2 && /map passed to Error\(\) becomes its message text/i.test(d.message)));
+  const errorParams = { textDocument: { uri: errorUri }, position: { line: 1, character: '  throw Error('.length } };
+  const errorCompletion = await connection.sendRequest('textDocument/completion', errorParams);
+  assert.ok(['message:', 'value:', 'cause:'].every((name) => errorCompletion.items.some((item) => item.label === name)));
+  const errorSignature = await connection.sendRequest('textDocument/signatureHelp', errorParams);
+  assert.match(errorSignature.signatures[0].label, /^Error\(message\?.*cause\?.*value\?/);
+  const throwHover = await connection.sendRequest('textDocument/hover', { textDocument: { uri: errorUri }, position: { line: 1, character: 4 } });
+  assert.match(throwHover.contents.value, /throw Error\(message:/);
+  assert.doesNotMatch(throwHover.contents.value, /\| Argument \|/);
 
   await require('./language-scenarios')(connection, init.capabilities,
     (args, options) => execFile(executable, [...cliArgs, ...args], { timeout: 60000, ...options }));

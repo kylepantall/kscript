@@ -211,15 +211,7 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 
 `timeout: …` on a test wins over `--timeout`, which wins over `test.timeout`.
 
-`test.env` is the environment the tests run in, so `config/config.test.yaml` is laid over the project's [config](language.md) while they run. The api and fullstack [project templates](projects.md#an-api---template-api) use it to give tests an empty database in memory:
-
-```yaml
-# config/config.test.yaml
-database:
-  connections:
-    main:
-      url: "sqlite::memory:"
-```
+`test.env` is the environment the tests run in. The API and fullstack [project templates](projects.md#an-api---template-api) use it in `config/config.kscript` to select an in-memory database. An explicitly listed YAML source can use a matching variant, such as `config.test.yaml`.
 
 `kscript test --env staging` and a `KSCRIPT_ENV` that is already set win over `test.env`.
 
@@ -240,6 +232,8 @@ test(name: "a note is saved") {
 ```
 
 ## Workflows that exercise several language features
+
+The repository tracks coverage gaps, combination targets and shared CLI, language-server and editor checks in the [language test plan](language-test-plan.md).
 
 Run `kscript test samples/scripts/tests/language/checkout-workflow.test.kscript` to follow a mixed-currency invoice from line validation through discounts, settlement and refunds. The tests assert amounts in both currencies, recover the original error from a missing quote and check the penny retained after a partial refund. [Checkout script](../samples/scripts/tests/language/checkout-workflow.test.kscript)
 

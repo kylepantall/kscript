@@ -43,7 +43,7 @@ for i in 0..3 {
 
 ## KS2001
 
-**A value isn't written correctly.** The message says what was expected. Common causes are a line that ends with an operator, a bracket that is never closed, and `&&`, `||` or `!` (KScript writes `and`, `or` and `not`).
+**A value isn't written correctly.** The message says what was expected. Common causes are a line that ends with an operator, a bracket that is never closed, and using `&&` or `||` where KScript expects `and` or `or`.
 
 ```kscript wrong
 total = 5 +          // wrong: nothing after the +

@@ -1,6 +1,6 @@
 // Tests for the JSON API (routes/api{{ ext }}). @api(/api/...) sends a
 // request to this app's own routes, without a
-// server. kscript test uses config/config.test.yaml, so these notes never reach the real {{#if db is none}}notes file{{else}}database{{/if}}.
+// server. the config script selects test storage, so these notes never reach the real {{#if db is none}}notes file{{else}}database{{/if}}.
 import KScript.Net
 {{#if auth}}
 import KScript.Auth

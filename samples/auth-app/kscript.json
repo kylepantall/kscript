@@ -12,9 +12,9 @@
     "middleware": ["log"],
     "auth": { "passkey_origin": "http://localhost:8080" }
   },
-  // $config reads config/config.yaml (and config.<env>.yaml with kscript --env <env>).
+  // Select the YAML source explicitly.
   "config": {
-    "root": "config"
+    "files": ["config/config.yaml", ".env?"]
   },
   // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
   "make": {

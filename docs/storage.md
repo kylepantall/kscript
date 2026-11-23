@@ -97,7 +97,7 @@ $drafts->delete('letter.md')
 
 ## The person's own settings: config.user
 
-`$config` reads a project's settings from `config.json`, `config.yaml` and `.env` (see [Settings](language.md#settings-config)). With `"user": true`, it also reads `config.json`, `config.yaml` or `config.yml` from the app's config folder, after the project's own files. So a person can change a setting for themselves without editing the project, and a script can save one for them:
+`$config` reads the sources listed in `kscript.json` under `config.files` (see [Settings](language.md#settings-config)). With `"user": true`, it also reads `config.json`, `config.yaml` or `config.yml` from the app's config folder, after the project's own files. A person can change a setting for themselves without editing the project, and a script can save one for them:
 
 ```jsonc
 // kscript.json

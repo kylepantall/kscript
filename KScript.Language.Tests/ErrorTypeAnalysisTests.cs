@@ -151,6 +151,30 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ErrorConstructorsOfferNamedArgumentsAndSignatureHelp()
+        {
+            Assert.Contains("message:", Labels("throw Error(‸)"));
+            Assert.Contains("value:", Labels("throw Error(‸)"));
+            Assert.Contains("cause:", Labels("throw Validation('Oops', ‸)"));
+            Assert.DoesNotContain("type:", Labels("throw Error(‸)"));
+            Assert.Contains("id:", Labels(Declarations + "throw PersonNotFound(‸)"));
+
+            (string text, int offset) = WithCaret("throw Error(message: 'Oops', cause: ‸null)");
+            var signature = Service.GetSignatureHelp(Service.Analyze(text, DocPath), offset);
+            Assert.Equal("cause?", Assert.Single(signature.Signatures).Parameters[signature.ActiveParameter].Label);
+        }
+
+        [Fact]
+        public void AMapPassedAsAnErrorMessageExplainsHowToPassTheFields()
+        {
+            var diagnostic = Assert.Single(Open("throw Error({ type: '', message: 'Oops', value: 'No', cause: null })").Diagnostics,
+                d => d.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Contains("becomes its message text", diagnostic.Message);
+            Assert.DoesNotContain(DiagnosticCodes.TypeMismatch, Codes("throw Error(message: 'Oops', value: 'No', cause: null)"));
+            Assert.DoesNotContain(DiagnosticCodes.TypeMismatch, Codes("throw { type: 'Error', message: 'Oops', value: 'No', cause: null }"));
+        }
+
+        [Fact]
         public void CaughtErrorsCompleteTheirFields()
         {
             List<string> fields = Labels(Declarations + "try { } catch PersonNotFound as e {\n  echo \"{ $e.‸ }\"\n}");

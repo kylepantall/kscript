@@ -19,9 +19,14 @@ namespace KScript.Http
         {
             var site = new PageSite(siteFolder);
             var app = new HttpApp(site.Root, project, log);
+            app.LoadStartupConfig();
+            site.StartupConfig = app.StartupConfig;
+            if (app.StartupConfig != null)
+                foreach (string path in app.StartupConfig.FileSources)
+                    site.HiddenFiles.Add(Path.GetRelativePath(site.Root, path).Replace('\\', '/'));
             if (app.ViewsFolder is string views) site.HiddenFolders.Add(views.Split('/', '\\')[0]);
             string projectRoot = project?.FilePath == null ? site.Root : Path.GetDirectoryName(Path.GetFullPath(project.FilePath));
-            ProtectStorage(site, projectRoot, app.Settings.Auth);
+            ProtectStorage(site, projectRoot, app.Settings.Auth, app.StartupConfig);
             site.RenderPage = app.RenderFilePage;
             if (app.HasRoutes)
             {
@@ -49,10 +54,10 @@ namespace KScript.Http
             return RunAndForget(app, PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started));
         }
 
-        internal static void ProtectStorage(PageSite site, string projectRoot, AuthSettings settings)
+        internal static void ProtectStorage(PageSite site, string projectRoot, AuthSettings settings, ConfigValue config = null)
         {
             string Relative(string path) => Path.GetRelativePath(site.Root, path).Replace('\\', '/');
-            foreach (string file in Data.DataPackage.LocalDatabaseFiles(projectRoot))
+            foreach (string file in Data.DataPackage.LocalDatabaseFiles(projectRoot, config))
                 foreach (string suffix in new[] { "", "-journal", "-wal", "-shm" })
                     site.HiddenFiles.Add(Relative(file) + suffix);
 

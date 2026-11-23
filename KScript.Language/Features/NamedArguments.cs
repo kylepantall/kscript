@@ -76,6 +76,37 @@ namespace KScript.Language.Features
                 });
             }
 
+            void AddErrorConstructor(string name, TypeShape instance)
+            {
+                var parameters = new List<(string Label, string Documentation)>
+                {
+                    ("message?: string", "The error message. You can also pass it as the first positional argument."),
+                    ("cause?", "The earlier error, usually the value bound by a catch. Leave it out for a new error."),
+                };
+                if (instance == null)
+                {
+                    parameters.Add(("value?: any", "An extra payload field. Read it with the caught error's ['value'] lookup."));
+                    parameters.Add(("fields...", "Built-in errors accept additional named fields."));
+                }
+                else
+                {
+                    parameters.AddRange(instance.Fields.Values.Where(field => !Analyzer.BaseErrorFields.Contains(field.Name))
+                        .Select(field => ($"{field.Name}: {field.DeclaredType ?? field.Shape.Display()}", field.Description)));
+                }
+                signatures.Add(new SignatureInfo
+                {
+                    Label = $"{name}({string.Join(", ", parameters.Select(parameter => parameter.Label))})",
+                    Documentation = "Creates an error value. Use throw to raise it when this statement runs. Pass fields by name.",
+                    Parameters = parameters,
+                    Details = parameters.Select(parameter => (ParameterName(parameter.Label), (IReadOnlyList<string>)null, false)).ToList(),
+                    ParameterTypes = parameters.Select(parameter =>
+                    {
+                        int colon = parameter.Label.IndexOf(':');
+                        return colon < 0 ? null : parameter.Label.Substring(colon + 1).Trim();
+                    }).ToList(),
+                });
+            }
+
             void AddMethods(TypeShape receiver, string name)
             {
                 if (analysis.DeclaredMethod(receiver, name) is Symbol declaration)
@@ -149,6 +180,15 @@ namespace KScript.Language.Features
                     if (fn?.Kind == SymbolKind.Function)
                     {
                         AddFunction(fn);
+                    }
+                    else if (fn?.Shape.Type == KType.ErrorType)
+                    {
+                        AddErrorConstructor(id.Name, fn.Shape.Instance);
+                    }
+                    else if (fn == null && pipe == null && KScript.Runtime.ErrorTypes.BuiltIn.TryGetValue(id.Name, out var error)
+                        && error.Name == id.Name)
+                    {
+                        AddErrorConstructor(id.Name, null);
                     }
                     else if (pipe != null)
                     {

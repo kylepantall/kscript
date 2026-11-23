@@ -103,6 +103,7 @@ namespace KScript.Docs
         {
             ["contributing.md"] = "building KScript from source and its CI, for contributors",
             ["language-server.md"] = "how the language server is built, for contributors",
+            ["language-test-plan.md"] = "coverage priorities and test matrices, for contributors",
         };
 
         private static readonly string[] SectionOrder = { ProjectSection, "Start here", "Language", "Build", "Tools", "Reference", "Methods by type", "More" };

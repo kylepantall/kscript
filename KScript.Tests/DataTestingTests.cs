@@ -133,7 +133,7 @@ public sealed class DataTestingTests : DataFixture
             test(name: 'sees nothing') {
               expect(value: Author->count(), equals: 0)
             }
-            """, "{ \"name\": \"testing\", \"test\": { \"database\": \"config\" } }");
+            """, "{ \"name\": \"testing\", \"config\": { \"files\": [\"config.yaml?\"] }, \"test\": { \"database\": \"config\" } }");
         Passed(file);
         if (Server == null) Assert.True(File.Exists(Path.Combine(Project, "data", "test.sqlite")));
     }

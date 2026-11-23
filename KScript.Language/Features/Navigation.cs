@@ -33,8 +33,10 @@ namespace KScript.Language.Features
             string text = analysis.Source.Text;
             foreach (MarkupElement e in analysis.Markup.DescendantNodes().OfType<MarkupElement>().Where(x => x.NameSpan.Length > 0).OrderByDescending(x => x.NameSpan.Start))
             {
-                int open = e.NameSpan.End;
-                if (open >= text.Length || text[open] != '(' || offset <= open || CodeStatementSnippets.ContainsKey(e.Name))
+                int open = CodeStatementHelp.OptionsFollowName(e.Name) && e.GetAttribute("name")?.Value is DecodedText declaredName
+                    ? declaredName.SourceSpan.End : e.NameSpan.End;
+                while (open < text.Length && text[open] is ' ' or '\t') open++;
+                if (open >= text.Length || text[open] != '(' || offset <= open)
                 {
                     continue;
                 }
@@ -44,16 +46,15 @@ namespace KScript.Language.Features
                     continue;
                 }
                 ElementInfo info = Catalog.GetElement(e.Name);
-                if (info == null || info.Attributes.Count == 0)
-                {
-                    return null;
-                }
-                List<AttributeInfo> attributes = info.Attributes.Where(a => a.Deprecated == null || e.GetAttribute(a.Name) != null).ToList();
+                if (info == null) continue;
+                List<AttributeInfo> attributes = CodeStatementHelp.Options(info)
+                    .Where(a => a.Deprecated == null || e.GetAttribute(a.Name) != null).ToList();
+                if (attributes.Count == 0) continue;
                 string Label(AttributeInfo a) => a.Name + (a.Required ? string.Empty : "?") + ": " + ShortKind(a);
                 SignatureInfo signature = new SignatureInfo
                 {
                     Label = e.Name + "(" + string.Join(", ", attributes.Select(Label)) + ")",
-                    Documentation = info.Description,
+                    Documentation = CodeStatementHelp.For(e.Name) ?? info.Description,
                     Parameters = attributes.Select(a => (Label(a), DeprecationLine(a.Deprecated, a.Name) + a.Description + OptionsLine(a))).ToList(),
                 };
 

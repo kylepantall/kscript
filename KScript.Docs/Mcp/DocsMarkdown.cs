@@ -213,6 +213,25 @@ namespace KScript.Docs.Mcp
         public string Element(ElementInfo e, string format, int level = 1)
         {
             string name = DocsSite.ElementName(e);
+            void AppendOptions(StringBuilder target, IEnumerable<AttributeInfo> options)
+            {
+                var attributes = options.ToList();
+                if (attributes.Count == 0) return;
+                target.Append(format == "xml" ? "\n| Attribute | Value | Description |\n" : "\n| Option | Value | Description |\n");
+                target.Append("|---|---|---|\n");
+                foreach (AttributeInfo a in attributes)
+                {
+                    string value = a.Options.Count > 0 ? string.Join(" \\| ", a.Options.Select(o => $"`{o}`")) : Regex.Replace(DocsSite.KindName(a.Kind), "</?code>", "`");
+                    target.Append($"| `{a.Name}`{(a.Required ? " (required)" : string.Empty)}{(a.Deprecated != null ? " (deprecated)" : string.Empty)} | {value} | {Cell(Deprecated(a.Deprecated).Trim() + " " + a.Description)} |\n");
+                }
+            }
+            if (format != "xml" && CodeStatementHelp.For(e.Name) is string codeHelp)
+            {
+                var code = new StringBuilder($"{new string('#', level)} {e.Name}\n\nPackage: {e.Package}\n{Deprecated(e.Deprecated)}\n{codeHelp}\n{Agent(e.Agent)}");
+                AppendOptions(code, CodeStatementHelp.Options(e));
+                if (e.Example != null) code.Append(Example(e.Example, format));
+                return code.ToString();
+            }
             var sb = new StringBuilder($"{new string('#', level)} <{name}>{(e.Deprecated != null ? " (deprecated)" : string.Empty)}\n\n");
             sb.Append($"Package: {e.Package ?? "planned (not in the interpreter yet)"}\n{Deprecated(e.Deprecated)}\n{e.Description}\n{Agent(e.Agent)}");
             var facts = new List<string>
@@ -234,15 +253,7 @@ namespace KScript.Docs.Mcp
             if (e.IsLoop) facts.Add("A loop: <break /> and <continue /> work inside.");
             if (e.AllowsExtraAttributes) facts.Add("Other attributes become variables.");
             sb.Append('\n').Append(string.Join(" ", facts)).Append('\n');
-            if (e.Attributes.Count > 0)
-            {
-                sb.Append("\n| Attribute | Value | Description |\n|---|---|---|\n");
-                foreach (AttributeInfo a in e.Attributes)
-                {
-                    string value = a.Options.Count > 0 ? string.Join(" \\| ", a.Options.Select(o => $"`{o}`")) : Regex.Replace(DocsSite.KindName(a.Kind), "</?code>", "`");
-                    sb.Append($"| `{a.Name}`{(a.Required ? " (required)" : string.Empty)}{(a.Deprecated != null ? " (deprecated)" : string.Empty)} | {value} | {Cell(Deprecated(a.Deprecated).Trim() + " " + a.Description)} |\n");
-                }
-            }
+            AppendOptions(sb, e.Attributes);
             if (e.Example != null) sb.Append(Example(e.Example, format));
             return sb.ToString();
         }

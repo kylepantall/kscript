@@ -123,6 +123,14 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void CompletesMethodsAfterNegatedArrow()
+        {
+            List<CompletionItem> items = Complete(Script("<echo>{ 'a'->!is_‸ }</echo>"));
+            Assert.Contains(items, i => i.Label == "is_blank");
+            Assert.DoesNotContain(items, i => i.Label == "push");
+        }
+
+        [Fact]
         public void CompletesAfterPipe()
         {
             List<string> labels = Labels(Script("<fn name=\"twice\" params=\"x\" value=\"$x * 2\" /><echo>{ 'a' |> ‸ }</echo>"));

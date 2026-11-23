@@ -57,8 +57,25 @@ namespace KScript.Http
         /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>
         public ProjectConfig Project { get; }
         public TextWriter Log { get; }
+        internal ConfigValue StartupConfig { get; private set; }
         public IReadOnlyList<RouteFileInfo> Files { get; }
         public bool HasRoutes => Files.Count > 0;
+
+        internal void LoadStartupConfig()
+        {
+            if (Project?.FilePath == null) return;
+            var host = new KScriptHost(Log ?? TextWriter.Null, Console.Error)
+            {
+                WorkingDirectory = projectRoot,
+                FileRoot = projectRoot,
+                FileRootName = "the project folder",
+                CanWriteFiles = false,
+                Config = Project.ConfigOptions(),
+            };
+            ConfigValue config = ConfigValue.For(host, projectRoot);
+            _ = config.Values;
+            StartupConfig = config;
+        }
 
         /// <summary>Reads environment variables (the auth middleware's token). Tests replace it.</summary>
         public Func<string, string> Environment { get; set; } = System.Environment.GetEnvironmentVariable;
@@ -183,6 +200,7 @@ namespace KScript.Http
             };
             host.Items[HttpPackage.ContextKey] = ctx;
             host.Items[AuthRequest.HostKey] = ctx.Auth;
+            StartupConfig?.CopyTo(host);
             return new Interpreter(host, options: new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 200 });
         }
 

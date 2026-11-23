@@ -406,13 +406,15 @@ namespace KScript.Language.Agents
             w.Append(project.IsXml ? "```xml\n" + CrashCourseXml() + "\n```\n\n" : "```kscript\n" + CrashCourse + "\n```\n\n");
             w.Append(Rules);
 
-            w.Append("\n## Design a change\n\n");
-            w.Append("- Read `kscript.json` and `.kscript/agents/index.md`. Reuse the native, record, model or library function already used by nearby code.\n");
-            w.Append("- Give domain values a type at entry. Use built-ins such as `email`, `uuid` and `duration`. For a repeated domain rule use `kscript make native` and put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
-            w.Append("- Give structured data a record (`kscript make type`), persisted rows a model (`kscript make model`), and parameters their domain types. Reserve `map` and `any` for genuinely open data. Validate external JSON at entry with `as: Type`.\n");
+            w.Append("\n## Required project conventions\n\n");
+            w.Append("- Before editing, read `kscript.json`, `.kscript/agents/index.md` and a neighboring feature. Follow the configured syntax and paths. Verify APIs in the generated package reference or MCP. Reuse existing types and operations.\n");
+            w.Append("- Type domain values at the boundary. Use built-in types such as `email`, `uuid` and `duration`. Define shared domain rules once with `kscript make native`. Put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
+            w.Append("- Use records for known shapes (`kscript make type`) and models and migrations for persisted rows. Validate external JSON with `as: Type` where supported. Use `map` for open keys and `any` for genuinely dynamic values.\n");
             if (project.Packages.Contains("KScript.Http") || project.Routes != null)
-                w.Append("- Use `kscript make route` for routing and a controller for the action. Generate a request type with `kscript make request`, import it, and type the controller’s `json` parameter. Keep reusable behavior on the type or in a library module, and presentation in views or components.\n");
-            w.Append("- Run generators from this project so they follow its `paths` settings. Add tests beside the existing suite for accepted data, rejected data and error recovery.\n");
+                w.Append("- Use `kscript make route` for routing and a controller for the action. For a known JSON body, generate a request type with `kscript make request`, import it, and type the controller’s `json` parameter so the framework validates it.\n");
+            if (project.Packages.Contains("KScript.Web") || project.Pages > 0)
+                w.Append("- Keep presentation in views or components. Put reusable domain behavior on the type or in a library module.\n");
+            w.Append("- Run generators from the project so they follow its `paths` settings. Catch specific errors where recovery or reporting belongs. Rethrow when the caller owns recovery.\n");
 
             w.Append("\n## Mistakes to avoid\n\n");
             w.Append(Mistakes);
@@ -421,11 +423,12 @@ namespace KScript.Language.Agents
                 w.Append("- XML attributes can't hold a raw `<`: write `lt`, `le`, `gt`, `ge`, or use `<if $n > 3>` shorthand start tags.\n");
             }
 
-            w.Append("\n## Workflow\n\n");
-            w.Append("1. Run `kscript check --output json --warnings-as-errors`. Fix diagnostics at their source. KS5016 identifies a known error that can escape the script. Handle it where the program can recover or report failure.\n");
-            w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
-            w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
-            w.Append("4. Unsure about a command or method? Read its package's file in `.kscript/agents/packages/` (such as `KScript.Core.md`), or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
+            w.Append("\n## Before finishing a change\n\n");
+            w.Append("1. For behavior changes, add or update tests beside the existing suite. Assert the result and cover applicable rejected inputs and recovery.\n");
+            w.Append("2. Run `kscript check --output json --warnings-as-errors`. Fix diagnostics at their source. For KS5016, handle the escaping error at the appropriate boundary.\n");
+            string testPattern = project.IsXml ? "*.test.ks.xml" : "*.test.kscript";
+            w.Append(project.Tests > 0 ? $"3. Run `kscript test` (runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}).\n" : $"3. Run `kscript test` (runs `{testPattern}` files).\n");
+            w.Append("4. Run `kscript fmt --check` and refresh generated notes with `kscript agents`. Report the verification results and any checks you could not run.\n");
 
             w.Append("\n## This project\n\n");
             if (project.Main != null)
@@ -529,7 +532,7 @@ namespace KScript.Language.Agents
 
         internal const string Mistakes = """
             - Leaving out `$` when reading (`$count`, not `count`), or adding it when setting (`count = 1`, not `$count = 1`).
-            - `&&`, `||`, `!`: write `and`, `or`, `not`.
+            - Write `and` and `or` for Boolean combinations. Use `not` or `!` to negate a condition, or `->!method()` to negate a method result.
             - Calling your own fn without `@`, or calling a package command without its `import` (`@read_json` needs `import KScript.IO`).
             - Inventing methods from other languages (`.length`, `.push()` on a string, `len()`): methods use `->` and are listed per package.
             - `else` after a branch that returns, breaks or continues: return early instead (KS6001).

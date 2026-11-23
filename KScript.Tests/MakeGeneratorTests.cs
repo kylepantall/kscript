@@ -520,15 +520,15 @@ public sealed class MakeGeneratorTests : IDisposable
     [Fact]
     public void SettingsFilesAreNamedForTheirEnvironment()
     {
-        // A new project keeps its settings in config/ (config.root in kscript.json says so).
+        // A scaffolded project lists its config script under config.files.
         string app = Project();
         Assert.Contains("already exists", Make(app, "config", "base").Err);
         Assert.Equal(0, Make(app, "config", "dev").Code);
-        Assert.Contains("debug: true", Read(app, "config/config.dev.yaml"));
-        // Without config.root, $config reads the script's folder, so the files go at the top.
+        Assert.Contains("fn configure(environment: string)", Read(app, "config/config.dev.kscript"));
+        // In an empty project, the generator writes to the project folder.
         using var plain = new TempSite(("kscript.json", "{}"));
         Assert.Equal(0, Make(plain.Root, "config", "base").Code);
-        Assert.Contains("logging:", Read(plain.Root, "config.yaml"));
+        Assert.Contains("logging:", Read(plain.Root, "config.kscript"));
         Assert.Equal(0, Make(app, "env", "base", "--keys", "api_token").Code);
         Assert.Equal(0, Make(app, "env", "staging").Code);
         Assert.Contains("\nAPI_TOKEN=\n", Read(app, ".env"));

@@ -11,14 +11,14 @@ namespace KScript.Runtime
         private static void RegisterConfig(PackageBuilder p)
         {
             p.Variable("config", KType.Config,
-                "The script's settings, from config.json, config.yaml and .env (plus staging.yaml, .env.staging and so on for the environment): $config.database.host.",
+                "The project's settings from kscript.json config.files, or .env by default: $config.database.host.",
                 (i, m) => ConfigValue.For(i.Host, m.Directory));
 
             p.Element(new ElementInfo("config",
                 "Reads the script's settings with other options: an environment, other files, a prefix for environment variables, defaults and required settings. Without `into`, it changes $config.",
                 ContentKind.Empty,
                 new A("env", K.Template, "The environment, such as staging or production. Its files (staging.yaml, config.staging.json, .env.staging) are layered over the base files. Default: kscript --env, or KSCRIPT_ENV."),
-                new A("files", K.Template, "The base files, as a list: `['settings.yaml', 'secrets.json?', '.env']` (in XML, `settings.yaml, secrets.json?, .env`). A name without an extension means .json, .yaml and .yml. End a name with ? if it may be missing. Default: config, .env.") { NameList = true },
+                new A("files", K.Template, "The base files, as a list: `['config.kscript', 'settings.yaml?', '.env?']` (in XML, `config.kscript, settings.yaml?, .env?`). A name without an extension means .json, .yaml and .yml. End a name with ? if it may be missing.") { NameList = true },
                 new A("prefix", K.Text, "Environment variables with this prefix override the files: with prefix=\"APP_\", APP_DATABASE__HOST sets database.host."),
                 new A("root", K.Path, "The folder the files are in. Default: the script's folder."),
                 new A("defaults", K.Expression, "A map of settings used when no file sets them."),

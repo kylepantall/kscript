@@ -110,6 +110,12 @@ test('double quotes fill in $name and { }; single quotes are kept as written', a
   assert.match(scopeOf(tokens, 'a'), /string\.quoted\.single\.kscript/);
 });
 
+test('negation and a negated method are highlighted inside interpolation', async () => {
+  const tokens = tokenize(await load(), 'echo "{ ! null->!is_null() }"');
+  assert.match(scopeOf(tokens, '!'), /keyword\.operator\.kscript/);
+  assert.match(scopeOf(tokens, 'is_null'), /support\.function\.kscript/);
+});
+
 test('a quoted URL distinguishes code, properties, escaped braces and path text', async () => {
   const tokens = tokenize(await load(), [
     'result = @join("{$config.passkeys.url}/{$kind}/finish")',

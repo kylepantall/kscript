@@ -835,7 +835,12 @@ namespace KScript.Runtime
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
             p.Command("char_of", "code: number", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
-                Environment.GetEnvironmentVariable(c.Str(0)) ?? (c.Has(1) ? c.Arg(1) : null));
+            {
+                string name = c.Str(0);
+                return Environment.GetEnvironmentVariable(name)
+                    ?? (c.Host.ConfigEnvironment?.TryGetValue(name, out string configured) == true ? configured : null)
+                    ?? (c.Has(1) ? c.Arg(1) : null);
+            });
         }
 
         private static object MinMax(CallContext c, bool min)
@@ -852,6 +857,8 @@ namespace KScript.Runtime
             p.Variable("env", KType.Map, "Environment variables: $env.HOME, $env['PATH'].", (i, m) =>
             {
                 var map = new Dictionary<string, object>();
+                if (i.Host.ConfigEnvironment != null)
+                    foreach (var entry in i.Host.ConfigEnvironment) map[entry.Key] = entry.Value;
                 foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
                 return map;
             });

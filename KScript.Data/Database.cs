@@ -64,13 +64,13 @@ namespace KScript.Data
             return FromOptions(wanted, options, root);
         }
 
-        internal static IEnumerable<string> LocalFiles(string folder)
+        internal static IEnumerable<string> LocalFiles(string folder, ConfigValue settings = null)
         {
             string root = ProjectFolder(folder);
             // Also keep a previous default database private after an app changes or relocates its connection.
             yield return Path.Combine(root, DefaultFile);
             yield return AppFolders.ProjectDataPath(root, DefaultFile);
-            var config = ConfigValue.For(KScriptHost.ForText(new StringWriter()), folder).Values.GetValueOrDefault("database") as Dictionary<string, object>;
+            var config = (settings ?? ConfigValue.For(KScriptHost.ForText(new StringWriter()), folder)).Values.GetValueOrDefault("database") as Dictionary<string, object>;
             var connections = config?.GetValueOrDefault("connections") as Dictionary<string, object>;
             if (connections == null || connections.Count == 0)
                 connections = new() { [DefaultName] = new Dictionary<string, object> { ["url"] = Environment.GetEnvironmentVariable("DATABASE_URL") } };
