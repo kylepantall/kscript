@@ -183,6 +183,14 @@ namespace KScript
                     O("--force", "Replace a file that is already there."),
                 },
                 "kscript convert hello.ks.xml\nkscript convert hello.kscript --syntax xml --stdout", "code-format") { Group = "code", Details = "The original is left as it is. A folder converts every script in it (*.kscript and *.ks.xml, tests too).\nImports, and file names in comments and strings, that point at a converted script are changed to its new name." },
+            new CliCommand("lib", "kscript lib add <owner/repo|github-url>",
+                "Install a KScript source library from GitHub into the project.",
+                Array.Empty<CliOption>(),
+                "kscript lib add owner/repo\nkscript lib add https://github.com/owner/repo/tree/main/libraries/example", "projects")
+            {
+                Group = "build",
+                Details = "Use a repository URL or a GitHub tree URL for a branch, tag, commit, or library folder. The command installs the source under the project's lib folder (paths.lib) and prints the import to use.",
+            },
             new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
                 "Build programs that run without kscript.",
                 new[]
@@ -231,7 +239,7 @@ namespace KScript
             ("web", new[] { "serve", "routes", "openapi", "css" }),
             ("data", new[] { "db" }),
             ("queue", new[] { "worker", "queue" }),
-            ("build", new[] { "make", "compile" }),
+            ("build", new[] { "make", "lib", "compile" }),
             ("docs", new[] { "docs", "mcp" }),
             ("tools", new[] { "ide", "lsp", "update", "version" }),
         };

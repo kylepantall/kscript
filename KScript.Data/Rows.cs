@@ -40,7 +40,7 @@ namespace KScript.Data
         /// <summary>True when <paramref name="password"/> (a password, or text) is the one this hash was made from.</summary>
         public bool Verify(object password)
         {
-            PasswordValue value = password as PasswordValue;
+            PasswordValue value = Values.Unwrap(password) as PasswordValue;
             if (value == null)
             {
                 string text = Values.ToStr(password);
@@ -78,6 +78,7 @@ namespace KScript.Data
         /// <summary>A value as a parameter, for a column (or, with no column, as the value itself suggests).</summary>
         public static object ToDb(object value, Column column, Dialect dialect)
         {
+            value = Values.Unwrap(value);
             switch (value)
             {
                 case null:
@@ -115,6 +116,7 @@ namespace KScript.Data
         /// </summary>
         public static object ForColumn(object value, Column column, Dialect dialect)
         {
+            value = Values.Unwrap(value);
             if (value is BareWord word) value = word.Name;
             if (column == null || value == null) return ToDb(value, column, dialect);
             if (column.Kind == ColumnKind.Password && value is not PasswordHash && value is not PasswordValue)
@@ -143,7 +145,24 @@ namespace KScript.Data
         }
 
         /// <summary>A stored value as the column's KScript value: a number, bool, date, email, enum word, list or map.</summary>
-        public static object FromDb(object raw, Column column)
+        public static object FromDb(object raw, Column column, Interpreter interpreter = null)
+        {
+            object value = ReadColumn(raw, column);
+            if (interpreter == null || value is null or PasswordHash || column?.Refinement is not { HasMethods: true } type)
+                return value;
+            // The row already contains the normalized value. Restore its methods after checking the stored form.
+            try
+            {
+                return Shapes.Convert(interpreter, value, TypeRef.Of(type), column.Name, type.Closure, type.Module, normalize: false);
+            }
+            catch (KScriptException ex) when (ex.Type is "Shape" or "Type")
+            {
+                // Like native columns, a value written by another application may no longer fit the declaration.
+                return value;
+            }
+        }
+
+        private static object ReadColumn(object raw, Column column)
         {
             if (raw == null || raw is DBNull) return null;
             if (column == null) return Plain(raw);

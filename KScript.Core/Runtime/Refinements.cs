@@ -358,7 +358,10 @@ namespace KScript.Runtime
     /// </summary>
     public sealed class RefinedType : IKObject, IDeclaredType
     {
-        internal RefinedType(string name, TypeRef baseType, TypeRules rules, string description, Scope closure, Module module)
+        private readonly IReadOnlyDictionary<string, MarkupElement> methods;
+
+        internal RefinedType(string name, TypeRef baseType, TypeRules rules, string description, Scope closure, Module module,
+            IReadOnlyDictionary<string, MarkupElement> methods = null)
         {
             Name = name;
             Base = baseType;
@@ -366,7 +369,15 @@ namespace KScript.Runtime
             Description = description;
             Closure = closure;
             Module = module;
-            if (rules.Normalize == null && rules.Validators.Count == 0 && baseType.Args == null && baseType.ListDepth == 0 && !baseType.Optional)
+            this.methods = methods;
+            if (baseType.ListDepth == 0 && !baseType.IsBuiltIn)
+            {
+                BaseRefinement = baseType.Args != null ? baseType.Refined(closure, module) : baseType.Inline as RefinedType;
+                if (BaseRefinement == null && closure != null && closure.TryGet(baseType.Name, out object parent))
+                    BaseRefinement = parent as RefinedType;
+            }
+            HasMethods = methods?.Count > 0 || BaseRefinement?.HasMethods == true;
+            if (!HasMethods && rules.Normalize == null && rules.Validators.Count == 0 && baseType.Args == null && baseType.ListDepth == 0 && !baseType.Optional)
                 StaticStringRoot = baseType.IsBuiltIn && baseType.Name == "string" ? this : (baseType.Inline as RefinedType)?.StaticStringRoot;
         }
 
@@ -377,6 +388,26 @@ namespace KScript.Runtime
 
         internal Scope Closure { get; }
         internal Module Module { get; }
+        internal RefinedType BaseRefinement { get; }
+        internal bool HasMethods { get; }
+
+        internal bool IsA(RefinedType other)
+        {
+            for (RefinedType type = this; type != null; type = type.BaseRefinement)
+                if (type == other) return true;
+            return false;
+        }
+
+        /// <summary>Look up a method together with the declaration that supplies its lexical scope and module.</summary>
+        internal bool TryFindMethod(string name, out RefinedType owner, out MarkupElement method)
+        {
+            for (owner = this; owner != null; owner = owner.BaseRefinement)
+            {
+                if (owner.methods != null && owner.methods.TryGetValue(name, out method)) return true;
+            }
+            method = null;
+            return false;
+        }
         /// <summary>The terminal string declaration when every rule in the chain is independent of script state.</summary>
         internal RefinedType StaticStringRoot { get; }
 

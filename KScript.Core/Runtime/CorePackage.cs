@@ -506,7 +506,7 @@ namespace KScript.Runtime
             string[] names = run.RequiredRaw("each").Split(',').Select(n => n.Trim().TrimStart('$')).Where(n => n.Length > 0).ToArray();
             if (names.Length == 0 || names.Length > 2) throw run.Error($"each=\"...\" names the loop variable (each=\"item\"), or a key and value for a map (each=\"key, value\").", "each", "Syntax");
             string indexName = run.VariableName("at", required: false);
-            object source = run.Eval("in");
+            object source = Values.Unwrap(run.Eval("in"));
 
             List<(object Item, object Key)> items = source switch
             {
@@ -579,7 +579,7 @@ namespace KScript.Runtime
                         throw new KScriptException($"<case> needs is=\"...\" or when=\"...\".", "Syntax") { Offset = c.Span.Start, OffsetModule = run.Module };
                     }
                     // With both, the value must be one of `is` and `when` must hold: 1, 2 when $ready => ...
-                    hit = (isText == null || run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => o is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value)))
+                    hit = (isText == null || run.Interpreter.EvaluateList(isText, scope, run.Module).Any(o => Values.Unwrap(o) is List<object> options ? options.Any(x => Values.LooseEquals(x, value)) : Values.LooseEquals(o, value)))
                         && (whenText == null || Values.Truthy(run.Interpreter.EvaluateText(whenText, scope, run.Module)));
                 }
                 else
@@ -599,16 +599,16 @@ namespace KScript.Runtime
         private static ICallable FindFunction(ElementRun run, string name)
         {
             name = name.Trim().TrimStart('@', '$');
-            if (run.Scope.TryGet(name, out object v) && v is ICallable fn) return fn;
+            if (run.Scope.TryGet(name, out object v) && Values.Unwrap(v) is ICallable fn) return fn;
             if (run.Module.Commands.TryGetValue(name, out CommandDefinition cmd))
                 return new NativeFunction(cmd.Name, call => run.Interpreter.InvokeCommand(cmd, call));
             int dot = name.IndexOf('.');
             if (dot > 0 && run.Module.Aliases.TryGetValue(name.Substring(0, dot), out ImportNamespace ns) && ns.TryGet(name.Substring(dot + 1), out object member))
             {
-                if (member is ICallable c) return c;
+                if (Values.Unwrap(member) is ICallable c) return c;
                 if (member is CommandDefinition d) return new NativeFunction(d.Name, call => run.Interpreter.InvokeCommand(d, call));
             }
-            string close = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && f is ICallable));
+            string close = Values.Closest(name, run.Scope.Names().Where(n => run.Scope.TryGet(n, out object f) && Values.Unwrap(f) is ICallable));
             throw run.Error(Wording.Of($"There is no function called {name}.") + (close != null ? $" Did you mean {close}?" : Wording.Of($" Declare it with <fn name=\"{name}\">.")), "fn", "Name");
         }
 
@@ -715,6 +715,7 @@ namespace KScript.Runtime
 
         private static KScriptException WithCause(KScriptException ex, object cause, ElementRun run)
         {
+            cause = Values.Unwrap(cause);
             KScriptException inner = cause is ErrorValue e ? e.Exception : cause is Dictionary<string, object> map ? ErrorTypes.FromMap(map)
                 : throw run.Error($"cause is the error that led to this one, such as $err in a catch, not {Values.Describe(cause)}.", "cause", "Argument");
             var wrapped = new KScriptException(ex.Words, ex.Type, inner) { Offset = ex.Offset, OffsetModule = ex.OffsetModule };
@@ -723,7 +724,7 @@ namespace KScript.Runtime
         }
 
         /// <summary>What <c>throw $value</c> throws: a caught error again, an error made with NotFound(...), or a map or text.</summary>
-        private static KScriptException ThrownValue(ElementRun run, object value) => value switch
+        private static KScriptException ThrownValue(ElementRun run, object value) => Values.Unwrap(value) switch
         {
             ErrorValue e => e.Exception,
             ErrorType t => t.IsBuiltIn || t.Fields.Fields.All(f => f.Optional) ? Located(run, t.Create(run.Interpreter, Array.Empty<object>(), new Dictionary<string, object>()))
@@ -850,7 +851,7 @@ namespace KScript.Runtime
 
         private static object MinMax(CallContext c, bool min)
         {
-            IEnumerable<object> items = c.Count == 1 && c.Arg(0) is List<object> list ? list : c.Args;
+            IEnumerable<object> items = c.Count == 1 && Values.Unwrap(c.Arg(0)) is List<object> list ? list : c.Args;
             List<object> all = items.ToList();
             if (all.Count == 0) return null;
             return all.Aggregate((a, b) => min ? (Values.Compare(a, b, "min") <= 0 ? a : b) : (Values.Compare(a, b, "max") >= 0 ? a : b));

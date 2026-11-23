@@ -303,7 +303,7 @@ namespace KScript.Runtime
             if (string.IsNullOrWhiteSpace(path)) return true;
             foreach (string part in path.Split('.'))
             {
-                switch (value)
+                switch (Values.Unwrap(value))
                 {
                     case Dictionary<string, object> map when map.TryGetValue(part, out object next):
                         value = next;

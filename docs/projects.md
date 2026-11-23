@@ -159,6 +159,24 @@ kscript make project my-app --template ../starters/api   # any folder
 }
 ```
 
+## Installing source libraries
+
+`kscript lib add` installs source files from a public GitHub repository. Give it an `owner/repo` name, an HTTPS repository URL, or the URL of a folder at a branch, tag or commit. Isolink Connect lives in the KScript repository.
+
+```sh
+kscript lib add https://github.com/kylepantall/kscript/tree/master/libraries/isolink-connect
+```
+
+Import the installed file from a script in the site root.
+
+```kscript
+import "lib/isolink-connect/index.kscript" as connect
+```
+
+The destination is `lib/<repository-name>/` for a whole repository, or `lib/<folder-name>/` for a selected folder. Set `paths.lib` in the nearest `kscript.json` to choose another folder relative to `serve.root`. Outside a project, the command installs into `lib/` in the current folder. Imports are relative to the script containing them, so a script one level down would use `../lib/isolink-connect/index.kscript`.
+
+The library can include sibling scripts and data files. An `index.kscript` or `index.ks.xml` at its root is the preferred entry point. The command prints an import for a KScript file it found and saves the source URL, commit SHA and entry path in `.kscript-lib.json` inside the installed folder. Commit the folder with your project to share that exact copy. Adding the same source again keeps the installed revision and local edits. To replace it, move the existing folder aside and run `lib add` with the desired tag or commit URL.
+
 ## Project settings: kscript.json
 
 `kscript serve`, `kscript check`, `kscript fmt`, `kscript make` and the editor read the nearest `kscript.json` in the folder they work on or a parent folder, so they behave the same from anywhere in the project. Every setting is optional:

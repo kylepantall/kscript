@@ -343,7 +343,7 @@ namespace KScript.Runtime
 
                 case UnaryNode unary:
                 {
-                    object operand = Evaluate(unary.Operand, scope, ctx);
+                    object operand = Values.Unwrap(Evaluate(unary.Operand, scope, ctx));
                     switch (unary.Operator)
                     {
                         case "not": return !Values.Truthy(operand);
@@ -585,13 +585,15 @@ namespace KScript.Runtime
 
         private object HandleCompare(BinaryNode bin, object other, CommandCallNode word, EvalContext ctx)
         {
-            if (!(other is HandleName)) throw Fail(word, ctx, $"Unknown command @{word.Name}(). An @name without a function is a handle only next to a handle, such as $user.handle == @{word.Name}.", "Name");
+            if (Values.Unwrap(other) is not HandleName) throw Fail(word, ctx, $"Unknown command @{word.Name}(). An @name without a function is a handle only next to a handle, such as $user.handle == @{word.Name}.", "Name");
             object handle = SemanticTypes.TryConvert(SemanticTypes.Handle, "@" + word.Name, out object h, out string reason) ? h : throw Fail(word, ctx, reason, "Type");
             return Binary(bin.Operator, other, handle, bin, ctx);
         }
 
         private object Binary(string op, object a, object b, ExprNode node, EvalContext ctx)
         {
+            a = Values.Unwrap(a);
+            b = Values.Unwrap(b);
             string where = Where(node, ctx);
             // An operator a native type declares (duration + duration, date - duration, ip in cidr) runs as it says.
             if (NativeOperators.BinaryOperators.Contains(op))
@@ -672,6 +674,7 @@ namespace KScript.Runtime
 
         private object GetMember(object target, string name, ExprNode node, EvalContext ctx)
         {
+            target = Values.Unwrap(target);
             switch (target)
             {
                 case Record record:
@@ -713,6 +716,8 @@ namespace KScript.Runtime
 
         private object GetIndex(object target, object key, ExprNode node, EvalContext ctx)
         {
+            target = Values.Unwrap(target);
+            key = Values.Unwrap(key);
             switch (target)
             {
                 case null:
@@ -770,7 +775,7 @@ namespace KScript.Runtime
             {
                 case MemberNode member:
                 {
-                    object container = Evaluate(AssignedThrough(member.Target), scope, ctx);
+                    object container = Values.Unwrap(Evaluate(AssignedThrough(member.Target), scope, ctx));
                     if (container is not Dictionary<string, object> map)
                         throw Fail(member, ctx, $"Only map fields can be set, but {ReadSourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
@@ -779,7 +784,7 @@ namespace KScript.Runtime
                 }
                 case IndexNode index:
                 {
-                    object container = Evaluate(AssignedThrough(index.Target), scope, ctx);
+                    object container = Values.Unwrap(Evaluate(AssignedThrough(index.Target), scope, ctx));
                     object key = Evaluate(index.Index, scope, ctx);
                     switch (container)
                     {
@@ -853,7 +858,7 @@ namespace KScript.Runtime
             {
                 case "??=": return current ?? value;
                 case "+=":
-                    if (current is List<object> list && value is not List<object>) return list.Append(value).ToList();
+                    if (Values.Unwrap(current) is List<object> list && Values.Unwrap(value) is not List<object>) return list.Append(value).ToList();
                     return Binary("+", current, value, node, ctx);
                 case "-=": return Binary("-", current, value, node, ctx);
                 case "*=": return Binary("*", current, value, node, ctx);
@@ -897,7 +902,7 @@ namespace KScript.Runtime
                 throw Fail(node, ctx, $"{ns.Display} has no command '{member}'." + Suggest(member, ns.Names), "Name");
             }
 
-            if (scope.TryGet(name, out object stored) && stored is ICallable) return stored;
+            if (scope.TryGet(name, out object stored) && Values.Unwrap(stored) is ICallable) return stored;
             if (module != null && module.Commands.TryGetValue(name, out CommandDefinition command)) return command;
 
             if (Retired.Commands.TryGetValue(name, out var retired))
@@ -907,7 +912,7 @@ namespace KScript.Runtime
             if (owner != null)
                 throw Fail(node, ctx, $"@{name}() is part of {owner.Name}. Add {ImportHint(module, owner.Name)} at the top of the script.", "Import");
 
-            IEnumerable<string> known = (module?.Commands.Keys ?? Enumerable.Empty<string>()).Concat(scope.Names().Where(n => scope.TryGet(n, out object f) && f is ICallable));
+            IEnumerable<string> known = (module?.Commands.Keys ?? Enumerable.Empty<string>()).Concat(scope.Names().Where(n => scope.TryGet(n, out object f) && Values.Unwrap(f) is ICallable));
             throw Fail(node, ctx, $"Unknown command @{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean @"), "Name");
         }
 
@@ -919,7 +924,7 @@ namespace KScript.Runtime
 
         private object CallResolved(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node, CallSite site = null)
         {
-            switch (target)
+            switch (Values.Unwrap(target))
             {
                 case CommandDefinition command:
                     return InvokeCommand(command, new CallContext(this, command.Name, args, named, scope, ctx.Module) { Site = site });
@@ -958,7 +963,7 @@ namespace KScript.Runtime
                 case IdentifierNode id:
                 {
                     // filter(...) after a pipe is a method of the value; slugify() is a function or command.
-                    if (scope.TryGet(id.Name, out object stored) && stored is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
+                    if (scope.TryGet(id.Name, out object stored) && Values.Unwrap(stored) is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
                     // NotFound(id: 42) makes an error, for throw.
                     if (!piped && ErrorTypes.FindExact(id.Name, scope) is ErrorType error)
                     {
@@ -976,13 +981,20 @@ namespace KScript.Runtime
                     {
                         return Construct(stored, args, named, scope, ctx);
                     }
+                    object receiver = pipedValue;
+                    if (piped && pipedValue is RefinedValue refined)
+                    {
+                        if (refined.Type.TryFindMethod(id.Name, out RefinedType owner, out MarkupElement declaration))
+                            return CallRefinedMethod(refined, owner, declaration, id.Name, args.Skip(1).ToList(), named, scope, ctx.Module);
+                        pipedValue = refined.Value;
+                    }
                     if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))
                     {
                         return Extensions.Call(this, extension, pipedValue, args.Skip(1).ToList(), named, scope, ctx.Module);
                     }
                     if (piped && TryFindMethod(pipedValue, id.Name, ctx.Module, out MethodDefinition method))
                     {
-                        return InvokeMethodDefinition(method, pipedValue, args.Skip(1).ToList(), named, scope, ctx);
+                        return InvokeMethodDefinition(method, receiver, args.Skip(1).ToList(), named, scope, ctx);
                     }
                     if (piped && pipedValue is IKObject obj
                         && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, id.Name, args.Skip(1).ToList(), named, scope, ctx.Module, isMethod: true)), id.Name, out object objResult))
@@ -1111,6 +1123,7 @@ namespace KScript.Runtime
         {
             var call = ArgumentBinder.Bind(method.Info, new CallContext(this, method.Name, args, named, scope, ctx.Module, isMethod: true));
             CallableInfoCheck(method.Info, call);
+            if (method.Receiver != KType.Any) target = Values.Unwrap(target);
             if (method.Receiver == "number" && target is string s) target = Values.ToNumber(s, call.Display);
             if (method.Receiver == "string" && target is ISemanticText text) target = text.Text;
             return method.Handler(target, call);
@@ -1128,6 +1141,13 @@ namespace KScript.Runtime
         /// <summary>Calls <c>value->name(args)</c>.</summary>
         public object InvokeMethod(object target, string name, List<object> args, Dictionary<string, object> named, Scope scope, EvalContext ctx, ExprNode node)
         {
+            object receiver = target;
+            if (target is RefinedValue refined)
+            {
+                if (refined.Type.TryFindMethod(name, out RefinedType declaringType, out MarkupElement declaration))
+                    return CallRefinedMethod(refined, declaringType, declaration, name, args, named, scope, ctx.Module);
+                target = refined.Value;
+            }
             // extend date { fn json() => ... }: methods the script (its imports, its project) adds to the type come first.
             if (Extensions.TryFind(target, name, ctx.Module, out ExtensionMethod extension))
             {
@@ -1157,16 +1177,16 @@ namespace KScript.Runtime
             // A renamed method says so before its arguments are looked at: User->avg(age) is told about ->average(), not about age.
             if (!defined && target != null && RetiredMembers.Method(Values.TypeOf(target), name) is KScript.Metadata.RetiredInfo retiredMethod)
                 throw Fail(node, ctx, $"->{name}() is no longer part of KScript. {retiredMethod.Replacement}", "Name");
-            if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, target, args, named, scope, ctx);
+            if (defined && target is IKObject && method.Receiver != "any") return InvokeMethodDefinition(method, receiver, args, named, scope, ctx);
             // A NativeText has no methods of its own, so an any-method (->is_a(semver)) binds its bare words as declared.
-            if (defined && target is NativeText) return InvokeMethodDefinition(method, target, args, named, scope, ctx);
+            if (defined && target is NativeText) return InvokeMethodDefinition(method, receiver, args, named, scope, ctx);
             if (target is IKObject obj && obj.TryCallMethod(ArgumentBinder.Plain(new CallContext(this, name, args, named, scope, ctx.Module, isMethod: true)), name, out object result))
             {
                 return result;
             }
             if (defined)
             {
-                return InvokeMethodDefinition(method, target, args, named, scope, ctx);
+                return InvokeMethodDefinition(method, receiver, args, named, scope, ctx);
             }
 
             if (TryFindField(target, name, ctx.Module, out _))
@@ -1196,6 +1216,17 @@ namespace KScript.Runtime
                 : string.Equals(name, "json", StringComparison.OrdinalIgnoreCase) ? " To write it as JSON text, use ->to_json()."
                 : $" Use ->to_string()->{name}() to work on its text.";
             throw Fail(node, ctx, $"{noun} have no method ->{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") + hint, "Name");
+        }
+
+        private object CallRefinedMethod(RefinedValue target, RefinedType owner, MarkupElement method, string name,
+            List<object> args, Dictionary<string, object> named, Scope scope, Module caller)
+        {
+            Scope closure = owner.Closure.Child();
+            closure.Declare("this", target);
+            closure.Declare("value", target.Value);
+            DeclareFunction(method, closure, owner.Module);
+            closure.TryGet(name, out object fn);
+            return Call((ICallable)fn, args, named, scope, caller);
         }
 
         #endregion

@@ -358,11 +358,11 @@ namespace KScript.Runtime
 
         public bool Bool(int i, bool fallback = false) => Has(i) ? Values.Truthy(Arg(i)) : fallback;
 
-        public ICallable Fn(int i) => Need(i) as ICallable ?? throw Error($"{Display} needs a function like fn(x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
+        public ICallable Fn(int i) => Values.Unwrap(Need(i)) as ICallable ?? throw Error($"{Display} needs a function like fn(x) => ... as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
-        public List<object> List(int i) => Need(i) as List<object> ?? throw Error($"{Display} needs a list as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
+        public List<object> List(int i) => Values.Unwrap(Need(i)) as List<object> ?? throw Error($"{Display} needs a list as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
-        public Dictionary<string, object> Map(int i) => Need(i) as Dictionary<string, object> ?? throw Error($"{Display} needs a map as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
+        public Dictionary<string, object> Map(int i) => Values.Unwrap(Need(i)) as Dictionary<string, object> ?? throw Error($"{Display} needs a map as argument {i + 1}, but got {Values.Describe(Arg(i))}.");
 
         public object Need(int i)
         {

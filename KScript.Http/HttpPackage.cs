@@ -179,7 +179,7 @@ namespace KScript.Http
                 {
                     RequestContext ctx = RequestContext.Current(c.Host) ?? throw c.Error("@route() works while kscript serve handles a request.", "Http");
                     var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
-                    if (c.Count > 1 && c.Arg(1) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
+                    if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
                     return ctx.Table.Url(c.Str(0), values);
                 }, "<a href=\"{@route('people.show', id: $p.id)}\">");
 
@@ -427,7 +427,7 @@ namespace KScript.Http
         {
             RequestContext ctx = RequestContext.Current(c.Host) ?? throw c.Error("@view() works while kscript serve handles a request.", "Http");
             var data = new Dictionary<string, object>(StringComparer.Ordinal);
-            if (c.Count > 1 && c.Arg(1) is Dictionary<string, object> map)
+            if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map)
             {
                 foreach (var kv in map) data[kv.Key] = kv.Value;
             }
@@ -437,14 +437,14 @@ namespace KScript.Http
 
         private static object Response(CallContext c)
         {
-            object body = c.Arg(0, "body");
+            object body = Values.Unwrap(c.Arg(0, "body"));
             int status = c.Has(1, "status") && c.Arg(1, "status") != null ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 200;
             HttpResponse response = body is HttpResponse existing ? existing : body is string || body == null
                 ? new HttpResponse(status, Values.ToStr(body))
                 : HttpResponse.Json(body, status);
             response.Status = status;
             if (c.Has(2, "type") && c.Arg(2, "type") != null) response.ContentType = Values.ToStr(c.Arg(2, "type"));
-            if (c.Has(3, "headers") && c.Arg(3, "headers") is Dictionary<string, object> headers)
+            if (c.Has(3, "headers") && Values.Unwrap(c.Arg(3, "headers")) is Dictionary<string, object> headers)
             {
                 foreach (var kv in headers) response.Headers[kv.Key] = Values.ToStr(kv.Value);
             }

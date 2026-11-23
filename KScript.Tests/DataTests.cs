@@ -90,6 +90,24 @@ public abstract class DataFixture : IDisposable
 public sealed class DataModelTests : DataFixture
 {
     [Fact]
+    public void StoredRefinementsKeepTheirMethodsWithoutNormalizingTwice()
+    {
+        string[] lines = Lines("""
+            type ProductName with [string] {
+              normalize: $value + '!'
+              fn display() => $value->upper()
+            }
+            model Product { name: ProductName }
+            $db->create_table(Product)
+            Product->create(name: 'Coffee')
+            echo Product->find(1).name->display()
+            echo Product->value(name)->display()
+            echo Product->pluck(name)[0]->display()
+            """);
+        Assert.Equal(new[] { "COFFEE!", "COFFEE!", "COFFEE!" }, lines);
+    }
+
+    [Fact]
     public void CreatesAndReadsRecords()
     {
         string[] lines = Lines(Users + """

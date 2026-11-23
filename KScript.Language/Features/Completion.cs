@@ -44,14 +44,16 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
-            List<CompletionItem> modelHeader = ModelHeaderCompletions(analysis, offset);
-            List<CompletionItem> items = modelHeader ?? GetCompletionsAt(analysis, offset);
+            List<CompletionItem> modelOptions = ModelOptionCompletionsAt(analysis, offset);
+            // A typed space retriggers the model's suggestions after a separator. Leave ordinary spaces quiet.
+            if (trigger == " ") return modelOptions ?? new List<CompletionItem>();
+            List<CompletionItem> items = modelOptions ?? GetCompletionsAt(analysis, offset);
             if (trigger == "[" && offset > 0 && analysis.Source.Text[offset - 1] == '['
-                && modelHeader == null && !items.Any(i => i.Kind == CompletionKind.Value))
+                && modelOptions == null && !items.Any(i => i.Kind == CompletionKind.Value))
             {
                 return new List<CompletionItem>();
             }
-            if (modelHeader == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
+            if (modelOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind == CompletionKind.Parameter || i.Kind == CompletionKind.Value || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
                 return new List<CompletionItem>();
             }
@@ -1010,7 +1012,8 @@ namespace KScript.Language.Features
         {
             // A <type>'s own fn methods and the methods extend blocks add (this file's, imports', the project's);
             // an override replaces the built-in method of the same name.
-            List<Symbol> added = analysis.ExtensionMethodsFor(receiver).Concat(receiver.Methods.Values)
+            var extensions = analysis.ExtensionMethodsFor(receiver);
+            List<Symbol> added = (receiver.RefinementBase != null ? receiver.Methods.Values.Concat(extensions) : extensions.Concat(receiver.Methods.Values))
                 .GroupBy(m => m.Name, StringComparer.Ordinal).Select(g => g.First()).ToList();
             var names = new HashSet<string>(added.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
             List<CompletionItem> items = added.Select(m => new CompletionItem

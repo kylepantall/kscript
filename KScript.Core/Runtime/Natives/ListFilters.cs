@@ -17,7 +17,7 @@ namespace KScript.Runtime
         {
             if (items.Count == 0) return EmptyListTypes.TryGetValue(items, out NativeType declared) ? declared : null;
             NativeType first = NativeTypeRegistry.Of(items[0]);
-            return first != null && items.All(x => x is IKObject k && k.TypeName == first.Name) ? first : null;
+            return first != null && items.All(x => Values.Unwrap(x) is IKObject k && k.TypeName == first.Name) ? first : null;
         }
 
         internal static void RememberEmptyType(List<object> empty, string elementType)
@@ -50,6 +50,7 @@ namespace KScript.Runtime
         /// <summary>True when <paramref name="value"/> is a <paramref name="type"/>: its type's name, or a number for int when whole.</summary>
         public static bool IsOfType(object value, string type)
         {
+            value = Values.Unwrap(value);
             string name = Shapes.TypeName(value);
             if (string.Equals(name, type, StringComparison.OrdinalIgnoreCase)) return true;
             return type switch
@@ -67,7 +68,7 @@ namespace KScript.Runtime
         {
             if (IsTypeName(what)) return Where(items, (x, _) => IsOfType(x, what) == keep, keep ? what : null);
             NativeType type = ElementTypeOf(items);
-            if (type?.ListFilter(what) is Func<object, bool> test) return Where(items, (x, _) => test(x) == keep, type.Name);
+            if (type?.ListFilter(what) is Func<object, bool> test) return Where(items, (x, _) => test(Values.Unwrap(x)) == keep, type.Name);
             string filters = type != null && type.ListFilters.Count > 0
                 ? $" The filters for a list of {type.Name} values are {string.Join(", ", type.ListFilters.Select(f => f.Name))}."
                 : items.Count > 0 && NativeTypeRegistry.Of(items[0]) is NativeType { ListFilters.Count: > 0 } first ? $" Filters such as {string.Join(", ", first.ListFilters.Select(f => f.Name))} work when every item is {first.Info.WithArticle}." : string.Empty;

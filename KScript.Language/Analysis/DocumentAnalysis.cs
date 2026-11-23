@@ -73,6 +73,9 @@ namespace KScript.Language.Analysis
         // Model options are checked before relation foreign keys and count fields are added.
         internal Dictionary<MarkupElement, FieldInfo[]> ModelFieldsAtDeclaration { get; } = new();
 
+        /// <summary>The instance shape made by each declared type and model.</summary>
+        internal Dictionary<MarkupElement, TypeShape> DeclaredTypes { get; } = new();
+
         /// <summary>The fields an option can name, with explicitly declared fields first.</summary>
         internal IEnumerable<FieldInfo> ModelOptionFields(MarkupElement model, string option)
         {
@@ -125,6 +128,14 @@ namespace KScript.Language.Analysis
                 }
             }
             return null;
+        }
+
+        /// <summary>Refinement methods precede base extensions. On records, extensions precede declared methods.</summary>
+        internal Symbol DeclaredMethod(TypeShape receiver, string name)
+        {
+            receiver.Methods.TryGetValue(name, out Symbol method);
+            if (method != null && receiver.RefinementBase != null) return method;
+            return ExtensionMethod(receiver, name) ?? method ?? TypeInference.ScopeOf(receiver, name);
         }
 
         /// <summary>Every extension method a value of this shape has.</summary>

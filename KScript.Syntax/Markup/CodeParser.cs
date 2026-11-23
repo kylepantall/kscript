@@ -1451,6 +1451,10 @@ namespace KScript.Syntax.Markup
             {
                 value = ReadRegexSpan();
             }
+            else if (rule == "pattern" && Lookahead("^/") && TryMisplacedPatternAnchor(out TextSpan misplaced))
+            {
+                value = misplaced;
+            }
             else if ((Peek(0) == '\'' || Peek(0) == '"') && rule is "pattern" or "min" or "max")
             {
                 // pattern: '^[a-z]+$' is the pattern itself, without its quotes.
@@ -1503,6 +1507,28 @@ namespace KScript.Syntax.Markup
             "parse" => "$value->split('x')",
             _ => "[a, b]",
         };
+
+        // ^/word$/ is commonly intended as /^word$/. Read through the closing slash here:
+        // the general expression reader would treat it as division and consume the next line.
+        private bool TryMisplacedPatternAnchor(out TextSpan span)
+        {
+            int start = pos++;
+            if (SkipRegex() && (AtStatementEnd() || PeekAfterSpaces(',')))
+            {
+                int closingSlash = text.LastIndexOf('/', pos - 1, pos - start);
+                if (closingSlash > start + 2 && text[closingSlash - 1] == '$' && text[closingSlash - 2] != '\\')
+                {
+                    span = TextSpan.FromBounds(start, pos);
+                    var prefix = new TextSpan(start, 2);
+                    Error(prefix, DiagnosticCodes.MarkupSyntax, "Place the ^ anchor inside the regex literal. Start the pattern with /^.",
+                        new QuickFix("Move ^ inside the opening slash", new TextChange(prefix, "/^")));
+                    return true;
+                }
+            }
+            pos = start;
+            span = default;
+            return false;
+        }
 
         /// <summary>A regex literal such as <c>/^H(?&lt;h&gt;\d+)$/i</c>: the slashes, escapes, a [class] and the flags.</summary>
         private TextSpan ReadRegexSpan()

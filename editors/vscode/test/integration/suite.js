@@ -119,6 +119,17 @@ async function run() {
   const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', doc.uri, new vscode.Position(1, 4));
   assert.ok(hovers.length > 0, 'hover on <let>');
 
+  // Type a space after the comma and accept the field without manually opening the suggest widget.
+  const model = await vscode.workspace.openTextDocument(path.join(folder, 'license.kscript'));
+  const editor = await vscode.window.showTextDocument(model);
+  const nextField = model.lineAt(1).text.indexOf(']');
+  editor.selection = new vscode.Selection(1, nextField, 1, nextField);
+  await vscode.commands.executeCommand('type', { text: ' ' });
+  await waitFor(async () => {
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    return model.lineAt(1).text.includes('[key_hash, owner_id]');
+  }, 'automatic field suggestions after a comma and space');
+
   // An explicit file check works without a kscript.json and returns the CLI result.
   assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', doc.uri), 1, 'the typo fails Check This File');
   const correct = await vscode.workspace.openTextDocument(path.join(folder, 'writes.kscript'));

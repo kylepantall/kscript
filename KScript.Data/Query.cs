@@ -282,7 +282,7 @@ namespace KScript.Data
             if (raw == null) return null;
             if (function == "AVG") return Convert.ToDouble(raw, CultureInfo.InvariantCulture);
             // ->min() and ->max() are a value of the column: a number, a date, text.
-            return Rows.FromDb(raw, c.Column);
+            return Rows.FromDb(raw, c.Column, call.Interpreter);
         }
 
         public bool Exists(CallContext call) => Database.Rows(call.Interpreter, Taking(1).SelectStatement("1"), Table).Count > 0;
@@ -291,7 +291,7 @@ namespace KScript.Data
         {
             SqlColumn c = ColumnNamed(column, " for ->pluck()");
             return Database.Rows(call.Interpreter, SelectStatement(Database.Dialect.Quote(column)), Table)
-                .Select(r => Model == null ? Rows.Plain(r.Values.First()) : Rows.FromDb(r.Values.First(), c.Column)).ToList();
+                .Select(r => Model == null ? Rows.Plain(r.Values.First()) : Rows.FromDb(r.Values.First(), c.Column, call.Interpreter)).ToList();
         }
 
         public object Value(CallContext call, string column) => Taking(1).Pluck(call, column).FirstOrDefault();

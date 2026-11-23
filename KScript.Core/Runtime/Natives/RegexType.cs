@@ -50,7 +50,7 @@ namespace KScript.Runtime
                 (t, c) => Safe(t, () => R(t).Matches(c.Str(0)).Select(match => (object)RegexValue.MatchMap(R(t), match)).ToList()),
                 "/\\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.text)");
             m.Method("replace", "text: string, with", "The text with every match replaced. with is text, where $1 and ${name} are groups, or fn(match) returning text.", S, (t, c) => Safe(t, () =>
-                c.Arg(1) is ICallable f
+                Values.Unwrap(c.Arg(1)) is ICallable f
                     ? R(t).Replace(c.Str(0), match => Values.ToStr(c.Call(f, RegexValue.MatchMap(R(t), match))))
                     : R(t).Replace(c.Str(0), c.Str(1))),
                 "/(\\d{4})-(\\d\\d)/->replace('2026-11', '$2/$1')");

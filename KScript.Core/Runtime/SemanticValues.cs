@@ -34,6 +34,7 @@ namespace KScript.Runtime
         /// </summary>
         public static bool TryConvert(string type, object value, out object result, out string reason)
         {
+            value = Values.Unwrap(value);
             result = null;
             reason = null;
             if (NativeTypeRegistry.Get(type) is not NativeType native) return false;
@@ -51,7 +52,7 @@ namespace KScript.Runtime
 
         /// <summary>Why a native value breaks the options given where its type is used: ip(version: 4), url(schemes: [https]).</summary>
         public static IEnumerable<string> OptionProblems(string type, object value, IReadOnlyDictionary<string, object> options) =>
-            options.Count == 0 || NativeTypeRegistry.Get(type) is not NativeType native ? Enumerable.Empty<string>() : native.OptionProblems(value, options);
+            options.Count == 0 || NativeTypeRegistry.Get(type) is not NativeType native ? Enumerable.Empty<string>() : native.OptionProblems(Values.Unwrap(value), options);
 
         /// <summary>
         /// Why a value doesn't fit, starting "needs ...". The value itself is never shown for a password.

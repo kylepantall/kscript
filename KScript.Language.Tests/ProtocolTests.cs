@@ -292,6 +292,23 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void SpaceRetriggersModelFieldCompletionAfterTheComma()
+        {
+            JsonArray triggers = Initialize()["result"]["capabilities"]["completionProvider"]["triggerCharacters"].AsArray();
+            Assert.Contains(triggers, t => t.GetValue<string>() == " ");
+            const string uri = "file:///work/model.kscript";
+            const string prefix = "model License(hidden: [key_hash, ";
+            Open("import KScript.Data\n" + prefix + "]) {\n  key_hash: string\n  owner_id: string\n}", uri);
+            JsonObject at = At(1, prefix.Length, uri);
+            at["context"] = new JsonObject { ["triggerKind"] = 2, ["triggerCharacter"] = " " };
+            JsonArray items = Request("textDocument/completion", at)["result"]["items"].AsArray();
+            Assert.DoesNotContain(items, i => i["label"].GetValue<string>() == "key_hash");
+            JsonNode owner = Assert.Single(items, i => i["label"].GetValue<string>() == "owner_id");
+            Assert.Equal("owner_id", owner["textEdit"]["newText"].GetValue<string>());
+            Assert.True(JsonNode.DeepEquals(Range(1, prefix.Length, 1, prefix.Length), owner["textEdit"]["range"]));
+        }
+
+        [Fact]
         public void SignatureHelpSendsEachParameterAsItsPlaceInTheLabel()
         {
             Initialize();

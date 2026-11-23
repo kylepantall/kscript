@@ -49,7 +49,7 @@ namespace KScript.Runtime
         /// </summary>
         public static RegexValue From(object pattern, string where)
         {
-            if (pattern is RegexValue regex) return regex;
+            if (Values.Unwrap(pattern) is RegexValue regex) return regex;
             string text = Values.ToStr(pattern);
             if (TryParse(text, out regex, out string reason)) return regex;
             throw new KScriptException($"'{text}' isn't a regular expression for {where}: {reason}.", "Value");

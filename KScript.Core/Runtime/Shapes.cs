@@ -562,10 +562,10 @@ namespace KScript.Runtime
             return Convert(interpreter, value, parsed, what, scope, module);
         }
 
-        internal static object Convert(Interpreter interpreter, object value, TypeRef type, string what, Scope scope, Module module)
+        internal static object Convert(Interpreter interpreter, object value, TypeRef type, string what, Scope scope, Module module, bool normalize = true)
         {
             if (type.IsSimple && type.IsBuiltIn && TypeDefaults.For(module, type.Name) == null) return Values.ConvertTo(value, type.Name, what);
-            var mapper = new ShapeMapper(interpreter, scope, module);
+            var mapper = new ShapeMapper(interpreter, scope, module, normalize);
             object result = mapper.Convert(value, true, type, "$", null, 0);
             mapper.ThrowIfAny(what, type);
             return result;
@@ -578,7 +578,7 @@ namespace KScript.Runtime
         public static object MapAs(Interpreter interpreter, object value, object type, string what, Scope scope = null, Module module = null)
         {
             TypeRef t = TypeArgument(type, scope, module, out Scope s, out Module m);
-            if (t.IsSimple && !t.IsBuiltIn && value is List<object> && Resolve(t, s, m) is RecordType) t = TypeRef.Parse(t.Name + "[]");
+            if (t.IsSimple && !t.IsBuiltIn && Values.Unwrap(value) is List<object> && Resolve(t, s, m) is RecordType) t = TypeRef.Parse(t.Name + "[]");
             return Convert(interpreter, value, t, what, s, m);
         }
 
@@ -596,7 +596,7 @@ namespace KScript.Runtime
         public static List<object> Problems(Interpreter interpreter, object value, RecordType type)
         {
             var mapper = new ShapeMapper(interpreter, type.Closure, type.Module);
-            TypeRef t = TypeRef.Of(type, value is List<object> ? 1 : 0);
+            TypeRef t = TypeRef.Of(type, Values.Unwrap(value) is List<object> ? 1 : 0);
             mapper.Convert(value, true, t, "$", null, 0);
             return mapper.Problems.Select(p => (object)p.ToValue()).ToList();
         }
@@ -850,12 +850,22 @@ namespace KScript.Runtime
                 throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it has rules (min, max, pattern, validate...) rather than fields.", run.Has("fields") ? "fields" : "path", "Syntax");
             if (!baseType.IsBuiltIn && baseType.Args == null && baseType.ListDepth == 0 && run.Scope.TryGet(baseType.Name, out object found) && found is RefinedType inner) baseType = TypeRef.Of(inner);
             TypeRules rules = TypeRules.Read(run.Element, run);
+            Dictionary<string, MarkupElement> methods = null;
             foreach (MarkupElement e in run.ChildElements)
             {
+                if (e.Name == "fn")
+                {
+                    string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
+                    if (string.IsNullOrEmpty(method)) throw run.Error("A method needs a name.", null, "Syntax");
+                    methods ??= new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
+                    methods[method] = e;
+                    continue;
+                }
                 if (!rules.TryAddChild(e, run, allowNormalize: true))
-                    throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize>, not <{e.Name}>.", null, "Syntax");
+                    throw run.Error(CodeArguments.NormalizeLambdaProblem(e, run.Module.IsCode)
+                        ?? Wording.Of($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize> rules or <fn> methods, not <{e.Name}>."), null, "Syntax");
             }
-            var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module);
+            var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module, methods);
             if (rules.ProblemFor(type.Root(), $"<type name=\"{name}\">") is string problem) throw run.Error(problem, null, "Syntax");
             return type;
         }
@@ -1216,12 +1226,14 @@ namespace KScript.Runtime
         private readonly Interpreter interpreter;
         private readonly Scope scope;
         private readonly Module module;
+        private readonly bool normalize;
 
-        public ShapeMapper(Interpreter interpreter, Scope scope, Module module)
+        public ShapeMapper(Interpreter interpreter, Scope scope, Module module, bool normalize = true)
         {
             this.interpreter = interpreter;
             this.scope = scope;
             this.module = module;
+            this.normalize = normalize;
         }
 
         public List<ShapeProblem> Problems { get; } = new List<ShapeProblem>();
@@ -1266,7 +1278,7 @@ namespace KScript.Runtime
             }
             if (type.ListDepth > 0)
             {
-                if (value is not List<object> list)
+                if (Values.Unwrap(value) is not List<object> list)
                 {
                     Problem(path, field, $"needs a list of {type.Item}, but got {Values.Describe(value)}.");
                     return null;
@@ -1286,6 +1298,7 @@ namespace KScript.Runtime
             }
             if (type.IsBuiltIn)
             {
+                if (type.Name != "any") value = Values.Unwrap(value);
                 // Data that should be text may be a number or a bool, but not a map or a list.
                 if (type.Name == "string" && (value is Dictionary<string, object> || value is List<object>))
                 {
@@ -1310,6 +1323,8 @@ namespace KScript.Runtime
             }
 
             object resolved = type.Inline ?? Shapes.Resolve(type, scope, module);
+            if (resolved is RefinedType refined) return MapRefined(value, refined, path, field, depth);
+            value = Values.Unwrap(value);
             if (resolved is EnumType e)
             {
                 string match = value is string s ? e.Names.FirstOrDefault(n => string.Equals(n, s.Trim(), StringComparison.OrdinalIgnoreCase)) : null;
@@ -1318,7 +1333,6 @@ namespace KScript.Runtime
                 Problem(path, field, $"must be a {e.Name} ({string.Join(", ", e.Names)}), but got {Values.Describe(value)}." + (close != null ? $" Did you mean {close}?" : string.Empty));
                 return null;
             }
-            if (resolved is RefinedType refined) return MapRefined(value, refined, path, field, depth);
             return MapRecord(value, (RecordType)resolved, path, depth);
         }
 
@@ -1328,24 +1342,40 @@ namespace KScript.Runtime
         /// </summary>
         private object MapRefined(object value, RefinedType type, string path, string field, int depth)
         {
-            var inner = new ShapeMapper(interpreter, type.Closure, type.Module);
-            object result = inner.Convert(value, true, type.Base, path, field, depth + 1);
-            if (inner.Problems.Count == 0 && type.Rules.Normalize != null)
+            bool normalizeValue = normalize;
+            if (value is RefinedValue typed)
+            {
+                if (typed.Type.IsA(type))
+                {
+                    // The existing value is canonical. Recheck its rules and retain its method overrides.
+                    type = typed.Type;
+                    value = typed.Value;
+                    normalizeValue = false;
+                }
+                else if (!type.IsA(typed.Type)) value = typed.Value;
+            }
+            var inner = new ShapeMapper(interpreter, type.Closure, type.Module, normalizeValue);
+            object mapped = inner.Convert(value, true, type.Base, path, field, depth + 1);
+            if (normalizeValue && inner.Problems.Count == 0 && type.Rules.Normalize != null)
             {
                 Scope s = type.Closure.Child();
-                s.Declare("value", result);
-                result = inner.Convert(interpreter.EvaluateText(type.Rules.Normalize, s, type.Module), true, type.Base, path, field, depth + 1);
+                s.Declare("value", Values.Unwrap(mapped));
+                mapped = inner.Convert(interpreter.EvaluateText(type.Rules.Normalize, s, type.Module), true, type.Base, path, field, depth + 1);
             }
             if (inner.Problems.Count > 0)
             {
                 Problems.AddRange(inner.Problems);
                 return null;
             }
+            object result = Values.Unwrap(mapped);
             int before = Problems.Count;
             foreach (string problem in type.Rules.Check(interpreter, result, type.Closure, type.Module, item => BaseItem(item, type, path, field, depth)))
                 Problem(path, field, problem + ".");
             if (result is PasswordValue password && type.Rules.Options.TryGetValue("algorithm", out object algorithm)) result = password.WithAlgorithm(Values.ToStr(algorithm));
-            return Problems.Count == before ? result : null;
+            if (Problems.Count != before) return null;
+            if (type.HasMethods) return new RefinedValue(type, result);
+            // A field may reference a type declared later in the same module.
+            return mapped is RefinedValue inherited ? new RefinedValue(inherited.Type, result) : result;
         }
 
         /// <summary>An item of one_of or not, converted to the base type so it compares like the value.</summary>
@@ -1372,7 +1402,7 @@ namespace KScript.Runtime
 
             var record = new Record(type);
             var used = new HashSet<string>(StringComparer.Ordinal);
-            var mapper = new ShapeMapper(interpreter, type.Closure, type.Module);
+            var mapper = new ShapeMapper(interpreter, type.Closure, type.Module, normalize);
             foreach (FieldDefinition f in type.Fields.Where(f => !f.Computed))
             {
                 bool found = TryRead(source, f.Path, out object raw, out string at, out string key);

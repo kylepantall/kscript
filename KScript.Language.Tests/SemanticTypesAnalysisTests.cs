@@ -148,6 +148,94 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
+        [InlineData("value")]
+        [InlineData("$value")]
+        public void RefinementMemberMistakesPointAtTheirOwnSource(string parameter)
+        {
+            string code = "type PasskeySessionKey with [string] {\n"
+                + "  min: 8\n"
+                + $"  normalize: fn({parameter}) => $value->trim()\n"
+                + "  pattern: ^/passkey_[a-zA-Z]+$/\n"
+                + "  fn break() { return $value->count() }\n}";
+            DocumentAnalysis analysis = Code(code);
+            Assert.Collection(analysis.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).OrderBy(d => d.Span.Start),
+                d => { Assert.Equal($"fn({parameter})", analysis.Source[d.Span]); Assert.Contains("normalize: $value->trim()", d.Message); },
+                d => { Assert.Equal("^/", analysis.Source[d.Span]); Assert.Equal("/^", Assert.Single(Assert.Single(d.Fixes).Changes).NewText); });
+        }
+
+        [Fact]
+        public void RecordFieldsNamedNormalizeAndRecordMethodsStillWork()
+        {
+            const string code = "type Key { text: string; normalize: fn = fn(value) => $value->trim(); fn size() => $this.text->count() }\n"
+                + "key = Key({ text: 'abc' })\necho $key->size()";
+            AssertClean(WithoutUnused(Code(code)));
+        }
+
+        [Fact]
+        public void RefinedMethodsCompleteAndNavigateThroughAnImportedBase()
+        {
+            string path = Path.GetFullPath("key.kscript");
+            var service = new LanguageService(files: new FakeFiles(new Dictionary<string, string> {
+                [path] = "type Key with [string] { fn custom_size() => $value->count() }"
+            }));
+            (string text, int offset) = WithCaret("""
+                import "key.kscript"
+                type SessionKey with [Key] { fn twice() => $this->custom_size() * 2 }
+                key: SessionKey = 'abc'
+                echo $key->cus‸tom_size()
+                echo $key->twice()
+                """);
+            DocumentAnalysis analysis = service.Analyze(text, Path.GetFullPath("main.kscript"));
+            AssertClean(WithoutUnused(analysis));
+            var items = service.GetCompletions(analysis, offset);
+            Assert.Contains(items, i => i.Label == "custom_size");
+            Assert.Contains(items, i => i.Label == "twice");
+            Assert.Equal(path, Assert.Single(service.GetDefinition(analysis, offset)).Path);
+        }
+
+        [Theory]
+        [InlineData("type Key with [string] { fn own_size() => $value->count() }\nplain = 'abc'\necho $plain->own_size()", "Unknown method ->own_size()")]
+        [InlineData("type Key with [string] { fn own_size() => $value->count() }\nmixed = [Key('x'), 'y']\necho $mixed[1]->own_size()", "Unknown method ->own_size()")]
+        [InlineData("type Key with [string] { fn own_size() => $value->own_size() }", "Unknown method ->own_size()")]
+        [InlineData("type Key with [string] { fn prefix(len: int) => $value->slice(0, $len) }\necho Key('abc')->prefix()", "takes 1 argument")]
+        public void RefinedMethodsBelongToTheTypedReceiver(string code, string message) =>
+            Assert.Contains(Code(code).Diagnostics, d => d.Message.Contains(message));
+
+        [Fact]
+        public void ARefinementOfAnEnumOffersItsOwnAndItsBaseMethods()
+        {
+            var (text, at) = WithCaret("enum Color { red, blue }\ntype Shade with [Color] { fn label() => $value->upper() }\necho Shade('red')->la‸bel()");
+            DocumentAnalysis analysis = Code(text);
+            AssertClean(analysis);
+            var items = Service.GetCompletions(analysis, at);
+            Assert.Contains(items, i => i.Label == "label");
+            Assert.Contains(items, i => i.Label == "upper");
+        }
+
+        [Fact]
+        public void RefinedMethodSignaturesUseTheDeclaringType()
+        {
+            var (text, at) = WithCaret("type Key with [string] { fn prefix(len: int) => $value->slice(0, $len) }\necho Key('abc')->prefix(‸2)");
+            DocumentAnalysis analysis = Code(text);
+            AssertClean(analysis);
+            var signature = Assert.Single(Service.GetSignatureHelp(analysis, at).Signatures);
+            Assert.StartsWith("Key->prefix(len: int)", signature.Label);
+        }
+
+        [Fact]
+        public void RefinedListMethodsKeepTheTypeOfEachReturnedItem()
+        {
+            AssertClean(Code("""
+                type Release with [semver] { fn label() => $value->to_string() }
+                type Releases with [Release[]] { fn newest() => $value->latest() }
+                versions = Releases(['1.0.0'])
+                echo $versions->newest()->label()
+                echo $versions->only(semver)->latest()->label()
+                for v in $versions { echo $v->label() }
+                """));
+        }
+
+        [Theory]
         [InlineData("type User { a: int }\ntype A with User {\n  b: int\n}\nx = A({ a: 1, b: 2 })\necho $x.a")]
         [InlineData("type T {\n  min\n  max: int(\n}")]
         [InlineData("msg = 'too small'\ntype A with [int] {\n  validate: $value > 0, $msg\n}\nx: A = 3\necho $x")]

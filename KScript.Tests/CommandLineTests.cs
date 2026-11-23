@@ -163,6 +163,10 @@ public sealed class CommandLineTests : IDisposable
         string script = Write("ok.ks.xml", "<kscript>\n  <echo>hi</echo>\n</kscript>\n");
         Assert.Contains("  kscript update ", Kscript("update", "--help").Out);
         Assert.Contains("kscript ide install", Kscript("ide", "help").Out);
+        Assert.Contains("kscript lib add <owner/repo|github-url>", Kscript("lib", "--help").Out);
+        var missingLibrary = Kscript("lib", "add");
+        Assert.Equal(ExitCodes.Usage, missingLibrary.Code);
+        Assert.Contains("kscript lib add", missingLibrary.Err);
         Assert.Contains("  kscript compile ", Kscript("compile", "--help").Out);
         Assert.Contains("  kscript docs ", Kscript("docs", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnings-as-errors").Out);

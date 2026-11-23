@@ -104,6 +104,43 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
+        [InlineData("hidden: ‸", "[owner_id]")]
+        [InlineData("hidden: ‸[]", "[owner_id]")]
+        [InlineData("hidden: [key_hash,  ‸]", "[key_hash,  owner_id]")]
+        [InlineData("hidden: [key_hash, ‸owner_id]", "[key_hash, owner_id]")]
+        public void PickingAFieldAfterASpaceKeepsTheListSyntax(string option, string value)
+        {
+            string source = License.Replace("hidden: [FIELDS]", option);
+            var item = Assert.Single(Complete(source, " "), i => i.Label == "owner_id");
+            string text = source.Replace("‸", "");
+            string edited = text.Remove(item.ReplaceSpan.Start, item.ReplaceSpan.Length)
+                .Insert(item.ReplaceSpan.Start, item.InsertText ?? item.Label);
+            Assert.Equal(License.Replace("[FIELDS]", value), edited);
+        }
+
+        [Theory]
+        [InlineData("hidden: [‸]", "[", "key_hash")]
+        [InlineData("hidden: [key_hash,‸]", ",", " owner_id")]
+        [InlineData("hidden: [key_hash, ‸]", " ", "owner_id")]
+        public void LegacyModelSettingLinesSupportTheSameTypingTriggers(string line, string trigger, string inserted)
+        {
+            var items = Complete(Model("  " + line + "\n  key_hash: string\n  owner_id: string"), trigger);
+            Assert.Contains(items, i => (i.InsertText ?? i.Label) == inserted);
+        }
+
+        [Theory]
+        [InlineData("x = [1, ‸2]")]
+        [InlineData("echo ‸")]
+        [InlineData("model Note {\n  ‸\n}")]
+        [InlineData("model Note(hidden: [title] ‸) { title: string }")]
+        [InlineData("model Note(hidden: ‸[title]) { title: string }")]
+        [InlineData("model Note(hidden: ‸\n  [title]) { title: string }")]
+        public void SpacesOutsideAnOptionCompletionStayQuiet(string source)
+        {
+            Assert.Empty(Complete(source, " "));
+        }
+
+        [Theory]
         [InlineData("key: 'ke‸y_hash'")]
         [InlineData("key: \"ke‸y_hash\"")]
         public void AKeyOffersDeclaredFieldsAndReplacesJustTheName(string key)
@@ -163,6 +200,16 @@ namespace KScript.Language.Tests
             Assert.StartsWith("validate: ", refined.Single(i => i.Label == "validate").InsertText);
             Assert.Contains("largest value", refined.Single(i => i.Label == "max").Documentation);
             Assert.Contains("Cleans up a value", refined.Single(i => i.Label == "normalize").Documentation);
+        }
+
+        [Fact]
+        public void InheritedTypesOfferMembersOfTheirResolvedKind()
+        {
+            Assert.Equal(new[] { "pattern", "parse", "validate", "fn" },
+                Labels("type Base { title: string }\ntype Note with [Base] {\n  ‸\n}"));
+            var refined = Labels("type Key with [string] {}\ntype LoginKey with [Key] {\n  ‸\n}");
+            Assert.Contains("normalize", refined);
+            Assert.Contains("fn", refined);
         }
 
         [Fact]

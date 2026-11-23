@@ -76,6 +76,18 @@ namespace KScript.Language.Features
                 });
             }
 
+            void AddMethods(TypeShape receiver, string name)
+            {
+                if (analysis.DeclaredMethod(receiver, name) is Symbol declaration)
+                {
+                    AddFunction(declaration);
+                    return;
+                }
+                string type = new TypeInference(Catalog, analysis).ReceiverType(name, receiver);
+                foreach (CallableInfo method in Catalog.GetMethods(name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
+                    AddCallable(method);
+            }
+
             // @accounts.sign_in(...) or math.sqrt(...): the imported script's function, or the package's command.
             void AddAliasMember(string aliasName, string memberName)
             {
@@ -123,12 +135,7 @@ namespace KScript.Language.Features
 
                 case MethodCallNode m:
                 {
-                    TypeShape receiver = InferAt(analysis, region, m.Target);
-                    string type = new TypeInference(Catalog, analysis).ReceiverType(m.Name, receiver);
-                    foreach (CallableInfo method in Catalog.GetMethods(m.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
-                    {
-                        AddCallable(method);
-                    }
+                    AddMethods(InferAt(analysis, region, m.Target), m.Name);
                     break;
                 }
 
@@ -144,12 +151,7 @@ namespace KScript.Language.Features
                     else if (pipe != null)
                     {
                         piped = 0; // A method's receiver isn't one of its parameters.
-                        TypeShape receiver = InferAt(analysis, region, pipe.Left);
-                        string type = new TypeInference(Catalog, analysis).ReceiverType(id.Name, receiver);
-                        foreach (CallableInfo method in Catalog.GetMethods(id.Name, type).Where(x => KType.AcceptsMethod(x.ReceiverType, x.Name, type)))
-                        {
-                            AddCallable(method);
-                        }
+                        AddMethods(InferAt(analysis, region, pipe.Left), id.Name);
                     }
                     break;
                 }

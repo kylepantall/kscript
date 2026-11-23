@@ -9,7 +9,7 @@ namespace KScript.Language.Analysis
     public sealed class TypeInference
     {
         private static readonly HashSet<string> SameShapeListMethods = new HashSet<string> { "filter", "reject", "each", "sort", "sort_by", "reverse", "slice", "unique", "push", "take", "skip", "only", "without" };
-        private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max_by", "min_by", "pop" };
+        private static readonly HashSet<string> ItemListMethods = new HashSet<string> { "first", "last", "find", "max", "min", "max_by", "min_by", "pop", "latest" };
 
         private readonly LanguageCatalog catalog;
         private readonly DocumentAnalysis result;
@@ -56,7 +56,11 @@ namespace KScript.Language.Analysis
                     {
                         TypeShape first = Infer(list.Items[0], region);
                         IEnumerable<TypeShape> rest = list.Items.Skip(1).Select(item => Infer(item, region));
-                        if (first.Type == KType.Map)
+                        if (first.RefinementBase != null)
+                        {
+                            shape.Element = Analyzer.Unify(rest.Prepend(first).ToList());
+                        }
+                        else if (first.Type == KType.Map)
                         {
                             TypeShape merged = new TypeShape(KType.Map);
                             foreach (TypeShape item in rest.Prepend(first))
@@ -119,7 +123,8 @@ namespace KScript.Language.Analysis
                     TypeShape instance = made.Shape.Instance;
                     if (instance == null) return TypeShape.Unknown;
                     ArgumentNode first = call.Arguments.FirstOrDefault(a => a.Name == null);
-                    return first != null && Infer(first.Value, region).Type == KType.List && instance.Type == KType.Map ? new TypeShape(KType.List) { Element = instance } : instance;
+                    return first != null && Infer(first.Value, region).Type == KType.List && instance.Type == KType.Map && instance.RefinementBase == null
+                        ? new TypeShape(KType.List) { Element = instance } : instance;
                 }
 
                 case IdentifierNode id when TypeSymbolNamed(id, region) is Symbol named:
@@ -583,7 +588,7 @@ namespace KScript.Language.Analysis
             {
                 if (SameShapeListMethods.Contains(method.Name))
                 {
-                    return receiver;
+                    return receiver.RefinementBase ?? receiver;
                 }
                 if (ItemListMethods.Contains(method.Name))
                 {
@@ -621,8 +626,7 @@ namespace KScript.Language.Analysis
 
         private TypeShape InferMethod(string name, TypeShape receiver, IReadOnlyList<ArgumentNode> args, ExpressionRegion region)
         {
-            // A record's relation method (->posts()) or a model's scope: a query of the model's records.
-            if ((receiver.Methods.TryGetValue(name, out Symbol own) || (own = ScopeOf(receiver, name)) != null) && own.ReturnShape.Type == KType.Query)
+            if (result.DeclaredMethod(receiver, name) is Symbol own)
             {
                 return own.ReturnShape;
             }
@@ -640,12 +644,12 @@ namespace KScript.Language.Analysis
                     if (KScript.Runtime.ListFilters.IsTypeName(elementType))
                     {
                         TypeShape element = TypeNamed(elementType, region.Source.ToSource(args[0].Value.Span.Start)) ?? new TypeShape(elementType);
-                        return new TypeShape(KType.List) { Element = element };
+                        return new TypeShape(KType.List) { Element = receiver.Element?.Type == element.Type ? receiver.Element : element };
                     }
                 }
                 if (SameShapeListMethods.Contains(name))
                 {
-                    return receiver;
+                    return receiver.RefinementBase ?? receiver;
                 }
                 if (ItemListMethods.Contains(name))
                 {

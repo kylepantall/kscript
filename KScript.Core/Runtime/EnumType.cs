@@ -20,6 +20,7 @@ namespace KScript.Runtime
         /// <summary>The enum value <paramref name="value"/> names, or an error naming the allowed values.</summary>
         public object Check(object value, string what)
         {
+            value = KScript.Runtime.Values.Unwrap(value);
             if (value is string s)
             {
                 string match = Keys.FirstOrDefault(k => string.Equals(k, s.Trim(), StringComparison.OrdinalIgnoreCase));

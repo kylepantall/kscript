@@ -134,6 +134,14 @@ import "lib/strings.kscript" // your own functions
 
 If you use something without importing its package, the error and the editor both tell you which import to add. The editor can add it for you.
 
+Install a source library from a public GitHub repository with `kscript lib add owner/repo` or its HTTPS URL. A GitHub folder URL selects one library from a larger repository. This command installs Isolink Connect.
+
+```sh
+kscript lib add https://github.com/kylepantall/kscript/tree/master/libraries/isolink-connect
+```
+
+With the default layout, a script at the project root imports it with `import "lib/isolink-connect/index.kscript" as connect`. The command prints the import path and records the exact commit it installed. See [Installing source libraries](docs/projects.md#installing-source-libraries) and the [Isolink Connect library](libraries/isolink-connect/README.md).
+
 ## Desktop apps, still just KScript
 
 After `import KScript.UI`, a `Window { }` block opens a native window on macOS, Windows or Linux. It works like `<live>`: the variables hold the state, the rest is the layout, and the window is redrawn after every handler.

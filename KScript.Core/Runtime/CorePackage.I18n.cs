@@ -17,7 +17,7 @@ namespace KScript.Runtime
                 KType.String, c =>
                 {
                     Translator tr = TranslatorFor(c.Interpreter, c.Module);
-                    object values = c.Arg(1, "values");
+                    object values = Values.Unwrap(c.Arg(1, "values"));
                     if (values != null && values is not Dictionary<string, object>)
                         throw new KScriptException($"@t() values should be a map, such as {{ name: $user.name, count: 3 }}, but got {Values.Describe(values)}.", "Argument");
                     return tr.Translate(c.Str(0), values as Dictionary<string, object>, c.Arg(2, "locale") is object l ? Values.ToStr(l) : null);
@@ -52,7 +52,7 @@ namespace KScript.Runtime
                 if (run.Has("set")) tr.Locale = run.Template("set");
                 else if (run.Has("from"))
                 {
-                    object from = run.Eval("from");
+                    object from = Values.Unwrap(run.Eval("from"));
                     IEnumerable<string> wishes = from is List<object> list ? list.Select(Values.ToStr) : Translator.AcceptLanguage(Values.ToStr(from));
                     tr.Locale = tr.Best(wishes) ?? tr.Default;
                 }
@@ -87,6 +87,7 @@ namespace KScript.Runtime
 
         private static DateTime DateArg(object value)
         {
+            value = Values.Unwrap(value);
             if (value is DateTime d) return d;
             if (value is string s && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out DateTime parsed)) return parsed;
             throw new KScriptException($"@format_date() needs a date, such as @now() or '2026-11-20', but got {Values.Describe(value)}.", "Argument");

@@ -28,7 +28,10 @@ namespace KScript.Runtime
     /// </summary>
     public static class Values
     {
-        public static string TypeOf(object value) => value switch
+        /// <summary>The underlying value for operations on the refinement's base type.</summary>
+        public static object Unwrap(object value) => value is RefinedValue refined ? refined.Value : value;
+
+        public static string TypeOf(object value) => Unwrap(value) switch
         {
             null => "null",
             bool => "bool",
@@ -39,7 +42,7 @@ namespace KScript.Runtime
             Dictionary<string, object> => "map",
             ICallable => "fn",
             IKObject o => o.TypeName,
-            _ => value.GetType().Name,
+            var other => other.GetType().Name,
         };
 
         /// <summary>Converts a value from .NET code (ints, arrays, dictionaries, JSON) into a KScript value.</summary>
@@ -48,7 +51,7 @@ namespace KScript.Runtime
             switch (value)
             {
                 case null: return null;
-                case string or bool or double or DateTime or ICallable or IKObject: return value;
+                case string or bool or double or DateTime or ICallable or IKObject or RefinedValue: return value;
                 case int i: return (double)i;
                 case long l: return (double)l;
                 case float f: return (double)f;
@@ -127,6 +130,7 @@ namespace KScript.Runtime
         private static void WriteJson(Utf8JsonWriter w, object value, int depth)
         {
             if (depth > 200) throw new KScriptException("The value is nested too deeply (or contains itself) to turn into JSON.");
+            value = Unwrap(value);
             switch (value)
             {
                 case null: w.WriteNullValue(); break;
@@ -160,7 +164,7 @@ namespace KScript.Runtime
 
         #region Text and numbers
 
-        public static string ToStr(object value) => value switch
+        public static string ToStr(object value) => Unwrap(value) switch
         {
             null => string.Empty,
             string s => s,
@@ -168,10 +172,10 @@ namespace KScript.Runtime
             double d => FormatNumber(d),
             DateTime dt => dt.TimeOfDay == TimeSpan.Zero ? dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : dt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
             List<object> list => string.Join(", ", list.Select(ToStr)),
-            Dictionary<string, object> => ToJson(value),
+            Dictionary<string, object> map => ToJson(map),
             IKObject o => o.ToText(),
             ICallable fn => fn.ToString(),
-            _ => value.ToString(),
+            var other => other.ToString(),
         };
 
         public static string FormatNumber(double d)
@@ -181,10 +185,10 @@ namespace KScript.Runtime
             return d.ToString("0.###############", CultureInfo.InvariantCulture);
         }
 
-        public static bool Truthy(object value) => value switch
+        public static bool Truthy(object value) => Unwrap(value) switch
         {
             null => false,
-            IKObject when NativeTypeRegistry.TryFalsy(value, out bool falsy) => !falsy,
+            IKObject native when NativeTypeRegistry.TryFalsy(native, out bool falsy) => !falsy,
             bool b => b,
             double d => d != 0 && !double.IsNaN(d),
             string s => s.Length > 0,
@@ -195,7 +199,7 @@ namespace KScript.Runtime
 
         public static bool TryNumber(object value, out double number)
         {
-            switch (value)
+            switch (Unwrap(value))
             {
                 case double d: number = d; return true;
                 case string s when s.Trim().Length > 0 && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
@@ -220,7 +224,7 @@ namespace KScript.Runtime
             _ => null,
         };
 
-        public static string Describe(object value) => value switch
+        public static string Describe(object value) => Unwrap(value) switch
         {
             null => "null",
             string s => $"the string '{Shorten(s)}'",
@@ -237,6 +241,8 @@ namespace KScript.Runtime
         /// <summary>Strict equality (<c>===</c>): same type and same value. Lists and maps compare deeply.</summary>
         public static bool StrictEquals(object a, object b)
         {
+            a = Unwrap(a);
+            b = Unwrap(b);
             if (a == null || b == null) return a == null && b == null;
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             // A record (a map made by a <type>) equals a plain map with the same keys and values.
@@ -262,6 +268,8 @@ namespace KScript.Runtime
         /// </summary>
         public static bool LooseEquals(object a, object b)
         {
+            a = Unwrap(a);
+            b = Unwrap(b);
             if (a == null || b == null) return a == null && b == null;
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (NativeTypeRegistry.TryEquals(a, b, out bool same)) return same;
@@ -277,6 +285,8 @@ namespace KScript.Runtime
 
         public static int Compare(object a, object b, string op)
         {
+            a = Unwrap(a);
+            b = Unwrap(b);
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (NativeTypeRegistry.TryCompare(a, b, op, out int native)) return native;
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
@@ -308,11 +318,11 @@ namespace KScript.Runtime
         /// <summary>Converts a value to a declared type, or fails with a clear message.</summary>
         public static object ConvertTo(object value, string type, string what)
         {
-            switch ((type ?? "any").Trim().ToLowerInvariant())
+            string name = (type ?? "any").Trim().ToLowerInvariant();
+            if (name is "any" or "") return value;
+            value = Unwrap(value);
+            switch (name)
             {
-                case "any":
-                case "":
-                    return value;
                 case "string":
                     return value is string ? value : ToStr(value);
                 case "int":

@@ -289,7 +289,7 @@ A visible refinement of `string`, or of a native type written as a word (`domain
 type PasskeySessionKey with [string] {
   min: 8
   normalize: $value->trim()
-  pattern: /passkey_[a-zA-Z]+$/
+  pattern: /^passkey_[a-zA-Z]+$/
 }
 
 key = passkey_abc
@@ -467,7 +467,7 @@ Write each rule on its own line, or separate rules on one line with a semicolon.
 | `one_of` | The value must be one of these. |
 | `not` | The value must not be one of these. |
 | `validate: test, 'message'` | Any expression, with the value as `$value`. Several can be given; each one that fails adds its message. |
-| `normalize: expression` | Changes the value before the rules check it, with the value as `$value`. |
+| `normalize: expression` | Evaluates the expression with `$value` already in scope, for example `normalize: $value->trim()`. The result is the value the rules check. |
 
 A value is converted to the base type first, then normalized, then checked against the rules. One that fails reports every rule it broke. Rules on a field work the same way: `title: string(min: 1)`.
 
@@ -482,12 +482,22 @@ type PasskeySessionKey with [string] {
   min: 8
   normalize: $value->trim()
   pattern: /^passkey_[a-zA-Z]+$/
+  fn length() {
+    return $value->count()
+  }
 }
+
+fn key_length(key: PasskeySessionKey) => $key->count()
 
 kind = 'login'
 session_key = "passkey_{$kind}" as PasskeySessionKey
 echo $session_key  // passkey_login
+echo $session_key->count()  // 13
+echo $session_key->length()  // 13
+echo @key_length($session_key)  // 13
 ```
+
+The opening slash comes before the `^` anchor in a regex literal. A `PasskeySessionKey` supports the methods of `string` and its own methods. Inside a refinement method, `$value` is the underlying value and `$this` is the refined receiver, so `$this->length()` can call another method on the type. A refinement inherits methods from its base and can replace one by declaring the same name. Use `$value` to call the underlying built-in method. You can also pass the key to a typed function such as `key_length`. In a record method, `$this.field` reads a field of the record.
 
 The target can also be a built-in type (`$text as int`), a type with local rules (`$name as string(min: 2)`), or a list (`$rows as Repo[]`). An optional target such as `PasskeySessionKey?` accepts null and validates every non-null value. Parenthesize an arithmetic expression to convert its result, as in `($a + $b) as int`.
 
@@ -496,10 +506,10 @@ The target can also be a built-in type (`$text as int`), a type with local rules
 `kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code:
 
 ```sh
-kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"
+kscript make native Sku --pattern '/^[A-Z]{3}-\d{4}$/' --normalize '$value->trim()->upper()'
 kscript make native Percent --base int --min 0 --max 100
 kscript make native Username --base handle --max 16 --not @admin,@root
-kscript make native CompanySite --base url --validate "$value.host->ends_with('example.com'), 'Use a company site'"
+kscript make native CompanySite --base url --validate "\$value.host->ends_with('example.com'), 'Use a company site'"
 ```
 
 The first one writes `natives/sku.kscript`:
@@ -520,7 +530,7 @@ sku: Sku = abc-1234   // ABC-1234
 fn price(of: Sku) => 10
 ```
 
-`--base` is the type it is made from: `string` by default, any native type (`url`, `domain`, `country`, ...) or one of your own. The rules are `--pattern`, `--min`, `--max`, `--one-of a,b`, `--not a,b`, `--normalize` and `--validate "test, 'message'"`. Add methods with `fn` in the body, as in any type. In an XML project, the file is a `<type>` element in `natives/sku.ks.xml`.
+`--base` selects the base type, which defaults to `string`. It accepts native types such as `url`, `domain` and `country`, or another refinement. The rules are `--pattern`, `--min`, `--max`, `--one-of a,b`, `--not a,b`, `--normalize` and `--validate "test, 'message'"`. Declare methods with `fn` in the type body and call them with `->`. In an XML project, the file is a `<type>` element in `natives/sku.ks.xml`.
 
 The types and enums in every file under `natives/` (subfolders too) are the project's own native types. `"natives"` in [kscript.json](projects.md#project-settings-kscriptjson) names other folders or globs, and `kscript make native` writes to the first folder it lists:
 

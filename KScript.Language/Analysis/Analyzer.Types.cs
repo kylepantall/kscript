@@ -133,7 +133,7 @@ namespace KScript.Language.Analysis
                 HashSet<Scope> topLevel = new HashSet<Scope>(other.RootScope.Children.Where(c => other.Markup.RootElements.Any(r => r.ContentSpan.Equals(c.Span)))) { other.RootScope };
                 foreach (Symbol s in other.Symbols.Where(s => s.SourcePath == null && s.DeclaringElement != null))
                 {
-                    if (s.Kind == SymbolKind.Function)
+                    if (s.Kind == SymbolKind.Function && topLevel.Any(scope => scope.Symbols.Any(r => r.Symbol == s)))
                     {
                         exports.TryAdd(s.Name, (SymbolKind.Function, s.ReturnShape));
                     }
@@ -203,6 +203,10 @@ namespace KScript.Language.Analysis
             if (known.Any(s => s.Type != first.Type))
             {
                 return TypeShape.Unknown;
+            }
+            if (first.RefinementBase != null)
+            {
+                return known.All(s => s.Name == first.Name) ? first : first.RefinementBase;
             }
             if (first.Type != KType.Map || known.Count == 1)
             {

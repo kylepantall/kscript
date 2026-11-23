@@ -261,7 +261,7 @@ namespace KScript.Runtime
         /// <summary>Puts values into {name} placeholders. Numbers are formatted for the locale.</summary>
         private static string Fill(string text, Dictionary<string, object> values, string locale) =>
             Placeholder.Replace(text, m => ConfigLoader.TryGet(values, m.Groups[1].Value, out object v) && v != null
-                ? (v is double d ? Formats.Number(d, null, locale) : Values.ToStr(v))
+                ? (Values.Unwrap(v) is double d ? Formats.Number(d, null, locale) : Values.ToStr(v))
                 : m.Value);
 
         /// <summary>

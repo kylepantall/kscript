@@ -256,7 +256,7 @@ namespace KScript.LanguageServer
                 ["textDocumentSync"] = new JsonObject { ["openClose"] = true, ["change"] = 2, ["save"] = true },
                 ["completionProvider"] = new JsonObject
                 {
-                    ["triggerCharacters"] = new JsonArray("<", "$", "@", ">", ".", "\"", "'", "/", "{", "(", ",", "["),
+                    ["triggerCharacters"] = new JsonArray("<", "$", "@", ">", ".", "\"", "'", "/", "{", "(", ",", "[", " "),
                     ["resolveProvider"] = false,
                 },
                 ["hoverProvider"] = true,

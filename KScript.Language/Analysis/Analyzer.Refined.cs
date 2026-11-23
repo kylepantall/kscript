@@ -242,9 +242,13 @@ namespace KScript.Language.Analysis
             {
                 return BuiltInTypeName(name);
             }
+            if (IsEnumName(name)) return KType.String;
             MarkupElement inner = TypeElementNamed(name);
             return inner != null && inner != type ? RefinedRoot(inner, depth + 1) : null;
         }
+
+        private bool IsEnumName(string name) => result.RootScope.Lookup(name, int.MaxValue)?.EnumValues != null ||
+            result.Markup.DescendantElements().Any(e => IsKScriptElementName(e, "enum") && e.GetAttributeValue("name")?.Trim() == name);
 
         /// <summary>The refinement types from <paramref name="type"/> down to its root, outermost first.</summary>
         private List<MarkupElement> RefinementChain(MarkupElement type)

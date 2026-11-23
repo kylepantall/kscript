@@ -30,6 +30,8 @@ namespace KScript.Data
 
         public FieldDefinition Field { get; init; }
 
+        public RefinedType Refinement { get; init; }
+
         public ColumnKind Kind { get; init; }
 
         public bool Nullable { get; init; }
@@ -249,6 +251,7 @@ namespace KScript.Data
             int? length = type.Args != null && type.Args.TryGetValue("max", out object max) && max is double d ? (int)d : null;
             ColumnKind kind;
             IReadOnlyList<string> words = null;
+            RefinedType refinement = null;
             string name = b.Inline == null && b.IsBuiltIn ? b.Name.ToLowerInvariant() : null;
             if (type.ListDepth > 0)
             {
@@ -267,7 +270,8 @@ namespace KScript.Data
                         kind = ColumnKind.Json;
                         break;
                     default:
-                        name = ((RefinedType)resolved).Root().ToLowerInvariant();
+                        refinement = (RefinedType)resolved;
+                        name = refinement.Root().ToLowerInvariant();
                         kind = KindOf(name);
                         break;
                 }
@@ -284,9 +288,9 @@ namespace KScript.Data
             {
                 // A belongs-to column holds the other model's key, so it is stored the same way; it is null only when the relation is optional.
                 Column target = references.Target.KeyColumn;
-                return new Column { Name = f.Name, Field = f, Kind = target.Kind, Nullable = references.Optional, Length = target.Length, Words = target.Words, References = references };
+                return new Column { Name = f.Name, Field = f, Kind = target.Kind, Nullable = references.Optional, Length = target.Length, Words = target.Words, Refinement = target.Refinement, References = references };
             }
-            return new Column { Name = f.Name, Field = f, Kind = kind, Nullable = nullable && !key, Length = length, Words = words, IsKey = key, AutoIncrement = auto };
+            return new Column { Name = f.Name, Field = f, Kind = kind, Nullable = nullable && !key, Length = length, Words = words, Refinement = refinement, IsKey = key, AutoIncrement = auto };
         }
 
         private static ColumnKind KindOf(string builtIn) => builtIn switch
