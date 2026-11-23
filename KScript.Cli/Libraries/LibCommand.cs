@@ -18,7 +18,7 @@ using static KScript.Projects.LibraryDependency;
 namespace KScript.Cli
 {
     /// <summary>Installs a GitHub library as ordinary source files imported by their project-relative paths.</summary>
-    public static class LibCommand
+    public static partial class LibCommand
     {
         private const string Receipt = ".kscript-lib.json";
         private const long SizeLimit = 64L * 1024 * 1024;
@@ -67,7 +67,8 @@ namespace KScript.Cli
                 }
                 else
                 {
-                    var installed = Add(client, source, project, libraryFolder, output).GetAwaiter().GetResult();
+                    bool bareName = source.Named && args[1] == source.Name;
+                    var installed = Add(client, source, bareName, project, libraryFolder, output).GetAwaiter().GetResult();
                     ProjectLibraries.Record(project.Directory, installed);
                 }
                 return ExitCodes.Ok;
@@ -94,7 +95,10 @@ namespace KScript.Cli
             internal bool Named => Ref == null && Folder.Length > 0;
             internal bool Ambiguous => Folder.Length > 0 && Ref != null && !Ref.Contains('/');
             internal bool CatalogEntry => Folder.StartsWith("libraries/", StringComparison.Ordinal) && Folder.LastIndexOf('/') == "libraries".Length;
-            internal string Name => Folder.Length == 0 ? Repo : Folder.Split('/')[^1];
+            internal string RootPackageName { get; init; }
+            internal string Name => RootPackageName ?? (Folder.Length == 0 ? Repo : Folder.Split('/')[^1]);
+            // A GitHub slug can be ".github" or "con". It can publish a library with a portable local name.
+            internal bool CanInstall => Folder.Length > 0 || RootPackageName != null || IsLibraryName(Repo);
             internal string Url
             {
                 get
@@ -122,25 +126,38 @@ namespace KScript.Cli
                 while (candidate.Folder.Length > 0)
                 {
                     candidate = candidate.LongerRef();
-                    yield return candidate;
+                    if (candidate.CanInstall) yield return candidate;
                 }
             }
 
             internal static Source FromDependency(LibraryDependency dependency)
             {
-                if (!IsCommit(dependency.Commit) || !TryParseDirect(dependency.Source, out var parsed)
-                    || parsed.Url != dependency.Source || parsed.Name != dependency.Name)
-                    throw new ProjectConfigException($"Invalid dependency '{dependency.Name}' in kscript.json. Use its canonical GitHub source URL, matching library folder name, and full commit SHA.");
-                return parsed;
+                if (IsCommit(dependency.Commit) && TryParseDirect(dependency.Source, out var parsed) && parsed.Url == dependency.Source)
+                {
+                    if (parsed.Name == dependency.Name && parsed.CanInstall) return parsed;
+                    if (parsed.IsRoot && IsLibraryName(dependency.Name)) return parsed with { RootPackageName = dependency.Name };
+                }
+                throw new ProjectConfigException($"Invalid dependency '{dependency.Name}' in kscript.json. Use its canonical GitHub source URL, matching library name, and full commit SHA.");
+            }
+
+            internal bool IsRoot => Ref == null && Folder.Length == 0;
+
+            // Match only identities a fresh bare lookup can produce. Explicit branches, arbitrary folders and
+            // other owners stay distinct even when a folder happens to have the requested name.
+            internal static Source Published(string url, string name, Func<string, bool> eligible)
+            {
+                if (!TryParseDirect(url, out var parsed) || parsed.Url != url || !eligible(parsed.Repository)) return null;
+                if (parsed.IsRoot) return parsed with { RootPackageName = name };
+                return parsed.Ref == "HEAD" && parsed.Folder == "libraries/" + name ? parsed : null;
             }
 
             internal static bool TryParse(string input, out Source source)
             {
-                if (TryParseDirect(input, out source)) return true;
+                if (TryParseDirect(input, out source)) return source.CanInstall;
                 if (string.IsNullOrEmpty(input) || input.Contains("://")) return false;
                 int at = input.IndexOf('@');
                 string name = at < 0 ? input : input[(at + 1)..];
-                if (!Regex.IsMatch(name, @"\A[A-Za-z0-9][A-Za-z0-9._-]*\z") || !IsSafePathComponent(name)) return false;
+                if (!IsLibraryName(name)) return false;
                 string repository = at < 0 ? LibraryRepositories.DefaultRepository : input[..at];
                 if (repository.EndsWith('/') || !TryParseDirect(repository, out var root) || root.Ref != null) return false;
                 source = root with { Folder = "libraries/" + name };
@@ -157,7 +174,7 @@ namespace KScript.Cli
                 if (parts.Length < 2 || (parts.Length != 2 && (!url || parts.Length < 4 || parts[2] != "tree"))) return false;
                 string owner = parts[0].ToLowerInvariant(), repo = parts[1].ToLowerInvariant();
                 if (repo.EndsWith(".git", StringComparison.Ordinal)) repo = repo[..^4];
-                if (!Regex.IsMatch(owner, @"\A[a-z0-9][a-z0-9-]*\z") || !Regex.IsMatch(repo, @"\A[a-z0-9][a-z0-9._-]*\z") || !IsSafePathComponent(repo)) return false;
+                if (!Regex.IsMatch(owner, @"\A[a-z0-9][a-z0-9-]*\z") || !IsRepositorySlug(repo)) return false;
                 string reference = parts.Length > 2 ? Uri.UnescapeDataString(parts[3]) : null;
                 if (reference != null && !reference.Split('/').All(IsSafePathComponent)) return false;
                 string[] folders = parts.Skip(4).Select(Uri.UnescapeDataString).ToArray();
@@ -166,6 +183,11 @@ namespace KScript.Cli
                 return true;
             }
         }
+
+        private static bool IsLibraryName(string name) => Regex.IsMatch(name, @"\A[A-Za-z0-9][A-Za-z0-9._-]*\z") && IsSafePathComponent(name);
+
+        private static bool IsRepositorySlug(string name) => Regex.IsMatch(name, @"\A[a-zA-Z0-9._-]+\z")
+            && !name.EndsWith('.') && !name.Equals(".git", StringComparison.OrdinalIgnoreCase);
 
         internal static void CheckDestination(string root, string destination)
         {
@@ -179,15 +201,19 @@ namespace KScript.Cli
             }
         }
 
-        private static async Task<LibraryDependency> Add(HttpClient client, Source source, ProjectConfig project, string libraryFolder, TextWriter output)
+        private static async Task<LibraryDependency> Add(HttpClient client, Source source, bool bareName, ProjectConfig project, string libraryFolder, TextWriter output)
         {
-            string requested = source.Url;
             var candidates = source.Interpretations().ToArray();
             foreach (var candidate in candidates)
             {
-                if (project.Libraries.TryGetValue(candidate.Name, out var dependency) && dependency.Source == candidate.Url)
-                    return await Install(client, Source.FromDependency(dependency), dependency.Commit, libraryFolder, project.SiteRoot,
-                        output, requested, requireCommit: true);
+                if (!project.Libraries.TryGetValue(candidate.Name, out var dependency)) continue;
+                var pinned = Source.FromDependency(dependency);
+                if (bareName || pinned.Url == candidate.Url || source.Named && pinned.IsRoot && pinned.Repository == source.Repository)
+                {
+                    if (!bareName && source.Named && pinned.IsRoot) pinned = pinned with { RootPackageName = candidate.Name };
+                    return await Install(client, pinned, dependency.Commit, libraryFolder, project.SiteRoot,
+                        output, pinned.Url, requireCommit: true);
+                }
             }
             if (source.Named && !LibraryRepositories.Contains(project.Directory, source.Repository))
                 throw new ProjectConfigException($"Library repository {source.Repository} is not registered for this project. Run kscript repo add {source.Repository} first.");
@@ -199,17 +225,29 @@ namespace KScript.Cli
                 string destination = Path.Combine(libraryFolder, possibilities.Key);
                 if (source.Ambiguous && new DirectoryInfo(destination).LinkTarget != null) continue;
                 CheckDestination(libraryFolder, destination);
-                var existing = Existing(possibilities, null, destination, project.SiteRoot, output, probe: source.Ambiguous);
+                var existing = Existing(possibilities, null, destination, project.SiteRoot, output, probe: source.Ambiguous,
+                    published: source.Named ? url => Source.Published(url, source.Name,
+                        repo => bareName ? LibraryRepositories.Contains(project.Directory, repo) : repo == source.Repository) : null);
                 if (existing != null) return existing;
             }
+            if (bareName)
+            {
+                var published = await FindPublisherLibrary(client, source.Name, project.Directory);
+                return await Install(client, published.Source, published.Commit, libraryFolder, project.SiteRoot, output, published.Source.Url, requireCommit: true);
+            }
+            return await Download(client, source, project, libraryFolder, output);
+        }
+
+        private static async Task<LibraryDependency> Download(HttpClient client, Source source, ProjectConfig project, string libraryFolder, TextWriter output)
+        {
+            string requested = source.Url;
             bool ambiguous = source.Ambiguous;
-            byte[] details;
+            string commit;
             while (true)
             {
                 try
                 {
-                    string url = $"https://api.github.com/repos/{source.Repository}/commits/{Uri.EscapeDataString(source.Ref ?? "HEAD")}";
-                    details = await client.GetByteArrayAsync(url);
+                    commit = await ResolveCommit(client, source);
                     break;
                 }
                 // GitHub also uses 422 for an unknown commit/ref in an existing repo.
@@ -217,18 +255,32 @@ namespace KScript.Cli
                     ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.UnprocessableEntity)
                 {
                     source = source.LongerRef();
+                    if (!source.CanInstall)
+                        throw new IOException($"'{source.Repo}' cannot be used as a local library directory. Choose a named library or a folder within the repository.");
                 }
                 catch (HttpRequestException ex) when (source.Named && ex.StatusCode == HttpStatusCode.NotFound)
                 {
                     throw new IOException($"Could not find the public GitHub repository {source.Repository}.", ex);
                 }
             }
-            using var metadata = JsonDocument.Parse(details);
+            if (project.Libraries.ContainsKey(source.Name)) throw Conflict(source.Name);
+            try { return await Install(client, source, commit, libraryFolder, project.SiteRoot, output, requested, requireCommit: false); }
+            catch (MissingCatalogEntry) when (source.Named)
+            {
+                var root = source with { Folder = "", RootPackageName = source.Name };
+                if (!await PublisherRootMatches(client, root, source.Name, commit)) throw;
+                return await Install(client, root, commit, libraryFolder, project.SiteRoot, output, root.Url, requireCommit: true);
+            }
+        }
+
+        private static async Task<string> ResolveCommit(HttpClient client, Source source)
+        {
+            string url = $"https://api.github.com/repos/{source.Repository}/commits/{Uri.EscapeDataString(source.Ref ?? "HEAD")}";
+            using var metadata = JsonDocument.Parse(await client.GetByteArrayAsync(url));
             if (metadata.RootElement.ValueKind != JsonValueKind.Object || !metadata.RootElement.TryGetProperty("sha", out var sha)
                 || sha.ValueKind != JsonValueKind.String || !IsCommit(sha.GetString()))
                 throw new InvalidDataException("GitHub did not return a commit SHA.");
-            if (project.Libraries.ContainsKey(source.Name)) throw Conflict(source.Name);
-            return await Install(client, source, sha.GetString(), libraryFolder, project.SiteRoot, output, requested, requireCommit: false);
+            return sha.GetString();
         }
 
         private static IOException Conflict(string name) =>
@@ -259,6 +311,8 @@ namespace KScript.Cli
                 var scripts = Extract(archive, folder, archiveRepo, stage);
                 string config = Path.Combine(stage, ProjectConfig.FileName);
                 LibraryManifest manifest = File.Exists(config) ? LibraryManifest.Load(config) : null;
+                if (source.RootPackageName != null && manifest?.Name != source.RootPackageName)
+                    throw new InvalidDataException($"The manifest in {source.Repository} must declare the library name '{source.RootPackageName}'.");
                 string entry = EntryFor(stage, scripts, manifest);
                 var receipt = new JsonObject { ["source"] = source.Url, ["commit"] = commit, ["entry"] = entry };
                 if (manifest != null)
@@ -288,6 +342,10 @@ namespace KScript.Cli
 
         private sealed record Submodule(string Repository, string Commit);
 
+        // Only this contents 404 permits falling back from the catalog entry to a manifest-declared root package.
+        private sealed class MissingCatalogEntry(Source source, Exception cause)
+            : IOException($"Folder {source.Folder}/ was not found in {source.Repository}.", cause) { }
+
         private static async Task<Submodule> ResolveSubmodule(HttpClient client, Source source, string commit)
         {
             string path = "libraries/" + Uri.EscapeDataString(source.Name);
@@ -295,7 +353,7 @@ namespace KScript.Cli
             try { contents = await client.GetByteArrayAsync($"https://api.github.com/repos/{source.Repository}/contents/{path}?ref={commit}"); }
             catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                throw new InvalidDataException($"Folder {source.Folder}/ was not found in {source.Repository}.", ex);
+                throw new MissingCatalogEntry(source, ex);
             }
             using var doc = JsonDocument.Parse(contents);
             var item = doc.RootElement;
@@ -318,7 +376,8 @@ namespace KScript.Cli
             return new Submodule(repo, sha);
         }
 
-        private static LibraryDependency Existing(IEnumerable<Source> candidates, string expectedCommit, string destination, string site, TextWriter output, bool probe = false)
+        private static LibraryDependency Existing(IEnumerable<Source> candidates, string expectedCommit, string destination, string site, TextWriter output, bool probe = false,
+            Func<string, Source> published = null)
         {
             string receipt = Path.Combine(destination, Receipt);
             if (!Directory.Exists(destination) && !File.Exists(destination)) return null;
@@ -328,7 +387,9 @@ namespace KScript.Cli
                 try { saved = JsonNode.Parse(File.ReadAllText(receipt)) as JsonObject; }
                 catch (JsonException) when (probe) { return null; }
                 string entry = saved?["entry"]?.ToString(), commit = saved?["commit"]?.ToString();
-                var source = candidates.FirstOrDefault(c => c.Url == saved?["source"]?.ToString());
+                string savedUrl = saved?["source"]?.ToString();
+                var source = candidates.FirstOrDefault(c => c.Url == savedUrl) ?? published?.Invoke(savedUrl);
+                if (source?.RootPackageName != null && saved?["name"]?.ToString() != source.RootPackageName) source = null;
                 if (source != null && IsCommit(commit) && entry != null && entry.Split('/').All(IsSafePathComponent))
                 {
                     if (expectedCommit != null && expectedCommit != commit)
@@ -356,7 +417,7 @@ namespace KScript.Cli
         private static string ArchivePath(ZipArchiveEntry file)
         {
             int slash = file.FullName.IndexOf('/');
-            if (slash < 1 || !IsSafePathComponent(file.FullName[..slash])) throw new InvalidDataException("Invalid GitHub archive root.");
+            if (slash < 1 || !IsRepositorySlug(file.FullName[..slash])) throw new InvalidDataException("Invalid GitHub archive root.");
             return file.FullName[(slash + 1)..];
         }
 

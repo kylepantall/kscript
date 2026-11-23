@@ -46,6 +46,13 @@ public sealed class LibCommandTests : IDisposable
                 status = ContentsStatus ?? status;
                 body = new StringContent(Contents);
             }
+            else if (request.RequestUri.Host == "api.github.com" && request.RequestUri.AbsolutePath.StartsWith("/users/"))
+                body = new StringContent("[]");
+            else if (request.RequestUri.Host == "raw.githubusercontent.com")
+            {
+                status = HttpStatusCode.NotFound;
+                body = new StringContent("");
+            }
             else throw new InvalidOperationException($"Unexpected request {request.RequestUri}");
             return Task.FromResult(new HttpResponseMessage(status) { Content = body });
         }
@@ -106,9 +113,10 @@ public sealed class LibCommandTests : IDisposable
             ("libraries/isolink-connect/index.kscript", "library", 0), ("libraries/other/index.kscript", "other", 0));
         var result = Add("isolink-connect");
         Assert.True(result.Code == ExitCodes.Ok, result.Error);
-        Assert.Equal(new[] { "https://api.github.com/repos/kylepantall/kscript/commits/HEAD",
-            $"https://api.github.com/repos/kylepantall/kscript/contents/libraries/isolink-connect?ref={Sha}",
-            $"https://codeload.github.com/kylepantall/kscript/zip/{Sha}" }, github.Requests);
+        Assert.Contains("https://api.github.com/repos/kylepantall/kscript/commits/HEAD", github.Requests);
+        Assert.Contains($"https://api.github.com/repos/kylepantall/kscript/contents/libraries/isolink-connect?ref={Sha}", github.Requests);
+        Assert.Equal($"https://codeload.github.com/kylepantall/kscript/zip/{Sha}", github.Requests.Last());
+        int requests = github.Requests.Count;
         Assert.Contains("import \"lib/isolink-connect/index.kscript\"", result.Output);
         string installed = Path.Combine(root, "lib", "isolink-connect");
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(installed, ".kscript-lib.json")));
@@ -122,7 +130,7 @@ public sealed class LibCommandTests : IDisposable
         github.Status = HttpStatusCode.ServiceUnavailable;
         Assert.Contains("Already installed", Add("KylePantall/KScript@isolink-connect").Output);
         Assert.Contains("Already installed", Add("https://github.com/kylepantall/kscript/tree/HEAD/libraries/isolink-connect").Output);
-        Assert.Equal(3, github.Requests.Count);
+        Assert.Equal(requests, github.Requests.Count);
         Assert.Equal("edited", File.ReadAllText(Path.Combine(installed, "index.kscript")));
     }
 
@@ -261,7 +269,8 @@ public sealed class LibCommandTests : IDisposable
         Assert.Contains("import \"dependencies/Slug/index.kscript\"", installed.Output);
         string script = Path.Combine(root, "dependencies", "Slug", "index.kscript");
         Assert.Equal("custom", File.ReadAllText(script));
-        var conflict = Add("Slug", subdir);
+        Assert.Equal(ExitCodes.Ok, Add("Slug", subdir).Code);
+        var conflict = Add("kylepantall/kscript@Slug", subdir);
         Assert.Equal(ExitCodes.Failed, conflict.Code);
         Assert.Contains("already exists", conflict.Error);
         Assert.Equal(3, github.Requests.Count);
@@ -272,18 +281,83 @@ public sealed class LibCommandTests : IDisposable
     public void MissingRepositoryOrLibraryReportsTheRequestedSourceAndNeverGuessesRefs()
     {
         github.Status = HttpStatusCode.NotFound;
-        var missingRepository = Add("missing");
+        var missingRepository = Add("kylepantall/kscript@missing");
         Assert.Equal(ExitCodes.Failed, missingRepository.Code);
         Assert.Contains("public GitHub repository kylepantall/kscript", missingRepository.Error);
         Assert.Single(github.Requests);
 
         github.Status = HttpStatusCode.OK;
         github.ContentsStatus = HttpStatusCode.NotFound;
-        var missingLibrary = Add("missing");
+        var missingLibrary = Add("kylepantall/kscript@missing");
         Assert.Equal(ExitCodes.Failed, missingLibrary.Code);
         Assert.Contains("libraries/missing/ was not found in kylepantall/kscript", missingLibrary.Error);
-        Assert.Equal(3, github.Requests.Count);
+        Assert.Equal(4, github.Requests.Count);
+        Assert.Equal($"https://raw.githubusercontent.com/kylepantall/kscript/{Sha}/kscript.json", github.Requests.Last());
         Assert.False(Directory.Exists(Path.Combine(root, "lib", "missing")));
+    }
+
+    [Theory]
+    [InlineData("orimovo/another-sdk")]
+    [InlineData("waggr-gb/isolink-connect")]
+    [InlineData("waggr-gb/.github")]
+    [InlineData("orimovo/_tools")]
+    [InlineData("orimovo/-tools")]
+    [InlineData("waggr-gb/con")]
+    public void QualifiedOfficialLibraryUsesOnlyItsPublisher(string repository)
+    {
+        github.Archive = Archive(("libraries/demo/index.kscript", "fn build() => 3", 0));
+        var installed = Add(repository + "@demo");
+        Assert.True(installed.Code == ExitCodes.Ok, installed.Error);
+        Assert.Equal(new[] { $"https://api.github.com/repos/{repository}/commits/HEAD",
+            $"https://api.github.com/repos/{repository}/contents/libraries/demo?ref={Sha}",
+            $"https://codeload.github.com/{repository}/zip/{Sha}" }, github.Requests);
+        Assert.False(Directory.Exists(Path.Combine(root, ".kscript", "repos")));
+    }
+
+    [Theory]
+    [InlineData("waggr-gb/.git")]
+    [InlineData("waggr-gb/CON")]
+    [InlineData("orimovo/.github")]
+    [InlineData("https://github.com/orimovo/.github/tree/main")]
+    [InlineData("orimovo/_tools")]
+    [InlineData("orimovo/-tools")]
+    [InlineData("orimovo/..@demo")]
+    [InlineData("https://github.com/orimovo/.github/tree/%2E%2E/tools")]
+    [InlineData("https://github.com/orimovo/.github/tree/main/CON")]
+    [InlineData("orimovo/.github@_tools")]
+    public void UnsafeInstallNamesAndPathsAreRejectedBeforeFetchingAnything(string selector)
+    {
+        Assert.Equal(ExitCodes.Usage, Add(selector).Code);
+        Assert.Empty(github.Requests);
+        Assert.Empty(Directory.GetFileSystemEntries(root));
+    }
+
+    [Theory]
+    [InlineData(401)]
+    [InlineData(403)]
+    [InlineData(429)]
+    [InlineData(500)]
+    public void BareNameStopsOnCatalogErrorsBesidesAnAbsentEntry(int status)
+    {
+        github.ContentsStatus = (HttpStatusCode)status;
+        Assert.Equal(ExitCodes.Failed, Add("demo").Code);
+        Assert.Equal(2, github.Requests.Count);
+        Assert.All(github.Requests, url => Assert.Contains("/kylepantall/kscript/", url));
+    }
+
+    [Fact]
+    public void BareNameStopsOnAnUnavailableArchiveOrInvalidPackageManifest()
+    {
+        github.ArchiveStatus = HttpStatusCode.NotFound;
+        Assert.Equal(ExitCodes.Failed, Add("demo").Code);
+        Assert.Equal($"https://codeload.github.com/kylepantall/kscript/zip/{Sha}", github.Requests.Last());
+        github.Requests.Clear();
+        github.ArchiveStatus = null;
+        github.Archive = Archive(("libraries/demo/kscript.json", """{"name":"demo","library":{"entry":"missing.kscript"}}""", 0),
+            ("libraries/demo/index.kscript", "echo true", 0));
+        Assert.Equal(ExitCodes.Failed, Add("demo").Code);
+        Assert.Equal($"https://codeload.github.com/kylepantall/kscript/zip/{Sha}", github.Requests.Last());
+        Assert.Single(github.Requests, url => url.StartsWith("https://codeload.github.com/"));
     }
 
     private static string Gitlink(string type, string url, string commit) =>
@@ -323,7 +397,7 @@ public sealed class LibCommandTests : IDisposable
         File.WriteAllText(script, "local changes");
         github.Status = HttpStatusCode.ServiceUnavailable;
         Assert.Contains("Already installed", Add(selector).Output);
-        Assert.Equal(ExitCodes.Failed, Add("slugs").Code);
+        Assert.Equal(ExitCodes.Ok, Add("slugs").Code);
         Assert.Equal(expected, github.Requests);
         Assert.Equal("local changes", File.ReadAllText(script));
     }

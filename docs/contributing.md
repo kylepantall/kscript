@@ -7,7 +7,6 @@ KScript is open source, and contributions are welcome. This page covers building
 KScript targets .NET 8 and runs on Windows, Linux and macOS. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download), then:
 
 ```sh
-git submodule update --init   # fetch pinned SDKs for integration tests
 dotnet build KScript.sln
 dotnet test KScript.sln
 
@@ -38,6 +37,7 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 | `KScriptApp/` | The `kscript` command line app. |
 | `KScript.Language/`, `KScript.LanguageServer/` | The analyzer and editor features, and the LSP server behind `kscript lsp` and `kscript check`. They read what each package registers, so the editor always matches the interpreter. |
 | `KScript.Tests/`, `KScript.Language.Tests/` | xUnit tests for the interpreter and packages, and for the language tools (including contract tests that keep them in step with the packages). |
+| `libraries/` | KScript source libraries published by `kylepantall/kscript`. The Isolink SDK lives in a separate repository under the trusted publisher `waggr-gb`. See [waggr-gb/isolink-connect](https://github.com/waggr-gb/isolink-connect). |
 | `editors/vscode/` | The VS Code extension. |
 | `samples/scripts/` | Sample scripts. Every sample is a `.kscript` file. |
 | `samples/xml/` | The scripts of `samples/scripts/` in the XML form: the one set of samples kept in XML. |

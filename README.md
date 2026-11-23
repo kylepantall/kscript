@@ -140,7 +140,9 @@ These native packages ship with KScript. Core operations such as `$text->trim()`
 kscript lib add isolink-connect
 ```
 
-The installer reads the library's `kscript.json`, prints its public import path and records the exact commit in your project's `kscript.json`. Commit that file and run `kscript lib restore` on a fresh checkout. The official repository also provides `integer-math`, `app-cache` and `request-id`. See the [official library list and installation guide](docs/projects.md#installing-source-libraries).
+A bare name searches the `kylepantall/kscript` catalog, public repositories owned by `orimovo` and `waggr-gb`, and any repositories registered in your project. If several packages match, the CLI lists their qualified names so you can choose one. To select the Isolink SDK directly, run `kscript lib add waggr-gb/isolink-connect@isolink-connect`.
+
+The installer prints the import path and records the publisher and exact commit in your project's `kscript.json`. Commit that file and run `kscript lib restore` on a fresh checkout. See the [installation guide for custom publishers and libraries](docs/projects.md#installing-source-libraries).
 
 ## Desktop apps, still just KScript
 

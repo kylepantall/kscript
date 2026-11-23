@@ -59,6 +59,83 @@ public sealed class LibraryRestoreTests : IDisposable
     private static string Config(string dir) => Path.Combine(dir, "kscript.json");
 
     [Theory]
+    [InlineData("orimovo/client-collection", true)]
+    [InlineData("waggr-gb/libraries", false)]
+    public void AnOfficialPinAndItsReceiptResolveBareNamesWithoutDiscovery(string repository, bool rootPackage)
+    {
+        string prefix = rootPackage ? "" : "libraries/roots/";
+        string source = "https://github.com/" + repository + (rootPackage ? "" : "/tree/HEAD/libraries/roots");
+        var pins = new { libraries = new { roots = new { source, commit = Pin } } };
+        File.WriteAllText(Config(root), JsonSerializer.Serialize(pins));
+        string contents = $"https://api.github.com/repos/{repository}/contents/libraries/roots?ref={Pin}";
+        if (!rootPackage) github.Routes[contents] = JsonSerializer.SerializeToUtf8Bytes(Array.Empty<string>());
+        string archive = $"https://codeload.github.com/{repository}/zip/{Pin}";
+        github.Routes[archive] = Archive(
+            (prefix + "kscript.json", """{"name":"roots","library":{"version":"1.0.0","entry":"client.kscript"}}"""),
+            (prefix + "client.kscript", "fn root() => 7"));
+        var restored = Run(root, "restore");
+        Assert.True(restored.Code == 0, restored.Error);
+        Assert.Equal(rootPackage ? new[] { archive } : new[] { contents, archive }, github.Requests);
+        string installed = Path.Combine(root, "lib", "roots", "client.kscript");
+        File.WriteAllText(installed, "fn root() => 8");
+        github.Routes.Clear();
+        github.Requests.Clear();
+        Assert.Equal(0, Run(root, "add", "roots").Code);
+        File.WriteAllText(Config(root), "{}");
+        var receiptOnly = Run(root, "add", "roots");
+        Assert.True(receiptOnly.Code == 0, receiptOnly.Error);
+        Assert.Empty(github.Requests);
+        Assert.Equal("fn root() => 8", File.ReadAllText(installed));
+        var pin = JsonNode.Parse(File.ReadAllText(Config(root)))["libraries"]["roots"];
+        Assert.Equal(source, (string)pin["source"]);
+        Assert.Equal(Pin, (string)pin["commit"]);
+    }
+
+    [Fact]
+    public void AliasOfAPublisherRootRequiresItsManifestToDeclareThatLibrary()
+    {
+        const string source = "https://github.com/orimovo/client-suite";
+        File.WriteAllText(Config(root), JsonSerializer.Serialize(new { libraries = new { roots = new { source, commit = Pin } } }));
+        string archive = $"https://codeload.github.com/orimovo/client-suite/zip/{Pin}";
+        github.Routes[archive] = Archive(("kscript.json", """{"name":"different","library":{"entry":"index.kscript","version":"2.0.0"}}"""), ("index.kscript", "echo false"));
+        var result = Run(root, "restore");
+        Assert.NotEqual(0, result.Code);
+        Assert.Contains("must declare the library name 'roots'", result.Error);
+        Assert.False(Directory.Exists(Path.Combine(root, "lib", "roots")));
+        Assert.Equal(new[] { archive }, github.Requests);
+    }
+
+    [Theory]
+    [InlineData("orimovo/publisher-tools", false)]
+    [InlineData("another-owner/publisher-tools", true)]
+    public void TheQualifiedNameOfAManifestBackedRootCanBeInstalledAndReused(string repository, bool register)
+    {
+        if (register) LibraryRepositories.Add(root, repository);
+        string api = "https://api.github.com/repos/" + repository;
+        string raw = $"https://raw.githubusercontent.com/{repository}/{Pin}/kscript.json";
+        const string manifest = """{"name":"roots","library":{"entry":"client.kscript","version":"1.2.3"}}""";
+        string archive = $"https://codeload.github.com/{repository}/zip/{Pin}";
+        github.Routes[api + "/commits/HEAD"] = JsonSerializer.SerializeToUtf8Bytes(new { sha = Pin });
+        github.Routes[raw] = Encoding.UTF8.GetBytes(manifest);
+        github.Routes[archive] = Archive(("kscript.json", manifest), ("client.kscript", "fn version() => 'verified'"));
+        var installed = Run(root, "add", repository + "@roots");
+        Assert.True(installed.Code == 0, installed.Error);
+        Assert.Equal(new[] { api + "/commits/HEAD", api + "/contents/libraries/roots?ref=" + Pin, raw, archive }, github.Requests);
+        string recorded = File.ReadAllText(Config(root));
+        string entry = Path.Combine(root, "lib", "roots", "client.kscript");
+        Assert.Equal("fn version() => 'verified'", File.ReadAllText(entry));
+        github.Requests.Clear();
+        Assert.Equal(0, Run(root, "add", repository + "@roots").Code);
+        File.WriteAllText(Config(root), "{}");
+        Assert.Equal(0, Run(root, "add", "roots").Code);
+        Assert.Empty(github.Requests);
+        string clone = Directory.CreateDirectory(Path.Combine(root, "fresh")).FullName;
+        File.WriteAllText(Config(clone), recorded);
+        Assert.Equal(0, Run(clone, "restore").Code);
+        Assert.Equal(new[] { archive }, github.Requests);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void FreshProjectRestoresTrackedSourceAtTheOriginalCommit(bool submodule)

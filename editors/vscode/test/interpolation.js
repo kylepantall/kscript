@@ -20,7 +20,9 @@ function tokensOnLine(data, types, lineNumber, source) {
   return tokens;
 }
 
-function writeFixture(root) {
+function writeFixture(directory) {
+  // Windows TEMP can contain an 8.3 alias. Use the same physical path for the document and its definitions.
+  const root = fs.realpathSync.native(directory);
   const file = path.join(root, 'finish.kscript');
   const settings = path.join(root, 'config', 'config.yaml');
   const lines = [

@@ -20,7 +20,7 @@ $k fmt --check libraries samples/scripts samples/xml samples/life-lab samples/ht
   samples/documents samples/queue-app samples/data samples/types "Example Sites/team"
 
 group "Run KScript tests"
-$k test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data libraries/isolink-connect/tests
+$k test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
 
 group "Run the data sample's migrations and seeder"
 $k db migrate --seed --project samples/data --no-ansi < /dev/null
