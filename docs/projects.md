@@ -215,7 +215,7 @@ For example, adding the Isolink SDK by name from its own repository produces a p
   "libraries": {
     "isolink-connect": {
       "source": "https://github.com/waggr-gb/isolink-connect/tree/HEAD/libraries/isolink-connect",
-      "commit": "e1b65ba700e1a6b8fcc2358f9fa12d542dfe4d49"
+      "commit": "93495edf7748dce619994dea43dfbe9ae2e406e9"
     }
   }
 }
