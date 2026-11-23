@@ -180,6 +180,12 @@ describe(name: "worlds") {
 }
 
 describe(name: "front ends") {
+  test(name: "an unknown interactive preset opens a blank board") {
+    world = @select_pattern('unknown', width: 4, height: 3, wrap: false)
+    expect(value: $world.grid, equals: ['....', '....', '....'])
+    expect(value: $world.wrap, equals: false)
+  }
+
   test(name: "the terminal version plays a pattern and exits") {
     run = @run_script('../life.kscript', options: { args: ['blinker', '3'] })
     expect(value: $run.code, equals: 0)
@@ -190,7 +196,7 @@ describe(name: "front ends") {
   test(name: "the terminal version reports unknown patterns") {
     run = @run_script('../life.kscript', options: { args: ['no-such-pattern'] })
     expect(value: $run.code, equals: 3)
-    expect(value: $run.error.message, contains: 'a pattern name or a file')
+    expect(value: $run.output, contains: 'a pattern name or a file')
   }
 
   test(name: "the menu works with typed answers") {

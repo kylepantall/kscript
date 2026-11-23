@@ -12,6 +12,94 @@ public class ErrorTypeTests
 
     private static KScriptException Fails(string code) => Assert.Throws<KScriptException>(() => Run(code));
 
+    [Fact]
+    public void ConditionalThrowEvaluatesTheGuardOnceAndBuildsOnlyTheThrownPayload()
+    {
+        string output = Run("""
+            state = { checks: 0, payloads: 0 }
+            fn failed(reply: map) {
+              state.checks += 1
+              return $reply->has('e')
+            }
+            fn error_code(reply: map) {
+              state.payloads += 1
+              return $reply.e.code
+            }
+            fn result(reply: map, method: string) {
+              throw if @failed($reply) {
+                type: 'Network'
+                message: "Isolink refused {$method}: {$reply.e.message}"
+                code: @error_code($reply)
+              }
+              return 'ok'
+            }
+            echo @result({}, 'connect')
+            try {
+              @result({ e: { code: 'denied', message: 'unavailable' } }, 'connect')
+            } catch Network as err {
+              echo "{$err.type} {$err.code}: {$err.message}"
+            }
+            echo "{$state.checks} checks, {$state.payloads} payload"
+            """);
+        Assert.Equal("ok\nNetwork denied: Isolink refused connect: unavailable\n2 checks, 1 payload\n", output);
+    }
+
+    [Theory]
+    [InlineData("throw if true { type: 'Network', message: 'offline' }")]
+    [InlineData("throw if true {\n  type: 'Network',\n  message: 'offline',\n}")]
+    [InlineData("throw { type: 'Network', message: 'offline' }")]
+    public void GuardedAndPlainThrowsAcceptAnOrdinaryErrorMap(string source)
+    {
+        var error = Fails(source);
+        Assert.Equal("Network", error.Type);
+        Assert.Equal("offline", error.Message);
+    }
+
+    [Theory]
+    [InlineData("throw if", "test")]
+    [InlineData("throw if true { type: 'Network' message: 'x' }", "to close the map")]
+    public void MalformedConditionalThrowsHaveSyntaxErrors(string source, string message)
+    {
+        var error = Fails(source);
+        Assert.Equal("Syntax", error.Type);
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
+    public void ConditionalRethrowPreservesTheCaughtErrorAndChecksOncePerCall()
+    {
+        string output = Run("""
+            state = { checks: 0 }
+            fn check(guard) {
+              state.checks += 1
+              return $guard
+            }
+            error Offline(status: 503) extends Network { code: string }
+            fn lookup(fail: bool) {
+              throw Offline(message: 'down', code: 'busy', cause: Error('root'))
+            } catch Network {
+              throw if @check($fail)
+              return 'cached'
+            }
+            echo @lookup(false)
+            try { @lookup(true) } catch Offline as err {
+              echo "{$err.type} {$err.status} {$err.code} {$err.message} {$err.cause.message}"
+            }
+            echo $state.checks
+            """);
+        Assert.Equal("cached\nOffline 503 busy down root\n2\n", output);
+    }
+
+    [Fact]
+    public void ConditionalBareThrowOutsideACatchHasTheSameEffectAsItsExpandedForm()
+    {
+        var plain = Fails("if true { throw }");
+        var guarded = Fails("throw if true");
+        Assert.Equal(plain.Type, guarded.Type);
+        Assert.Equal(plain.Message, guarded.Message);
+        Assert.Equal("ok\n", Run("throw if false\necho 'ok'"));
+    }
+
     private const string Declarations = """
         /// Nothing has that id.
         error PersonNotFound(message: "No person with id {$id}") extends NotFound {

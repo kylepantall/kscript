@@ -176,6 +176,16 @@ fn pattern_world(name: string, width: int, height: int, wrap = true) {
   return @new_world(@place(@blank(width: $width, height: $height), rows: $patterns[$name].rows), wrap: $wrap, pattern: $name)
 }
 
+/// Chooses a preset for an interactive board. A missing preset leaves the user a blank board to draw on.
+fn select_pattern(name: string, width: int, height: int, wrap = true) {
+  try {
+    return @pattern_world($name, $width, $height, $wrap)
+  } catch Pattern as err {
+    $log->warn($err.message)
+    return @new_world(@blank($width, $height), wrap: $wrap)
+  }
+}
+
 /// The world with its grid replaced by hand (a click or a typed cell). Starts the history again.
 fn edit_world(world: map, grid: string[]) {
   return $world->merge({ grid: $grid, history: [$grid->join('')], pattern: 'custom' })

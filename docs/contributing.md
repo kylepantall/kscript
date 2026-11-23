@@ -49,6 +49,19 @@ dotnet publish KScriptApp -c Release -r osx-arm64 --self-contained \
 
 `KScript.Tests` covers the interpreter, every package, `kscript serve` pages, `kscript make`, `kscript.json` and the sample scripts; `KScript.Language.Tests` covers the analyzer, the editor features and the language server. Run them with `dotnet test KScript.sln`.
 
+Add runnable language examples to `samples/scripts/tests/language`. Run `kscript test samples/scripts/tests/language` for their runtime results and `kscript check samples/scripts/tests/language --warnings-as-errors` for diagnostics. The VS Code extension tests also open these scripts through the language server. They exercise completion, navigation, test discovery and edits to unsaved buffers.
+
+After a Release build, run the editor suites from `editors/vscode`.
+
+```sh
+npm ci
+npm test
+npm run smoke -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+npm run test:vscode -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
+```
+
+`smoke` starts the server and sends JSON-RPC requests. `test:vscode` runs the extension in VS Code. On headless Linux, prefix the latter command with `xvfb-run -a`.
+
 Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine. The solution is built once, in the `Build and test (linux)` job, and the other Linux jobs (the project templates, the VS Code extension and the database servers) download that build instead of compiling their own.

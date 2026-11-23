@@ -19,8 +19,8 @@ namespace KScript.Language.Analysis
         /// <summary>The error types this document declares, by name.</summary>
         private readonly Dictionary<string, DeclaredError> declaredErrors = new Dictionary<string, DeclaredError>(StringComparer.Ordinal);
 
-        /// <summary>The names of error types other scripts export to this one.</summary>
-        private readonly HashSet<string> importedErrors = new HashSet<string>(StringComparer.Ordinal);
+        /// <summary>The error types other scripts export to this one and the type each extends.</summary>
+        private readonly Dictionary<string, string> importedErrors = new(StringComparer.Ordinal);
 
         private sealed class DeclaredError
         {
@@ -279,12 +279,12 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(symbol, span, false, false));
                 return true;
             }
-            return IsBuiltInError(name) || importedErrors.Contains(name);
+            return IsBuiltInError(name) || importedErrors.ContainsKey(name);
         }
 
         /// <summary>The error types visible at <paramref name="offset"/>: declared, imported and built-in.</summary>
         private IEnumerable<string> KnownErrorNames(Scope scope, int offset) =>
-            scope.VisibleAt(offset).Where(s => s.Shape.Type == KType.ErrorType).Select(s => s.Name).Concat(importedErrors).Concat(ErrorTypes.BuiltIn.Values.Select(t => t.Name)).Distinct();
+            scope.VisibleAt(offset).Where(s => s.Shape.Type == KType.ErrorType).Select(s => s.Name).Concat(importedErrors.Keys).Concat(ErrorTypes.BuiltIn.Values.Select(t => t.Name)).Distinct();
 
         /// <summary>The fields every error has, and those of a Shape error.</summary>
         internal static TypeShape BaseErrorShape(int depth = 0)
@@ -343,7 +343,7 @@ namespace KScript.Language.Analysis
             TextSpan span = region.Source.ToSource(id.Span);
             Symbol symbol = scope.Lookup(id.Name, span.Start);
             bool declared = symbol?.Shape.Type == KType.ErrorType;
-            if (!declared && !(IsBuiltInError(id.Name) && char.IsUpper(id.Name[0])) && !importedErrors.Contains(id.Name))
+            if (!declared && !(IsBuiltInError(id.Name) && char.IsUpper(id.Name[0])) && !importedErrors.ContainsKey(id.Name))
             {
                 return false;
             }
@@ -397,7 +397,7 @@ namespace KScript.Language.Analysis
                 result.References.Add(new SymbolReference(symbol, span, false, false));
                 return true;
             }
-            return ErrorTypes.BuiltIn.TryGetValue(node.Name, out ErrorType b) && b.Name == node.Name || importedErrors.Contains(node.Name);
+            return ErrorTypes.BuiltIn.TryGetValue(node.Name, out ErrorType b) && b.Name == node.Name || importedErrors.ContainsKey(node.Name);
         }
     }
 }

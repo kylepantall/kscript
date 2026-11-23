@@ -143,6 +143,14 @@ namespace KScript.Language.Analysis
                     AnalyzePipeTarget(pipe, region, scope);
                     return;
 
+                case LambdaNode lambda when NormalizerInput(lambda, region) is TypeShape input:
+                    AnalyzeLambda(lambda, region, scope, new[] { input });
+                    if (lambda.Parameters.Count != 1)
+                    {
+                        Report(region.Source.ToSource(lambda.Span), DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount, CodeArguments.NormalizerArity);
+                    }
+                    return;
+
                 case LambdaNode lambda:
                     AnalyzeLambda(lambda, region, scope);
                     return;
@@ -394,14 +402,20 @@ namespace KScript.Language.Analysis
             }
         }
 
+        private TypeShape NormalizerInput(ExprNode node, ExpressionRegion region) =>
+            node == region.Parse?.Root && region.Attribute?.Name == "value"
+            && region.Element?.Parent is { } parent && IsKScriptElementName(region.Element, "normalize")
+            && result.DeclaredTypes.TryGetValue(parent, out TypeShape refined) ? refined.RefinementBase : null;
+
         private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped, TypeShape pipedShape = null)
         {
             AnalyzeArguments(c.Arguments, region, scope);
             TextSpan full = region.Source.ToSource(c.NameSpan);
             TextSpan nameSpan = TextSpan.FromBounds(full.Start + 1, full.End);
-            int count = c.ArgumentList == null ? -1 : c.Arguments.Count + piped;
+            TypeShape normalizerInput = c.ArgumentList == null ? NormalizerInput(c, region) : null;
+            int count = normalizerInput != null ? 1 : c.ArgumentList == null ? -1 : c.Arguments.Count + piped;
 
-            Symbol fn = scope.Lookup(c.Name, nameSpan.Start);
+            Symbol fn = scope.Lookup(c.Name, nameSpan.Start, includeMethods: true);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, nameSpan, false, false));
@@ -413,7 +427,7 @@ namespace KScript.Language.Analysis
                 }
                 if (count >= 0)
                 {
-                    NoteCallArguments(fn, c.Arguments, piped > 0 ? pipedShape ?? TypeShape.Unknown : null, region);
+                    NoteCallArguments(fn, c.Arguments, normalizerInput ?? (piped > 0 ? pipedShape ?? TypeShape.Unknown : null), region);
                 }
                 return;
             }
@@ -421,7 +435,7 @@ namespace KScript.Language.Analysis
             int dot = c.Name.IndexOf('.');
             if (dot > 0)
             {
-                AnalyzeAliasCommand(c, dot, nameSpan, scope, region);
+                AnalyzeAliasCommand(c, dot, nameSpan, scope, region, normalizerInput);
                 return;
             }
 
@@ -468,7 +482,7 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            IEnumerable<string> candidates = catalog.Commands.Select(x => x.Name).Concat(result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name));
+            IEnumerable<string> candidates = catalog.Commands.Select(x => x.Name).Concat(result.VisibleFunctions(nameSpan.Start).Select(s => s.Name));
             string suggestion = Suggestions.Closest(c.Name, candidates);
             Report(full, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand,
                 $"Unknown command @{c.Name}." + (suggestion != null ? $" Did you mean @{suggestion}?" : " Declare it with " + FnHint(c.Name) + "."),
@@ -476,7 +490,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary><c>@math.sqrt(2)</c> or <c>@str.slugify($t)</c>: a command of a package or a function of a script imported with as="...".</summary>
-        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope, ExpressionRegion region)
+        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope, ExpressionRegion region, TypeShape normalizerInput)
         {
             string aliasName = c.Name.Substring(0, dot), member = c.Name.Substring(dot + 1);
             TextSpan aliasSpan = new TextSpan(nameSpan.Start, dot);
@@ -496,10 +510,10 @@ namespace KScript.Language.Analysis
             if (ReferenceMember(import, member, memberSpan) is Symbol fn && fn.Kind == SymbolKind.Function)
             {
                 ReportIfDeprecated(fn, memberSpan);
-                int count = c.ArgumentList == null ? -1 : c.Arguments.Count;
+                int count = normalizerInput != null ? 1 : c.ArgumentList == null ? -1 : c.Arguments.Count;
                 if (count >= 0)
                 {
-                    NoteCallArguments(fn, c.Arguments, null, region);
+                    NoteCallArguments(fn, c.Arguments, normalizerInput, region);
                     TextSpan full = TextSpan.FromBounds(nameSpan.Start - 1, nameSpan.End);
                     if (!CheckNamedArguments($"@{import.Name}.{fn.Name}()", c.Arguments, 0, SlotsOf(fn, scope), region, full))
                     {
@@ -525,7 +539,7 @@ namespace KScript.Language.Analysis
                 case IdentifierNode id:
                 {
                     TextSpan span = region.Source.ToSource(id.Span);
-                    Symbol fn = scope.Lookup(id.Name, span.Start);
+                    Symbol fn = scope.Lookup(id.Name, span.Start, includeMethods: true);
                     if (piped)
                     {
                         if (fn != null && fn.Kind == SymbolKind.Function)
@@ -739,7 +753,7 @@ namespace KScript.Language.Analysis
             if (candidates.Count == 0)
             {
                 IEnumerable<string> names = catalog.MethodsFor(receiver.Type).Concat(receiver.Kind != null ? catalog.MethodsFor(receiver.Kind) : Enumerable.Empty<CallableInfo>()).Select(m => m.Name).Concat(receiver.Methods.Keys)
-                    .Concat(pipe ? result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name) : Enumerable.Empty<string>());
+                    .Concat(pipe ? result.VisibleFunctions(nameSpan.Start).Select(s => s.Name) : Enumerable.Empty<string>());
                 string suggestion = Suggestions.Closest(name, names);
                 Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownMethod,
                     $"Unknown method {arrow}{name}()." + (suggestion != null ? $" Did you mean {arrow}{suggestion}()?" : string.Empty),

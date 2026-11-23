@@ -258,7 +258,7 @@ namespace KScript.Language.Agents
                 string kind = e.Name switch
                 {
                     "fn" when s.Kind == SymbolKind.Function => "fn",
-                    "type" => "type",
+                    "type" or "model" when s.Shape.Type == KType.Type && s.Name == e.GetAttributeValue("name") => e.Name,
                     "enum" => "enum",
                     "const" => "const",
                     "let" when s.IsConst => "const",
@@ -286,7 +286,7 @@ namespace KScript.Language.Agents
                     Example = ShortExample(doc?.Examples.FirstOrDefault()),
                     Deprecated = doc?.Deprecated != null,
                     Calls = kind == "fn" ? CallsIn(analysis, s) : Array.Empty<string>(),
-                    Throws = kind == "fn" ? ThrowsIn(e) : Array.Empty<string>(),
+                    Throws = kind == "fn" ? s.EscapingErrors : Array.Empty<string>(),
                     File = file,
                     Line = analysis.Source.GetPosition(s.DeclarationSpan.Start).Line + 1,
                 };
@@ -302,20 +302,11 @@ namespace KScript.Language.Agents
                 .Select(r => "@" + r.Symbol.Name).Distinct(StringComparer.Ordinal).ToList();
         }
 
-        /// <summary>The error types thrown in a function's body (Error when a throw names none).</summary>
-        private static IReadOnlyList<string> ThrowsIn(MarkupElement fn) =>
-            Descendants(fn).Where(x => x.Name == "throw")
-              .Select(x => x.GetAttributeValue("type")?.Trim() is string t && t.Length > 0 ? t : "Error")
-              .Distinct(StringComparer.Ordinal).ToList();
-
-        private static IEnumerable<MarkupElement> Descendants(MarkupElement e) =>
-            e.ChildElements.SelectMany(c => new[] { c }.Concat(Descendants(c)));
-
         private static string SignatureOf(Symbol s, string kind) => kind switch
         {
             "fn" => s.TypedSignature,
             "enum" => $"enum {s.Name} {{ {string.Join(", ", s.EnumValues ?? new List<string>())} }}",
-            "type" => TypeSignature(s),
+            "type" or "model" => TypeSignature(s),
             _ => $"const ${s.Name}" + (s.Shape.IsVague ? string.Empty : ": " + s.Shape.Display()),
         };
 
@@ -352,7 +343,16 @@ namespace KScript.Language.Agents
                 fields.AddRange(inline.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0));
             }
             string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "path").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
-            return fields.Count == 0 ? $"type {s.Name}{options} {{ }}" : $"type {s.Name}{options} {{ {string.Join(", ", fields)} }}";
+            var bases = Analyzer.WithNames(type);
+            string head = $"{type.Name} {s.Name}{options}" + (bases.Count == 0 ? "" : $" with [{string.Join(", ", bases)}]");
+            foreach (var rule in type.Attributes.Where(a => TypeRules.Attributes.Contains(a.Name)))
+                fields.Add($"{rule.Name}: {rule.ValueText}");
+            foreach (var rule in type.ChildElements.Where(c => c.Name is "normalize" or "validate"))
+                fields.Add($"{rule.Name}: {rule.GetAttributeValue(rule.Name == "normalize" ? "value" : "test")}");
+            if (s.Shape.Instance != null)
+                fields.AddRange(s.Shape.Instance.Methods.Values.Where(m => m.DeclaringElement?.Parent == type
+                    && !m.Name.StartsWith('_') && m.Doc?.AgentHidden != true).Select(m => m.TypedSignature));
+            return fields.Count == 0 ? $"{head} {{ }}" : $"{head} {{ {string.Join(", ", fields)} }}";
         }
 
         private static readonly HashSet<string> FieldBasics = new HashSet<string>(StringComparer.Ordinal) { "name", "type", "from", "default", "optional", "value", "description" };
@@ -406,6 +406,14 @@ namespace KScript.Language.Agents
             w.Append(project.IsXml ? "```xml\n" + CrashCourseXml() + "\n```\n\n" : "```kscript\n" + CrashCourse + "\n```\n\n");
             w.Append(Rules);
 
+            w.Append("\n## Design a change\n\n");
+            w.Append("- Read `kscript.json` and `.kscript/agents/index.md`. Reuse the native, record, model or library function already used by nearby code.\n");
+            w.Append("- Give domain values a type at entry. Use built-ins such as `email`, `uuid` and `duration`. For a repeated domain rule use `kscript make native` and put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
+            w.Append("- Give structured data a record (`kscript make type`), persisted rows a model (`kscript make model`), and parameters their domain types. Reserve `map` and `any` for genuinely open data. Validate external JSON at entry with `as: Type`.\n");
+            if (project.Packages.Contains("KScript.Http") || project.Routes != null)
+                w.Append("- Use `kscript make route` for routing and a controller for the action. Generate a request type with `kscript make request`, import it, and type the controller’s `json` parameter. Keep reusable behavior on the type or in a library module, and presentation in views or components.\n");
+            w.Append("- Run generators from this project so they follow its `paths` settings. Add tests beside the existing suite for accepted data, rejected data and error recovery.\n");
+
             w.Append("\n## Mistakes to avoid\n\n");
             w.Append(Mistakes);
             if (project.IsXml)
@@ -414,7 +422,7 @@ namespace KScript.Language.Agents
             }
 
             w.Append("\n## Workflow\n\n");
-            w.Append("1. After each change run `kscript check --output json`. Each problem has `file`, `line`, `column`, `code`, `message` and `fixes` (exact text edits). Repeat until it reports 0 errors.\n");
+            w.Append("1. Run `kscript check --output json --warnings-as-errors`. Fix diagnostics at their source. KS5016 identifies a known error that can escape the script. Handle it where the program can recover or report failure.\n");
             w.Append(project.Tests > 0 ? $"2. `kscript test` runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}. Add a test for each change.\n" : "2. `kscript test` runs `*.test.kscript` files. Add a test for each change.\n");
             w.Append("3. `kscript fmt` formats files. `kscript agents` refreshes these docs (the editor does it on save).\n");
             w.Append("4. Unsure about a command or method? Read its package's file in `.kscript/agents/packages/` (such as `KScript.Core.md`), or call `lookup` / `search_docs` on the `kscript mcp` server (the full reference). Never invent names: `kscript check` rejects unknown ones.\n");
@@ -474,7 +482,7 @@ namespace KScript.Language.Agents
               done: bool = false
             }
 
-            /// What the fn does, shown in hover. Tags: @param @returns @example @llm @prefer @avoid @pitfall
+            /// What the fn does, shown in hover. Tags: @param @returns @throws @example @llm @prefer @avoid @pitfall
             fn label(task: Task, mark: string = '-') => $mark + ' ' + $task.title->upper()
 
             fn open_tasks(tasks: Task[]) {
@@ -514,7 +522,7 @@ namespace KScript.Language.Agents
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
             - Types, models, enums, errors and jobs are named bare (`as: Task`, `User->create(name: 'Joan')`), and calling the name makes a value: `Task($data)`, `Task(title: 'x')`. An optional field is `due?: date`. Options go in brackets: `model User(timestamps, unique: [email]) { }`.
-            - A package is named only in its import: `import KScript.UI`, then `Window { }`, never `KScript.Window { }`. Nothing is imported for you (`job` and `dispatch` need `import KScript.Queue`).
+            - A package is named in its import: `import KScript.UI`, then `Window { }`. Core and the packages configured in `kscript.json` are available throughout the project. Import additional packages where used.
             - Lengths of time are durations, a number and a unit with no quotes: `timeout: 30s`, `ttl: 10m`, `wait(duration: 500ms)`. A plain number is seconds.
 
             """;
@@ -635,6 +643,10 @@ namespace KScript.Language.Agents
             string returns = c.ReturnType != null && c.ReturnType != KType.Any ? ": " + c.ReturnType : string.Empty;
             string summary = Summarize(c.Agent?.Llm ?? c.Description);
             e.Append($"- `{label}{returns}`{(summary != null ? " " + summary : string.Empty)}\n");
+            foreach (var parameter in c.Signatures.SelectMany(s => s.Parameters).DistinctBy(p => p.Name))
+                foreach (var field in parameter.Fields)
+                    e.Append($"  - `{parameter.Name}.{field.Name}: {field.Type}` {Summarize(field.Description)}"
+                        + (field.Example == null ? "\n" : $" Example `{field.Example}`.\n"));
             AppendNotes(e, c.Agent);
             // Examples are written in either format; ones that start with an element are XML, so leave them to the MCP server.
             string example = ShortExample(c.Example);

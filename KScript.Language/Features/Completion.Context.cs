@@ -31,7 +31,7 @@ namespace KScript.Language.Features
             ["enum"] = "enum ${1:Name} { ${2:a}, ${3:b} }",
             ["echo"] = "echo $0",
             ["return"] = "return $0",
-            ["throw"] = "throw '$0'",
+            ["throw"] = "throw \"$0\"",
             ["import"] = "import $0",
             ["const"] = "const ${1:name} = $0",
         };
@@ -292,7 +292,10 @@ namespace KScript.Language.Features
             foreach (ElementInfo e in Catalog.Elements)
             {
                 bool follows = e.MustFollow?.Count > 0;
-                if (!e.Context.HasFlag(ElementContext.Script) || e.Planned || NotCodeStatements.Contains(e.Name) || follows != followOn || !FitsHere(e, parent, previous)
+                bool attachedCatch = e.Name == "catch" && (previous?.Name is "try" or "fn" or "type" or "model"
+                    || previous?.Name == "catch" && previous.Parent?.Name is "try" or "fn" or "type" or "model");
+                if (!e.Context.HasFlag(ElementContext.Script) || e.Planned || NotCodeStatements.Contains(e.Name)
+                    || (e.Name == "catch" ? !attachedCatch : follows != followOn || !FitsHere(e, parent, previous))
                     || NeedsImport(analysis, e.Package))
                 {
                     continue;
@@ -310,8 +313,26 @@ namespace KScript.Language.Features
                     ReplaceSpan = replace,
                     SortText = e.Deprecated != null ? "9" + e.Name : "0" + Ranking.Statement(e.Name, KScript.Projects.TestSettings.IsTestFileName(analysis.Path)),
                 });
+                if (e.Name == "throw") items.Add(ConditionalThrowCompletion(replace, parent, includeThrow: true));
             }
             return items;
+        }
+
+        private static CompletionItem ConditionalThrowCompletion(TextSpan replace, MarkupElement parent, bool includeThrow)
+        {
+            string prefix = includeThrow ? "throw if" : "if";
+            bool rethrow = parent != null && parent.Ancestors().Prepend(parent).Any(e => e.Name == "catch");
+            return new CompletionItem
+            {
+                Label = prefix,
+                Kind = CompletionKind.Keyword,
+                Detail = rethrow ? "conditional rethrow" : "conditional throw",
+                Documentation = "When the condition is true, a bare throw rethrows the error being handled. Add an error map to throw a new error with its fields.",
+                InsertText = prefix + " ${1:condition}" + (rethrow ? "" : " {\n\ttype: '${2:Network}'\n\tmessage: '${3:Request failed}'\n}"),
+                IsSnippet = true,
+                ReplaceSpan = replace,
+                SortText = "1throw if",
+            };
         }
 
         /// <summary>An element as a .kscript statement: <c>describe(name: "$1") { }</c>, <c>wait(duration: $1)</c>; null for a bare word.</summary>
@@ -366,6 +387,7 @@ namespace KScript.Language.Features
             HashSet<string> taken = new HashSet<string>(already.Select(n => n.Trim()), StringComparer.Ordinal);
             DocumentAnalysis imported = Analyze(source, full);
             return imported.Symbols
+                .Where(s => s.Kind != SymbolKind.Function || (s.SourcePath == null && imported.RootScope.Lookup(s.Name, int.MaxValue) == s))
                 .Where(s => (s.Kind is SymbolKind.Function or SymbolKind.Constant || s.EnumValues != null || s.Shape.Type == KType.Type) && !taken.Contains(s.Name))
                 .GroupBy(s => s.Name).Select(g => g.First())
                 .Select(s => new CompletionItem

@@ -64,6 +64,9 @@ namespace KScript.Syntax.Markup
             /// <summary>The head of a block (if, for, while, match, case): also ends at '{'.</summary>
             Header,
 
+            /// <summary>A map payload: ends as soon as its closing '}' is read.</summary>
+            Map,
+
             /// <summary>An attribute value inside name(...): ends at ',' or ')'.</summary>
             Argument,
 
@@ -957,12 +960,13 @@ namespace KScript.Syntax.Markup
             if (Lookahead("=>"))
             {
                 pos += 2;
-                AddExpressionAttribute(e, "value", Stop.Line);
+                AddExpressionAttribute(e, "value", Stop.Line, beforeCatch: true);
             }
             else
             {
                 ParseBlock(e);
             }
+            ParseHandlers(e);
             Finish(e, start);
         }
 
@@ -1115,6 +1119,7 @@ namespace KScript.Syntax.Markup
                 // type User(fields: "login: string, id: int") needs no block.
                 e.StartTagSpan = TextSpan.FromBounds(start, pos);
             }
+            ParseHandlers(e);
             Finish(e, start);
         }
 
@@ -1368,7 +1373,10 @@ namespace KScript.Syntax.Markup
             }
             int saved = pos;
             pos = end;
-            bool field = AtStatementEnd() || PeekAfterSpaces('=') || LookaheadWordAfterSpaces("from");
+            SkipSpaces();
+            // fn(x) is also shaped like a parameterised type; the arrow makes it a normalize callback.
+            bool normalizer = word == "normalize" && text.AsSpan(p).StartsWith("fn(") && Lookahead("=>");
+            bool field = !normalizer && (AtStatementEnd() || Peek(0) == '=' || TryWord("from"));
             pos = saved;
             return field ? null : word;
         }
@@ -1378,15 +1386,6 @@ namespace KScript.Syntax.Markup
             int p = pos;
             while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
             return p < text.Length && text[p] == c;
-        }
-
-        private bool LookaheadWordAfterSpaces(string word)
-        {
-            int saved = pos;
-            SkipSpaces();
-            bool found = TryWord(word);
-            pos = saved;
-            return found;
         }
 
         /// <summary>
@@ -1562,6 +1561,12 @@ namespace KScript.Syntax.Markup
         {
             MarkupElement e = Begin(parent, "try", start);
             ParseBlock(e);
+            ParseHandlers(e, allowFinally: true);
+            Finish(e, start);
+        }
+
+        private void ParseHandlers(MarkupElement e, bool allowFinally = false)
+        {
             while (true)
             {
                 int save = pos;
@@ -1586,7 +1591,7 @@ namespace KScript.Syntax.Markup
                     Finish(c, clauseStart);
                     continue;
                 }
-                if (word == "finally")
+                if (allowFinally && word == "finally")
                 {
                     MarkupElement f = Begin(e, "finally", clauseStart);
                     ParseBlock(f);
@@ -1596,7 +1601,6 @@ namespace KScript.Syntax.Markup
                 pos = save;
                 break;
             }
-            Finish(e, start);
         }
 
         /// <summary>
@@ -1664,12 +1668,37 @@ namespace KScript.Syntax.Markup
         /// <summary>
         /// <c>throw "message"</c>, <c>throw Validation "Age must be positive, got {$age}"</c>, <c>throw NotFound(id: 42)</c>,
         /// <c>throw $err</c> (a caught error, again) or a bare <c>throw</c>, which rethrows the error a catch is handling.
+        /// <c>throw if condition</c> guards a bare throw, or a new error if a map follows the condition.
         /// </summary>
         private void ParseThrow(MarkupElement parent, int start)
         {
-            MarkupElement e = Begin(parent, "throw", start);
+            pos += "throw".Length;
             SkipSpaces();
-            if (Peek(0) is '$' or '@' || (Lexer.IsIdentStart(Peek(0)) && LooksLikeCall()))
+            int guardStart = pos;
+            if (TryWord("if"))
+            {
+                MarkupElement guard = Begin(parent, "if", start, new TextSpan(guardStart, 2), consumeName: false);
+                AddExpressionAttribute(guard, "test", Stop.Header);
+                int payload = pos;
+                guard.StartTagSpan = TextSpan.FromBounds(start, payload);
+                if (Peek(0) == '{')
+                {
+                    MarkupElement error = Begin(guard, "throw", payload, new TextSpan(payload, 0), consumeName: false);
+                    AddExpressionAttribute(error, "value", Stop.Map);
+                    Finish(error, payload);
+                    guard.ContentSpan = error.Span;
+                }
+                else
+                {
+                    MarkupElement error = Begin(guard, "throw", start, consumeName: false);
+                    Finish(error, start, error.NameSpan.End);
+                    guard.ContentSpan = error.Span;
+                }
+                Finish(guard, start);
+                return;
+            }
+            MarkupElement e = Begin(parent, "throw", start, consumeName: false);
+            if (Peek(0) is '$' or '@' or '{' || (Lexer.IsIdentStart(Peek(0)) && LooksLikeCall()))
             {
                 AddExpressionAttribute(e, "value", Stop.Line);
                 Finish(e, start);
@@ -1955,9 +1984,9 @@ namespace KScript.Syntax.Markup
             return e;
         }
 
-        private void Finish(MarkupElement e, int start)
+        private void Finish(MarkupElement e, int start, int? end = null)
         {
-            e.Span = TextSpan.FromBounds(start, Math.Max(start, pos));
+            e.Span = TextSpan.FromBounds(start, Math.Max(start, end ?? pos));
             if (e.StartTagSpan.Length == 0)
             {
                 e.StartTagSpan = e.Span;
@@ -1979,9 +2008,9 @@ namespace KScript.Syntax.Markup
         private void AddAttribute(MarkupElement e, string name, DecodedText value, TextSpan span, TextSpan? nameSpan = null, char quote = '\0') =>
             e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? new TextSpan(span.Start, 0), Value = value, Span = span, Quote = quote, Owner = e });
 
-        private void AddExpressionAttribute(MarkupElement e, string name, Stop stop)
+        private void AddExpressionAttribute(MarkupElement e, string name, Stop stop, bool beforeCatch = false)
         {
-            (int s, int end) = ReadExpression(stop);
+            (int s, int end) = ReadExpression(stop, beforeCatch: beforeCatch);
             if (end == s)
             {
                 Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, $"Write the {name} for this {e.Name}.");
@@ -1998,7 +2027,7 @@ namespace KScript.Syntax.Markup
         /// Reads an expression as raw text, keeping brackets and strings balanced. A new line ends it unless a bracket
         /// is open, the line ends with an operator, or the next line starts with one (such as |>).
         /// </summary>
-        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false, bool recoverModelList = false)
+        private (int Start, int End) ReadExpression(Stop stop, bool plainRuleList = false, bool recoverModelList = false, bool beforeCatch = false)
         {
             SkipSpaces();
             int start = pos;
@@ -2072,6 +2101,7 @@ namespace KScript.Syntax.Markup
                     }
                     brackets.Pop();
                     pos++;
+                    if (stop == Stop.Map && brackets.Count == 0) break;
                     continue;
                 }
                 // In an unfinished model list, leave the next named option for the header parser.
@@ -2082,6 +2112,7 @@ namespace KScript.Syntax.Markup
                 }
                 if (brackets.Count == 0)
                 {
+                    if (beforeCatch && pos > start && char.IsWhiteSpace(text[pos - 1]) && c == 'c' && PeekName() == "catch") break;
                     if (c == ';' && stop is Stop.Line or Stop.Rule or Stop.Header or Stop.Arm)
                     {
                         break;

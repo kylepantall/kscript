@@ -1,0 +1,65 @@
+fn make_adder(offset: int) => fn(n) => $n + $offset
+
+fn apply_twice(action: fn, value: number) => $action($action($value))
+
+fn format_label(text: string, prefix = '[', suffix = ']') =>
+  $prefix + $text + $suffix
+
+fn make_counter(start: int) {
+  current = $start
+  fn advance(step: int = 1) {
+    current += $step
+    return $current
+  }
+  return @advance
+}
+
+describe(name: "Functions and closures") {
+  test(name: "callbacks returned by a factory retain their own arguments") {
+    add_three = @make_adder(3)
+    add_ten = @make_adder(10)
+    expect(value: $add_ten(2), equals: 12)
+    expect(value: $add_three(2), equals: 5)
+  }
+
+  test(name: "a named function can call a callback more than once") {
+    expect(value: @apply_twice(fn(n) => $n * 3, 2), equals: 18)
+    add_three = @make_adder(3)
+    expect(value: @apply_twice($add_three, 2), equals: 8)
+  }
+
+  test(name: "a returned named function retains mutable state between calls") {
+    left = @make_counter(0)
+    right = @make_counter(10)
+    expect(value: $left(), equals: 1)
+    expect(value: $left(4), equals: 5)
+    expect(value: $right(), equals: 11)
+    expect(value: $left(), equals: 6)
+  }
+
+  test(name: "named arguments can skip a default or arrive out of order") {
+    expect(value: @format_label('cat'), equals: '[cat]')
+    expect(value: @format_label('cat', suffix: '!'), equals: '[cat!')
+    expect(
+      value: @format_label(suffix: '>', text: 'cat', prefix: '<'),
+      equals: '<cat>'
+    )
+  }
+
+  test(name: "a function reference keeps its defaults when called through a variable") {
+    label = @format_label
+    expect(value: $label('cat'), equals: '[cat]')
+    expect(value: $label('cat', prefix: '('), equals: '(cat]')
+  }
+
+  test(name: "an indexed callback receives both each item and its position") {
+    places = ['start', 'end']->map(fn(name, index) => "{$index}={$name}")
+    expect(value: $places, equals: ['0=start', '1=end'])
+  }
+
+  test(name: "reduce starts at the given seed even when no items are present") {
+    add = fn(total, next) => $total + $next
+    expect(value: [2, 3]->reduce($add, 10), equals: 15)
+    expect(value: []->reduce($add, 10), equals: 10)
+  }
+}

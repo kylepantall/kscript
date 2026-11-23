@@ -201,6 +201,13 @@ fn hello(who: string) => @greet($who)
 start of a doc line suggests the tags (with an `@param name` for each parameter not described yet), typing a name
 after `@param` or `@arg` suggests the parameters, and hovering a tag says what it means.
 
+Use one `@throws` line per error type on a function or method. For example,
+`/// @throws Network The host declined the request.` explains when callers may see a network error.
+Hover and signature help also show error types inferred from explicit throws and calls to known functions or methods.
+An unconditional matching catch handles that error. A rethrow makes it visible to the caller again.
+For native operations, runtime-selected callbacks, and computed error types, document known outcomes with `@throws`.
+These hints help callers choose handlers. KScript accepts calls without a catch.
+
 `kscript check` and the editor warn about a `@param` that names no parameter (KS4007) and about calls to a
 `@deprecated` function (KS4008). `@public` marks a function used from outside the project, so it is never reported as
 [unused](language.md#unused-code) (KS6002). `@llm`, `@prefer`, `@avoid`, `@pitfall` and `@agent hide` are notes for

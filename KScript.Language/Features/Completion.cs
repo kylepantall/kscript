@@ -300,10 +300,10 @@ namespace KScript.Language.Features
             }
             if (e.MustBeInside != null && e.MustBeInside.Count > 0)
             {
-                bool inside = e.MustBeInside.Contains("fn") || e.InsideAnyAncestor
+                bool inside = (e.Name != "catch" && e.MustBeInside.Contains("fn")) || e.InsideAnyAncestor
                     ? parent != null && (e.MustBeInside.Contains(ElementInfo.BareName(parent.Name)) || parent.Ancestors().Any(a => e.MustBeInside.Contains(ElementInfo.BareName(a.Name))))
                     : parent != null && e.MustBeInside.Contains(parent.Name);
-                if (!inside)
+                if (!inside && !(e.Name == "return" && parent != null && parent.Ancestors().Prepend(parent).Any(a => a.Name == "catch" && a.Parent?.Name is "type" or "model")))
                 {
                     return false;
                 }
@@ -526,7 +526,10 @@ namespace KScript.Language.Features
                     return a.Options.Concat(TypeNames(analysis)).Distinct().Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) }).ToList();
 
                 case AttributeKind.ErrorType:
-                    return ErrorTypeCompletions(analysis, cursor.Offset, replace);
+                    var errors = ErrorTypeCompletions(analysis, cursor.Offset, replace);
+                    if (analysis.Markup.Syntax == SourceSyntax.Code && cursor.TagElement.Name == "throw")
+                        errors.Add(ConditionalThrowCompletion(replace, cursor.TagElement.Parent, includeThrow: false));
+                    return errors;
 
                 case AttributeKind.Bool:
                     // A boolean is true or false (KS6011); the flag on its own is offered with the argument names.
@@ -932,8 +935,7 @@ namespace KScript.Language.Features
         private List<CompletionItem> CommandCompletions(DocumentAnalysis analysis, TextSpan replace, bool withSigil)
         {
             string sigil = withSigil ? "@" : string.Empty;
-            List<CompletionItem> items = analysis.Symbols.Where(s => s.Kind == SymbolKind.Function)
-                .GroupBy(s => s.Name).Select(g => g.First())
+            List<CompletionItem> items = analysis.VisibleFunctions(replace.Start)
                 .Select(s => new CompletionItem
                 {
                     Label = sigil + s.Name,
@@ -964,7 +966,7 @@ namespace KScript.Language.Features
         }
 
         private List<CompletionItem> FunctionSymbolCompletions(DocumentAnalysis analysis, TextSpan replace) =>
-            analysis.Symbols.Where(s => s.Kind == SymbolKind.Function).GroupBy(s => s.Name).Select(g => g.First())
+            analysis.VisibleFunctions(replace.Start)
                 .Select(s => new CompletionItem { Label = s.Name, Kind = CompletionKind.Function, Detail = s.TypedSignature, ReplaceSpan = replace })
                 .ToList();
 
@@ -988,7 +990,7 @@ namespace KScript.Language.Features
 
             if (pipe)
             {
-                items.AddRange(analysis.Symbols.Where(s => s.Kind == SymbolKind.Function).GroupBy(s => s.Name).Select(g => g.First())
+                items.AddRange(analysis.VisibleFunctions(replace.Start)
                     .Select(s => new CompletionItem
                     {
                         Label = s.Name,
@@ -1145,7 +1147,7 @@ namespace KScript.Language.Features
             {
                 string want = SplitType(type).Name;
                 HashSet<string> giving = new HashSet<string>(Catalog.Commands.Where(c => c.ReturnType == want).Select(c => c.Name), StringComparer.Ordinal);
-                giving.UnionWith(analysis.Symbols.Where(f => f.Kind == SymbolKind.Function && (f.ReturnShape.Type == want || f.ReturnShape.Name == want)).Select(f => f.Name));
+                giving.UnionWith(analysis.VisibleFunctions(offset).Where(f => f.ReturnShape.Type == want || f.ReturnShape.Name == want).Select(f => f.Name));
                 commands = commands.Select(i => giving.Contains(i.FilterText ?? i.Label) ? WithSort(i, "0" + i.SortText) : i).ToList();
             }
             return commands;

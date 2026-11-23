@@ -26,11 +26,11 @@ namespace KScript.Language.Analysis
         /// that many others reach (a project's native types, which every file sees) is analysed once, not once per path.
         /// </summary>
         [ThreadStatic]
-        private static Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape)>> nestedImportCache;
+        private static Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape, IReadOnlyList<string> Errors)>> nestedImportCache;
 
         /// <summary>The exports of imported files, by path, shared by the passes of one analysis.</summary>
-        private Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape)>> importCache =
-            new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape)>>(StringComparer.Ordinal);
+        private Dictionary<string, Dictionary<string, (SymbolKind Kind, TypeShape Shape, IReadOnlyList<string> Errors)>> importCache =
+            new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape, IReadOnlyList<string>)>>(StringComparer.Ordinal);
 
         /// <summary>
         /// Runs the analysis until function return types, and the parameter types calls give, stop changing. A function can be called above the line that
@@ -81,7 +81,7 @@ namespace KScript.Language.Analysis
                     continue;
                 }
 
-                Dictionary<string, (SymbolKind Kind, TypeShape Shape)> exports = ImportedTypes(symbol.SourcePath);
+                Dictionary<string, (SymbolKind Kind, TypeShape Shape, IReadOnlyList<string> Errors)> exports = ImportedTypes(symbol.SourcePath);
                 if (exports == null || !exports.TryGetValue(symbol.Name, out var export))
                 {
                     continue;
@@ -89,6 +89,7 @@ namespace KScript.Language.Analysis
                 if (symbol.Kind == SymbolKind.Function && export.Kind == SymbolKind.Function)
                 {
                     symbol.ReturnShape = export.Shape;
+                    symbol.EscapingErrors = export.Errors;
                 }
                 else if (symbol.Kind != SymbolKind.Function && export.Kind != SymbolKind.Function && symbol.Shape.Type == KType.Any)
                 {
@@ -98,7 +99,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The return types of an imported file's functions and the types of its top-level variables.</summary>
-        private Dictionary<string, (SymbolKind Kind, TypeShape Shape)> ImportedTypes(string path)
+        private Dictionary<string, (SymbolKind Kind, TypeShape Shape, IReadOnlyList<string> Errors)> ImportedTypes(string path)
         {
             if (importCache.TryGetValue(path, out var cached))
             {
@@ -114,7 +115,7 @@ namespace KScript.Language.Analysis
             bool outermost = analysingImports.Count == 0;
             if (outermost)
             {
-                nestedImportCache = new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape)>>(StringComparer.Ordinal);
+                nestedImportCache = new Dictionary<string, Dictionary<string, (SymbolKind, TypeShape, IReadOnlyList<string>)>>(StringComparer.Ordinal);
             }
             else if (nestedImportCache != null && nestedImportCache.TryGetValue(path, out var shared))
             {
@@ -127,19 +128,20 @@ namespace KScript.Language.Analysis
             }
             try
             {
-                DocumentAnalysis other = Analyze(text, path, files, catalog);
-                Dictionary<string, (SymbolKind, TypeShape)> exports = new Dictionary<string, (SymbolKind, TypeShape)>(StringComparer.Ordinal);
+                // Scanning callers while their own imports are being resolved can cache incomplete method uses.
+                DocumentAnalysis other = AnalyzeFile(text, path, files, catalog);
+                Dictionary<string, (SymbolKind, TypeShape, IReadOnlyList<string>)> exports = new Dictionary<string, (SymbolKind, TypeShape, IReadOnlyList<string>)>(StringComparer.Ordinal);
                 // Top-level names live in the scope of the <kscript> element's content.
                 HashSet<Scope> topLevel = new HashSet<Scope>(other.RootScope.Children.Where(c => other.Markup.RootElements.Any(r => r.ContentSpan.Equals(c.Span)))) { other.RootScope };
                 foreach (Symbol s in other.Symbols.Where(s => s.SourcePath == null && s.DeclaringElement != null))
                 {
                     if (s.Kind == SymbolKind.Function && topLevel.Any(scope => scope.Symbols.Any(r => r.Symbol == s)))
                     {
-                        exports.TryAdd(s.Name, (SymbolKind.Function, s.ReturnShape));
+                        exports.TryAdd(s.Name, (SymbolKind.Function, s.ReturnShape, s.EscapingErrors));
                     }
                     else if ((s.Kind == SymbolKind.Constant || s.Kind == SymbolKind.Variable) && topLevel.Any(scope => scope.Symbols.Any(r => r.Symbol == s)))
                     {
-                        exports.TryAdd(s.Name, (s.Kind, s.Shape));
+                        exports.TryAdd(s.Name, (s.Kind, s.Shape, Array.Empty<string>()));
                     }
                 }
                 importCache[path] = exports;
@@ -160,7 +162,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>After a &lt;fn&gt; is walked: works out what it returns from value="..." or its &lt;return&gt; elements.</summary>
-        private void RecordReturnShape(MarkupElement fn)
+        private void RecordReturnShape(MarkupElement fn, IReadOnlyList<TypeShape> typeFallbacks = null)
         {
             Symbol symbol = result.Symbols.FirstOrDefault(s => s.Kind == SymbolKind.Function && s.DeclaringElement == fn && s.SourcePath == null);
             if (symbol == null)
@@ -168,7 +170,7 @@ namespace KScript.Language.Analysis
                 return;
             }
 
-            List<TypeShape> shapes = new List<TypeShape>();
+            List<TypeShape> shapes = typeFallbacks?.ToList() ?? new List<TypeShape>();
             foreach (ExpressionRegion region in result.Regions)
             {
                 if (region.Attribute?.Name != "value" || region.Parse?.Root == null)
@@ -185,7 +187,7 @@ namespace KScript.Language.Analysis
 
             TypeShape returned = Unify(shapes);
             // A recursive function's own call gives nothing; keep what the last pass found rather than forgetting it.
-            if (returned.Type != KType.Any || symbol.ReturnShape.Type == KType.Any)
+            if (typeFallbacks != null || returned.Type != KType.Any || symbol.ReturnShape.Type == KType.Any)
             {
                 symbol.ReturnShape = returned;
             }

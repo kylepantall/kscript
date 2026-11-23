@@ -902,7 +902,7 @@ namespace KScript.Runtime
                 throw Fail(node, ctx, $"{ns.Display} has no command '{member}'." + Suggest(member, ns.Names), "Name");
             }
 
-            if (scope.TryGet(name, out object stored) && Values.Unwrap(stored) is ICallable) return stored;
+            if (scope.TryGet(name, out object stored, includeMethods: true) && Values.Unwrap(stored) is ICallable) return stored;
             if (module != null && module.Commands.TryGetValue(name, out CommandDefinition command)) return command;
 
             if (Retired.Commands.TryGetValue(name, out var retired))
@@ -985,7 +985,7 @@ namespace KScript.Runtime
                     if (piped && pipedValue is RefinedValue refined)
                     {
                         if (refined.Type.TryFindMethod(id.Name, out RefinedType owner, out MarkupElement declaration))
-                            return CallRefinedMethod(refined, owner, declaration, id.Name, args.Skip(1).ToList(), named, scope, ctx.Module);
+                            return Call(BindRefinedMethod(refined, owner, declaration), args.Skip(1).ToList(), named, scope, ctx.Module);
                         pipedValue = refined.Value;
                     }
                     if (piped && Extensions.TryFind(pipedValue, id.Name, ctx.Module, out ExtensionMethod extension))
@@ -1145,7 +1145,7 @@ namespace KScript.Runtime
             if (target is RefinedValue refined)
             {
                 if (refined.Type.TryFindMethod(name, out RefinedType declaringType, out MarkupElement declaration))
-                    return CallRefinedMethod(refined, declaringType, declaration, name, args, named, scope, ctx.Module);
+                    return Call(BindRefinedMethod(refined, declaringType, declaration), args, named, scope, ctx.Module);
                 target = refined.Value;
             }
             // extend date { fn json() => ... }: methods the script (its imports, its project) adds to the type come first.
@@ -1157,12 +1157,10 @@ namespace KScript.Runtime
             // A <type>'s own methods: fn inside the type, with the record's fields (and $this) as variables.
             if (target is Record record && record.Type.OwnMethods.TryGetValue(name, out MarkupElement methodElement))
             {
-                Scope methodScope = record.Type.Closure.Child();
-                foreach (KeyValuePair<string, object> field in record) methodScope.Declare(field.Key, field.Value);
-                methodScope.Declare("this", record);
-                DeclareFunction(methodElement, methodScope, record.Type.Module);
-                methodScope.TryGet(name, out object fn);
-                return Call((ICallable)fn, args, named, scope, ctx.Module);
+                RecordType methodOwner = record.Type.MethodOwner(name, methodElement);
+                Scope methodScope = CatchClauses.BindReceiver(methodOwner.Closure, record, recordFields: true);
+                var fn = DeclareFunction(methodElement, methodScope, methodOwner.Module, record.Type.Catches, record);
+                return Call(fn, args, named, scope, ctx.Module);
             }
 
             // Methods the record's kind adds, such as a model record's relations: $user->posts().
@@ -1218,15 +1216,11 @@ namespace KScript.Runtime
             throw Fail(node, ctx, $"{noun} have no method ->{name}()." + Suggest(name, known).Replace("Did you mean ", "Did you mean ->").Replace("?", "()?") + hint, "Name");
         }
 
-        private object CallRefinedMethod(RefinedValue target, RefinedType owner, MarkupElement method, string name,
-            List<object> args, Dictionary<string, object> named, Scope scope, Module caller)
+        internal UserFunction BindRefinedMethod(object target, RefinedType owner, MarkupElement method, RefinedType normalizing = null)
         {
-            Scope closure = owner.Closure.Child();
-            closure.Declare("this", target);
-            closure.Declare("value", target.Value);
-            DeclareFunction(method, closure, owner.Module);
-            closure.TryGet(name, out object fn);
-            return Call((ICallable)fn, args, named, scope, caller);
+            Scope closure = CatchClauses.BindReceiver(owner.Closure, target, recordFields: false);
+            var type = normalizing ?? ((RefinedValue)target).Type;
+            return DeclareFunction(method, closure, owner.Module, type.Catches, target);
         }
 
         #endregion

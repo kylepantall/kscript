@@ -50,6 +50,20 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ATypeCatchCanChangeTheReturnTypeOfItsMethods()
+        {
+            var analysis = Service.Analyze("""
+                type Probe {
+                  fn status(offline: bool) {
+                    if $offline { throw Network "down" }
+                    return 200
+                  }
+                } catch Network { return 'offline' }
+                """, "probe.kscript");
+            Assert.Equal("any", Named(analysis, "status").ReturnShape.Type);
+        }
+
+        [Fact]
         public void ResultsOfCallsHaveTypesEvenWhenTheFunctionComesLater()
         {
             // The call is above the function, so this needs a second pass.
@@ -205,6 +219,18 @@ namespace KScript.Language.Tests
             List<string> hints = Service.GetInlayHints(a).Where(h => h.Label.StartsWith(" →", StringComparison.Ordinal))
                 .Select(h => text.Substring(0, h.Offset).Split('\n').Last() + "⟦" + h.Label + "⟧").ToList();
             Assert.Equal(new[] { "fn none()⟦ → number⟧", "fn one(key)⟦ → bool⟧", "fn spaced (a, b = (1))⟦ → string⟧" }, hints);
+        }
+
+        [Fact]
+        public void AReceiverSpecificMethodOnAnyHasNoConcreteReturnHint()
+        {
+            const string text = "fn trim_dynamic(key: any) => $key->trim()\n"
+                + "fn trim_text(key: string) => $key->trim()\n"
+                + "fn stringify(key: any) => $key->to_string()\n";
+            var analysis = Service.Analyze(text, "trim.kscript");
+            var hints = Service.GetInlayHints(analysis).Where(h => h.Label.StartsWith(" →", StringComparison.Ordinal))
+                .Select(h => (analysis.Source.GetPosition(h.Offset).Line, h.Label));
+            Assert.Equal(new[] { (1, " → string"), (2, " → string") }, hints);
         }
 
         [Fact]

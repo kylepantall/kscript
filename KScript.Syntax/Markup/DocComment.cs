@@ -33,6 +33,9 @@ namespace KScript.Syntax.Markup
         /// <summary>@param descriptions, by parameter name (without $), in the order written.</summary>
         public IReadOnlyList<(string Name, string Text)> Params => paramList;
 
+        public IReadOnlyList<(string Name, string Text)> Throws => throwsList;
+        private readonly List<(string, string)> throwsList = new();
+
         public string Returns { get; private set; }
 
         /// <summary>The @deprecated text: empty when deprecated without a reason, null when not deprecated.</summary>
@@ -63,7 +66,7 @@ namespace KScript.Syntax.Markup
         /// <summary>True when the doc says <c>@agent hide</c>: the symbol is left out of the agent docs.</summary>
         public bool AgentHidden { get; private set; }
 
-        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && Returns == null && Deprecated == null && !IsPublic && examples.Count == 0 && see.Count == 0
+        public bool IsEmpty => Summary.Length == 0 && paramList.Count == 0 && throwsList.Count == 0 && Returns == null && Deprecated == null && !IsPublic && examples.Count == 0 && see.Count == 0
             && Llm == null && prefer.Count == 0 && avoid.Count == 0 && pitfalls.Count == 0 && !AgentHidden;
 
         private readonly List<(string, string)> paramList = new List<(string, string)>();
@@ -84,6 +87,7 @@ namespace KScript.Syntax.Markup
             new DocTag("param", "name text", "Describes a parameter: its name (the $ is optional), then what it is for.", Repeats: true),
             new DocTag("arg", "name text", "Another name for @param: describes a parameter.", Repeats: true, AliasOf: "param"),
             new DocTag("argument", "name text", "Another name for @param: describes a parameter.", Repeats: true, AliasOf: "param"),
+            new DocTag("throws", "type text", "Names an error type that may escape a call, with an optional explanation.", Repeats: true),
             new DocTag("returns", "text", "Describes the result."),
             new DocTag("return", "text", "Another name for @returns: describes the result.", AliasOf: "returns"),
             new DocTag("example", "code", "Example code, on the same line or on the indented lines below. Hover shows it as a code block.", Repeats: true),
@@ -151,12 +155,14 @@ namespace KScript.Syntax.Markup
                 current = new StringBuilder();
                 switch (FindTag(tag).AliasOf ?? tag)
                 {
+                    case "throws":
                     case "param":
                         {
                             int space = rest.IndexOfAny(new[] { ' ', '\t' });
                             string name = (space < 0 ? rest : rest.Substring(0, space)).TrimStart('$');
                             current.Append(space < 0 ? string.Empty : rest.Substring(space + 1).Trim()).Append('\n');
-                            finish = t => doc.paramList.Add((name, Clean(t)));
+                            var entries = tag == "throws" ? doc.throwsList : doc.paramList;
+                            finish = t => { if (tag != "throws" || name.Length > 0) entries.Add((name, Clean(t))); };
                             break;
                         }
                     case "returns":
@@ -216,8 +222,17 @@ namespace KScript.Syntax.Markup
             return lines.Select(l => l.Length >= indent ? l.Substring(indent) : l.TrimStart());
         }
 
+        public static string ThrowsMarkdown(IEnumerable<(string Name, string Text)> documented, IEnumerable<string> inferred)
+        {
+            var entries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in documented ?? Array.Empty<(string, string)>()) entries[item.Name] = item.Text;
+            foreach (string name in inferred ?? Array.Empty<string>()) entries.TryAdd(name, "");
+            return entries.Count == 0 ? "" : "**May throw**\n\n" + string.Join("\n", entries.Select(item =>
+                "- `" + item.Key + "`" + (string.IsNullOrEmpty(item.Value) ? "" : " — " + item.Value)));
+        }
+
         /// <summary>The whole comment as Markdown for a hover: deprecation, summary, parameters, result, examples.</summary>
-        public string ToMarkdown(bool includeParams = true)
+        public string ToMarkdown(bool includeParams = true, IEnumerable<string> inferredThrows = null)
         {
             StringBuilder sb = new StringBuilder();
             void Block(string s)
@@ -245,6 +260,8 @@ namespace KScript.Syntax.Markup
             {
                 Block("**Returns** " + Returns);
             }
+            string errors = ThrowsMarkdown(Throws, inferredThrows);
+            if (errors.Length > 0) Block(errors);
             foreach (string example in examples)
             {
                 Block("**Example**\n```kscript\n" + example + "\n```");

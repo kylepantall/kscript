@@ -17,6 +17,9 @@ namespace KScript.Runtime
 
         public Scope Parent { get; }
 
+        // A normalize rule can call methods of the value being normalized with @name.
+        internal (RefinedType Type, object Input)? Normalizing { get; init; }
+
         public Scope Child() => new Scope(this);
 
         public Scope Root
@@ -29,10 +32,18 @@ namespace KScript.Runtime
             }
         }
 
-        public bool TryGet(string name, out object value)
+        public bool TryGet(string name, out object value) => TryGet(name, out value, includeMethods: false);
+
+        internal bool TryGet(string name, out object value, bool includeMethods)
         {
             for (Scope s = this; s != null; s = s.Parent)
             {
+                if (includeMethods && s.Normalizing is { } normalizer
+                    && normalizer.Type.TryFindMethod(name, out RefinedType owner, out var method))
+                {
+                    value = owner.Module.Interpreter.BindRefinedMethod(normalizer.Input, owner, method, normalizer.Type);
+                    return true;
+                }
                 lock (s.vars)
                 {
                     if (s.vars.TryGetValue(name, out value)) return true;

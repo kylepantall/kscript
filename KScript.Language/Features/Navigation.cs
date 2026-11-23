@@ -265,6 +265,11 @@ namespace KScript.Language.Features
             Cursor cursor = Locate(analysis, offset);
             if (cursor.Region != null && cursor.InCode && NodeAt(cursor.Region, cursor.LocalIndex) is MemberNode member && member.NameSpan.Contains(cursor.LocalIndex))
             {
+                if (ConfigField(analysis, cursor.Region, member) is ConfigKey setting)
+                {
+                    locations.Add(setting.Location);
+                    return locations;
+                }
                 TypeShape target = InferAt(analysis, cursor.Region, member.Target);
                 if (target.Fields.TryGetValue(member.Name, out FieldInfo field) && field.Declaration.HasValue)
                 {
@@ -311,22 +316,17 @@ namespace KScript.Language.Features
             }
             Symbol s = at.Symbol;
             string self = Path.GetFullPath(analysis.Path);
-            string target = s.SourcePath ?? (s.DeclaringElement != null && IsTopLevel(analysis, s) ? self : null);
+            string target = DefinitionPath(analysis, s);
             if (target == null)
             {
                 return local;
             }
 
-            List<SourceLocation> found = new List<SourceLocation>();
-            if (target == self)
-            {
-                found.AddRange(local);
-            }
-            else
-            {
-                // Here: every use of the imported name, whichever way it was imported.
-                found.AddRange(analysis.References.Where(r => r.Symbol.SourcePath == target && r.Symbol.Name == s.Name && !r.IsDeclaration).Select(r => new SourceLocation(null, r.Span)));
-            }
+            IEnumerable<SymbolReference> Matches(DocumentAnalysis doc, string path) =>
+                doc.References.Where(r => (!r.IsDeclaration || (includeDeclaration && path == target))
+                    && r.Symbol.Kind == s.Kind && r.Symbol.ProjectUseName == s.ProjectUseName && DefinitionPath(doc, r.Symbol) == target);
+
+            List<SourceLocation> found = Matches(analysis, self).Select(r => new SourceLocation(null, r.Span)).ToList();
 
             string stem = Path.GetFileName(target).Split('.')[0];
             foreach (string file in ProjectUsage.FilesUnder(ProjectFolder(target) ?? Path.GetDirectoryName(target), Files))
@@ -339,23 +339,24 @@ namespace KScript.Language.Features
                 string text = Files.ReadText(full);
                 // A project-native refinement can be used by a literal in a file that never spells its type name.
                 if (text == null || (s.Shape.LiteralPattern == null && (text.IndexOf(s.Name, StringComparison.Ordinal) < 0
-                    || (full != target && text.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))))
+                    || (s.MethodLocation == null && full != target && text.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))))
                 {
                     continue;
                 }
                 DocumentAnalysis other = Analyze(text, full);
-                IEnumerable<SymbolReference> uses = full == target
-                    ? other.References.Where(r => r.Symbol.SourcePath == null && r.Symbol.Name == s.Name && r.Symbol.Kind == s.Kind && (includeDeclaration || !r.IsDeclaration))
-                    : other.References.Where(r => r.Symbol.SourcePath == target && r.Symbol.Name == s.Name && !r.IsDeclaration);
-                found.AddRange(uses.Select(r => new SourceLocation(full, other.Source.GetPosition(r.Span.Start), other.Source.GetPosition(r.Span.End))));
+                found.AddRange(Matches(other, full).Select(r => new SourceLocation(full, other.Source.GetPosition(r.Span.Start), other.Source.GetPosition(r.Span.End))));
             }
             return found;
         }
 
-        /// <summary>True for a function or constant at the top of its script, which other scripts can import.</summary>
-        private static bool IsTopLevel(DocumentAnalysis analysis, Symbol s) =>
-            s.Kind == SymbolKind.Function || analysis.RootScope.Symbols.Any(r => r.Symbol == s)
-            || analysis.RootScope.Children.Any(c => analysis.Markup.RootElements.Any(e => e.ContentSpan.Equals(c.Span)) && c.Symbols.Any(r => r.Symbol == s));
+        private static string DefinitionPath(DocumentAnalysis analysis, Symbol s)
+        {
+            string path = s.MethodLocation?.Path ?? s.SourcePath;
+            if (path == null && s.DeclaringElement != null && (analysis.RootScope.Symbols.Any(r => r.Symbol == s)
+                || analysis.RootScope.Children.Any(c => analysis.Markup.RootElements.Any(e => e.ContentSpan.Equals(c.Span)) && c.Symbols.Any(r => r.Symbol == s))))
+                path = analysis.Path;
+            return path == null ? null : Path.GetFullPath(path);
+        }
 
         /// <summary>The span that would be renamed at the offset, or null if nothing can be renamed there.</summary>
         public TextSpan? PrepareRename(DocumentAnalysis analysis, int offset)
@@ -384,8 +385,8 @@ namespace KScript.Language.Features
             }
             Symbol clash = analysis.Symbols.FirstOrDefault(s => s != at.Symbol && s.Name == name &&
                 (s.Kind == SymbolKind.Function) == (at.Symbol.Kind == SymbolKind.Function) &&
-                (s.Kind == SymbolKind.BuiltIn || analysis.ReferencesTo(at.Symbol).Any(r => analysis.ScopeAt(r.Span.Start).Lookup(name, r.Span.Start) == s)
-                    || analysis.ReferencesTo(s).Any(r => analysis.ScopeAt(r.Span.Start).Lookup(at.Symbol.Name, r.Span.Start) == at.Symbol)));
+                (s.Kind == SymbolKind.BuiltIn || analysis.ReferencesTo(at.Symbol).Any(r => analysis.ScopeAt(r.Span.Start).Lookup(name, r.Span.Start, includeMethods: s.Kind == SymbolKind.Function) == s)
+                    || analysis.ReferencesTo(s).Any(r => analysis.ScopeAt(r.Span.Start).Lookup(at.Symbol.Name, r.Span.Start, includeMethods: s.Kind == SymbolKind.Function) == at.Symbol)));
             if (clash != null)
             {
                 return new RenameResult { Error = $"'{name}' is already used here." };

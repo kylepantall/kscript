@@ -83,40 +83,13 @@ namespace KScript.Runtime
             string root = !string.IsNullOrWhiteSpace(options.Root) && Path.IsPathRooted(options.Root)
                 ? Path.GetFullPath(options.Root)
                 : host.ResolvePath(string.IsNullOrWhiteSpace(options.Root) ? "." : options.Root, directory);
-            bool defaults = options.Files == null;
-            List<string> names = options.Files ?? ConfigOptions.DefaultFiles.ToList();
-
-            // Every layer, in the order it applies: the base files, then the environment's files.
-            var layers = new List<(string Path, bool EnvFile)>();
-            var missing = new List<string>();
-            foreach (string entry in names)
-            {
-                string name = entry.Trim();
-                bool optional = defaults || name.EndsWith('?');
-                name = name.TrimEnd('?').Trim();
-                if (name.Length == 0) continue;
-                List<string> found = Candidates(name).Select(c => Path.Combine(root, c)).Where(File.Exists).ToList();
-                if (found.Count == 0 && !optional) missing.Add(name);
-                layers.AddRange(found.Select(f => (f, IsEnvFile(f))));
-            }
-            if (environment != null)
-            {
-                foreach (string entry in names)
-                {
-                    string name = entry.Trim().TrimEnd('?').Trim();
-                    if (name.Length == 0) continue;
-                    layers.AddRange(EnvironmentCandidates(name, environment).Select(c => Path.Combine(root, c)).Where(File.Exists).Select(f => (f, IsEnvFile(f))));
-                }
-                // staging.yaml / staging.json: a file named after the environment.
-                layers.AddRange(Extensions.Select(e => Path.Combine(root, environment + e)).Where(File.Exists).Select(f => (f, false)));
-            }
+            var layers = ProjectLayers(options, root, environment, File.Exists, out var missing);
             // The person's own settings, in the app's config folder: outside the project, so not checked against FileRoot.
             var user = string.IsNullOrWhiteSpace(options.UserFolder)
                 ? new List<string>()
                 : Extensions.Select(e => Path.Combine(options.UserFolder, "config" + e)).Where(File.Exists).ToList();
             if (missing.Count > 0)
                 throw new KScriptException($"There is no config file {string.Join(" or ", missing.Select(m => $"'{m}'"))} in {root}. End a name with ? if it may be missing.", "Config");
-            layers = layers.Distinct().ToList();
 
             foreach (var layer in layers) host.CheckPath(layer.Path);
             layers.AddRange(user.Select(f => (f, false)));
@@ -188,6 +161,40 @@ namespace KScript.Runtime
                 throw new KScriptException($"These settings are required but not set: {string.Join(", ", absent)}. Add them to {(sources.Count(s => s.Kind != "defaults") > 0 ? string.Join(" or ", sources.Where(s => s.Kind != "defaults" && s.Kind != "environment").Select(s => s.Name)) : "config.yaml")}{hint}.", "Config");
             }
             return (values, sources, environment);
+        }
+
+        /// <summary>The ordered project sources. The editor uses these same candidates to link a setting to its key.</summary>
+        internal static List<(string Path, bool EnvFile)> ProjectLayers(ConfigOptions options, string root, string environment,
+            Func<string, bool> fileExists, out List<string> missing)
+        {
+            bool defaults = options.Files == null;
+            List<string> names = options.Files ?? ConfigOptions.DefaultFiles.ToList();
+
+            // Every layer, in the order it applies: the base files, then the environment's files.
+            var layers = new List<(string Path, bool EnvFile)>();
+            missing = new List<string>();
+            foreach (string entry in names)
+            {
+                string name = entry.Trim();
+                bool optional = defaults || name.EndsWith('?');
+                name = name.TrimEnd('?').Trim();
+                if (name.Length == 0) continue;
+                List<string> found = Candidates(name).Select(c => Path.Combine(root, c)).Where(fileExists).ToList();
+                if (found.Count == 0 && !optional) missing.Add(name);
+                layers.AddRange(found.Select(f => (f, IsEnvFile(f))));
+            }
+            if (environment != null)
+            {
+                foreach (string entry in names)
+                {
+                    string name = entry.Trim().TrimEnd('?').Trim();
+                    if (name.Length == 0) continue;
+                    layers.AddRange(EnvironmentCandidates(name, environment).Select(c => Path.Combine(root, c)).Where(fileExists).Select(f => (f, IsEnvFile(f))));
+                }
+                // staging.yaml / staging.json: a file named after the environment.
+                layers.AddRange(Extensions.Select(e => Path.Combine(root, environment + e)).Where(fileExists).Select(f => (f, false)));
+            }
+            return layers.Distinct().ToList();
         }
 
         /// <summary>The environment variable that sets a setting: APP_ + database.host is APP_DATABASE__HOST.</summary>

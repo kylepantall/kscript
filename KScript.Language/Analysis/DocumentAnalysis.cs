@@ -167,13 +167,24 @@ namespace KScript.Language.Analysis
             Regions.Where(r => r.SourceSpan.Contains(offset)).OrderBy(r => r.SourceSpan.Length).FirstOrDefault();
 
         /// <summary>The symbol reference (or declaration) under the offset.</summary>
-        public SymbolReference ReferenceAt(int offset) =>
-            References.Where(r => r.Span.Contains(offset)).OrderBy(r => r.Span.Length).FirstOrDefault();
+        public SymbolReference ReferenceAt(int offset)
+        {
+            // The editable name excludes its sigil. Clicking the sigil should still navigate to that name.
+            if (offset >= 0 && offset < Source.Length && Source.Text[offset] == '$'
+                && References.FirstOrDefault(r => r.Span.Start == offset + 1) is SymbolReference variable)
+            {
+                return variable;
+            }
+            return References.Where(r => r.Span.Contains(offset)).OrderBy(r => r.Span.Length).FirstOrDefault();
+        }
 
         public IEnumerable<SymbolReference> ReferencesTo(Symbol symbol) => References.Where(r => r.Symbol == symbol);
 
         /// <summary>The scope at an offset.</summary>
         public Scope ScopeAt(int offset) => RootScope.Innermost(offset);
+
+        internal IEnumerable<Symbol> VisibleFunctions(int offset) =>
+            ScopeAt(offset).VisibleAt(offset, includeMethods: true).Where(s => s.Kind == SymbolKind.Function);
 
         public DocumentLink LinkAt(int offset) => Links.FirstOrDefault(l => l.Span.Contains(offset));
 

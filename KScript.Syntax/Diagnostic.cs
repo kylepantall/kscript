@@ -123,6 +123,9 @@ namespace KScript.Syntax
         /// <summary>Two visible text refinements declare the same pattern for unquoted literals.</summary>
         public const string DuplicateLiteralPattern = "KS5015";
 
+        /// <summary>A script statement can let a known error escape its outermost calling code.</summary>
+        public const string UnhandledError = "KS5016";
+
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
 

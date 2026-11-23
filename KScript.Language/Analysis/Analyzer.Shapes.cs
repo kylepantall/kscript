@@ -456,18 +456,13 @@ namespace KScript.Language.Analysis
             bool refined = instance?.RefinementBase != null;
             foreach (MarkupElement child in e.ChildElements)
             {
-                if (refined && CodeArguments.NormalizeLambdaProblem(child, result.Markup.Syntax == SourceSyntax.Code) is Wording problem)
-                {
-                    Report(TrimmedSpan(child.GetAttribute("type").Value), DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, problem);
-                    continue;
-                }
-                if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn"))
+                if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn") || IsKScriptElementName(child, "catch"))
                 {
                     continue;
                 }
                 if (!IsKScriptElementName(child, "field"))
                 {
-                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{child.Name}>.");
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
                     continue;
                 }
                 if (refined)
@@ -483,8 +478,9 @@ namespace KScript.Language.Analysis
                     Report(TrimmedSpan(nameAttr.Value), DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The field '{name}' is listed twice.");
                 }
             }
-            bool hasFields = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null;
-            if (!hasFields)
+            bool hasMembers = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null
+                || (IsKScriptElementName(e, "type") && e.ChildElements.Any(c => IsKScriptElementName(c, "fn")));
+            if (!hasMembers)
             {
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, CodeArguments.TypeNeedsFields(e.GetAttributeValue("name")?.Trim()));
             }
@@ -520,6 +516,16 @@ namespace KScript.Language.Analysis
                 AnalyzeExpressionRegion(parse.Value, RegionKind.Expression, parseScope, e, parse);
             }
             WalkChildren(e.Children, typeScope, markupMode);
+            if (e.ChildElements.Any(c => c.Name == "catch"))
+            {
+                // A type handler can supply the result of any call to one of these methods.
+                // Infer its return expressions in their own scope after the handler has been walked.
+                var fallbacks = result.Regions.Where(r => r.Element?.Name == "return" && r.Attribute?.Name == "value"
+                    && r.Parse?.Root != null && r.Element.Ancestors().FirstOrDefault(a => a.Name is "fn" or "type" or "model") == e)
+                    .Select(r => Infer(r.Parse.Root, r)).ToList();
+                if (fallbacks.Count > 0)
+                    foreach (var method in e.ChildElements.Where(c => c.Name == "fn")) RecordReturnShape(method, fallbacks);
+            }
         }
 
         private void DeclareImplicit(Scope scope, string name, TypeShape shape, string description, MarkupElement e, TextSpan? declaration = null)

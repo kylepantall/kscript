@@ -1,0 +1,37 @@
+test(name: 'semantic versions choose the latest release numerically') {
+  versions: semver[] = [1.4.2, 2.0.0-rc.1, 1.4.10]
+  expect(value: $versions->latest()->to_string(), same: '1.4.10')
+  expect(value: $versions->only(prereleases), count: 1)
+}
+
+test(name: 'empty typed versions keep their list methods') {
+  versions: semver[] = []
+  expect(value: $versions->latest(), equals: null)
+  expect(value: $versions->only(releases), equals: [])
+}
+
+test(name: 'filtering a heterogeneous list retains the type with no matches') {
+  values = ['unchanged', 2]
+  expect(value: $values->only(semver)->only(releases)->latest(), equals: null)
+  expect(value: $values, equals: ['unchanged', 2])
+}
+
+test(name: 'an email normalizes the domain and inherits string methods') {
+  address: email = ' Jo@EXAMPLE.com '
+  expect(value: $address.local, equals: 'Jo')
+  expect(value: $address.domain, equals: 'example.com')
+  expect(value: $address->lower()->split('@'), equals: ['jo', 'example.com'])
+}
+
+test(name: 'named regex captures report the matching pieces of text') {
+  version = /v(?<major>\d+)\.(?<minor>\d+)/
+  match = $version->match('build v12.3')
+  expect(value: $match.groups.major, same: '12')
+  expect(value: $match.groups.minor, same: '3')
+  expect(value: $version->match('build v12'), equals: null)
+}
+
+test(name: 'typed money can total fractional amounts') {
+  amounts: money[] = ['GBP 9.50', 'GBP 0.50']
+  expect(value: $amounts->total()->to_string(), equals: 'GBP 10.00')
+}

@@ -348,11 +348,12 @@ fn transfer(from: int, to: int, amount: number) {
   }
 }
 
-@transfer(1, 2, 30)
-try {
-  @transfer(1, 2, 500)
-} catch Conflict as e {
-  echo $e.message
+for amount in [30, 500] {
+  try {
+    @transfer(1, 2, $amount)
+  } catch Conflict as err {
+    echo $err.message
+  }
 }
 echo Account->pluck(balance)
 ```

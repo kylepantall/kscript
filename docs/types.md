@@ -467,7 +467,7 @@ Write each rule on its own line, or separate rules on one line with a semicolon.
 | `one_of` | The value must be one of these. |
 | `not` | The value must not be one of these. |
 | `validate: test, 'message'` | Any expression, with the value as `$value`. Several can be given; each one that fails adds its message. |
-| `normalize: expression` | Evaluates the expression with `$value` already in scope, for example `normalize: $value->trim()`. The result is the value the rules check. |
+| `normalize: expression` | Evaluates an expression with the base value in `$value`. If the expression supplies a function, KScript passes the base value to that function. The rules check the returned value. |
 
 A value is converted to the base type first, then normalized, then checked against the rules. One that fails reports every rule it broke. Rules on a field work the same way: `title: string(min: 1)`.
 
@@ -480,7 +480,7 @@ Use `expression as Type` when you need a typed value inside an expression. KScri
 ```kscript
 type PasskeySessionKey with [string] {
   min: 8
-  normalize: $value->trim()
+  normalize: fn(c) => $c->trim()
   pattern: /^passkey_[a-zA-Z]+$/
   fn length() {
     return $value->count()
@@ -497,7 +497,19 @@ echo $session_key->length()  // 13
 echo @key_length($session_key)  // 13
 ```
 
-The opening slash comes before the `^` anchor in a regex literal. A `PasskeySessionKey` supports the methods of `string` and its own methods. Inside a refinement method, `$value` is the underlying value and `$this` is the refined receiver, so `$this->length()` can call another method on the type. A refinement inherits methods from its base and can replace one by declaring the same name. Use `$value` to call the underlying built-in method. You can also pass the key to a typed function such as `key_length`. In a record method, `$this.field` reads a field of the record.
+The opening slash comes before the `^` anchor in a regex literal. Here the normalizer receives the string before the pattern runs. You can also write `normalize: $value->trim()` directly.
+
+A helper can live on the type itself. The normalizer can call it with `@trim_key($value)` or pass the function as `normalize: @trim_key`. Both forms use the input string. KScript finds helpers declared later in the block, inherited methods, and functions declared in the surrounding module. A method on the type takes precedence over a module function of the same name.
+
+```kscript
+type KeyText with [string] {
+  normalize: @trim_key($value)
+  fn trim_key(key: string) => $key->trim()
+}
+echo KeyText('  passkey_Login  ')  // passkey_Login
+```
+
+A `PasskeySessionKey` supports the methods of `string` and its own methods. Inside a refinement method, `$value` is the underlying value and `$this` is the refined receiver, so `$this->length()` can call another method on the type. A refinement inherits methods from its base and can replace one by declaring the same name. Use `$value` to call the underlying built-in method. You can also pass the key to a typed function such as `key_length`. In a record method, `$this.field` reads a field of the record.
 
 The target can also be a built-in type (`$text as int`), a type with local rules (`$name as string(min: 2)`), or a list (`$rows as Repo[]`). An optional target such as `PasskeySessionKey?` accepts null and validates every non-null value. Parenthesize an arithmetic expression to convert its result, as in `($a + $b) as int`.
 

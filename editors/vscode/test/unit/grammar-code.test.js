@@ -110,6 +110,31 @@ test('double quotes fill in $name and { }; single quotes are kept as written', a
   assert.match(scopeOf(tokens, 'a'), /string\.quoted\.single\.kscript/);
 });
 
+test('a quoted URL distinguishes code, properties, escaped braces and path text', async () => {
+  const tokens = tokenize(await load(), [
+    'result = @join("{$config.passkeys.url}/{$kind}/finish")',
+    'nested = "before { @pick({ part: $kind }, \'a}b\')->trim() } after"',
+    'escaped = "{{literal}} {$kind}"',
+    'bare = "Contact user@example.com or see $config.passkeys.url and @format($kind)"',
+    'single = \'{$config.passkeys.url}/{$kind}/finish\'',
+  ].join('\n'));
+  for (const field of ['passkeys', 'url']) {
+    assert.match(scopeOf(tokens, field), /meta\.embedded\.expression\.kscript .*variable\.other\.property/);
+    assert.match(scopeOf(tokens, field, 1), /string\.quoted\.double\.kscript .*variable\.other\.property/);
+  }
+  assert.match(scopeOf(tokens, '$config'), /meta\.embedded\.expression\.kscript .*variable\.other/);
+  assert.match(scopeOf(tokens, '/finish'), /string\.quoted\.double\.kscript$/);
+  assert.match(scopeOf(tokens, '@pick'), /meta\.embedded\.expression\.kscript .*entity\.name\.function/);
+  assert.match(scopeOf(tokens, 'a}b'), /string\.quoted\.single/);
+  assert.match(scopeOf(tokens, 'trim'), /meta\.embedded\.expression\.kscript .*support\.function/);
+  assert.match(scopeOf(tokens, 'after'), /string\.quoted\.double\.kscript$/);
+  for (const escaped of ['{{', '}}']) assert.match(scopeOf(tokens, escaped), /constant\.character\.escape/);
+  assert.match(scopeOf(tokens, 'literal'), /string\.quoted\.double\.kscript$/);
+  assert.match(scopeOf(tokens, '@format'), /entity\.name\.function/);
+  assert.ok(!tokens.some(t => t.text === '@example'));
+  assert.match(scopeOf(tokens, '{$config.passkeys.url}/{$kind}/finish'), /string\.quoted\.single\.kscript$/);
+});
+
 test('elements and their attributes', async () => {
   const tokens = tokenize(await load(), 'Row(gap: 8, wrap) {\n  Button(variant: primary, on_click: "go()") "Play"\n  div {\n  }\n}');
   assert.match(scopeOf(tokens, 'Row'), /entity\.name\.tag\.kscript/);

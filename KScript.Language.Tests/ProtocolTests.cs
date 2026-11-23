@@ -662,6 +662,24 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void SingleQuotedNamesKeepTheirLiteralTextInDiscoveryAndRunFilters()
+        {
+            Initialize();
+            const string uri = "file:///work/tests/literals.test.kscript";
+            OpenAs("kscript-code", """
+                describe(name: 'literal names') {
+                  test(name: 'keeps \n and {$title}') { expect(value: 1, equals: 1) }
+                }
+                """, uri);
+            const string fullName = @"literal names › keeps \n and {$title}";
+            JsonNode group = Assert.Single(Request("kscript/tests", Doc(uri))["result"]["tests"].AsArray());
+            Assert.Equal(fullName, Assert.Single(group["children"].AsArray())["fullName"].GetValue<string>());
+            JsonNode run = Request("textDocument/codeLens", Doc(uri))["result"].AsArray()
+                .Single(l => l["command"]["command"].GetValue<string>() == "kscript.runTest" && l["range"]["start"]["line"].GetValue<int>() == 1);
+            Assert.Equal(fullName, run["command"]["arguments"][1].GetValue<string>());
+        }
+
+        [Fact]
         public void ANewUnsavedKscriptFileIsCheckedAsCode()
         {
             Initialize();

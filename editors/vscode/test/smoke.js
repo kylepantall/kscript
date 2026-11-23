@@ -5,13 +5,14 @@
 const assert = require('assert');
 const cp = require('child_process');
 const path = require('path');
+const execFile = require('util').promisify(cp.execFile);
 const rpc = require('vscode-jsonrpc/node');
 
 const dll = process.argv[2] || path.resolve(__dirname, '../../../KScriptApp/bin/Debug/net8.0/KScript.dll');
 // A .dll runs with dotnet; anything else is a kscript binary (single-file or Native AOT) and runs as it is.
-const server = dll.endsWith('.dll')
-  ? cp.spawn('dotnet', [dll, 'lsp'], { stdio: ['pipe', 'pipe', 'inherit'] })
-  : cp.spawn(dll, ['lsp'], { stdio: ['pipe', 'pipe', 'inherit'] });
+const executable = dll.endsWith('.dll') ? 'dotnet' : dll;
+const cliArgs = dll.endsWith('.dll') ? [dll] : [];
+const server = cp.spawn(executable, [...cliArgs, 'lsp'], { stdio: ['pipe', 'pipe', 'inherit'] });
 const connection = rpc.createMessageConnection(new rpc.StreamMessageReader(server.stdout), new rpc.StreamMessageWriter(server.stdin));
 
 const uri = 'file:///tmp/kscript-smoke/hello.ks.xml';
@@ -95,6 +96,10 @@ const diagnostics = new Promise((resolve) => {
   assert.strictEqual(tests.tests[0].children[0].fullName, 'cart › starts empty', 'the tests of a test file');
   const testLenses = await connection.sendRequest('textDocument/codeLens', { textDocument: { uri: testUri } });
   assert.deepStrictEqual(testLenses.map((l) => l.command.command), ['kscript.runTestsInFile', 'kscript.runTest', 'kscript.runTest'], 'Run test lenses');
+
+  await require('./language-scenarios')(connection, init.capabilities,
+    (args) => execFile(executable, [...cliArgs, ...args], { timeout: 60000 }));
+  await require('./interpolation')(connection, init.capabilities);
 
   await connection.sendRequest('shutdown');
   connection.sendNotification('exit');

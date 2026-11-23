@@ -13,7 +13,7 @@ Window(
 ) {
   cols = 40
   rows = 24
-  world = @pattern_world('glider_gun', $cols, $rows)
+  world = @select_pattern('glider_gun', $cols, $rows)
   playing = false
   speed = 0.15
   pattern = 'glider_gun'
@@ -46,7 +46,7 @@ Window(
     Select(bind: speed, options: { Slow: 0.4, Normal: 0.15, Fast: 0.04 })
     Text(color: "#94a3b8") "Pattern"
     Select(bind: pattern, options: $pattern_choices,
-      on_change: { world = @pattern_world($pattern, $cols, $rows, $world.wrap); playing = false })
+      on_change: { world = @select_pattern($pattern, $cols, $rows, $world.wrap); playing = false })
   }
 
   Row(gap: 8, wrap) {

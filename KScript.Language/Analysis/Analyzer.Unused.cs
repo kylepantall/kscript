@@ -86,9 +86,11 @@ namespace KScript.Language.Analysis
             declarations = result.Symbols.Where(s => s.DeclarationSpan.Length > 0).ToLookup(s => (s.Name, s.DeclarationSpan));
             foreach (SymbolReference r in result.References)
             {
-                if (!r.IsDeclaration && r.Symbol.SourcePath != null && (r.Symbol.Kind == SymbolKind.Function || r.Symbol.Kind == SymbolKind.Constant))
+                if (r.IsDeclaration || r.Symbol.Kind is not (SymbolKind.Function or SymbolKind.Constant)) continue;
+                string path = r.Symbol.MethodLocation?.Path ?? r.Symbol.SourcePath;
+                if (path != null && path != result.Path)
                 {
-                    result.ExternalUses.Add((r.Symbol.SourcePath, r.Symbol.Name));
+                    result.ExternalUses.Add((path, r.Symbol.ProjectUseName));
                 }
             }
 
@@ -134,7 +136,7 @@ namespace KScript.Language.Analysis
             foreach (Symbol fn in candidates)
             {
                 ProjectUses uses = project();
-                if (uses.Names.Contains(fn.Name))
+                if (uses.Names.Contains(fn.ProjectUseName))
                 {
                     continue;
                 }

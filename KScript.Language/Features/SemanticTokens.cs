@@ -109,8 +109,31 @@ namespace KScript.Language.Features
             foreach (ExpressionRegion region in analysis.Regions)
             {
                 string text = region.Source.Value;
-                List<CastNode> casts = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<CastNode>().ToList();
-                foreach (TextSpan code in region.CodeSpans)
+                List<ExprNode> nodes = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).ToList();
+                List<CastNode> casts = nodes.OfType<CastNode>().ToList();
+                // The lexer returns one token for a quoted string or slash path. The parser has already
+                // distinguished its executable parts from literal text (including SQL and escaped braces).
+                HashSet<int> interpolated = new HashSet<int>();
+                List<TextSpan> codeSpans = region.CodeSpans.ToList();
+                foreach (LiteralNode literal in nodes.OfType<LiteralNode>().Where(l => l.Template?.Expressions.Any() == true))
+                {
+                    List<TemplateSegment> parts = literal.Template.Segments;
+                    // Segment spans omit the opening quote. Unlike the literal node's span, they also
+                    // exclude any parentheses around the literal, so this is the lexer's token start.
+                    interpolated.Add(parts[0].Span.Start - (literal.Kind == LiteralKind.String ? 1 : 0));
+                    foreach (TemplateSegment part in parts)
+                    {
+                        if (part.Kind == TemplateSegmentKind.Text)
+                        {
+                            tokens.Add(new SemanticToken(region.Source.ToSource(part.Span), SemanticTokenType.String, SemanticTokenModifiers.None));
+                        }
+                        else if (part.Node != null)
+                        {
+                            codeSpans.Add(part.Node.Span);
+                        }
+                    }
+                }
+                foreach (TextSpan code in codeSpans)
                 {
                     List<Token> list = Lexer.Tokenize(text, code.Start, Math.Min(code.End, text.Length));
                     for (int i = 0; i < list.Count; i++)
@@ -127,11 +150,14 @@ namespace KScript.Language.Features
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.Number, SemanticTokenModifiers.None));
                                 break;
                             case TokenKind.String:
+                            case TokenKind.SlashPath:
                             case TokenKind.Email:
                             case TokenKind.Uuid:
                             case TokenKind.Url:
-                            case TokenKind.SlashPath:
-                                tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
+                                if (!interpolated.Contains(t.Span.Start))
+                                {
+                                    tokens.Add(new SemanticToken(span, SemanticTokenType.String, SemanticTokenModifiers.None));
+                                }
                                 break;
                             case TokenKind.Regex:
                                 tokens.Add(new SemanticToken(span, SemanticTokenType.Regexp, SemanticTokenModifiers.None));

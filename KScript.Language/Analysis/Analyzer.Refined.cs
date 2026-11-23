@@ -24,7 +24,7 @@ namespace KScript.Language.Analysis
         private static bool IsTextRoot(string root) => root == "string" || (KScript.Metadata.NativeTypes.IsNative(root) && root != "port");
 
         /// <summary>The types named in with="..." (<c>with [User, Auditable]</c>), without brackets.</summary>
-        private static List<string> WithNames(MarkupElement type)
+        internal static List<string> WithNames(MarkupElement type)
         {
             string with = type.GetAttributeValue("with")?.Trim();
             if (string.IsNullOrEmpty(with))
@@ -129,7 +129,7 @@ namespace KScript.Language.Analysis
         private bool IsUnboundLiteralWord(string word, Scope scope, int offset) =>
             word != "_" && !Lexer.Keywords.Contains(word) && scope.Lookup(word, offset) == null
             && !(catalog.GetCommand(word) is { } command && importedPackages.Contains(command.Package))
-            && !importedErrors.Contains(word) && !(ErrorTypes.BuiltIn.TryGetValue(word, out var error) && error.Name == word);
+            && !importedErrors.ContainsKey(word) && !(ErrorTypes.BuiltIn.TryGetValue(word, out var error) && error.Name == word);
 
         /// <summary>Consider the spelling only when the normal name and argument rules have given it no meaning.</summary>
         private bool TryPatternLiteral(IdentifierNode id, ExpressionRegion region, Scope scope = null, bool record = true) =>

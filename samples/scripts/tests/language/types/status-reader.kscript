@@ -1,0 +1,11 @@
+type StatusReader {
+  fn read(offline: bool) {
+    throw if $offline {
+      type: 'Network'
+      message: 'disconnected'
+    }
+    return 'connected'
+  }
+} catch Network {
+  return 'offline'
+}

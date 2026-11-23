@@ -15,7 +15,7 @@ namespace KScript.Language.Analysis
     {
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
-            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false)
+            IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -48,7 +48,7 @@ namespace KScript.Language.Analysis
             callables.SelectMany(c => c.Signatures)
                 .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
                     RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null,
-                    Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel)).ToList())
+                    Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel, OptionalNativeCallback: p.Optional && p.Type == KType.Fn)).ToList())
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -95,6 +95,15 @@ namespace KScript.Language.Analysis
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
+            if (slot.Type is "fn" or "fn?" && a.Value != null)
+            {
+                string actual = Infer(a.Value, region).Type;
+                bool acceptsNull = slot.Type == "fn?" || slot.OptionalNativeCallback;
+                if (actual is not (KType.Any or KType.Fn) && !(actual == KType.Null && acceptsNull))
+                    Report(region.Source.ToSource(a.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                        $"The '{slot.Name}' argument needs a function, but this value is {actual}. Pass a function reference such as @handler or an inline fn.");
+                return;
+            }
             if (slot.AcceptsModel)
             {
                 CheckModelArgument(a.Value, region, slot.Type == ParameterInfo.ModelOrString);

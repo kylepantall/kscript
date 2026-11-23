@@ -311,8 +311,11 @@ namespace KScript.Runtime
             NormaliseArguments(module, e, info);
             CheckAttributes(module, e, info);
 
-            if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
-                    || (info.MustBeInside.Contains("fn") && module.Elements.TryGetValue(BareName(a.Name), out ElementDefinition outer) && outer.Info.IsFunctionBody)))
+            if (info.MustBeInside != null && info.MustBeInside.Count > 0 && !(info.Name == "catch"
+                ? e.Parent != null && info.MustBeInside.Contains(BareName(e.Parent.Name))
+                : e.Ancestors().Any(a => info.MustBeInside.Contains(BareName(a.Name))
+                    || (info.Name == "return" && a.Name == "catch" && a.Parent?.Name is "type" or "model")
+                    || (info.MustBeInside.Contains("fn") && module.Elements.TryGetValue(BareName(a.Name), out ElementDefinition outer) && outer.Info.IsFunctionBody))))
                 throw Located(new KScriptException($"<{info.Name}> must be inside {Values.OrList(info.MustBeInside.Select(n => module.ElementHint(n)).ToList())}.", "Syntax"), module, e.NameSpan.Start);
 
             if (def.OwnsContent) return;
@@ -868,7 +871,8 @@ namespace KScript.Runtime
             }
         }
 
-        internal void DeclareFunction(MarkupElement e, Scope scope, Module module)
+        internal UserFunction DeclareFunction(MarkupElement e, Scope scope, Module module,
+            IReadOnlyList<TypeCatch> typeCatches = null, object receiver = null)
         {
             string name = e.GetAttributeValue("name")?.Trim().TrimStart('@');
             if (string.IsNullOrEmpty(name)) throw new KScriptException($"<fn> needs a name, such as <fn name=\"greet\" params=\"who\">.", "Syntax");
@@ -882,7 +886,13 @@ namespace KScript.Runtime
                 value = GetParse(module, v, ParseMode.Expression).Root;
                 valueContext = new EvalContext(module, v);
             }
-            scope.Declare(name, new UserFunction(name, parameters, e, value, valueContext, scope, module, e.Documentation));
+            var fn = new UserFunction(name, parameters, e, value, valueContext, scope, module, e.Documentation)
+            {
+                TypeCatches = typeCatches,
+                Receiver = receiver,
+            };
+            scope.Declare(name, fn);
+            return fn;
         }
 
         /// <summary>Starts a function on another thread (&lt;spawn&gt;). The run waits for spawned functions before it ends.</summary>

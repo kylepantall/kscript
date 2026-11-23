@@ -78,14 +78,22 @@ fn load_pattern(name_or_path: string, wrap = true) {
 
 // kscript life.kscript <pattern> [generations]: play and stop.
 if $args->count() > 0 {
-  world = @load_pattern($args[0])
-  world = @play($world, generations: ($args[1] ?? '100')->to_int(default: 100))
-  @draw($world, 'done')
+  try {
+    world = @load_pattern($args[0])
+    world = @play(
+      $world,
+      generations: ($args[1] ?? '100')->to_int(default: 100)
+    )
+    @draw($world, 'done')
+  } catch Pattern as err {
+    $log->error($err.message)
+    exit 3
+  }
   exit
 }
 
 // Interactive
-world = @pattern_world('glider', width: $board_w, height: $board_h)
+world = @select_pattern('glider', width: $board_w, height: $board_h)
 actions = {
   'Step one generation': 'step',
   'Play 25 generations': 'play25',
@@ -116,7 +124,7 @@ while true {
     'pattern' => {
       menu(into: name, options: $patterns->keys()) "Which pattern?"
       echo "{ @dim($patterns[$name].about) }"
-      world = @pattern_world(
+      world = @select_pattern(
         $name,
         width: $board_w,
         height: $board_h,

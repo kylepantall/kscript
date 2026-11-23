@@ -62,7 +62,7 @@
               }
             },
             {
-              "match": "(?:^|\\G)\\s*(@(?:returns?|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
+              "match": "(?:^|\\G)\\s*(@(?:returns?|throws|example|deprecated|see|public|llm|prefer|avoid|pitfall|agent|param|argument|arg))(?![\\w-])",
               "captures": {
                 "1": {
                   "name": "storage.type.class.doc.kscript"
@@ -240,6 +240,9 @@
           "include": "#variable"
         },
         {
+          "include": "#member"
+        },
+        {
           "include": "#command"
         },
         {
@@ -283,10 +286,16 @@
           "name": "constant.character.escape.kscript"
         },
         {
+          "include": "#escapedBraces"
+        },
+        {
           "include": "#interpolation"
         },
         {
-          "include": "#variable"
+          "include": "#textVariable"
+        },
+        {
+          "include": "#textCall"
         }
       ]
     },
@@ -307,28 +316,7 @@
       },
       "patterns": [
         {
-          "include": "#string"
-        },
-        {
-          "include": "#variable"
-        },
-        {
-          "include": "#command"
-        },
-        {
-          "include": "#method"
-        },
-        {
-          "include": "#constants"
-        },
-        {
-          "include": "#cast"
-        },
-        {
-          "include": "#operators"
-        },
-        {
-          "include": "#braces"
+          "include": "#expression"
         }
       ]
     },
@@ -354,7 +342,7 @@
       ]
     },
     "variable": {
-      "match": "\\$[A-Za-z_][\\w]*(?:\\.[A-Za-z_][\\w]*)*",
+      "match": "\\$[A-Za-z_]\\w*",
       "name": "variable.other.kscript"
     },
     "command": {
@@ -775,10 +763,16 @@
           "contentName": "string.unquoted.block.kscript",
           "patterns": [
             {
+              "include": "#escapedBraces"
+            },
+            {
               "include": "#interpolation"
             },
             {
-              "include": "#variable"
+              "include": "#textVariable"
+            },
+            {
+              "include": "#textCall"
             }
           ]
         }
@@ -794,6 +788,65 @@
           "name": "entity.name.type.kscript"
         }
       }
+    },
+    "escapedBraces": {
+      "match": "\\{\\{|\\}\\}",
+      "name": "constant.character.escape.kscript"
+    },
+    "member": {
+      "match": "(?<!\\.)(\\??\\.)([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "keyword.operator.kscript"
+        },
+        "2": {
+          "name": "variable.other.property.kscript"
+        }
+      }
+    },
+    "textVariable": {
+      "match": "(?<![\\w.])\\$[A-Za-z_]\\w*(?:(?:\\??\\.)[A-Za-z_]\\w*)*",
+      "captures": {
+        "0": {
+          "patterns": [
+            {
+              "include": "#variable"
+            },
+            {
+              "include": "#member"
+            }
+          ]
+        }
+      }
+    },
+    "textCall": {
+      "begin": "(?<![\\w.])(@[A-Za-z_]\\w*)(\\()",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.function.kscript"
+        }
+      },
+      "end": "\\)",
+      "patterns": [
+        {
+          "include": "#arguments"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "arguments": {
+      "begin": "\\(",
+      "end": "\\)",
+      "patterns": [
+        {
+          "include": "#arguments"
+        },
+        {
+          "include": "#expression"
+        }
+      ]
     }
   }
 }

@@ -49,6 +49,6 @@ open "dist/mac-arm64/Life Lab.app"
 ## Tests
 
 ```sh
-kscript test        # 24 tests: the rules, worlds, the .cells format and the terminal version
+kscript test        # the rules, worlds, the .cells format and the terminal version
 kscript check       # editor diagnostics for every file here
 ```

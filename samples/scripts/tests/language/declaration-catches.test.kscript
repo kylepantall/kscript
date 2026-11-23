@@ -1,0 +1,86 @@
+import "types/status-reader.kscript"
+
+/// @throws Network if the remote service is unavailable.
+fn fetch_name(mode: string) {
+  if $mode == 'offline' {
+    throw Network "offline"
+  }
+  if $mode == 'missing' {
+    throw NotFound "missing"
+  }
+  return 'ready'
+}
+
+type NameSource {
+  fallback: string
+
+  fn read(mode: string) => @fetch_name($mode)
+  catch NotFound {
+    return 'method fallback'
+  }
+
+  fn retry(mode: string) {
+    return @fetch_name($mode)
+  } catch Network {
+    throw
+  }
+
+  fn uncaught() {
+    throw Validation "invalid key"
+  }
+} catch Network | NotFound as err {
+  if $this.fallback == 'propagate' {
+    throw
+  }
+  return $this.fallback + ': ' + $err.message
+}
+
+fn read_or_default(mode: string) => @fetch_name($mode)
+catch Network | NotFound as err {
+  return $err.type
+}
+
+test(name: 'an expression function returns the value of its matching catch') {
+  expect(value: @read_or_default('missing'), same: 'NotFound')
+  expect(value: @read_or_default('offline'), same: 'Network')
+}
+
+test(name: 'a successful method returns without running either catch') {
+  source = NameSource(fallback: 'local')
+  expect(value: $source->read('online'), same: 'ready')
+}
+
+test(name: 'a method handler gets the first chance to handle an error') {
+  source = NameSource(fallback: 'local')
+  expect(value: $source->read('missing'), same: 'method fallback')
+}
+
+test(name: 'an unmatched method error goes to the handler on the type') {
+  source = NameSource(fallback: 'cached')
+  expect(value: $source->read('offline'), same: 'cached: offline')
+}
+
+test(name: 'a bare rethrow preserves the error for the type handler') {
+  source = NameSource(fallback: 'saved')
+  expect(value: $source->retry('offline'), same: 'saved: offline')
+}
+
+test(name: 'errors outside both handlers reach the caller') {
+  source = NameSource(fallback: 'local')
+  expect_error(type: Validation, contains: 'invalid key') {
+    $source->uncaught()
+  }
+}
+
+test(name: 'rethrowing from the method and the type reaches the caller once') {
+  source = NameSource(fallback: 'propagate')
+  expect_error(type: Network, contains: 'offline') {
+    $source->retry('offline')
+  }
+}
+
+test(name: 'a stateless type can share a catch across its methods') {
+  reader = StatusReader({})
+  expect(value: $reader->read(false), same: 'connected')
+  expect(value: $reader->read(true), same: 'offline')
+}

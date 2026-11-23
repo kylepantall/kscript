@@ -23,6 +23,11 @@ const { runTests } = require('@vscode/test-electron');
   fs.writeFileSync(path.join(workspace, 'stops.kscript'), "stock = 0\nthrow \"out of stock\"\necho $stock\n");
   fs.writeFileSync(path.join(workspace, 'cart.test.kscript'),
     "test(name: \"starts empty\") {\n  expect(value: 0, equals: 0)\n}\ntest(name: \"fails\") {\n  expect(value: 1, equals: 2)\n}\n");
+  const languageSamples = path.resolve(__dirname, '../../../../samples/scripts/tests/language');
+  fs.mkdirSync(path.join(workspace, 'types'));
+  for (const file of ['normalizers.test.kscript', 'types/login-name.kscript', 'declaration-catches.test.kscript', 'types/status-reader.kscript']) {
+    fs.copyFileSync(path.join(languageSamples, file), path.join(workspace, file));
+  }
   // A kscript serve page: VS Code's HTML grammar must still apply, with KScript { } highlighted on top.
   fs.writeFileSync(path.join(workspace, '_layout.html'), '<!doctype html>\n<html><body><main><slot /></main></body></html>\n');
   fs.writeFileSync(path.join(workspace, 'page.html'), '<layout path="_layout.html" title="Home">\n  <p class="lead">Hi {$title->upper()}</p>\n</layout>\n');

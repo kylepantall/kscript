@@ -159,7 +159,7 @@ namespace KScript.Language.Tests
 
             AgentSymbol add = project.Symbols.Single(s => s.Name == "add_task");
             Assert.Equal("Append a task; returns the new list.", add.Summary);
-            Assert.Equal(new[] { "Validation" }, add.Throws);
+            Assert.Equal(new[] { "Error", "Validation" }, add.Throws);
             Assert.Equal(new[] { "@clean" }, add.Calls);
             Assert.Equal(new[] { "@old", "@seed" }, add.CalledBy.OrderBy(c => c));
             Assert.Equal("@add_task([], title: 'Milk')", add.Example);
@@ -172,7 +172,7 @@ namespace KScript.Language.Tests
             Assert.Contains("  - prefer: @add_task($tasks, title: 'x') over ->push().", index);
             Assert.Contains("  - avoid: Calling it in a loop.", index);
             Assert.Contains("  - pitfall: title is trimmed; an empty one throws.", index);
-            Assert.Contains("  - throws: Validation", index);
+            Assert.Contains("  - throws: Error, Validation", index);
             Assert.Contains("  - calls: @clean", index);
             Assert.Contains("  - e.g. `@add_task([], title: 'Milk')`", index);
             Assert.Contains("(deprecated)", index);
@@ -257,6 +257,32 @@ namespace KScript.Language.Tests
             Assert.Contains("runs the 2 test files", xml);
             Assert.Contains("1 page", xml);
             Assert.Contains("`.ks.xml`", xml);
+        }
+
+        [Fact]
+        public void AgentsShowDomainTypesAndFrameworkPlacement()
+        {
+            Write("kscript.json", """{ "name": "portal", "packages": ["KScript.Http"] }""");
+            Write("natives/passkey-session-key.kscript", """
+                type PasskeySessionKey with [string] {
+                  min: 8
+                  normalize: $value->trim()
+                  fn size() => $value->count()
+                }
+                """);
+            Write("models/device.kscript", "import KScript.Data\nmodel Device { serial: string }\n");
+            AgentProject project = AgentDocs.Read(dir);
+            string section = AgentDocs.AgentsSection(project);
+            Assert.Contains("kscript make native", section);
+            Assert.Contains("kscript make request", section);
+            Assert.Contains("KS5016", section);
+            string index = AgentDocs.Index(project);
+            Assert.Contains("type PasskeySessionKey with [string]", index);
+            Assert.Contains("min: 8", index);
+            Assert.Contains("normalize: $value->trim()", index);
+            Assert.Contains("PasskeySessionKey->size()", index);
+            Assert.Contains("model Device", index);
+            Assert.DoesNotContain("type this", index);
         }
 
         [Fact]

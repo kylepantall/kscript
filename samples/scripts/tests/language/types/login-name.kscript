@@ -1,0 +1,3 @@
+type LoginName with [string] {
+  normalize: fn (c) => $c->trim()->lower()
+}

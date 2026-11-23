@@ -26,8 +26,13 @@ fn place(sku: string, customer: email, quantity: int) {
   }
 }
 
-@place('TEA-1', 'ada@example.com', 2)
-@place('MUG-1', 'ben@example.com', 1)
+try {
+  @place('TEA-1', 'ada@example.com', 2)
+  @place('MUG-1', 'ben@example.com', 1)
+} catch Conflict as err {
+  $log->error('Could not place the initial orders', $err)
+  exit 3
+}
 try {
   @place('POT-1', 'cy@example.com', 2)
 } catch Conflict as e {

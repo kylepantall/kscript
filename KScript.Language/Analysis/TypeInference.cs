@@ -20,6 +20,50 @@ namespace KScript.Language.Analysis
             result = analysis;
         }
 
+        private TypeShape InferCommand(CommandCallNode c, ExpressionRegion region, bool reference)
+        {
+            Symbol fn = FunctionNamed(c.Name, region.Source.ToSource(c.NameSpan.Start));
+            if (fn != null)
+            {
+                return reference ? new TypeShape(KType.Fn) : fn.ReturnShape;
+            }
+            CallableInfo command = catalog.GetCommand(c.Name);
+            if (command == null)
+            {
+                return TypeShape.Unknown;
+            }
+            if (reference) return new TypeShape(KType.Fn);
+            TypeShape json = null;
+            if (command.Name == "read_json" && c.Arguments.Count > 0 && c.Arguments[0].Value is LiteralNode { Kind: LiteralKind.String } file)
+            {
+                json = result.JsonFileShape(file.Value);
+            }
+            if (MappedShape(command, c.Arguments, 0, json, region) is TypeShape mapped)
+            {
+                return mapped;
+            }
+            if (json != null)
+            {
+                return json;
+            }
+            if (command.Package == "KScript.Data" && command.Name == "db")
+            {
+                // @db('users') is a query on the table; @db() and @db(connection: reports) are the database.
+                return new TypeShape(c.Arguments.Any(a => a.Name == null || a.Name == "table") ? KType.Query : KType.Database);
+            }
+            if (command.ReturnShape != null && ShapeText.Parse(command.ReturnShape) is TypeShape described)
+            {
+                // The package says what fields the result has: @user() is { id, email, ... }.
+                return described;
+            }
+            TypeShape shape = new TypeShape(command.ReturnType);
+            if (command.Name == "files")
+            {
+                shape.Element = new TypeShape(KType.File);
+            }
+            return shape;
+        }
+
         private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
         {
             TextSpan span = region.Source.ToSource(v.Span);
@@ -163,47 +207,7 @@ namespace KScript.Language.Analysis
                 }
 
                 case CommandCallNode c:
-                {
-                    Symbol fn = FunctionNamed(c.Name);
-                    if (fn != null)
-                    {
-                        return fn.ReturnShape;
-                    }
-                    CallableInfo command = catalog.GetCommand(c.Name);
-                    if (command == null)
-                    {
-                        return TypeShape.Unknown;
-                    }
-                    TypeShape json = null;
-                    if (command.Name == "read_json" && c.Arguments.Count > 0 && c.Arguments[0].Value is LiteralNode { Kind: LiteralKind.String } file)
-                    {
-                        json = result.JsonFileShape(file.Value);
-                    }
-                    if (MappedShape(command, c.Arguments, 0, json, region) is TypeShape mapped)
-                    {
-                        return mapped;
-                    }
-                    if (json != null)
-                    {
-                        return json;
-                    }
-                    if (command.Package == "KScript.Data" && command.Name == "db")
-                    {
-                        // @db('users') is a query on the table; @db() and @db(connection: reports) are the database.
-                        return new TypeShape(c.Arguments.Any(a => a.Name == null || a.Name == "table") ? KType.Query : KType.Database);
-                    }
-                    if (command.ReturnShape != null && ShapeText.Parse(command.ReturnShape) is TypeShape described)
-                    {
-                        // The package says what fields the result has: @user() is { id, email, ... }.
-                        return described;
-                    }
-                    TypeShape shape = new TypeShape(command.ReturnType);
-                    if (command.Name == "files")
-                    {
-                        shape.Element = new TypeShape(KType.File);
-                    }
-                    return shape;
-                }
+                    return InferCommand(c, region, reference: c.ArgumentList == null);
 
                 case MethodCallNode m:
                 {
@@ -223,13 +227,13 @@ namespace KScript.Language.Analysis
                     switch (pipe.Right)
                     {
                         case CallNode call when call.Callee is IdentifierNode id:
-                            if (FunctionNamed(id.Name) is Symbol piped)
+                            if (FunctionNamed(id.Name, region.Source.ToSource(id.Span.Start)) is Symbol piped)
                             {
                                 return piped.ReturnShape;
                             }
                             return InferMethod(id.Name, left, call.Arguments, region);
                         case CommandCallNode command:
-                            return Infer(command, region);
+                            return InferCommand(command, region, reference: false);
                         default:
                             return TypeShape.Unknown;
                     }
@@ -483,7 +487,7 @@ namespace KScript.Language.Analysis
                 "handle" => new TypeShape(KType.Handle) { Declared = depth == 0 },
                 "uuid" => new TypeShape(KType.Uuid) { Declared = depth == 0 },
                 "regex" => new TypeShape(KType.Regex) { Declared = depth == 0 },
-                "any" => TypeShape.Unknown,
+                "any" => TypeShape.ExplicitAny,
                 _ => null,
             };
             if (shape == null && NativeTypes.Get(t) is NativeTypeInfo native)
@@ -529,10 +533,9 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The user function (declared or imported) a call names, or null for a built-in command.</summary>
-        private Symbol FunctionNamed(string name)
+        private Symbol FunctionNamed(string name, int offset)
         {
-            // Functions are hoisted into the root scope.
-            Symbol s = result.RootScope.Lookup(name, int.MaxValue);
+            Symbol s = result.ScopeAt(offset).Lookup(name, offset, includeMethods: true);
             return s?.Kind == SymbolKind.Function ? s : null;
         }
 
@@ -659,6 +662,11 @@ namespace KScript.Language.Analysis
 
             string type = ReceiverType(name, receiver);
             List<CallableInfo> methods = catalog.GetMethods(name, type).Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, type)).ToList();
+            if (receiver == TypeShape.ExplicitAny)
+            {
+                methods.RemoveAll(m => m.ReceiverType != KType.Any);
+                if (methods.Count == 0) return TypeShape.ExplicitAny;
+            }
             CallableInfo method = methods.FirstOrDefault(m => args.Count >= m.MinArgs && args.Count <= m.MaxArgs) ?? methods.FirstOrDefault();
             if (args.Count > 0 && MappedShape(method, args, 0, null, region) is TypeShape mapped)
             {

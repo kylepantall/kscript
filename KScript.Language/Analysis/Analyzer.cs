@@ -53,6 +53,7 @@ namespace KScript.Language.Analysis
             DocumentKind documentKind = kind ?? MarkupParser.KindFromPath(path);
             Analyzer analyzer = RunToFixedPoint(() => new Analyzer(new SourceText(text), path, documentKind, files, catalog));
             analyzer.ReportDeferred();
+            FunctionErrors.Infer(analyzer.result, analyzer.importedErrors);
             analyzer.CheckSpellings();
             analyzer.CheckNamingStyle();
             analyzer.CheckDuplicateLiteralPatterns();
@@ -558,7 +559,7 @@ namespace KScript.Language.Analysis
                 }
                 if (let.Name == "error")
                 {
-                    importedErrors.Add(nameAttr.ValueText.Trim());
+                    importedErrors.TryAdd(nameAttr.ValueText.Trim(), let.GetAttributeValue("extends")?.Trim() ?? KScript.Runtime.ErrorTypes.Root);
                 }
                 if (let.Name != "let" && let.Name != "const")
                 {
@@ -697,6 +698,12 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            if (info.Name == "normalize" && info.Package == "KScript.Core" && e.Parent != null
+                && result.DeclaredTypes.TryGetValue(e.Parent, out TypeShape owner) && owner.RefinementBase != null)
+            {
+                scope = new Scope(scope, e.Span) { Normalizing = owner };
+            }
+
             CheckAttributes(e, info);
             ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
@@ -722,7 +729,8 @@ namespace KScript.Language.Analysis
             // Elements that build their own scopes (fn, catch) must not also get an empty content scope,
             // or Scope.Innermost would find the empty one first.
             bool ownScopes = info.Name == "fn" || info.Name == "catch";
-            Scope inner = e.SelfClosing || !e.StartTagClosed || ownScopes ? scope : new Scope(scope, e.ContentSpan);
+            Scope inner = e.SelfClosing || !e.StartTagClosed || ownScopes ? scope : new Scope(scope,
+                info.Name is "type" or "model" && e.ChildElements.Any(c => c.Name == "catch") ? e.Span : e.ContentSpan);
             List<Action> declareAfter = new List<Action>();
 
             switch (info.Name)
@@ -801,6 +809,8 @@ namespace KScript.Language.Analysis
                         outer = outer.Parent;
                     }
                     Scope catchScope = new Scope(outer, e.Span);
+                    if (e.Parent != null && result.DeclaredTypes.TryGetValue(e.Parent, out TypeShape ownerType) && ownerType.RefinementBase != null)
+                        DeclareImplicit(catchScope, "this", ownerType, $"The {ownerType.Name} whose method was called.", e);
                     if (e.GetAttribute("as") == null)
                     {
                         // Without as, the error is $err.
@@ -1141,10 +1151,12 @@ namespace KScript.Language.Analysis
 
             if (info.MustBeInside != null && info.MustBeInside.Count > 0)
             {
-                bool ok = info.MustBeInside.Contains("fn") || info.InsideAnyAncestor
+                bool ok = (info.Name != "catch" && info.MustBeInside.Contains("fn")) || info.InsideAnyAncestor
                     ? e.Ancestors().Any(a => info.MustBeInside.Contains(ElementInfo.BareName(a.Name))
                         || (info.MustBeInside.Contains("fn") && catalog.GetElement(ElementInfo.BareName(a.Name))?.IsFunctionBody == true))
                     : e.Parent != null && info.MustBeInside.Contains(ElementInfo.BareName(e.Parent.Name), StringComparer.OrdinalIgnoreCase);
+                if (!ok && info.Name == "return")
+                    ok = e.Ancestors().Any(a => a.Name == "catch" && a.Parent?.Name is "type" or "model");
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
@@ -1646,13 +1658,14 @@ namespace KScript.Language.Analysis
 
             CheckIdentifier(e.GetAttribute("name")?.Value);
 
-            bool hasBody = e.Children.Any(c => c is MarkupElement || (c is MarkupText t && !t.IsWhitespace));
+            bool hasBody = e.Children.Any(c => c is MarkupElement { Name: not "catch" } || (c is MarkupText t && !t.IsWhitespace));
             if (e.GetAttribute("value") != null && hasBody)
             {
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, $"<fn> has both a value and a body. Use one.");
             }
 
-            WalkChildren(e.Children, new Scope(body, e.ContentSpan), markupMode);
+            WalkChildren(e.ChildElements.Where(c => c.Name == "catch"), body, markupMode);
+            WalkChildren(e.Children.Where(c => c is not MarkupElement { Name: "catch" }), new Scope(body, e.ContentSpan), markupMode);
             RecordReturnShape(e);
         }
 

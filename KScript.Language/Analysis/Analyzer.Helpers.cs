@@ -257,7 +257,7 @@ namespace KScript.Language.Analysis
                 ReferenceImportedFunction(name, dot, span, scope);
                 return null;
             }
-            Symbol fn = scope.Lookup(name, int.MaxValue);
+            Symbol fn = scope.Lookup(name, int.MaxValue, includeMethods: true);
             if (fn != null && fn.Kind == SymbolKind.Function)
             {
                 result.References.Add(new SymbolReference(fn, span, false, false));
@@ -275,7 +275,7 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            IEnumerable<string> candidates = result.Symbols.Where(s => s.Kind == SymbolKind.Function).Select(s => s.Name);
+            IEnumerable<string> candidates = result.VisibleFunctions(span.Start).Select(s => s.Name);
             string suggestion = Suggestions.Closest(name, candidates);
             Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedFunction,
                 $"No function named '{name}'. Declare it with {FnHint(name)}." + (suggestion != null ? $" Did you mean '{suggestion}'?" : string.Empty),

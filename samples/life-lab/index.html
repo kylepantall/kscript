@@ -25,7 +25,7 @@
         <live id="lab">
           <state
             name="world"
-            value="@pattern_world('glider_gun', width: $cols, height: $rows)" />
+            value="@select_pattern('glider_gun', width: $cols, height: $rows)" />
           <state name="playing" value="false" />
           <state name="speed" value="'0.15'" />
           <state name="pattern" value="'glider_gun'" />
@@ -54,7 +54,7 @@
               </select>
             </label>
             <label>Pattern
-              <select bind="pattern" on-change="world = @pattern_world($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
+              <select bind="pattern" on-change="world = @select_pattern($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
                 <for each="name" in="$patterns->keys()">
                   <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
                 </for>

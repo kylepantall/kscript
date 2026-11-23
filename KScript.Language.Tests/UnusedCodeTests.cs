@@ -151,6 +151,21 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AnImportedMethodCallMarksOnlyItsOwnDeclarationAsUsed()
+        {
+            string path = At("p", "account.kscript");
+            var files = new MemoryFiles()
+                .Add(At("p", "kscript.json"), "{}")
+                .Add(path, "type Account { name: string; fn label() => $this.name }\nfn label() => 'module'\n")
+                .Add(At("p", "main.kscript"), "import \"account.kscript\"\naccount = Account(name: 'Ada')\necho $account->label()");
+            string importer = At("p", "main.kscript");
+            Analyzer.Analyze(files.ReadText(importer), importer, files);
+            var analysis = Analyzer.Analyze(files.ReadText(path), path, files);
+            var unused = Assert.Single(analysis.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction);
+            Assert.Equal(files.ReadText(path).LastIndexOf("label", StringComparison.Ordinal), unused.Span.Start);
+        }
+
+        [Fact]
         public void OneImporterIsNamed()
         {
             MemoryFiles files = new MemoryFiles()
