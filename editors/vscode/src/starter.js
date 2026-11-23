@@ -6,7 +6,7 @@
  */
 const STARTER = `// Your first script. Press F5, or click Run above the next line, to run it.
 name = "world"
-echo "Hello $name!"
+echo "Hello {$name}!"
 
 // A function takes values and gives one back.
 fn double(n: number) => $n * 2
@@ -14,7 +14,7 @@ fn double(n: number) => $n * 2
 // A list holds several values, and for goes through them one at a time.
 numbers = [1, 2, 3]
 for n in $numbers {
-  echo "$n doubled is { @double(n: $n) }"
+  echo "{$n} doubled is { @double(n: $n) }"
 }
 
 // Try it: change "world" to your name, add a number to the list, then run again.

@@ -38,7 +38,7 @@ echo @storage(data)->list(recursive)
 import KScript.Storage
 
 for kind, folder in @app_folders() {
-  echo "$kind: $folder"
+  echo "{ $kind }: { $folder }"
 }
 ```
 
@@ -90,7 +90,7 @@ import KScript.Storage
 drafts = @storage(data)->folder('drafts')
 $drafts->write('letter.md', '# Dear Joan')
 for name in $drafts->list('*.md') {
-  echo "$name: { $drafts->read($name)->count() } characters"
+  echo "{ $name }: { $drafts->read($name)->count() } characters"
 }
 $drafts->delete('letter.md')
 ```

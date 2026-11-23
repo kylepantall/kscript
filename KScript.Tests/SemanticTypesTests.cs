@@ -11,15 +11,15 @@ public class SemanticTypesTests
 
     [Theory]
     // email
-    [InlineData("e: email = ' Joan.Smith@Example.COM '\necho \"$e { $e.local } { $e.domain } { $e->type() }\"", "Joan.Smith@example.com Joan.Smith example.com email")]
+    [InlineData("e: email = ' Joan.Smith@Example.COM '\necho \"{ $e } { $e.local } { $e.domain } { $e->type() }\"", "Joan.Smith@example.com Joan.Smith example.com email")]
     [InlineData("e = joan@example.com\necho \"{ $e->upper() } { $e == 'joan@EXAMPLE.com' } { $e == 'x' } { $e->starts_with('jo') }\"", "JOAN@EXAMPLE.COM true false true")]
     [InlineData("e: email = 'joan@bücher.example'\necho $e", "joan@bücher.example")]
     [InlineData("echo \"{ { e: joan@example.com }->to_json() }\"", "{\"e\":\"joan@example.com\"}")]
     // handle
-    [InlineData("h: handle = @Joan_S\necho \"$h { $h.name } { $h == @joan_s } { $h != @sam } { @joan_s == $h }\"", "@joan_s joan_s true true true")]
+    [InlineData("h: handle = @Joan_S\necho \"{ $h } { $h.name } { $h == @joan_s } { $h != @sam } { @joan_s == $h }\"", "@joan_s joan_s true true true")]
     [InlineData("h: handle = '@a.b-c'\necho $h->count()", "6")]
     // uuid
-    [InlineData("u: uuid = '{3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F}'\necho \"$u { $u.version }\"", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f 4")]
+    [InlineData("u: uuid = '{3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F}'\necho \"{ $u } { $u.version }\"", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f 4")]
     [InlineData("u: uuid = 'urn:uuid:3f2a8c1e9b7d4c2a8e1f0a9b8c7d6e5f'\necho $u", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f")]
     [InlineData("u: uuid = 00000000-0000-0000-0000-000000000000\necho $u.version", "0")]
     [InlineData("u: uuid = 'ffffffff-ffff-ffff-ffff-ffffffffffff'\necho $u.version", "15")]
@@ -29,13 +29,13 @@ public class SemanticTypesTests
     [InlineData("r = /(?<y>\\d{4})-(\\d\\d)/\necho \"{ $r->test('on 2026-11') } { $r->match('on 2026-11').groups.y } { $r->match('on 2026-11').captures } { $r->match('none') ?? 'null' }\"", "true 2026 2026, 11 null")]
     [InlineData("echo \"{ /\\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.index) } { /\\s*,\\s*/->split('a , b,c') }\"", "0, 8 a, b, c")]
     [InlineData("echo \"{ /(\\d+)/->replace('a1b22', '<$1>') } { /\\d+/->replace('a1b22', fn(m) => $m.text + '!') }\"", "a<1>b<22> a1!b22!")]
-    [InlineData("r = /^[a-z]+$/im\necho \"$r { $r.pattern } { $r.flags } { $r->type() } { $r->test('ABC') }\"", "/^[a-z]+$/im ^[a-z]+$ im regex true")]
-    [InlineData("r: regex = '^a+$'\necho \"$r { $r->test('aa') }\"", "/^a+$/ true")]
+    [InlineData("r = /^[a-z]+$/im\necho \"{ $r } { $r.pattern } { $r.flags } { $r->type() } { $r->test('ABC') }\"", "/^[a-z]+$/im ^[a-z]+$ im regex true")]
+    [InlineData("r: regex = '^a+$'\necho \"{ $r } { $r->test('aa') }\"", "/^a+$/ true")]
     [InlineData("r: regex = '/x/s'\necho $r.flags", "s")]
     [InlineData("echo \"{ 10 / 2 / 5 }\"", "1")]
     [InlineData("a = 10\nb = 2\necho \"{ $a / $b }\"", "5")]
     // password
-    [InlineData("p: password = 'correct horse battery staple'\necho \"$p { { p: $p }->to_json() } { $p->type() } { $p->reveal()->count() }\"", "******** {\"p\":\"********\"} password 28")]
+    [InlineData("p: password = 'correct horse battery staple'\necho \"{ $p } { { p: $p }->to_json() } { $p->type() } { $p->reveal()->count() }\"", "******** {\"p\":\"********\"} password 28")]
     [InlineData("p: password = 'correct horse battery staple'\nh = $p->hash(algorithm: 'bcrypt')\necho \"{ $p->verify($h) } { $h->starts_with('$2') } { $p->needs_rehash($h) }\"", "true true true")]
     [InlineData("p: password = 'correct horse battery staple'\nh = $p->hash()\nq: password = 'Correct horse battery staple'\necho \"{ $q->verify($h) } { $p->needs_rehash($h) }\"", "false false")]
     [InlineData("p: password = 'password1'\ns = $p->strength(min: 12, upper: true, symbol: true, not: ['pass'])\necho \"{ $s.ok } { $s.label } { $s.problems->count() }\"", "false very weak 5")]
@@ -88,11 +88,11 @@ public class SemanticTypesTests
 
     [Theory]
     [InlineData("type Age with [int] { min: 0; max: 150 }\na: Age = '42'\necho \"{ $a + 1 } { $a->type() }\"", "43 number")]
-    [InlineData("type Slug with [string] {\n  pattern: /^[a-z0-9-]+$/\n  normalize: $value->trim()->lower()\n}\ns: Slug = ' Hello-World '\necho \"[$s]\"", "[hello-world]")]
+    [InlineData("type Slug with [string] {\n  pattern: /^[a-z0-9-]+$/\n  normalize: $value->trim()->lower()\n}\ns: Slug = ' Hello-World '\necho \"[{ $s }]\"", "[hello-world]")]
     [InlineData("type Slug with [string] { pattern: '^[a-z]+$' }\ns: Slug = abc\necho $s", "abc")]
     [InlineData("type Size with [string] { one_of: [small, large] }\ns: Size = small\necho $s", "small")]
     [InlineData("type Tags with [string[]] { max: 2 }\nt: Tags = ['a']\necho $t", "a")]
-    [InlineData("type Username with [handle] {\n  not: [@admin, @root]\n  max: 8\n}\ntype Staff with [Username] { pattern: /^@staff_/ }\ns: Staff = @Staff_Jo\necho \"$s { $s.name } { Staff.name } { Staff.base } { Staff->check('@admin')->count() }\"", "@staff_jo staff_jo Staff Username 1")]
+    [InlineData("type Username with [handle] {\n  not: [@admin, @root]\n  max: 8\n}\ntype Staff with [Username] { pattern: /^@staff_/ }\ns: Staff = @Staff_Jo\necho \"{ $s } { $s.name } { Staff.name } { Staff.base } { Staff->check('@admin')->count() }\"", "@staff_jo staff_jo Staff Username 1")]
     [InlineData("type Even with [int] { validate: $value % 2 == 0, 'must be even' }\necho \"{ Even->check(3)[0].message } { Even->check(4)->count() } { Even('6') }\"", "must be even. 0 6")]
     [InlineData("type Even with [int] { validate: $value % 2 == 0 }\necho Even->check(3)[0].message", "doesn't pass the rule $value % 2 == 0.")]
     [InlineData("/// A short code.\ntype Code with [string] { max: 3 }\necho \"{ Code.description } { Code->type() }\"", "A short code. type")]
@@ -165,7 +165,7 @@ public class SemanticTypesTests
 
     [Theory]
     [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n  fn area() => $w * $h\n}\ns: Size = 1920x1080\necho \"{ $s.w } { $s->area() } { Size('2x3')->area() }\"", "1920 2073600 6")]
-    [InlineData("type Pair {\n  pattern: /^(?<a>\\w+)=(?<b>\\w+)$/\n  parse: { a: $match.groups.b, b: $match.groups.a }\n  a: string\n  b: string\n}\np = Pair('x=y')\necho \"$p.a $p.b\"", "y x")]
+    [InlineData("type Pair {\n  pattern: /^(?<a>\\w+)=(?<b>\\w+)$/\n  parse: { a: $match.groups.b, b: $match.groups.a }\n  a: string\n  b: string\n}\np = Pair('x=y')\necho \"{ $p.a } { $p.b }\"", "y x")]
     [InlineData("type Csv {\n  parse: { items: $value->split(',') }\n  items: string[]\n}\nc = Csv('a,b')\necho $c.items->count()", "2")]
     [InlineData("type Size {\n  pattern: /^(?<w>\\d+)x(?<h>\\d+)$/\n  w: int\n  h: int\n}\necho Size->check('big')[0].message", "needs text matching /^(?<w>\\d+)x(?<h>\\d+)$/ to make a Size, but got the string 'big'.")]
     public void TypesReadFromText(string code, string expected) => Assert.Equal(expected, Code(code));

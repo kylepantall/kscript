@@ -369,7 +369,7 @@ namespace KScript.Language.Tests
         public void TypesInCodeFilesGetTheSameChecksAndCompletion()
         {
             const string types = "enum Size { s, m }\ntype Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 's'\n}\n";
-            AssertNoDiagnostics(types + "r = Repo({ name: 'k', stargazers_count: 1 })\necho \"$r.name { $r.stars }\"");
+            AssertNoDiagnostics(types + "r = Repo({ name: 'k', stargazers_count: 1 })\necho \"{$r.name} { $r.stars }\"");
 
             DocumentAnalysis bad = Analyzer.Analyze(types + "r = Repo({})\necho $r.stras\ntype T { a: Nope }", "test.kscript");
             Assert.Contains(bad.Diagnostics, d => d.Code == "KS5010" && d.Message.Contains("stars"));

@@ -65,11 +65,11 @@ A `port`, `card` or `password` keeps none. The rest, such as `->to_date()` on a 
 
 ```kscript
 email: email = ' Joan.Smith@Example.COM '
-echo "$email { $email.local } at { $email.domain }"
+echo "{ $email } { $email.local } at { $email.domain }"
 echo "{ $email == 'Joan.Smith@EXAMPLE.com' }"
 
 who: handle = @Joan_S
-echo "$who { $who.name }"
+echo "{ $who } { $who.name }"
 
 id = @uuid()
 key = @uuid(v: 8, name: 'joan@example.com')
@@ -102,7 +102,7 @@ v: semver = 1.4.2
 echo "{ $v->satisfies('^1.2.0') } { $v->bump('minor') }"
 
 uk: country = 'United Kingdom'
-echo "$uk { $uk.name } { $uk.currency->format(1234.5) } { $uk.flag }"
+echo "{ $uk } { $uk.name } { $uk.currency->format(1234.5) } { $uk.flag }"
 
 wait: duration = 1h30m
 echo "{ $wait.minutes } { $wait + 45m }"
@@ -111,7 +111,7 @@ brand: color = '#ff8800'
 echo "{ $brand->lighten(0.5) } { $brand->contrast_ratio(white) }"
 
 pay: card = '4242 4242 4242 4242'
-echo "$pay { $pay.brand }"
+echo "{ $pay } { $pay.brand }"
 ```
 
 ### Web and network
@@ -208,7 +208,7 @@ You can also attach a quote to a particular balance with `price: money(rates: { 
 ```kscript
 api: url(schemes: ['https'], hosts: ['api.example.com']) = https://api.example.com/v1
 office: ip(version: 4) = 10.0.0.1
-echo "$api $office"
+echo "{ $api } { $office }"
 ```
 
 ## Operators on native types
@@ -296,7 +296,7 @@ Some values need no quotes, the same way a regex needs none in JavaScript.
 
 - **Durations** are literals anywhere: `30s`, `500ms`, `1h30m`. See [lengths of time](language.md#values-and-methods).
 - **Emails, URLs, UUIDs and regexes** are literals anywhere: `joan@example.com`, `https://example.com/docs`, `3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f`, `/^[a-z]+$/i`. The editor checks them as you type. A URL starts with `http://`, `https://`, `ftp://`, `ws://` or `wss://`, so its `//` is never a comment, and it ends at a space, a comma, a bracket or `->`.
-- **Slash paths** are literals anywhere when each name is letters, digits, `_`, `-`, `.`, `~` or `%`: `/docs/getting-started`, `/v1/users/12`. A slash path that is also a regex, such as `/blog/` or `/a/i`, is a regex where no type is declared, and a slash path where one is. A path with spaces in its names, such as `/My Apps/Notes`, needs quotes, except as the whole value of a declared `slash_path` (`menu: slash_path = /My Apps/Notes`). `$name` and `{ expression }` inside one are filled in, as they are in double quotes.
+- **Slash paths** are literals anywhere when each name is letters, digits, `_`, `-`, `.`, `~` or `%`: `/docs/getting-started`, `/v1/users/12`. A slash path that is also a regex, such as `/blog/` or `/a/i`, is a regex where no type is declared, and a slash path where one is. A path with spaces in its names, such as `/My Apps/Notes`, needs quotes, except as the whole value of a declared `slash_path` (`menu: slash_path = /My Apps/Notes`). `$name` and `{ expression }` inside one are filled in.
 - **Handles** are written as `@joan` only where a handle is expected: a `handle` variable or parameter, a `not:` or `one_of:` list on a handle type, or next to a handle in `==`. Everywhere else, `@joan` still names the function `joan`.
 - **Words** need no quotes where the type is read from text. That covers an enum (`color: Color = red`), a type with a `pattern` (`size: Size = 1920x1080`), a refinement of text (`slug: Slug = my-post`) and the native types: `domain = example.com`, `ip = 10.0.0.1`, `cidr = 10.0.0.0/8`, `timezone = Europe/London`, `semver = 1.4.2`, `duration = 1h30m`, `color = red`, `country = GB` and the rest. Method and function arguments of those types work the same way: `$brand->contrast_ratio(white)`, `@allow(10.0.0.0/8)`, `@release(1.4.2-beta.1)`.
 
@@ -346,11 +346,11 @@ echo "{ $site.parent.is_root } { $site->join('blog/../about') }"
 docs = /docs/guides/start
 echo "{ $docs->is_within(/docs) } { $docs.parent.name }"
 
-fn open(page: slash_path) => "Opening $page"
+fn open(page: slash_path) => "Opening { $page }"
 echo @open(/help/contact)
 ```
 
-A bare slash path fills in values the way double quotes do: `$name` and `{ expression }` are worked out, and a name in braces, such as `{id}`, stays as written because it is a route parameter. A value with `/` in it adds more names. Text becomes a slash path wherever one is expected:
+A bare slash path supports interpolation: `$name` and `{ expression }` are worked out, and a name in braces, such as `{id}`, stays as written because it is a route parameter. A value with `/` in it adds more names. Text becomes a slash path wherever one is expected:
 
 ```kscript
 id = 42
@@ -410,7 +410,7 @@ A password prints as `********`. That applies to `echo`, logs, JSON and error me
 
 ```kscript
 pw: password = 'correct horse battery staple'
-echo "Password: $pw"
+echo "Password: { $pw }"
 
 stored = $pw->hash()
 echo "{ $stored->starts_with('$argon2id$') } { $pw->verify($stored) }"
@@ -440,7 +440,7 @@ work: email(domains: ['example.com']) = joan@example.com
 id: uuid(v: 4) = 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f
 pin: password(min: 4, max: 8, common: false) = '1234'
 title: string(min: 1, max: 80) = 'Hello'
-echo "$work $id $pin $title"
+echo "{ $work } { $id } { $pin } { $title }"
 ```
 
 | Type | Arguments |
@@ -483,7 +483,7 @@ type Username with [handle] {
 
 age: Age = 42
 slug: Slug = ' Hello-World '
-echo "$age $slug"
+echo "{ $age } { $slug }"
 try {
   too_old: Age = 200
 } catch err {

@@ -22,7 +22,7 @@ public class SyntaxConventionTests
     private static readonly string[] Guarded =
     {
         DiagnosticCodes.BareDeclaration, DiagnosticCodes.OneSpelling, DiagnosticCodes.PreferArrayList,
-        DiagnosticCodes.QuoteText, DiagnosticCodes.BoolWords, DiagnosticCodes.TypeForm,
+        DiagnosticCodes.QuoteText, DiagnosticCodes.BoolWords, DiagnosticCodes.TypeForm, DiagnosticCodes.BareStringInterpolation,
     };
 
     [Fact]

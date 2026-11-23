@@ -30,7 +30,7 @@ fn sign_up(json: SignUp) {
 /// POST /api/tokens: trades an email and password for a new token.
 fn issue_token(json: SignIn) {
   user = @attempt($json.email, $json.password, session: false)
-  if $user == null {
+  guard $user != null else {
     throw Unauthorized "That email and password don't match an account."
   }
   return @response({ token: @api_token($user, name: $json.device) }, status: 201)

@@ -82,7 +82,25 @@ const diagnostics = new Promise((resolve) => {
     connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === untitled) resolve(p.diagnostics); });
   });
   connection.sendNotification('textDocument/didOpen', { textDocument: { uri: untitled, languageId: 'kscript-code', version: 1, text: "name = 'Joan'\necho \"Hello $nmae\"\n" } });
-  assert.ok((await untitledDiagnostics).some((d) => d.code === 'KS4001' && /Did you mean \$name/.test(d.message)), 'an untitled .kscript file is checked');
+  const untitledProblems = await untitledDiagnostics;
+  assert.ok(untitledProblems.some((d) => d.code === 'KS4001' && /Did you mean \$name/.test(d.message)), 'an untitled .kscript file is checked');
+  assert.ok(untitledProblems.some((d) => d.code === 'KS6019' && d.severity === 1), 'unbraced interpolation is diagnosed as an error');
+
+  const catchUri = 'untitled:PostfixCatch';
+  const catchDiagnostics = new Promise((resolve) => {
+    connection.onNotification('textDocument/publishDiagnostics', (p) => { if (p.uri === catchUri) resolve(p.diagnostics); });
+  });
+  connection.sendNotification('textDocument/didOpen', { textDocument: {
+    uri: catchUri, languageId: 'kscript-code', version: 1,
+    text: [
+      'fn fail() { throw Validation "No match" }',
+      'fn recover() => @fail() catch Validation as problem => $problem.message',
+      'echo @recover()',
+      'echo @fail() catch => null',
+    ].join('\n'),
+  } });
+  assert.deepStrictEqual((await catchDiagnostics).map((d) => [d.code, d.range.start.line]),
+    [['KS5016', 3]], 'the LSP resolves the inline binding and reports the error that still escapes');
 
   // The script New Script opens has nothing to fix, and can be run.
   const starter = 'untitled:Untitled-2';

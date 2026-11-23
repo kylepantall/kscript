@@ -115,7 +115,7 @@ public class MoreNativeTypesTests
     [InlineData("v: semver = '1.0.0-beta.2'\necho \"{ $v->compare('1.0.0') } { $v->compare('1.0.0-beta.10') } { $v.prerelease } { $v->bump('patch') }\"", "-1 -1 beta.2 1.0.0")]
     [InlineData("m: mime = 'application/vnd.api+json; charset=utf-8'\necho \"{ $m.main_type } { $m.subtype } { $m.essence } { $m.params.charset } { $m->is('application/*') } { $m->is('text/*') }\"", "application vnd.api+json application/vnd.api+json utf-8 true false")]
     [InlineData("h: hex = 'ff80'\necho \"{ $h.bytes } { $h->to_number() } { $h->upper() }\"", "2 65408 FF80")]
-    [InlineData("b = 'hello world'->to_base64()\necho \"$b { $b->decode() } { $b.bytes } { '??>'->to_base64(url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
+    [InlineData("b = 'hello world'->to_base64()\necho \"{ $b } { $b->decode() } { $b.bytes } { '??>'->to_base64(url: true) }\"", "aGVsbG8gd29ybGQ= hello world 11 Pz8-")]
     [InlineData("j: json = '{ \"a\": [1, 2] }'\necho \"{ $j->json().a[1] }\"", "2")]
     [InlineData("p: phone = '+44 7700 900123'\necho \"{ $p.country_code } { $p.national } { $p->tel() }\"", "44 7700900123 tel:+447700900123")]
     [InlineData("c: country = 'de'\necho \"{ $c.name } { $c.alpha3 } { $c.currency } { $c.flag }\"", "Germany DEU EUR 🇩🇪")]
@@ -127,9 +127,9 @@ public class MoreNativeTypesTests
     [InlineData("c: cron = '0 9 * * mon-fri'\necho \"{ $c->next('2026-11-21T10:00:00'->to_date())->format('ddd HH:mm') } { $c->next_times(2, '2026-11-23T10:00:00'->to_date())->map(fn(t) => $t->format('ddd')) }\"", "Mon 09:00 Tue, Wed")]
     [InlineData("c: cron = '@hourly'\necho \"{ $c->next('2026-11-21T10:20:00'->to_date())->format('HH:mm') }\"", "11:00")]
     [InlineData("c: color = '#ff8800'\necho \"{ $c->rgb().g } { $c->mix('#0000ff') } { $c->lighten(0.5) } { $c->darken() } { $c.luminance } { $c->contrast_ratio('white') }\"", "136 #804480 #ffc480 #cc6d00 0.3887 2.39")]
-    [InlineData("c: color = 'rgb(255 0 0 / 0.5)'\necho \"$c { $c->hex() } { $c->css() } { $c->rgb().a }\"", "#ff000080 #ff0000 rgb(255 0 0 / 0.5) 0.5")]
+    [InlineData("c: color = 'rgb(255 0 0 / 0.5)'\necho \"{ $c } { $c->hex() } { $c->css() } { $c->rgb().a }\"", "#ff000080 #ff0000 rgb(255 0 0 / 0.5) 0.5")]
     [InlineData("i: iban = 'GB82WEST12345698765432'\necho \"{ $i.country } { $i.country.name } { $i->formatted() } { $i.bban }\"", "GB United Kingdom GB82 WEST 1234 5698 7654 32 WEST12345698765432")]
-    [InlineData("c: card = '5555 5555 5555 4444'\necho \"$c { $c.last4 } { $c.brand } { $c->reveal() } { { card: $c }->to_json() }\"", "•••• 4444 4444 mastercard 5555555555554444 {\"card\":\"•••• 4444\"}")]
+    [InlineData("c: card = '5555 5555 5555 4444'\necho \"{ $c } { $c.last4 } { $c.brand } { $c->reveal() } { { card: $c }->to_json() }\"", "•••• 4444 4444 mastercard 5555555555554444 {\"card\":\"•••• 4444\"}")]
     public void EachTypeHasMethodsOfItsOwn(string code, string expected)
     {
         Assert.Equal(expected, Code(code));
@@ -171,7 +171,7 @@ public class MoreNativeTypesTests
     [InlineData("c: currency = EUR\necho $c.symbol", "€")]
     [InlineData("l: locale = en-GB\necho $l.region", "GB")]
     [InlineData("d: duration = 1h30m\necho $d.minutes", "90")]
-    [InlineData("c: color = red\necho \"$c { $c->contrast_ratio(white) }\"", "#ff0000 4")]
+    [InlineData("c: color = red\necho \"{ $c } { $c->contrast_ratio(white) }\"", "#ff0000 4")]
     [InlineData("m: mime = text/html\necho $m.subtype", "html")]
     [InlineData("s: slug = my-post\necho $s.words", "my, post")]
     [InlineData("fn host(u: url) => $u.host\necho @host(https://example.com/x)", "example.com")]
@@ -332,7 +332,7 @@ public class MoreNativeTypesTests
             ("natives/sku.kscript", "/// A stock code.\ntype Sku with [string] {\n  normalize: $value->trim()->upper()\n  pattern: /^[A-Z]{3}-\\d{4}$/\n}\n"),
             ("natives/money/tier.kscript", "enum Tier { gold, silver }\n"),
             ("natives/site.ks.xml", "<kscript><type name=\"Site\" with=\"url\"><validate test=\"$value.host->ends_with('example.com')\" message=\"Use a company site\" /></type></kscript>"),
-            ("scripts/main.kscript", "sku: Sku = abc-1234\ntier: Tier = gold\nsite: Site = https://www.example.com\nfn shop(s: Sku) => 'shop ' + $s\necho \"$sku $tier { @shop('xyz-0001') } { $site.host }\"\n"),
+            ("scripts/main.kscript", "sku: Sku = abc-1234\ntier: Tier = gold\nsite: Site = https://www.example.com\nfn shop(s: Sku) => 'shop ' + $s\necho \"{ $sku } { $tier } { @shop('xyz-0001') } { $site.host }\"\n"),
             ("scripts/own.kscript", "enum Tier { bronze }\nt: Tier = bronze\necho $t\n"));
         Assert.Equal("ABC-1234 gold shop XYZ-0001 www.example.com\n", RunFile(Path.Combine(dir, "scripts", "main.kscript")));
         // A script's own type of the same name wins.
@@ -348,7 +348,7 @@ public class MoreNativeTypesTests
             ("src/kinds/sku.kscript", "type Sku with [string] { pattern: /^[A-Z]+$/ }\n"),
             ("more/level.kscript", "type Level with [int] { min: 1; max: 3 }\n"),
             ("natives/ignored.kscript", "type Ignored with [string] {}\n"),
-            ("main.kscript", "s: Sku = ABC\nl: Level = 2\necho \"$s $l\"\n"),
+            ("main.kscript", "s: Sku = ABC\nl: Level = 2\necho \"{ $s } { $l }\"\n"),
             ("other.kscript", "i: Ignored = 'x'\necho $i\n"));
         Assert.Equal("ABC 2\n", RunFile(Path.Combine(dir, "main.kscript")));
         Assert.Throws<KScriptException>(() => RunFile(Path.Combine(dir, "other.kscript")));

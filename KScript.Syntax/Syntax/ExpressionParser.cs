@@ -9,7 +9,8 @@ namespace KScript.Syntax
     /// <code>
     ///   statements := statement ( ';' statement )* ';'?
     ///   statement  := target assign-op expression | expression        assign-op: = += -= *= /= ??=
-    ///   expression := nullish ( '?' expression ':' expression )?
+    ///   expression := conditional ( 'catch' name? ( 'as' name )? '=&gt;' expression )?
+    ///   conditional := nullish ( '?' expression ':' conditional )?
     ///   nullish    := or ( '??' or )*
     ///   or         := and ( 'or' and )*
     ///   and        := not ( 'and' not )*
@@ -57,6 +58,22 @@ namespace KScript.Syntax
         }
 
         #region Public API
+
+        /// <summary>Identifies a catch expression's header so block catches keep their own statement boundary.</summary>
+        public static bool StartsArrowCatch(string text, int start)
+        {
+            if (!text.AsSpan(start).StartsWith("catch", StringComparison.Ordinal)) return false;
+            Lexer header = new Lexer(text, start);
+            if (!header.Next().IsWord("catch")) return false;
+            Token next = header.Next();
+            if (next.Kind == TokenKind.Identifier && !next.IsWord("as")) next = header.Next();
+            if (next.IsWord("as"))
+            {
+                if (header.Next().Kind != TokenKind.Identifier) return false;
+                next = header.Next();
+            }
+            return next.Is("=>") && text.AsSpan(start, next.Span.Start - start).IndexOfAny('\r', '\n') < 0;
+        }
 
         /// <summary>Parses text that must be exactly one expression (an attribute such as <c>test</c> or <c>value</c>).</summary>
         public static ParseResult ParseExpression(string text)
@@ -222,6 +239,12 @@ namespace KScript.Syntax
 
         private ExprNode ParseExpr()
         {
+            ExprNode value = ParseConditional();
+            return Peek().IsWord("catch") ? ParseCatchExpression(value) : value;
+        }
+
+        private ExprNode ParseConditional()
+        {
             ExprNode condition = ParseNullish();
             if (!Peek().Is("?"))
             {
@@ -232,7 +255,7 @@ namespace KScript.Syntax
             ExprNode whenTrue = ParseExpr();
             pendingConditionalDepths.Pop();
             Expect(":", "in a ? b : c conditional");
-            ExprNode whenFalse = ParseExpr();
+            ExprNode whenFalse = ParseConditional();
             return new ConditionalNode
             {
                 Condition = condition,
@@ -240,6 +263,34 @@ namespace KScript.Syntax
                 WhenFalse = whenFalse,
                 Span = TextSpan.FromBounds(condition.Span.Start, whenFalse.Span.End),
             };
+        }
+
+        private ExprNode ParseCatchExpression(ExprNode body)
+        {
+            Advance();
+            var node = new CatchExpressionNode { Protected = body };
+            bool typed = Peek().Kind == TokenKind.Identifier && !Peek().IsWord("as");
+            if (typed)
+            {
+                Token type = Advance();
+                node.ErrorType = type.Text;
+                node.ErrorTypeSpan = type.Span;
+            }
+            if (Peek().IsWord("as"))
+            {
+                Advance();
+                if (Peek().Kind == TokenKind.Identifier)
+                {
+                    Token binding = Advance();
+                    node.Binding = binding.Text;
+                    node.BindingSpan = binding.Span;
+                }
+                else Error(Peek().Span, "Write a name after as.");
+            }
+            Expect("=>", "before the catch expression");
+            node.Fallback = ParseExpr();
+            node.Span = TextSpan.FromBounds(body.Span.Start, node.Fallback.Span.End);
+            return node;
         }
 
         private ExprNode ParseNullish() => ParseLeftAssociative(ParseOr, t => t.Is("??") ? "??" : null);

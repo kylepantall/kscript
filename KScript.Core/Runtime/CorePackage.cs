@@ -205,6 +205,16 @@ namespace KScript.Runtime
                 return ok;
             });
 
+            p.Element(new ElementInfo("guard", "Checks a precondition. When the test is false, its body must leave the current flow.", ContentKind.Statements, Test), run =>
+            {
+                if (!Values.Truthy(run.Eval("test")))
+                {
+                    run.RunChildren();
+                    throw run.Error("The guard's failure block must leave with return, throw, break, continue or exit.", null, "Syntax");
+                }
+                return null;
+            });
+
             p.Element(new ElementInfo("elif", "Runs when the earlier <if>/<elif> tests were false and this test is true.", ContentKind.Statements, Test)
             {
                 MustFollow = new[] { "if", "elif" },

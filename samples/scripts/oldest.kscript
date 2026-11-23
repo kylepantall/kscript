@@ -13,4 +13,4 @@ for p in $people {
     eldest = $p
   }
 }
-echo "$eldest.name again."
+echo "{ $eldest.name } again."

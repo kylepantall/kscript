@@ -37,6 +37,7 @@ namespace KScript.Syntax.Markup
         /// the other KS6xxx codes are style, which a standard sets.
         /// </summary>
         public static bool IsOldSpelling(string code) =>
+            code == DiagnosticCodes.BareStringInterpolation ||
             code is DiagnosticCodes.PreferArrayList or DiagnosticCodes.QuoteText or DiagnosticCodes.BareDeclaration
                 or DiagnosticCodes.BoolWords or DiagnosticCodes.OneSpelling or DiagnosticCodes.TypeForm;
 
@@ -57,6 +58,9 @@ namespace KScript.Syntax.Markup
             {
                 switch (node)
                 {
+                    case LiteralNode { Kind: LiteralKind.String, Template: not null } literal when codeFile:
+                        foreach (OldSpelling spelling in InQuotedTemplate(literal.Template, text)) yield return spelling;
+                        break;
                     case BinaryNode binary when codeFile && binary.OperatorText != null && CodeSpellings.ComparisonSymbols.TryGetValue(binary.OperatorText, out string symbol)
                         && SourceIs(text, binary.OperatorSpan, binary.OperatorText):
                         yield return new OldSpelling(binary.OperatorSpan, DiagnosticCodes.OneSpelling,
@@ -79,6 +83,16 @@ namespace KScript.Syntax.Markup
                             $"Change to {target.Name}", new TextChange(new TextSpan(target.Span.Start, 1), string.Empty));
                         break;
                 }
+            }
+        }
+
+        public static IEnumerable<OldSpelling> InQuotedTemplate(Template template, string text)
+        {
+            foreach (TemplateSegment part in template.Expressions.Where(part => part.Kind == TemplateSegmentKind.Reference && part.Expression.Success))
+            {
+                yield return new OldSpelling(part.Span, DiagnosticCodes.BareStringInterpolation,
+                    "Wrap an interpolated value in { } inside a double-quoted string.",
+                    "Wrap in interpolation braces", new TextChange(part.Span, "{ " + text.Substring(part.Span.Start, part.Span.Length) + " }"));
             }
         }
 

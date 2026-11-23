@@ -434,7 +434,7 @@ public sealed class McpTests : IDisposable
     public void Check_code_reports_problems_with_their_positions()
     {
         McpServer server = Server();
-        var (kscript, error) = Call(server, "check_code", new { code = "x = @nope(1)\necho \"$x\"" });
+        var (kscript, error) = Call(server, "check_code", new { code = "x = @nope(1)\necho \"{ $x }\"" });
         Assert.True(error);
         Assert.Contains("1 error", kscript);
         Assert.Contains("1:5: error KS5001: Unknown command @nope.", kscript);
@@ -504,7 +504,7 @@ public sealed class McpTests : IDisposable
     public void Run_code_runs_in_the_sandbox()
     {
         McpServer server = Server();
-        var (ran, error) = Call(server, "run_code", new { code = "n = 3\necho \"n is $n\"" });
+        var (ran, error) = Call(server, "run_code", new { code = "n = 3\necho \"n is { $n }\"" });
         Assert.False(error);
         Assert.Contains("Exit code 0", ran);
         Assert.Contains("Output:\nn is 3\n", ran);

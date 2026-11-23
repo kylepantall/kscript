@@ -51,7 +51,7 @@ fn store(json: NoteInput) {
 fn show(id: int) {
   note = @mine()->filter(fn(n) => $n.id == $id)->first()
   if $note == null {
-    throw NotFound "There is no note $id."
+    throw NotFound "There is no note {$id}."
   }
   return $note
 }

@@ -350,7 +350,8 @@ namespace KScript.Runtime
                     {
                         // <echo format="json">{ "a": 1 }</echo> is JSON written out, used as it is.
                         bool literalJson = e.GetAttributeValue("format")?.Trim() == "json" && JsonText.IsValid(content.Value);
-                        if (!literalJson) GetTemplate(module, content, bareReferences: true, check: true, info.LiteralText);
+                        if (!literalJson) GetTemplate(module, content, bareReferences: true, check: true, info.LiteralText,
+                            quoted: e.ContentSpan.Start < module.Source.Length && module.Source.Text[e.ContentSpan.Start] == '"');
                     }
                     else if (info.Content == ContentKind.AssignmentStatements
                         || (info.Content == ContentKind.Expression && e.GetAttribute("name") == null && info.GetAttribute("name") != null))
@@ -429,7 +430,7 @@ namespace KScript.Runtime
                         GetParse(module, a.Value, ParseMode.List, check: true);
                         break;
                     case AttributeKind.Template:
-                        GetTemplate(module, a.Value, bareReferences: true, check: true);
+                        GetTemplate(module, a.Value, bareReferences: true, check: true, quoted: a.Quote == '"');
                         break;
                     case AttributeKind.Enum:
                         if (spec.Options.Count > 0 && !spec.Options.Contains(a.Value.Value.Trim()) && !a.Value.Value.Contains('{'))
@@ -498,7 +499,7 @@ namespace KScript.Runtime
             throw Located(new KScriptException(found.Message, "Syntax"), module, text.ToSource(found.Span.Start));
         }
 
-        internal Template GetTemplate(Module module, DecodedText text, bool bareReferences, bool check = false, TextLiterals literals = TextLiterals.None)
+        internal Template GetTemplate(Module module, DecodedText text, bool bareReferences, bool check = false, TextLiterals literals = TextLiterals.None, bool quoted = false)
         {
             Template template;
             lock (module.TemplateCache)
@@ -511,6 +512,8 @@ namespace KScript.Runtime
                         module.OldSpellingCache[text] = found;
                 }
             }
+            if (module.IsCode && quoted && OldSpellings.InQuotedTemplate(template, text.Value).FirstOrDefault() is OldSpelling bare)
+                throw Located(new KScriptException(bare.Message, "Syntax"), module, text.ToSource(bare.Span.Start));
             RefuseOldSpelling(module, text);
             SyntaxError error = template.Errors.FirstOrDefault();
             if (error != null)

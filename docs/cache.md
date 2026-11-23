@@ -44,7 +44,7 @@ import KScript.Cache
 
 store = @cache(file, name: 'visits')
 count = $store->increment('today', ttl: 1d)
-echo "Visit $count today, { $store->ttl('today') } left"
+echo "Visit { $count } today, { $store->ttl('today') } left"
 ```
 
 ## In routes: ETags and Cache-Control

@@ -131,7 +131,7 @@ public class NativeOperatorsPeopleAndMoneyTests
     public void MoneyAddsExactly()
     {
         // Decimal inside: 0.10 + 0.20 is 0.30, not 0.30000000000000004.
-        Assert.Equal("USD 0.30 true", Code("a: money = '$0.10'\nb: money = '$0.20'\nc = $a + $b\necho \"$c { $c == '$0.30' }\""));
+        Assert.Equal("USD 0.30 true", Code("a: money = '$0.10'\nb: money = '$0.20'\nc = $a + $b\necho \"{ $c } { $c == '$0.30' }\""));
         Assert.Equal("0.3", Code("a: money = '$0.10'\nb: money = '$0.20'\necho ($a + $b).amount"));
     }
 
@@ -282,7 +282,7 @@ public class NativeOperatorsPeopleAndMoneyTests
         Assert.Equal("British Pound £ 2 £1,234.50", Code("c: currency = 'GBP'\necho \"{ $c.name } { $c.symbol } { $c.digits } { $c->format(1234.5) }\""));
         Assert.Equal("de DE 1.234,5", Code("l: locale = 'de-DE'\necho \"{ $l.language } { $l.region } { $l->format(1234.5) }\""));
         Assert.Equal("GB country GB82 WEST 1234 5698 7654 32", Code("i: iban = 'GB82WEST12345698765432'\necho \"{ $i.country } { $i.country->type() } { $i->formatted() }\""));
-        Assert.Equal("•••• 4444 4444 mastercard 16", Code("c: card = '5555 5555 5555 4444'\necho \"$c { $c.last4 } { $c.brand } { $c->reveal()->count() }\""));
+        Assert.Equal("•••• 4444 4444 mastercard 16", Code("c: card = '5555 5555 5555 4444'\necho \"{ $c } { $c.last4 } { $c.brand } { $c->reveal()->count() }\""));
         Assert.Contains("must be a +44 number", Fails("p: phone(countries: ['+44']) = '+14155550100'\necho $p"));
     }
 }

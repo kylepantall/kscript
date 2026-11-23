@@ -64,7 +64,7 @@ public class StdlibBehaviourTests
     [InlineData("1w", "1w", 604800)]
     public void A_duration_is_written_as_a_number_and_a_unit(string written, string shown, double seconds)
     {
-        Assert.Equal($"duration {shown} {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}", Code($"d = {written}\necho \"{{ $d->type() }} $d {{ $d.seconds }}\""));
+        Assert.Equal($"duration {shown} {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}", Code($"d = {written}\necho \"{{ $d->type() }} {{ $d }} {{ $d.seconds }}\""));
     }
 
     [Theory]

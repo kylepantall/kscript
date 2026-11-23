@@ -99,10 +99,13 @@ test('assignment targets and constants', async () => {
   assert.match(scopeOf(tokens, '=='), /keyword\.operator\.kscript/);
 });
 
-test('double quotes fill in $name and { }; single quotes are kept as written', async () => {
-  const tokens = tokenize(await load(), "echo \"Hi $name, { @upper('x') } \\\" done\"\nx = $s->replace('a', 'b')");
+test('double quotes highlight expressions inside braces', async () => {
+  const tokens = tokenize(await load(), "echo \"Hi $name, { $other } { @upper('x') } \\\" done\"\nx = $s->replace('a', 'b')");
   assert.match(scopeOf(tokens, 'echo'), /support\.function\.builtin\.kscript/);
-  assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
+  const bare = tokens.find(t => t.text.includes('$name'));
+  assert.match(bare.scopes, /string\.quoted\.double\.kscript/);
+  assert.doesNotMatch(bare.scopes, /variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, '$other'), /meta\.interpolation\.kscript .*variable\.other\.kscript/);
   assert.match(scopeOf(tokens, '@upper'), /meta\.interpolation\.kscript .*entity\.name\.function\.kscript/);
   assert.match(scopeOf(tokens, 'x'), /string\.quoted\.single\.kscript/);
   assert.match(scopeOf(tokens, '\\"'), /constant\.character\.escape\.kscript/);
@@ -126,7 +129,6 @@ test('a quoted URL distinguishes code, properties, escaped braces and path text'
   ].join('\n'));
   for (const field of ['passkeys', 'url']) {
     assert.match(scopeOf(tokens, field), /meta\.embedded\.expression\.kscript .*variable\.other\.property/);
-    assert.match(scopeOf(tokens, field, 1), /string\.quoted\.double\.kscript .*variable\.other\.property/);
   }
   assert.match(scopeOf(tokens, '$config'), /meta\.embedded\.expression\.kscript .*variable\.other/);
   assert.match(scopeOf(tokens, '/finish'), /string\.quoted\.double\.kscript$/);
@@ -136,7 +138,7 @@ test('a quoted URL distinguishes code, properties, escaped braces and path text'
   assert.match(scopeOf(tokens, 'after'), /string\.quoted\.double\.kscript$/);
   for (const escaped of ['{{', '}}']) assert.match(scopeOf(tokens, escaped), /constant\.character\.escape/);
   assert.match(scopeOf(tokens, 'literal'), /string\.quoted\.double\.kscript$/);
-  assert.match(scopeOf(tokens, '@format'), /entity\.name\.function/);
+  assert.ok(!tokens.some(t => t.text === '@format'));
   assert.ok(!tokens.some(t => t.text === '@example'));
   assert.match(scopeOf(tokens, '{$config.passkeys.url}/{$kind}/finish'), /string\.quoted\.single\.kscript$/);
 });
@@ -221,9 +223,9 @@ test('every sample tokenizes without leaving a string or block open', async () =
 });
 
 test('a backslash at the end of a line joins a string to the next line', async () => {
-  const tokens = tokenize(await load(), "echo \"Hello, \\\n    $name\"\nx = 'abc \\\n  def'\ny = 1");
+  const tokens = tokenize(await load(), "echo \"Hello, \\\n    { $name }\"\nx = 'abc \\\n  def'\ny = 1");
   assert.match(scopeOf(tokens, '\\'), /string\.quoted\.double\.kscript constant\.character\.escape\.line-continuation\.kscript/);
-  assert.match(scopeOf(tokens, '$name'), /string\.quoted\.double\.kscript variable\.other\.kscript/);
+  assert.match(scopeOf(tokens, '$name'), /meta\.embedded\.expression\.kscript .*variable\.other\.kscript/);
   assert.match(scopeOf(tokens, '\\', 1), /string\.quoted\.single\.kscript constant\.character\.escape\.line-continuation\.kscript/);
   assert.match(scopeOf(tokens, 'def'), /string\.quoted\.single\.kscript/);
   assert.match(scopeOf(tokens, 'y'), /variable\.other\.assignment\.kscript/);

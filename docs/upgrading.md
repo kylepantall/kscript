@@ -19,7 +19,7 @@ What is left as a warning is style, not spelling: an `else` after a `return` (KS
 | --- | --- | --- |
 | `Section(title: Results)` | `Section(title: "Results")`: text in an argument goes in quotes, and a bare word is a name | fix (KS6009) |
 | `Button(on_click: "count += 1")` | `Button(on_click: count += 1)`, or `on_click: { count += 1 }`: double quotes always make text | |
-| `'Hello $name'` | `"Hello $name"`: double quotes fill in `$name` and `{ }` everywhere, single quotes keep text as written | |
+| `'Hello $name'` | `"Hello { $name }"`: double quotes evaluate expressions in braces. Single quotes keep text as written | |
 | `route = "/users/{id}"`, `"\d{3}"`, `"a { color: red }"` | `'/users/{id}'`, `'\d{3}'`, `'a { color: red }'`, or doubled braces (`"/users/{{id}}"`): a `{ }` in double quotes always holds an expression, whatever it opens with, so `"{ User->count() } users"` and `"{ 1 + 2 }"` fill in | |
 | `$total = 3`, `$total += 1` | `total = 3`, `total += 1`: a name being set has no `$` | fix (KS6010) |
 | `fn($n) => $n * 2` | `fn(n) => $n * 2` | fix (KS6010) |

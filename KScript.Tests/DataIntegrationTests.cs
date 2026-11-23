@@ -214,7 +214,7 @@ public sealed class DataIntegrationTests : DataFixture
         Assert.Contains("User has no field 'colour'", b.Send("POST", "/api/colour", json: "{ \"email\": \"amy@example.com\", \"password\": \"correct horse battery\" }").Body);
 
         // The user is a row of the users table, with a hash in its password field.
-        Assert.Equal("1 Joan true", Keep("u = User->find(1)\nok = $u.password->verify('correct horse battery')\necho \"$u.id $u.name $ok\""));
+        Assert.Equal("1 Joan true", Keep("u = User->find(1)\nok = $u.password->verify('correct horse battery')\necho \"{ $u.id } { $u.name } { $ok }\""));
         Keep("Post->create(title: 'Mine', author_id: 1)");
 
         Assert.Equal(401, b.Send("GET", "/api/me", headers: new Dictionary<string, object> { ["accept"] = "application/json" }).Status);

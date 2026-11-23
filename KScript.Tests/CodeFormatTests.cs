@@ -83,7 +83,7 @@ public class CodeFormatTests
                 return 'positive'
               }
             }
-            for n in [-2, 0, 5] { echo "$n is { @classify($n) }" }
+            for n in [-2, 0, 5] { echo "{ $n } is { @classify($n) }" }
             total = 0
             for i in 0..5 {
               if $i == 3 { continue }
@@ -188,7 +188,7 @@ public class CodeFormatTests
             var output = new StringWriter();
             var error = new StringWriter();
             Assert.Equal(0, KScript.Conversion.ConvertCommand.Run(new[] { dir }, output, error));
-            Assert.Equal("x = 1\necho \"$x\"\n", File.ReadAllText(Path.Combine(dir, "a.kscript")));
+            Assert.Equal("x = 1\necho \"{ $x }\"\n", File.ReadAllText(Path.Combine(dir, "a.kscript")));
 
             Assert.Equal(1, KScript.Conversion.ConvertCommand.Run(new[] { Path.Combine(dir, "a.ks.xml") }, output, error));
             Assert.Contains("already exists", error.ToString());
@@ -234,13 +234,13 @@ public class CodeFormatTests
     {
         const string code = "/*\n  Header\n    indented\n*/\n"
             + "x = 1 /* inline */\n"
-            + "echo \"x is $x\" /* trailing */\n"
+            + "echo \"x is { $x }\" /* trailing */\n"
             + "/* one */ echo \"two\"\n"
             + "list = [\n  1, /* first */\n  2  // second\n]\n"
             + "y = $x + /* mid */ 2\n"
             + "z = $x /* a\n  multi-line trailing */\n"
             + "/**\n * Star style\n * second\n */\n"
-            + "if $x > 0 {\n  /* nested */\n  echo \"{ $list->count() } $y $z\"\n}\n";
+            + "if $x > 0 {\n  /* nested */\n  echo \"{ $list->count() } { $y } { $z }\"\n}\n";
         Assert.Equal("x is 1\ntwo\n2 3 1\n", Run(code));
 
         MarkupDocument doc = CodeParser.Parse(code);
@@ -253,10 +253,10 @@ public class CodeFormatTests
         // Converting keeps every comment: XML has one kind, so they come back as // lines.
         string xml = ScriptConverter.Convert(code, "a.kscript").Text;
         Assert.Contains("<let name=\"x\" value=\"1\" /> <!-- inline -->", xml);
-        Assert.Contains("<echo>x is $x</echo> <!-- trailing -->", xml);
+        Assert.Contains("<echo>x is { $x }</echo> <!-- trailing -->", xml);
         Assert.Contains("$x + /* mid */ 2", xml);
         string back = ScriptConverter.Convert(xml, "a.ks.xml").Text;
-        Assert.StartsWith("// Header\n//   indented\nx = 1 // inline\necho \"x is $x\" // trailing\n// one\n", back);
+        Assert.StartsWith("// Header\n//   indented\nx = 1 // inline\necho \"x is { $x }\" // trailing\n// one\n", back);
         Assert.Contains("// Star style\n// second\n", back);
         Assert.Equal("x is 1\ntwo\n2 3 1\n", Run(back));
     }
@@ -377,7 +377,7 @@ public class CodeFormatTests
             "enum Size { s, m }\n"
             + "type Repo {\n  name: string\n  stars: int from stargazers_count\n  size: Size = 'm'\n}\n"
             + "r = '{\"name\": \"kscript\", \"stargazers_count\": 12}'->json(as: Repo)\n"
-            + "echo \"$r.name has $r.stars stars, size $r.size\""));
+            + "echo \"{ $r.name } has { $r.stars } stars, size { $r.size }\""));
     }
 
     [Fact]
@@ -386,11 +386,11 @@ public class CodeFormatTests
         Assert.Equal(
             "Hello Joan, you have 4 and 2! Sam a+b {x} $5 a@b.com\nHello $name {$n} /users/{id} \\d{3}\nHi dear Joan!\nJOAN.\n",
             Run("name = 'Joan'\nn = 2\np = { name: 'Sam', tags: ['a', 'b'] }\n"
-                + "g = \"Hello $name, you have { $n * 2 } and {$n}! $p.name { $p.tags->join('+') } {{x}} $5 a@b.com\"\n"
+                + "g = \"Hello { $name }, you have { $n * 2 } and {$n}! { $p.name } { $p.tags->join('+') } {{x}} $5 a@b.com\"\n"
                 + "echo $g\n"
                 + "s = 'Hello $name {$n} /users/{id} \\d{3}'\necho $s\n"
-                + "fn greet(who) {\n  return \"Hi $who!\"\n}\n"
-                + "echo @greet(\"dear $name\")\n"
+                + "fn greet(who) {\n  return \"Hi { $who }!\"\n}\n"
+                + "echo @greet(\"dear { $name }\")\n"
                 + "echo \"{ $name->upper() }. \"->trim()\n").Replace("\r\n", "\n"));
     }
 
@@ -405,12 +405,12 @@ public class CodeFormatTests
         Assert.Contains("id", unknown.Message);
         KScriptException open = Assert.Throws<KScriptException>(() => Run("css = \"a { color: red }\"\necho $css\n"));
         Assert.Contains("write {{ and }} for braces, or use 'single quotes'", open.Message);
-        Assert.Equal("/users/{id} a { color: red }\n", Run("route = \"/users/{{id}}\"\ncss = 'a { color: red }'\necho \"$route $css\"\n").Replace("\r\n", "\n"));
+        Assert.Equal("/users/{id} a { color: red }\n", Run("route = \"/users/{{id}}\"\ncss = 'a { color: red }'\necho \"{ $route } { $css }\"\n").Replace("\r\n", "\n"));
     }
 
     [Fact]
     public void FilledInTextIsWorkedOutEachTimeItRuns()
     {
-        Assert.Equal(" 1 2 3\n", Run("out = ''\nfor i in 1..4 {\n  out = \"$out $i\"\n}\necho $out\n").Replace("\r\n", "\n"));
+        Assert.Equal(" 1 2 3\n", Run("out = ''\nfor i in 1..4 {\n  out = \"{ $out } { $i }\"\n}\necho $out\n").Replace("\r\n", "\n"));
     }
 }

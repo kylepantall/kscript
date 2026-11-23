@@ -363,6 +363,21 @@ namespace KScript.Runtime
                         ? Evaluate(conditional.WhenTrue, scope, ctx)
                         : Evaluate(conditional.WhenFalse, scope, ctx);
 
+                case CatchExpressionNode attempt:
+                    try
+                    {
+                        return Evaluate(attempt.Protected, scope, ctx);
+                    }
+                    catch (KScriptException error) when (attempt.ErrorType == null || ErrorTypes.Matches(error, attempt.ErrorType))
+                    {
+                        Scope handler = scope.Child();
+                        handler.Declare(attempt.Binding, error.ToValue());
+                        object fallback;
+                        using (ErrorTypes.Handle(error)) fallback = Evaluate(attempt.Fallback, handler, ctx);
+                        if (Values.Unwrap(fallback) == null) throw;
+                        return fallback;
+                    }
+
                 case LambdaNode lambda:
                     return new Lambda(lambda, scope, ctx, SourceOf(lambda, ctx));
 

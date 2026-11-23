@@ -14,18 +14,18 @@ const limit = 10
 n: int = $args[0] // convert, or stop with a clear error
 
 echo "Hello, {$name}! You have { $count } new { $count == 1 ? 'message' : 'messages' }."
-echo "$person.name is $person.age" // bare $name works in text too
-echo "$people" // a map or list of maps prints as indented JSON
+echo "{ $person.name } is { $person.age }"
+echo "{ $people }" // a map or list of maps prints as indented JSON
 ```
 
 A map, or a list of maps, on its own in `echo` prints as indented JSON, coloured in a terminal (unless `NO_COLOR` is set). Inside text it stays on one line. `echo(format: json)` reformats JSON text, and `->to_json()` gives compact JSON.
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 
-`"Double quotes"` fill in `$name` and `{ }` wherever they are written: after `echo`, given to a variable, returned from a function or passed to a call. `'Single quotes'` keep text exactly as written.
+`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written.
 
 ```kscript
-greeting = "Hello $name, you have { $count * 2 } points." // filled in
+greeting = "Hello { $name }, you have { $count * 2 } points."
 label = 'Write $name to use a variable.' // kept as written
 boxes = "{ 2 * 3 } boxes, { [1, 2]->count() } lists" // a { } always holds an expression
 route = '/users/{id}' // text with braces of its own goes in single quotes
@@ -219,7 +219,7 @@ type Repo {
 }
 
 repo = Repo({ name: 'kscript', stargazers_count: 12, owner: { login: 'kyle', id: 1 } })
-echo "$repo.name has $repo.stars stars, owned by $repo.owner.login"
+echo "{ $repo.name } has { $repo.stars } stars, owned by { $repo.owner.login }"
 ```
 
 `stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `Repo(data)` maps a map, a list of maps or JSON text.
@@ -385,6 +385,29 @@ The editor completes and checks extension methods only where they apply: in a fi
 
 ## Errors
 
+Use `guard condition else { ... }` to continue only when a precondition holds. The failure block must leave the current flow with `return`, `throw`, `break`, `continue`, or `exit`.
+
+```kscript try
+fn save_age(age: int, enabled: bool) {
+  guard $enabled else {
+    return 'Skipped'
+  }
+
+  throw if $age < 0 {
+    type: 'Validation'
+    message: "Age cannot be negative: { $age }"
+  }
+
+  return 'Saved'
+}
+
+echo @save_age(-1, true) catch => $err.message
+```
+
+A postfix `catch` preserves the value on its left when evaluation succeeds. When it throws, KScript binds the error to `$err` and evaluates the fallback. Use `catch Validation => $err.message` to recover from one error type, or `catch Validation as problem => $problem.message` to name the binding. A null fallback propagates the original error.
+
+In `@a() + @b() catch => 0`, the handler covers both calls and the addition. In `@a() + (@b() catch => 0)`, it covers only `@b()`.
+
 Use `throw if` to raise an error only when a condition holds. Inside its block, write one field per line. KScript evaluates the condition once. It evaluates the fields only when the condition is true, so a successful reply can omit `e` entirely.
 
 ```kscript
@@ -459,6 +482,16 @@ echo $directory->lookup('')  // guest
 Inside a catch, `throw if condition` rethrows the current error when the condition holds. With a nonblank fallback, `lookup` returns it. When the key and fallback are both blank, the same `Validation` error reaches the type handler and it returns `'A key is required'`. Supply a payload block after the condition to create a new error.
 
 Use `/// @throws Network` to document an error that callers may need to handle, including an error from a dynamically chosen function. Hover and signature help show known errors. A helper can let an error reach its caller. At a top-level script statement, `kscript check` and the editor warn when a known error can still escape ([KS5016](errors.md#ks5016)).
+
+For a single call, recover the result inline with `catch`.
+
+```kscript try
+echo @testing(1, 2) catch Error => $err.message
+
+fn testing(arg1: number, arg2: number) {
+  throw Error(message: "{ $arg1 } and { $arg2 }")
+}
+```
 
 ### Throw with a value and a cause
 

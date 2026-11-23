@@ -240,6 +240,14 @@ namespace KScript.Language.Analysis
             return last != null && ExitElements.Contains(last.Name);
         }
 
+        private static bool GuardLeaves(MarkupElement block)
+        {
+            if (EndsWithExit(block)) return true;
+            MarkupElement last = LastChildElement(block);
+            return last?.Name == "else" && ChainBefore(last) is List<MarkupElement> chain
+                && chain.All(GuardLeaves) && GuardLeaves(last);
+        }
+
         /// <summary>
         /// Rewrites the chain so this branch no longer needs else: adds <paramref name="exit"/> to the earlier branches
         /// that don't end early (when given), then moves an else's body after the chain, or starts a new if for an elif.

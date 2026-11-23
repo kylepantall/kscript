@@ -116,7 +116,7 @@ public class MultilineStringTests
             "repo = ```<Repo>",
             "    { \"name\": \"kscript\", \"stars\": 12 }",
             "    ```",
-            "echo \"$repo.name $repo.stars\"")));
+            "echo \"{ $repo.name } { $repo.stars }\"")));
 
         var error = Assert.Throws<KScriptException>(() => Run(type + Lines(
             "repo = ```<Repo>",

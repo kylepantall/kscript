@@ -5,7 +5,8 @@ import "types/repo.kscript"
 
 repos = @read_json('data/repos.json', as: Repo)
 for repo in $repos {
-  echo "$repo.label by $repo.owner.login, licence: { $repo.license ?? 'none' }"
+  echo "{ $repo.label } by { $repo.owner.login }, licence: \
+    { $repo.license ?? 'none' }"
 }
 
 // The same works for a live API: @api($url)->check()->json(as: Repo) with

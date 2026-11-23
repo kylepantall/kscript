@@ -303,6 +303,9 @@ namespace KScript.Language.Analysis
                     return a.Type == b.Type ? a : TypeShape.Unknown;
                 }
 
+                case CatchExpressionNode attempt:
+                    return Analyzer.Unify(new[] { Infer(attempt.Protected, region), Infer(attempt.Fallback, region) });
+
                 default:
                     return TypeShape.Unknown;
             }

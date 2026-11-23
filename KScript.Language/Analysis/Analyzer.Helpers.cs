@@ -67,14 +67,28 @@ namespace KScript.Language.Analysis
             }
 
             ExpressionRegion region = NewRegion(RegionKind.Template, text, element, attribute, scope, template: template);
+            bool doubleQuoted = attribute != null ? attribute.Quote == '"'
+                : element?.ContentSpan.Start is int start && start < source.Length && source.Text[start] == '"';
             foreach (TemplateSegment segment in template.Expressions)
             {
+                if (doubleQuoted) CheckQuotedInterpolation(region, segment, report: true);
                 ReportSyntaxErrors(region, segment.Expression.Errors);
                 if (segment.Node != null)
                 {
                     AnalyzeExpr(segment.Node, region, scope, ExprContext.Value);
                 }
             }
+        }
+
+        private void CheckQuotedInterpolation(ExpressionRegion region, TemplateSegment segment, bool report = false)
+        {
+            if (result.Markup.Syntax != SourceSyntax.Code || segment.Kind != TemplateSegmentKind.Reference
+                || !segment.Expression.Success) return;
+            TextSpan span = region.Source.ToSource(segment.Span);
+            if (!result.BareQuotedReferences.Add(span) || !report) return;
+            Report(span, DiagnosticSeverity.Error, DiagnosticCodes.BareStringInterpolation,
+                "Wrap an interpolated value in { } inside a double-quoted string.",
+                new[] { new QuickFix("Wrap in interpolation braces", new TextChange(span, "{ " + source[span] + " }")) });
         }
 
         private void ReportSyntaxErrors(ExpressionRegion region, IEnumerable<SyntaxError> errors)

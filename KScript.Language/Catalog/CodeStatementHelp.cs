@@ -17,10 +17,11 @@ public static class CodeStatementHelp
     public static string For(string name) => name switch
     {
         "throw" => """Raises an error when the statement runs. Use `throw Validation "Invalid age"` for a message, or `throw Error(message: 'Oops', value: $age, cause: $original)` for named fields. To throw a payload map, write `throw $payload`. Inside a catch, bare `throw` rethrows the current error. Use `throw if condition { ... }` for a conditional throw.""",
-        "try" => "Runs a block with error handling. Write `try { ... } catch Validation as err { ... }` and add `finally { ... }` for cleanup.",
-        "catch" => "Handles errors from a try block, function, or type. Write `catch Validation as err { ... }` to bind a matching error, or `catch err { ... }` to bind any error.",
+        "try" => "Runs statements with one or more error handlers and optional cleanup. Write `try { ... } catch Validation as err { ... }`.",
+        "catch" => "Recovers from errors. Use `@load() catch Validation => $err.message` for a fallback value or append `catch Validation { return $err.message }` to a declaration. Omit the type to catch any error.",
         "finally" => "Runs cleanup after the try body and any catch. Append `finally { ... }` after the preceding block.",
         "if" => "Runs a block when its condition is true. Write `if $ready { ... }`, followed by optional `elif condition { ... }` and `else { ... }` branches.",
+        "guard" => "Checks a precondition. Write `guard $ready else { return }`. The failure block leaves with return, throw, break, continue or exit.",
         "elif" => "Tests another condition after an if or elif branch. Write `elif $ready { ... }`.",
         "else" => "Runs the fallback branch. Write `else { ... }` after an if, elif, or for block.",
         "while" => "Repeats while its condition is true. Write `while $remaining > 0 { ... }`.",

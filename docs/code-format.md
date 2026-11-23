@@ -18,7 +18,7 @@ fn slugify(text: string) => $text->lower()->replace(' ', '-')
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 for p in $people {
   if $p.age < 18 {
-    echo "$p.name is not an adult"
+    echo "{ $p.name } is not an adult"
     continue
   }
   echo "{ @slugify($p.name) } is an adult"
@@ -65,6 +65,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `fn greet(who: string, hi = 'Hello') { }` | `<fn name="greet" params="who: string, hi = 'Hello'">` |
 | `fn double(x: int) => $x * 2` | `<fn name="double" params="x: int" value="$x * 2" />` |
 | `return $x`, `exit 1` | `<return value="$x" />`, `<exit code="1" />` |
+| `@load() catch NotFound => 'Missing'` | Same expression in XML expression attributes |
 | `try { } catch NotFound as err { } catch err { } finally { }` | `<try>` with `<catch type as>` and `<finally>` inside (`when test` adds a test to a catch) |
 | `throw Validation "Bad {$x}"` | `<throw type="Validation">Bad {$x}</throw>` |
 | `import KScript.Math as math` | `<import package="KScript.Math" as="math" />` |
@@ -152,8 +153,7 @@ repo = ```<Repo>
   for anything else. The result is one statement on the arm's line or a `{ }` block, and arms are separated by a new
   line or a comma. A match used as a value (`label = match $x { 1 => 'one', _ => 'other' }`) writes its arms the
   same way.
-- `"double quotes"` are text, exactly like XML element text or an attribute value: `{ }` and `$name` interpolate where
-  the element interpolates, and in an expression too (`greeting = "Hello $name"`): a `{ }` always holds an expression, and
+- `"double quotes"` interpolate expressions enclosed in `{ }`, as in `greeting = "Hello { $name }"`. A `{ }` always holds an expression, and
   `{{` and `}}` are braces. `\"` and `\\` are the only escapes (plus a `\` at the end of a line, which joins it to
   the next: see [Long strings and blocks of text](#long-strings-and-blocks-of-text)). `'single quotes'` are string literals inside
   expressions and are kept exactly as written.

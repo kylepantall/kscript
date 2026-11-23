@@ -18,6 +18,7 @@ namespace KScript.Language.Features
         private static readonly Dictionary<string, string> CodeStatementSnippets = new Dictionary<string, string>
         {
             ["if"] = "if ${1:condition} {\n\t$0\n}",
+            ["guard"] = "guard ${1:condition} else {\n\t${2:return}\n}",
             ["elif"] = "elif ${1:condition} {\n\t$0\n}",
             ["else"] = "else {\n\t$0\n}",
             ["while"] = "while ${1:condition} {\n\t$0\n}",

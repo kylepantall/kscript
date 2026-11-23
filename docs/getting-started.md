@@ -27,17 +27,17 @@ A script runs from top to bottom, one statement per line. `//` starts a comment.
 ```kscript try
 name = 'Joan'
 age = 82
-echo "$name is $age."
+echo "{ $name } is { $age }."
 
 age = $age + 1
 echo "Next year { $name } will be { $age }."
 ```
 
-After `=`, a value is an expression, so text needs quotes. `"Double quotes"` fill in `$name` and `{ }` wherever they are written, and `'single quotes'` keep the text exactly as written:
+After `=`, a value is an expression, so text needs quotes. `"Double quotes"` evaluate expressions within `{ }`, and `'single quotes'` keep the text exactly as written:
 
 ```kscript try
 name = 'Joan'
-greeting = "Hello $name, you are { 80 + 2 }."
+greeting = "Hello { $name }, you are { 80 + 2 }."
 label = 'Curly { braces } stay as written, and so does C:\temp.'
 echo $greeting
 echo $label
@@ -81,7 +81,7 @@ for n in 1..16 {
     echo "Buzz"
     continue
   }
-  echo "$n"
+  echo "{ $n }"
 }
 ```
 
@@ -153,7 +153,7 @@ KScript.Terminal reads from the keyboard. In the docs, click **Input** and type 
 import KScript.Terminal
 
 input(into: name, default: 'stranger') "What's your name? "
-echo "Hello, $name!"
+echo "Hello, { $name }!"
 ```
 
 ## The .kscript format and XML
@@ -164,10 +164,10 @@ Everything above can also be written as XML, which looks like HTML: `name = 'Joa
 people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }]
 for p in $people {
   if $p.age > 40 {
-    echo "$p.name is over 40"
+    echo "{ $p.name } is over 40"
     continue
   }
-  echo "$p.name is { $p.age }"
+  echo "{ $p.name } is { $p.age }"
 }
 ```
 

@@ -14,6 +14,51 @@ namespace KScript.Language.Tests
             TestHelpers.WithoutUnused(Analyzer.Analyze(text, Path.Combine(Folder, file), files ?? EmptyFileSystem.Instance));
 
         [Fact]
+        public void BareReferencesInCodeStringsWarnAndHaveStringColorUntilWrapped()
+        {
+            const string text = """
+                fn testing(arg1: number, arg2: number) {
+                  throw Error(message: "$arg1 and {$arg2}")
+                }
+                echo "$config.name"
+                echo '$arg1'
+                """;
+            var analysis = Code(text);
+            var warnings = analysis.Diagnostics.Where(d => d.Code == DiagnosticCodes.BareStringInterpolation).OrderBy(d => d.Span.Start).ToArray();
+            Assert.Equal(new[] { "$arg1", "$config.name" }, warnings.Select(d => analysis.Source[d.Span]));
+            var tokens = new LanguageService().GetSemanticTokens(analysis);
+            foreach (Diagnostic warning in warnings)
+            {
+                Assert.Equal(DiagnosticSeverity.Error, warning.Severity);
+                Assert.Contains(tokens, token => token.Span.Equals(warning.Span) && token.Type == SemanticTokenType.String);
+                Assert.DoesNotContain(tokens, token => warning.Span.Contains(token.Span.Start) && token.Type != SemanticTokenType.String);
+            }
+            int braced = text.IndexOf("$arg2", StringComparison.Ordinal);
+            Assert.Contains(tokens, token => token.Span.Contains(braced) && token.Type == SemanticTokenType.Parameter);
+            (string fixedText, int count) = Fixer.Apply(text, "app.kscript");
+            Assert.Equal(2, count);
+            Assert.Contains("message: \"{ $arg1 } and {$arg2}\"", fixedText);
+            Assert.Contains("echo \"{ $config.name }\"", fixedText);
+            Assert.DoesNotContain(Code(fixedText).Diagnostics, d => d.Code == DiagnosticCodes.BareStringInterpolation);
+        }
+
+        [Fact]
+        public void InlineCatchOnlyHandlesTheProtectedExpressionAndMatchingErrors()
+        {
+            const string declaration = "fn fail() { throw Validation \"Invalid\" }\n";
+            Assert.DoesNotContain(Code(declaration + "echo @fail() catch => $err.message").Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCodes.UnhandledError || diagnostic.Severity == DiagnosticSeverity.Error);
+            Assert.Contains(Code(declaration + "echo @fail() catch NotFound => 'Missing'").Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCodes.UnhandledError);
+            Assert.Contains(Code(declaration + "echo @fail() catch => null").Diagnostics,
+                d => d.Code == DiagnosticCodes.UnhandledError);
+            Assert.Contains(Code(declaration + "echo @fail() catch => @fail()").Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCodes.UnhandledError);
+            Assert.Contains(Code("guard false else { echo 'Oops' }").Diagnostics,
+                diagnostic => diagnostic.Code == DiagnosticCodes.StatementSyntax && diagnostic.Message.Contains("failure block"));
+        }
+
+        [Fact]
         public void AnImportedTypeIsNamedBareToo()
         {
             var files = new AnalyzerCoverageTests.Files(("models/product.kscript", "import KScript.Data\n\nmodel Product {\n  name: string\n}\n"));

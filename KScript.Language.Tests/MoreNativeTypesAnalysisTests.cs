@@ -111,7 +111,7 @@ namespace KScript.Language.Tests
                 ("natives/tier.kscript", "enum Tier { gold, silver }\n"));
             string main = Path.Combine(dir, "main.kscript");
 
-            DocumentAnalysis ok = WithoutUnused(Service.Analyze("sku: Sku = ABC-1234\nt: Tier = gold\necho \"$sku $t\"", main));
+            DocumentAnalysis ok = WithoutUnused(Service.Analyze("sku: Sku = ABC-1234\nt: Tier = gold\necho \"{$sku} {$t}\"", main));
             AssertClean(ok);
 
             DocumentAnalysis bad = Service.Analyze("sku: Sku = abc\necho $sku", main);
