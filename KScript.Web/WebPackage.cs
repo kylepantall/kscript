@@ -97,6 +97,8 @@ namespace KScript.Web
                 "@live_redirect('/account')");
             p.Command("live_download", "name, bytes: base64", "Downloads bytes from a live action as a file. Use a filename without directory separators.",
                 KType.Null, DownloadLive, "@live_download('report.txt', bytes: 'Hello'->to_base64())");
+            p.Command("stream", "target, text, mode?, html?: bool", "Sends an update to a visible live-stream target before the action finishes. Text is literal by default. Use mode: 'replace' to replace the target's contents, or html: true for trusted HTML.",
+                KType.Null, StreamLive, "@stream('progress', 'Working…', mode: 'replace')");
             p.Command("skip_render", "", "Keeps the current HTML after a live action while saving its state and sending any effects.", KType.Null, call =>
             {
                 LiveAction(call).SkipLiveRender = true;
@@ -147,6 +149,19 @@ namespace KScript.Web
             if (bytes.Length > 12 * 1024 * 1024)
                 throw new KScriptException("A live download can contain up to 12 MiB of base64 text.", "Limit");
             page.LiveDownload = new Dictionary<string, object> { ["name"] = name, ["bytes"] = bytes };
+            return null;
+        }
+
+        private static object StreamLive(CallContext call)
+        {
+            PageContext page = LiveAction(call);
+            string target = call.Str(0);
+            if (page.LiveStreamTargets?.Contains(target) != true)
+                throw new KScriptException("The stream needs a visible live-stream target in this component.", "Argument");
+            string mode = call.Str(2, "append");
+            if (mode is not ("append" or "replace"))
+                throw new KScriptException("A live stream mode must be append or replace.", "Argument");
+            LiveActionStream.Emit(page.Request, target, call.Str(1), mode, call.Bool(3));
             return null;
         }
 

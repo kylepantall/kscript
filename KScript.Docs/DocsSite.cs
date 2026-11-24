@@ -74,6 +74,7 @@ namespace KScript.Docs
             new Guide("code-format", "code-format.md", "Language", "The .kscript format", "kscript"),
             new Guide("types", "types.md", "Language", "Types and validation", "kscript"),
             new Guide("web", "web.md", "Build", "Web pages"),
+            new Guide("components", "components.md", "Build", "Components"),
             new Guide("http", "http.md", "Build", "Routes and APIs"),
             new Guide("desktop", "desktop.md", "Build", "Desktop apps"),
             new Guide("compile", "compile.md", "Build", "Programs: kscript compile"),

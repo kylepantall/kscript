@@ -601,6 +601,35 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void Live_markup_keeps_portals_inert_and_signs_client_callable_actions()
+    {
+        var site = PageRenderer.RenderString("""
+            <div id="outlet"></div>
+            <live id="notes">
+              <state name="draft" value="''" />
+              <template live-portal="#outlet">
+                <input bind="draft" live-use-autosize>
+                <span live-stream="progress"></span>
+                <span live-action="save" on-action="draft = $event.data"></span>
+                <button live-client="edit">Edit</button>
+              </template>
+            </live>
+            """);
+        Assert.Contains("<template data-ks-live-portal=\"#outlet\">", site.Body);
+        Assert.Contains("data-ks-bind=\"draft\" value=\"\" name=\"draft\" live-use-autosize", site.Body);
+        Assert.Contains("data-ks-live-stream=\"progress\"", site.Body);
+        Assert.Contains("data-ks-live-action=\"save\" data-ks-on-action=\"0\"", site.Body);
+        Assert.Contains("data-ks-live-client=\"edit\"", site.Body);
+    }
+
+    [Fact]
+    public void A_navigation_only_page_loads_the_live_runtime()
+    {
+        string html = PageRenderer.RenderString("<a live-navigate href=\"/notes\">Notes</a>").Body;
+        Assert.Contains("src=\"/_ks/live.js\"", html);
+    }
+
+    [Fact]
     public void Live_bindings_update_one_map_field_and_retain_its_siblings()
     {
         using var site = new TempSite(("index.html", """

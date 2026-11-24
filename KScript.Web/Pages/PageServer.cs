@@ -326,6 +326,7 @@ namespace KScript.Pages
             app.Run(async http =>
             {
                 if (reload != null && await reload.TryHandleAsync(http, app.Lifetime.ApplicationStopping)) return;
+                var liveStream = LiveActionStream.Negotiate(http);
                 string revision = reload?.Revision;
                 var started = DateTime.UtcNow;
                 PageResult result;
@@ -335,25 +336,37 @@ namespace KScript.Pages
                     KScript.Runtime.WorkingFolder.Check();
                     result = (handler != null ? await handler(http.Request) : null) ?? await HandleAsync(site, http.Request, types);
                 }
+                catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested)
+                {
+                    return;
+                }
                 catch (Exception ex)
                 {
                     result = ErrorPage(ex);
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
                 }
 
-                if (revision != null) BrowserReload.Inject(result, http.Request, revision);
-                http.Response.StatusCode = result.Status;
-                http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
-                foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
-                foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
-                if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
+                try
                 {
-                    http.Response.ContentType = result.ContentType;
-                    if (result.FilePath != null)
-                        await http.Response.SendFileAsync(result.FilePath);
+                    if (liveStream?.Started == true) await liveStream.FinishAsync(result);
                     else
-                        await http.Response.WriteAsync(result.Body, Encoding.UTF8);
+                    {
+                        if (revision != null) BrowserReload.Inject(result, http.Request, revision);
+                        http.Response.StatusCode = result.Status;
+                        http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
+                        foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
+                        foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
+                        if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
+                        {
+                            http.Response.ContentType = result.ContentType;
+                            if (result.FilePath != null)
+                                await http.Response.SendFileAsync(result.FilePath);
+                            else
+                                await http.Response.WriteAsync(result.Body, Encoding.UTF8);
+                        }
+                    }
                 }
+                catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested) { return; }
 
                 if (cli != null)
                 {
@@ -614,7 +627,7 @@ namespace KScript.Pages
                 body = await reader.ReadToEndAsync();
             }
 
-            return new Dictionary<string, object>
+            var built = new Dictionary<string, object>
             {
                 [RequestFields.Method.Name] = request.Method,
                 [RequestFields.Scheme.Name] = request.Scheme,
@@ -628,6 +641,8 @@ namespace KScript.Pages
                 [RequestFields.Params.Name] = new Dictionary<string, object>(),
                 [RequestFields.RouteInfo.Name] = null,
             };
+            LiveActionStream.Bind(request, built);
+            return built;
         }
 
         /// <summary>

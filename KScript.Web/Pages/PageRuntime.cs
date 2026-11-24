@@ -47,7 +47,10 @@ namespace KScript.Pages
             host.Items[ContextKey] = ctx;
             if (ctx.Request != null) host.Items[Translator.RequestKey] = ctx.Request;
             ctx.StartupConfig?.CopyTo(host);
-            Interpreter = new Interpreter(host, options: new InterpreterOptions { MaxSteps = ctx.MaxSteps, MaxCallDepth = 200 });
+            Interpreter = new Interpreter(host, options: new InterpreterOptions
+            {
+                MaxSteps = ctx.MaxSteps, MaxCallDepth = 200, Cancellation = LiveActionStream.Cancellation(ctx.Request),
+            });
         }
 
         public Interpreter Interpreter { get; }

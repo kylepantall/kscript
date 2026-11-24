@@ -364,6 +364,10 @@ public sealed class McpTests : IDisposable
         Assert.StartsWith("# KScript.IO", Call(server, "read_doc", new { page = "KScript.IO" }).Text);
         Assert.Contains("<import package=\"KScript.IO\" />", Call(server, "read_doc", new { page = "io", format = "xml" }).Text);
         Assert.Contains("```kscript", Call(server, "read_doc", new { page = "kscript://docs/guide/getting-started" }).Text);
+        var (components, componentError) = Call(server, "read_doc", new { page = "components" });
+        Assert.False(componentError);
+        Assert.StartsWith("# Components", components);
+        Assert.Contains("KScriptLive.directive", components);
         Assert.Contains("```xml", Server("xml").Tools.ReadDoc(new JsonObject { ["page"] = "getting-started" }).Text);
 
         var (missing, error) = Call(server, "read_doc", new { page = "nope" });

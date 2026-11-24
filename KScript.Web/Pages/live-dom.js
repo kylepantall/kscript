@@ -62,7 +62,7 @@ const liveDom = (() => {
     if (current.hasAttribute("data-ks-live-ignore") && next.hasAttribute("data-ks-live-ignore")) return;
     attributes(current, next);
     if (next instanceof HTMLTemplateElement) {
-      children(current.content, next.content);
+      children(livePortals.content(current), next.content);
       return;
     }
     const selection = next instanceof HTMLSelectElement

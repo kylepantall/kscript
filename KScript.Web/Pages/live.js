@@ -11,6 +11,7 @@
   var ticks = Object.create(null);
   var restoringFocus = false;
   var lifecycle = new WeakMap();
+  const activeRequests = new Set();
   // Live proofs identify the URL that rendered the document, including its original query string.
   var renderedUrl = location.pathname + location.search;
 
@@ -25,10 +26,11 @@
       else url.searchParams.set(name, String(value));
     }
     history.replaceState(history.state, "", url);
+    liveNavigation.updateCurrentUrl(url);
   }
 
   function owned(block, selector) {
-    return Array.from(block.querySelectorAll(selector)).filter(el => blockOf(el) === block);
+    return livePortals.query(block, selector).filter(el => blockOf(el) === block);
   }
 
   function setBusy(block, busy) {
@@ -75,6 +77,7 @@
     state.observer?.disconnect();
     state.observer = null;
     lifecycle.set(block, state);
+    if (!previous) liveHooks.emit("mount", { component: block });
     const lazy = block.getAttribute("data-ks-live-lazy");
     if (lazy) {
       const load = () => {
@@ -144,13 +147,12 @@
   function scheduleTick(block) {
     var id = block.getAttribute("data-ks-live");
     clearTimeout(ticks[id]);
-    var el = null;
-    block.querySelectorAll("[data-ks-on-tick]").forEach(function (t) { if (!el && blockOf(t) === block) el = t; });
+    var el = owned(block, "[data-ks-on-tick]")[0];
     if (!el) return;
     var every = parseFloat(el.getAttribute("data-ks-every")) || 1000;
     ticks[id] = setTimeout(function () {
       var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
-      if (!current || !current.contains(el)) return;
+      if (!current || !el.isConnected || blockOf(el) !== current) return;
       var handler = parseInt(el.getAttribute("data-ks-on-tick"), 10);
       send(current, handler, handlerArgs(el, handler), el, { type: "tick" });
     }, every);
@@ -160,7 +162,7 @@
     return el.getAttribute("data-ks-args-" + handler) || el.getAttribute("data-ks-args");
   }
 
-  function blockOf(el) { return el && el.closest ? el.closest("[data-ks-live]") : null; }
+  function blockOf(el) { return livePortals.owner(el); }
 
   function parentStates(block) {
     const parents = [];
@@ -222,8 +224,8 @@
 
   function binds(block) {
     var out = Object.create(null);
-    block.querySelectorAll("[data-ks-bind]").forEach(function (input) {
-      if (blockOf(input) !== block || input.matches(":disabled") || input.type === "radio" && !input.checked) return;
+    owned(block, "[data-ks-bind]").forEach(function (input) {
+      if (input.matches(":disabled") || input.type === "radio" && !input.checked) return;
       out[input.getAttribute("data-ks-bind")] = controlValue(input);
     });
     return out;
@@ -279,6 +281,10 @@
       eventInfo.data = domEvent.data;
       eventInfo.source = domEvent.source;
     }
+    if (domEvent?.type === "action") {
+      eventInfo.name = domEvent.name;
+      eventInfo.data = domEvent.data;
+    }
     if (domEvent?.type === "sort") {
       eventInfo.item = domEvent.item;
       eventInfo.from = domEvent.from;
@@ -289,7 +295,7 @@
     if (targetBind && (target.matches(":disabled") || target.type === "radio" && !target.checked)) targetBind = null;
     var targetValue = targetBind ? controlValue(target) : null;
 
-    queues[id] = (queues[id] || Promise.resolve()).then(function () {
+    const queued = (queues[id] || Promise.resolve()).then(async function () {
       flush(id); // start from the newest HTML, even if it was waiting for the pointer
       var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
       if (!current || lifecycle.get(current) !== mounting) return;
@@ -305,7 +311,10 @@
       setBusy(current, true);
       var route = current.getAttribute("data-ks-route");
       var headers = { "Content-Type": "application/json" };
-      if (route) headers["X-KScript-Live"] = route;
+      if (route) {
+        headers["X-KScript-Live"] = route;
+        headers["X-KScript-Stream"] = "1";
+      }
       let body = JSON.stringify({
         page: renderedUrl,
         block: id,
@@ -323,51 +332,81 @@
         delete headers["Content-Type"];
         body = form;
       }
-      return fetch(route ? renderedUrl : "/_ks/live", {
-        method: "POST", mode: "same-origin", credentials: "same-origin", redirect: "manual",
-        headers, body,
-      }).then(function (res) {
-        if (res.status === 409 || res.type === "opaqueredirect" || (route && res.ok && res.headers.get("X-KScript-Fragment") !== "1")) {
+      const controller = new AbortController();
+      const stream = liveStream.updates(current, owned(current, "[data-ks-live-stream]"));
+      const url = route ? renderedUrl : "/_ks/live";
+      activeRequests.add(controller);
+      liveHooks.emit("request", { component: current, url, event: eventInfo, signal: controller.signal });
+      try {
+        const res = await fetch(url, {
+          method: "POST", mode: "same-origin", credentials: "same-origin", redirect: "manual",
+          headers, body, signal: controller.signal,
+        });
+        const streamed = res.headers.get("Content-Type")?.split(";")[0].toLowerCase() === liveStream.contentType;
+        const result = streamed ? await liveStream.read(res, frame => {
+          if (current.isConnected && lifecycle.get(current) === mounting) stream.apply(frame);
+        }) : { status: res.status, fragment: res.headers.get("X-KScript-Fragment") === "1", html: await res.text() };
+        if (controller.signal.aborted || !current.isConnected || lifecycle.get(current) !== mounting) return false;
+        const ok = result.status >= 200 && result.status < 300;
+        liveHooks.emit("response", { component: current, response: res, status: result.status, streamed, event: eventInfo });
+        if (streamed && result.status >= 300 && result.status < 400 && result.status !== 304 && result.location) {
+          const destination = new URL(result.location, location.href);
+          if (destination.origin === location.origin) {
+            location.assign(destination.href);
+            return true;
+          }
+        }
+        if (result.status === 409 || res.type === "opaqueredirect" || (route && ok && !result.fragment)) {
+          stream.restore();
           if (modelForms.keepExpiredDraft(document)) {
             current.setAttribute("data-ks-expired", "");
             setBusy(current, false);
             clearTimeout(ticks[id]);
             delete pending[id];
           } else location.reload();
-          return null;
+          return false;
         }
-        return res.text().then(function (html) { return { ok: res.ok, status: res.status, html: html }; });
-      }).then(function (r) {
-        var el = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
-        if (!r || !el || lifecycle.get(el) !== mounting) return;
-        if (!r.ok) {
-          console.error("KScript:", r.html);
-          setBusy(el, false);
-          showError(el, uploads.length && r.status === 413 ? "The upload is too large." : "The action failed. Try again.");
-          scheduleTick(el);
-          return;
+        if (!ok) {
+          stream.restore();
+          console.error("KScript:", result.html);
+          setBusy(current, false);
+          showError(current, uploads.length && result.status === 413 ? "The upload is too large." : "The action failed. Try again.");
+          liveHooks.emit("error", { component: current, status: result.status, event: eventInfo });
+          scheduleTick(current);
+          return false;
         }
         // While typing, keep what is in the box; after an action (Add, Reset…) show what the server set.
         var keepValue = handler < 0 || eventInfo.type === "input";
-        if (pointerDown || modelForms.composingIn(el)) pending[id] = { html: r.html, keepValue: keepValue, checkpoint: checkpoint, submitted: b, mounting, hop };
-        else swap(el, r.html, keepValue, checkpoint, b, hop);
-      });
-    }).catch(function (err) {
-      console.error("KScript:", err);
-      var current = document.querySelector('[data-ks-live="' + CSS.escape(id) + '"]');
-      if (current && lifecycle.get(current) === mounting) {
-        setBusy(current, false);
-        showError(current, "Could not reach the server. Try again.");
-        scheduleTick(current);
+        if (pointerDown || modelForms.composingIn(current)) pending[id] = { html: result.html, keepValue, checkpoint, submitted: b, mounting, hop };
+        else swap(current, result.html, keepValue, checkpoint, b, hop);
+        return true;
+      } catch (error) {
+        if (!controller.signal.aborted && current.isConnected && lifecycle.get(current) === mounting) {
+          stream.restore();
+          console.error("KScript:", error);
+          setBusy(current, false);
+          showError(current, "Could not reach the server. Try again.");
+          liveHooks.emit("error", { component: current, error, event: eventInfo });
+          scheduleTick(current);
+        }
+        return false;
+      } finally {
+        activeRequests.delete(controller);
       }
+    }).catch(error => {
+      console.error("KScript:", error);
+      return false;
     });
+    queues[id] = queued;
+    queued.then(() => { if (queues[id] === queued) delete queues[id]; });
+    return queued;
   }
 
   // Replace the block, keeping focus, caret and what the user is typing.
   function swap(block, html, keepValue, checkpoint, submitted, hop) {
     var active = document.activeElement;
     var keep = null;
-    if (active && block.contains(active)) {
+    if (active && blockOf(active) === block) {
       keep = {
         bind: active.getAttribute("data-ks-bind"),
         id: active.id,
@@ -402,9 +441,11 @@
       scheduleTick(block);
       emitEvents(block, hop);
       download(block);
+      liveHooks.emit("commit", { component: block, renderless: true });
       return;
     }
-    const nested = Array.from(block.querySelectorAll("[data-ks-live]"));
+    const nested = livePortals.query(block, "[data-ks-live]");
+    let committed = false;
     restoringFocus = true;
     try {
       setBusy(block, false);
@@ -412,26 +453,29 @@
       const state = lifecycle.get(block);
       if (state) state.baseline = binds(fresh);
       restoreBindings(block, fresh, submitted);
+      liveHooks.emit("morph", { component: block, fragment: fresh });
       fresh = liveDom(block, fresh);
+      livePortals.sync();
       syncQuery(previousQuery, nextQuery);
       scheduleTick(fresh);
       startLifecycle(fresh, state);
       for (const old of nested) {
         if (old.isConnected) continue;
-        lifecycle.get(old)?.observer?.disconnect();
-        clearTimeout(ticks[old.getAttribute("data-ks-live")]);
+        stopComponent(old);
       }
-      for (const child of fresh.querySelectorAll("[data-ks-live]")) {
+      for (const child of livePortals.query(fresh, "[data-ks-live]")) {
         if (lifecycle.has(child)) continue;
         scheduleTick(child);
         startLifecycle(child);
       }
       updateOnline();
+      liveHooks.sync();
       emitEvents(fresh, hop);
       download(fresh);
+      committed = true;
       if (!keep || (active.form?.hasAttribute("data-ks-model-form") && !modelFocus)) return;
       var el = modelFocus || (keep.bind
-        ? fresh.querySelector('[data-ks-bind="' + CSS.escape(keep.bind) + '"]')
+        ? owned(fresh, '[data-ks-bind="' + CSS.escape(keep.bind) + '"]')[0]
         : keep.id ? document.getElementById(keep.id) : null);
       if (!el) return;
       if (!modelFocus && keepValue && keep.bind && "value" in el && el.type !== "checkbox") el.value = keep.value;
@@ -439,6 +483,7 @@
       try { if (keep.start != null) el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text input */ }
     } finally {
       restoringFocus = false;
+      if (committed) liveHooks.emit("commit", { component: fresh, renderless: false });
     }
   }
 
@@ -451,6 +496,14 @@
     if (type === "compositionend") setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
     if (type === "compositionstart" || type === "compositionend" || e.isComposing) return;
     if (!block) return;
+    if (type === "click" && !e.defaultPrevented) {
+      const action = target.closest?.("[data-ks-live-client]");
+      if (action && blockOf(action) === block && liveHooks.invokeAction(action.getAttribute("data-ks-live-client"),
+          { component: block, element: action, event: e, call: (name, data) => call(block, name, data) })) {
+        e.preventDefault();
+        return;
+      }
+    }
     if (type === "input" || type === "change") updateDirty(block, lifecycle.get(block)?.baseline);
     if (liveSort.handle(e, block, (container, details) => {
       const handler = Number(container.getAttribute("data-ks-on-sort"));
@@ -512,13 +565,57 @@
 
   EVENTS.forEach(function (type) { document.addEventListener(type, handle, true); });
 
+  function stopComponent(block) {
+    const state = lifecycle.get(block);
+    if (!state) return;
+    const id = block.getAttribute("data-ks-live");
+    state.observer?.disconnect();
+    clearTimeout(timers[id]);
+    clearTimeout(ticks[id]);
+    delete pending[id];
+    lifecycle.delete(block);
+    liveHooks.emit("unmount", { component: block });
+  }
+
   function start() {
+    livePortals.sync();
     document.querySelectorAll("[data-ks-live]").forEach(block => {
+      if (lifecycle.has(block)) return;
       scheduleTick(block);
       startLifecycle(block);
     });
+    liveHooks.sync();
     updateOnline();
   }
+
+  function call(component, name, data) {
+    const block = typeof component === "string" ? document.getElementById(component) : component;
+    if (!block?.matches?.("[data-ks-live]") || !lifecycle.has(block))
+      return Promise.reject(new Error("The live component is not mounted."));
+    const action = owned(block, "[data-ks-live-action]").find(el => el.getAttribute("data-ks-live-action") === name);
+    if (!action) return Promise.reject(new Error("The component has no rendered action named " + name + "."));
+    const handler = Number(action.getAttribute("data-ks-on-action"));
+    return send(block, handler, handlerArgs(action, handler), action, { type: "action", name, data });
+  }
+
+  liveNavigation.install({
+    beforeReplace(detail) {
+      for (const controller of activeRequests) controller.abort();
+      document.querySelectorAll("[data-ks-live]").forEach(stopComponent);
+      liveHooks.clear();
+      livePortals.clear();
+      pointerDown = false;
+      queues = Object.create(null);
+      liveHooks.emit("navigate:leave", detail);
+    },
+    afterReplace(url, detail) {
+      renderedUrl = url.pathname + url.search;
+      start();
+      liveHooks.emit("navigate", detail);
+    },
+  });
+  window.KScriptLive = Object.freeze({ ...liveHooks.api, call, navigate: liveNavigation.visit });
+  document.dispatchEvent(new CustomEvent("kscript:init"));
   window.addEventListener("online", updateOnline);
   window.addEventListener("offline", updateOnline);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);

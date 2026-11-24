@@ -26,7 +26,7 @@ const liveSort = (() => {
     }
     const item = event.target.closest?.("[data-ks-sort-item]");
     const container = item?.parentElement;
-    if (!container?.hasAttribute("data-ks-on-sort") || container.closest("[data-ks-live]") !== block) return false;
+    if (!container?.hasAttribute("data-ks-on-sort") || livePortals.owner(container) !== block) return false;
     if (event.type === "dragstart" && event.dataTransfer) {
       dragged = item;
       event.dataTransfer.setData(type, item.getAttribute("data-ks-sort-item"));

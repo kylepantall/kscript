@@ -221,3 +221,5 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 When you use `kscript serve`, a live component posts back to the GET URL that rendered it. For a controller view, each interaction runs the original route and its middleware again. KScript binds the component state and actions to the current session, URL and component ID. It checks that a submitted field or action is still rendered before using it. Use a unique ID per instance when rendering a component in a loop, for example `id="profile-{$profile.id}"`. Keep render expressions free of side effects because the server may evaluate them more than once. Put persistent changes in an authorized action or model binding. State and action arguments travel in the HTML and are readable by the browser.
 
 See `/demo` in `Example Sites/team` for a counter, live search, a to-do list and a temperature converter, and [`samples/life-lab`](../samples/life-lab) for a game whose rules are a KScript script shared with a terminal version and a desktop app.
+
+See the [component guide](components.md) for reusable component classes, advanced live interactions, and client extensions.

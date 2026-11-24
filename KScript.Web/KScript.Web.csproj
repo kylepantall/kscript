@@ -23,6 +23,10 @@
     <EmbeddedResource Include="Pages\live.js" LogicalName="KScript.Pages.live.js" />
     <EmbeddedResource Include="Pages\live-dom.js" LogicalName="KScript.Pages.live-dom.js" />
     <EmbeddedResource Include="Pages\live-sort.js" LogicalName="KScript.Pages.live-sort.js" />
+    <EmbeddedResource Include="Pages\live-portals.js" LogicalName="KScript.Pages.live-portals.js" />
+    <EmbeddedResource Include="Pages\live-hooks.js" LogicalName="KScript.Pages.live-hooks.js" />
+    <EmbeddedResource Include="Pages\live-navigation.js" LogicalName="KScript.Pages.live-navigation.js" />
+    <EmbeddedResource Include="Pages\live-stream.js" LogicalName="KScript.Pages.live-stream.js" />
     <EmbeddedResource Include="Pages\browser-reload.js" LogicalName="KScript.Pages.browser-reload.js" />
     <EmbeddedResource Include="Pages\passkeys.js" LogicalName="KScript.Pages.passkeys.js" />
   </ItemGroup>

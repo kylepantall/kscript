@@ -60,6 +60,7 @@ namespace KScript.Pages
         internal List<string> LiveParents { get; } = new();
         internal List<object> LiveEffects { get; } = new();
         internal bool InLiveAction { get; set; }
+        internal HashSet<string> LiveStreamTargets { get; set; }
         internal string LiveRedirect { get; set; }
         internal Dictionary<string, object> LiveDownload { get; set; }
         internal bool SkipLiveRender { get; set; }
@@ -140,6 +141,7 @@ namespace KScript.Pages
             public HashSet<string> VisibleActions;
             public HashSet<string> SelectedOptions;
             public HashSet<string> UploadFields;
+            public HashSet<string> StreamTargets;
             public HashSet<string> LockedFields;
             public bool InPlaceholder;
 
@@ -154,7 +156,8 @@ namespace KScript.Pages
             {
                 Ctx = Ctx, File = File, Markdown = markdown ?? Markdown, Slot = Slot, LiveScope = liveScope ?? LiveScope, Module = Module, Imports = Imports,
                 ActionScope = ActionScope, BoundFields = BoundFields, VisibleActions = VisibleActions,
-                SelectedOptions = SelectedOptions, UploadFields = UploadFields, LockedFields = LockedFields, InPlaceholder = InPlaceholder,
+                SelectedOptions = SelectedOptions, UploadFields = UploadFields, StreamTargets = StreamTargets,
+                LockedFields = LockedFields, InPlaceholder = InPlaceholder,
             };
         }
 
@@ -208,7 +211,8 @@ namespace KScript.Pages
         private static string AddLiveRuntime(string html)
         {
             if (!html.Contains("data-ks-live=\"", StringComparison.Ordinal) && !html.Contains("data-ks-passkey=\"", StringComparison.Ordinal)
-                && !html.Contains("data-ks-autosave=\"", StringComparison.Ordinal)) return html;
+                && !html.Contains("data-ks-autosave=\"", StringComparison.Ordinal) &&
+                !html.Contains(" live-navigate", StringComparison.OrdinalIgnoreCase)) return html;
             const string tag = "<script src=\"/_ks/live.js\" defer></script>";
             int body = html.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
             return body >= 0 ? html.Insert(body, tag + "\n") : html + "\n" + tag;
@@ -794,6 +798,19 @@ namespace KScript.Pages
                     if (!el.HasAttr("tabindex")) sb.Append(" tabindex=\"0\"");
                     continue;
                 }
+                if (a.Name is "live-stream" or "live-portal" or "live-action" or "live-client")
+                {
+                    if (state.LiveScope == null) throw new PageException($"{a.Name} only works inside a <live> block.");
+                    if (a.Name == "live-portal" && el.Name != "template")
+                        throw new PageException("Use live-portal on a <template>.");
+                    if (a.Name == "live-action" && !el.HasAttr("on-action"))
+                        throw new PageException("A live-action name needs an on-action handler.");
+                    string directiveValue = Values.ToStr(AttributeValue(a, scope, state));
+                    if (string.IsNullOrWhiteSpace(directiveValue)) throw new PageException($"{a.Name} needs a value.");
+                    if (a.Name == "live-stream") state.StreamTargets?.Add(directiveValue);
+                    sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(Values.HtmlEscape(directiveValue)).Append('"');
+                    continue;
+                }
                 if (a.Name is "live-loading" or "live-offline" or "live-disable" or "live-confirm" or "live-key" or "live-replace"
                     or "live-dirty" or "live-cloak" or "live-ignore" or "live-error")
                 {
@@ -1024,6 +1041,7 @@ namespace KScript.Pages
             inner.BoundFields = boundFields;
             inner.VisibleActions = null;
             inner.UploadFields = null;
+            inner.StreamTargets = null;
             inner.LockedFields = locked;
             bool skipRender = target && ctx.SkipLiveRender;
             if (skipRender) boundFields = previouslyBound;
@@ -1179,12 +1197,14 @@ namespace KScript.Pages
             probe.BoundFields = new Dictionary<string, object>();
             probe.VisibleActions = new HashSet<string>(StringComparer.Ordinal);
             probe.UploadFields = new HashSet<string>(StringComparer.Ordinal);
+            probe.StreamTargets = new HashSet<string>(StringComparer.Ordinal);
             probe.LockedFields = lockedFields;
             RenderLiveChildren(el, id, probeScope, new StringBuilder(), probe);
             var ev = state.Ctx.Live;
             if ((ev.Handler >= 0 && !probe.VisibleActions.Contains(ev.ArgsToken)) || ev.Binds.Keys.Any(k => !probe.BoundFields.ContainsKey(k)) ||
                 ev.Files?.Keys.Any(k => !probe.UploadFields.Contains(k)) == true)
                 throw new LiveExpiredException();
+            state.Ctx.LiveStreamTargets = probe.StreamTargets;
         }
 
         private static string HandlerScope(string blockScope, PageAttribute handler) =>

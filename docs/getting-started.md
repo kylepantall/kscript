@@ -177,6 +177,7 @@ for p in $people {
 
 - [The language](language.md): the whole language, in detail.
 - [Web pages](web.md) and [routes and APIs](http.md): websites and JSON APIs with `kscript serve`.
+- [Components](components.md) covers reusable templates and interactive server-backed interfaces.
 - [Desktop apps](desktop.md): windows with buttons and text boxes.
 - [Testing](testing.md): tests for your scripts with `kscript test`.
 - [The command line](/cli): every `kscript` command.
