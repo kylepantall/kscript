@@ -53,28 +53,31 @@ else
 fi
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT INT TERM
+package_dir=''
+trap 'rm -rf "$tmp"; if [ -n "$package_dir" ]; then rm -rf "$package_dir"; fi' EXIT INT TERM
 
 say "Downloading $asset ($VERSION)..."
 download "$url" "$tmp/$asset" || fail "could not download $url"
-mkdir "$tmp/pkg"
-tar -xzf "$tmp/$asset" -C "$tmp/pkg" || fail "could not unpack $asset"
-[ -f "$tmp/pkg/kscript" ] || fail "$asset has no kscript binary inside"
-
 mkdir -p "$BIN_DIR"
-chmod +x "$tmp/pkg/kscript"
+package_dir="$(mktemp -d "$BIN_DIR/.kscript-install.XXXXXX")"
+tar -xzf "$tmp/$asset" -C "$package_dir" || fail "could not unpack $asset"
+[ -f "$package_dir/kscript" ] || fail "$asset has no kscript binary inside"
+
+chmod +x "$package_dir/kscript"
 if [ "$os" = osx ]; then
   # The binary isn't notarized: clear the quarantine flag so Gatekeeper lets it run.
-  xattr -dr com.apple.quarantine "$tmp/pkg" 2>/dev/null || true
+  xattr -dr com.apple.quarantine "$package_dir" 2>/dev/null || true
 fi
-# The desktop UI's native libraries ship beside kscript. Rename everything into place so a running kscript isn't disturbed.
-for file in "$tmp/pkg"/*; do
-  [ -d "$file" ] && continue
-  [ "$file" = "$tmp/pkg/kscript" ] || mv -f "$file" "$BIN_DIR/"
-done
-mv -f "$tmp/pkg/kscript" "$BIN_DIR/kscript"
+# Keep loader errors visible and check the package before replacing an existing installation.
+installed="$("$package_dir/kscript" --version)" || fail "$asset could not run on this system"
 
-installed="$("$BIN_DIR/kscript" --version 2>/dev/null)" || fail "installed $BIN_DIR/kscript but it didn't run"
+# The desktop UI's native libraries ship beside kscript. Rename everything into place so a running kscript isn't disturbed.
+for file in "$package_dir"/*; do
+  [ -d "$file" ] && continue
+  [ "$file" = "$package_dir/kscript" ] || mv -f "$file" "$BIN_DIR/"
+done
+mv -f "$package_dir/kscript" "$BIN_DIR/kscript"
+
 say "Installed kscript $installed to $BIN_DIR/kscript"
 
 case ":$PATH:" in
