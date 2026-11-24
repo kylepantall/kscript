@@ -33,7 +33,7 @@ namespace KScript.LanguageServer
                         string runtime = service.Catalog.FindPackage(package);
                         if (runtime == null || runtime == "KScript.Core") continue;
                         if (packages[runtime] is not JsonArray requiredBy) packages[runtime] = requiredBy = new JsonArray();
-                        if (!requiredBy.Any(name => name.GetValue<string>() == dependency.Name)) requiredBy.Add(dependency.Name);
+                        if (!requiredBy.Any(name => name.GetValue<string>() == dependency.Name)) requiredBy.Add((JsonNode)dependency.Name);
                     }
                 }
             }
