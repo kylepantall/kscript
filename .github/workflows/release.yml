@@ -7,22 +7,28 @@ name: Release
 on:
   push:
     tags: [ 'v*' ]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - install.sh
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     name: Build (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.image }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { rid: linux-x64,   os: ubuntu-latest,    ext: '' }
-          # Native AOT compiles for the machine it runs on, so arm64 Linux builds on an arm64 runner.
-          - { rid: linux-arm64, os: ubuntu-24.04-arm, ext: '' }
+          # Link against Debian 12's libc, the baseline used by the generated Dockerfiles.
+          # Each container runs on a host of the same architecture.
+          - { rid: linux-x64,   os: ubuntu-latest,    ext: '', image: 'mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5' }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, ext: '', image: 'mcr.microsoft.com/dotnet/sdk:8.0-bookworm-slim@sha256:1b955f179b02df4f0eb5fadedaa898cbe44d620a64aab52eec72c8e91d1355b5' }
           # macOS binaries are built on macOS so they get the ad-hoc code signature Apple Silicon requires.
           # The Intel build is cross-compiled on Apple Silicon.
           - { rid: osx-arm64,   os: macos-latest,     ext: '' }
@@ -30,9 +36,16 @@ jobs:
           - { rid: win-x64,     os: windows-latest,   ext: '.exe' }
 
     steps:
+      - name: Install the Linux Native AOT toolchain
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends clang zlib1g-dev
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-dotnet@v5
+        if: runner.os != 'Linux'
         with:
           dotnet-version: 8.0.x
 
@@ -122,6 +135,53 @@ jobs:
             kscript-${{ matrix.rid }}.*
             kscript-runtime-${{ matrix.rid }}.*
 
+  bookworm:
+    name: Install and run on Debian 12 (${{ matrix.rid }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: kscript-${{ matrix.rid }}
+
+      - name: Install the release archive and run a script in bookworm-slim
+        shell: bash
+        env:
+          ASSET: kscript-${{ matrix.rid }}.tar.gz
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION="${GITHUB_REF_NAME#v}"; else VERSION="0.0.0-dev"; fi
+          docker run --rm -i --env "KSCRIPT_VERSION=v$VERSION" --env "ASSET=$ASSET" \
+            --env KSCRIPT_INSTALL=/opt/kscript --env KSCRIPT_NO_MODIFY_PATH=1 \
+            --mount "type=bind,source=$PWD/$ASSET,target=/tmp/$ASSET,readonly" \
+            --mount "type=bind,source=$PWD/install.sh,target=/tmp/install.sh,readonly" \
+            debian:bookworm-slim sh -eu <<'SCRIPT'
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl libicu72
+
+          # The candidate is an Actions artifact until the release is published.
+          # Substitute the archive download and run the regular installer.
+          mkdir /tmp/artifact-download
+          cat > /tmp/artifact-download/curl <<'CURL'
+          #!/bin/sh
+          set -eu
+          test "$2" = "https://github.com/kylepantall/kscript/releases/download/$KSCRIPT_VERSION/$ASSET"
+          cp "/tmp/$ASSET" "$4"
+          CURL
+          chmod +x /tmp/artifact-download/curl
+          PATH="/tmp/artifact-download:$PATH" sh /tmp/install.sh
+          /opt/kscript/bin/kscript --version | grep -Fx "${KSCRIPT_VERSION#v}"
+          printf '<kscript><echo>Bookworm smoke test passed</echo></kscript>\n' > /tmp/smoke.ks.xml
+          /opt/kscript/bin/kscript /tmp/smoke.ks.xml | grep -Fx 'Bookworm smoke test passed'
+          SCRIPT
+
   vscode:
     name: Build the editor extension
     runs-on: ubuntu-latest
@@ -153,9 +213,11 @@ jobs:
 
   release:
     name: Publish release
-    needs: [build, vscode]
+    needs: [bookworm, vscode]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v7
         with:
@@ -217,6 +279,19 @@ jobs:
           ls ~/.kscript/bin | grep -q "^libSkiaSharp"
           ~/.kscript/bin/kscript update --check
           ~/.kscript/bin/kscript update --force
+
+      - name: Install and run in Debian 12
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          docker run --rm -i --env KSCRIPT_VERSION --env KSCRIPT_INSTALL=/opt/kscript --env KSCRIPT_NO_MODIFY_PATH=1 \
+            --mount "type=bind,source=$PWD/install.sh,target=/tmp/install.sh,readonly" \
+            debian:bookworm-slim sh -eu <<'SCRIPT'
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl libicu72
+          sh /tmp/install.sh
+          test "$(/opt/kscript/bin/kscript --version)" = "${KSCRIPT_VERSION#v}"
+          SCRIPT
 
       - name: install.ps1
         if: runner.os == 'Windows'
