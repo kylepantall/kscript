@@ -61,14 +61,17 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
+                // Component templates import their companion automatically and may never spell its filename.
+                bool companion = MarkupParser.KindFromPath(file) != DocumentKind.Script
+                    && SamePath(TemplateContracts.CompanionFile(files, file), target);
                 string other = files.ReadText(file);
-                if (other == null || other.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0)
+                if (other == null || (!companion && other.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))
                 {
                     continue;
                 }
 
                 var (uses, imports) = UsesOf(file, other, target, text, files, catalog);
-                if (imports.Any(i => SamePath(i, target)))
+                if (companion || imports.Any(i => SamePath(i, target)))
                 {
                     found.Importers.Add(file);
                 }
