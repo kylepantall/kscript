@@ -1,3 +1,6 @@
+--- make
+when: examples
+---
 // Tests for how the pages call the API (lib/notes-client{{ ext }}).
 import "../lib/notes-client{{ ext }}"
 {{#if auth}}

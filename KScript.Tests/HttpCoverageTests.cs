@@ -70,6 +70,33 @@ public class HttpCoverageTests
         """;
 
     [Fact]
+    public void APackageCanBeImportedBothWithAnAliasAndDirectly()
+    {
+        const string code = """
+            import KScript.Math as math
+            import KScript.Math
+            echo @math.sqrt(4)
+            echo @sqrt(9)
+            """;
+        var output = new StringWriter();
+        new Interpreter(KScriptHost.ForText(output)).RunText(code, "package-alias.kscript");
+        Assert.Equal("2\n3\n", output.ToString().Replace("\r\n", "\n"));
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("name: ''")]
+    [InlineData("'  '")]
+    [InlineData("123")]
+    public void RouteNamesMustBeNonemptyTextAtRuntime(string argument)
+    {
+        var interpreter = new Interpreter(KScriptHost.ForText(new StringWriter()));
+        var error = Assert.Throws<KScriptException>(() => interpreter.RunText(
+            $"<kscript><import package=\"KScript.Http\" /><do>@route({argument})</do></kscript>"));
+        Assert.Contains("nonempty route name", error.Message);
+    }
+
+    [Fact]
     public void ControllersCanBeLambdasCommandsAndInlineBlocks()
     {
         using var site = new TempSite(("routes.ks.xml", """

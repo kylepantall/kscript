@@ -17,7 +17,7 @@ namespace KScript.Language.Analysis
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
             IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false,
-            bool ScriptParameter = false, TypeArgumentConstraint TypeConstraint = TypeArgumentConstraint.None, Signature FunctionSignature = null)
+            bool ScriptParameter = false, TypeArgumentConstraint TypeConstraint = TypeArgumentConstraint.None, Signature FunctionSignature = null, bool RequiresRouteName = false)
         {
             public bool IsEnum => Values != null && Values.Count > 0;
 
@@ -47,11 +47,11 @@ namespace KScript.Language.Analysis
         private readonly HashSet<ArgumentNode> pendingRaw = new HashSet<ArgumentNode>();
 
         private static List<List<ParameterSlot>> SlotsOf(IEnumerable<CallableInfo> callables, bool knownReceiver = true) =>
-            callables.SelectMany(c => c.Signatures)
-                .Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
+            callables.SelectMany(c => c.Signatures.Select(s => s.Parameters.Select(p => new ParameterSlot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.IsFlag, p.Values.Count > 0 ? p.Values : null,
                     RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null,
                     Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel, OptionalNativeCallback: p.Optional && p.Type == KType.Fn,
-                    TypeConstraint: p.TypeConstraint, FunctionSignature: p.FunctionSignature)).ToList())
+                    TypeConstraint: p.TypeConstraint, FunctionSignature: p.FunctionSignature,
+                    RequiresRouteName: c is { Package: "KScript.Http", Name: "route" } && p.Name == "name")).ToList()))
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
@@ -117,12 +117,28 @@ namespace KScript.Language.Analysis
                     $"The '{slot.Name}' argument requires a type with the {slot.TypeConstraint} constraint.");
         }
 
+        private void CheckRouteName(ExprNode value, ExpressionRegion region)
+        {
+            TypeShape actual = Infer(value, region);
+            if (actual.Type is not (KType.Any or KType.String)
+                || value is LiteralNode { Kind: LiteralKind.String, Template: null } name && string.IsNullOrWhiteSpace(name.Value))
+            {
+                Report(region.Source.ToSource(value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    "@route() needs a nonempty route name as text, for example 'people.show'.");
+            }
+        }
+
         /// <summary>An argument that reached its parameter: a waiting <c>@kyle</c> is a handle there, and a literal is checked against the type.</summary>
         private void ClaimTyped(ArgumentNode a, ParameterSlot slot, ExpressionRegion region)
         {
             if (slot.TypeConstraint != TypeArgumentConstraint.None && a.Value != null)
                 CheckTypeConstraint(a.Value, slot, region);
 
+            if (slot.RequiresRouteName && a.Value != null)
+            {
+                CheckRouteName(a.Value, region);
+                return;
+            }
             if (slot.Type is "fn" or "fn?" && a.Value != null)
             {
                 if (slot.FunctionSignature is Signature contract)
@@ -360,7 +376,7 @@ namespace KScript.Language.Analysis
                     {
                         pendingBare.Remove(a);
                         ParameterSlot target = signature[flag];
-                        if (!target.Flag && (target.IsEnum || target.TypeName != null))
+                        if (!target.Flag && (target.IsEnum || target.TypeName != null || target.RequiresRouteName))
                         {
                             Report(region.Source.ToSource(a.Span), DiagnosticSeverity.Error, DiagnosticCodes.NamedArgument,
                                 $"'{w}' isn't a true/false parameter of {display}, so it can't be written as a flag. Give it a value: {w}: ...");

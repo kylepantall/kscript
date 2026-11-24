@@ -153,6 +153,13 @@
     "keywords": {
       "patterns": [
         {
+          "match": "(?<![\\w$@.-])(extends)(?![\\w-])(?:[ \\t]+([A-Z]\\w*))?",
+          "captures": {
+            "1": { "name": "storage.modifier.kscript" },
+            "2": { "name": "entity.name.type.kscript" }
+          }
+        },
+        {
           "match": "(?<![\\w$@.-])(if|guard|elif|else|for|in|at|while|match|when|try|catch|finally|throw|return|exit|break|continue)(?![\\w-])",
           "name": "keyword.control.flow.kscript"
         },
@@ -424,7 +431,7 @@
           ]
         },
         {
-          "match": "\\b(type|enum|extend)\\s+([A-Za-z_]\\w*)",
+          "match": "\\b(type|model|enum|extend|error|job)\\s+([A-Za-z_]\\w*)",
           "captures": {
             "1": {
               "name": "storage.type.kscript"

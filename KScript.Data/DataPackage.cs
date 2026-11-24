@@ -47,6 +47,9 @@ namespace KScript.Data
             {
                 new A("name", K.DeclareVariable, "The model's name, such as User: User->where(...) queries it, and its records have its fields.", true),
                 new A("fields", K.Fields, "A short model's fields on one line: `name: string, email: email`. Bigger models list one <field> per line."),
+                new A("with", K.TypeNames, "The record types, models and mixins this model extends, in order."),
+                new A("mixin", K.Bool, "Declares reusable fields, methods and options for other models. A mixin has no table."),
+                new A("auto_create", K.Bool, "Creates this model's table and indexes on first use if the table is missing."),
                 new A("table", K.Text, "The table its records are kept in. Default: the plural of the name in snake case (User is users, BlogPost blog_posts)."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection (main)."),
                 new A("key", K.Text, "The field that is the key. Default: id, an int the database numbers, added when the model doesn't declare it.") { ModelFields = ModelFieldKind.Single },
@@ -553,22 +556,7 @@ namespace KScript.Data
                 {
                     ModelInfo model = ModelInfo.Of(c.Arg(0)) ?? throw new KScriptException($"->create_table() needs a model, such as User, but got {Values.Describe(c.Arg(0))}.", "Argument");
                     Database db = DatabaseOf(t, c);
-                    bool existed = db.Tables(c.Interpreter).Contains(model.Table);
-                    foreach (string statement in db.Dialect.CreateTable(model, ifMissing: true))
-                    {
-                        db.Execute(c.Interpreter, new SqlStatement(statement, Array.Empty<object>()), model.Table);
-                    }
-                    // A pivot table is made with the second of its two tables, so both are there for its foreign keys.
-                    List<string> tables = db.Tables(c.Interpreter);
-                    foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.ManyToMany && tables.Contains(r.Target.Table) && !tables.Contains(r.Pivot)))
-                    {
-                        foreach (string statement in db.Dialect.CreatePivot(r, ifMissing: true))
-                        {
-                            db.Execute(c.Interpreter, new SqlStatement(statement, Array.Empty<object>()), r.Pivot);
-                        }
-                        tables.Add(r.Pivot);
-                    }
-                    return !existed;
+                    return db.CreateModelTable(c.Interpreter, model);
                 });
             p.Method(KType.Database, "drop_table", "table", "Deletes a table and everything in it, if it is there: a name, or a model's table. True when there was one.", KType.Bool,
                 (t, c) =>

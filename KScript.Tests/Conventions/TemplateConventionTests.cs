@@ -121,7 +121,8 @@ public sealed class TemplateConventionTests : IDisposable
             new[] { "api", "--template", "api", "--db", "postgres", "--docker" },
             new[] { "fullstack", "--template", "fullstack" },
             new[] { "fullstack", "--template", "fullstack", "--auth" },
-            new[] { "fullstack", "--template", "fullstack", "--db", "none", "--no-cache" },
+            new[] { "fullstack", "--template", "fullstack", "--examples", "--auth" },
+            new[] { "fullstack", "--template", "fullstack", "--examples", "--db", "none", "--no-cache" },
         };
         foreach (string[] c in cases)
         {

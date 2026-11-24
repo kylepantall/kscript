@@ -73,6 +73,37 @@ A model's options go in the brackets after its name, like the options of every o
 | `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
 | `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `user.role = 'admin'`. |
 | `connection: "reports"` | The [connection](#connections) the table is in. |
+| `auto_create` | Creates the table and indexes if they are needed on first database use. Referenced models on the same connection are created first when they also opt in. Use migrations for changes to existing tables and circular foreign keys. |
+
+### Extending models
+
+Use `extends` to share fields, methods, validation and model options. A concrete model keeps its own table and connection. Add `mixin` to a reusable declaration that has no table.
+
+```kscript
+import KScript.Data
+
+model UID(mixin, key: 'uid') {
+  uid: uuid = @uuid()
+}
+
+model SoftDeletable(mixin, soft_deletes)
+model Auditable(mixin, timestamps)
+
+model Entry extends UID {
+  title: string
+}
+
+model Note(table: 'notes', auto_create) extends [Entry, SoftDeletable, Auditable] {
+  title: string(min: 1, max: 200)
+  body: string = ''
+}
+
+note = Note->create(title: 'Draft')
+echo $note.uid
+```
+
+Options from later bases take precedence over earlier bases. Put a literal option on a base reference to change it for this use, as in `extends [Entry, Auditable(timestamps: false)]`. Options on the new model take precedence over its bases. Each table, connection and `auto_create` setting belongs to its own concrete declaration. XML writes the base list in the model's `with` attribute.
+
 
 How each type is stored:
 

@@ -49,7 +49,7 @@ namespace KScript
                 },
                 "kscript check\nkscript check scripts/ --warnings-as-errors\nkscript check --fix", "standards") { Group = "code" },
             new CliCommand("agents", "kscript agents [folder] [--check] [--print]",
-                "Write AGENTS.md and .kscript/agents: compact docs for coding agents, made from the project's code and packages.",
+                "Write AGENTS.md and .kscript/agents from project code, packages and Markdown listed in agents.merge.",
                 new[]
                 {
                     O("--check", "Write nothing; fail if the agent docs are out of date (for CI)."),
@@ -210,12 +210,13 @@ namespace KScript
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
                 },
                 "kscript compile hello.kscript\nkscript compile --target all", "compile") { Group = "build", Details = "It holds the script, its imports and files, and only the packages it uses: a terminal script, a KScript.Window desktop app, or a kscript serve site.\nWith no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }. A project without app.main but with pages compiles to a program that serves the site." },
-            new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker]\nkscript make <type> <name> [--key value]\nkscript make auth [--passkeys] [--origin URL] [--rp-id DOMAIN] [--api]\nkscript make --list",
+            new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker] [--examples]\nkscript make <type> <name> [--key value]\nkscript make auth [--passkeys] [--origin URL] [--rp-id DOMAIN] [--api]\nkscript make --list",
                 "Start a new project, or generate a file: a route (added to the routes file), controller, request, middleware, view, page, component, stylesheet, type, enum, window, config, test and more. kscript make --list shows them all, with their options.",
                 new[]
                 {
                     O("--list", "Every type of file kscript make can make, with its options and examples. kscript make <type> --help shows one."),
                     O("--template name", "kscript make project: web (the default), api (a JSON API), fullstack (pages and their API) or bare. With no options at a terminal, a setup wizard asks."),
+                    O("--examples", "Add the optional Notes example to a fullstack project."),
                     O("-n, --no-interaction", "kscript make project: ask nothing, and take the defaults."),
                     O("--syntax kscript|xml", "Write .kscript (the default) or .ks.xml files."),
                     O("--dry-run", "Show what would be made, and make nothing."),

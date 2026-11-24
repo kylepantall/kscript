@@ -176,13 +176,15 @@ namespace KScript.Http
             p.Command("etag", "value, weak?: bool",
                 "Tags the answer with an ETag made from a value (such as a record's version or updated time). When the request's If-None-Match already has it, the request stops here with 304 Not Modified, so the rest of the controller doesn't run.",
                 KType.String, HttpCaching.EtagCommand, "<do>@etag($person.updated_at)</do>");
-            p.Command("route", "name, params...", "The address of a named route, with its {parameters} filled in: @route('people.show', id: 3) is /people/3. Other values become the query.",
+            p.Command("route", "name: string(min: 1), params...", "Returns the URL for a named route. Pass the route name as nonempty text and supply the values for its path parameters. For example, @route('people.show', id: 3) returns /people/3. Extra named values become query parameters.",
                 KType.String, c =>
                 {
+                    if (Values.Unwrap(c.Need(0)) is not string name || string.IsNullOrWhiteSpace(name))
+                        throw c.Error("@route() needs a nonempty route name as text, for example 'people.show'.", "Argument");
                     RouteTable table = RouteCatalog.Current(c).Table;
                     var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
                     if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
-                    return table.Url(c.Str(0), values);
+                    return table.Url(name, values);
                 }, "<a href=\"{@route('people.show', id: $p.id)}\">");
 
             RouteCatalog.Register(p);

@@ -2,6 +2,7 @@ using KScript.Language.Analysis;
 using KScript.Runtime;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Features
 {
@@ -18,6 +19,30 @@ namespace KScript.Language.Features
             string name = SplitType(type).Name;
             string root = analysis.RootScope.Lookup(name, int.MaxValue)?.Shape.Instance?.Type ?? name;
             return root is not (KType.Number or "int" or "float" or KType.Bool or "port");
+        }
+
+        private static bool InQuotedText(ExpressionRegion region, int index)
+        {
+            string text = region.Source.Value;
+            TextSpan span = region.CodeSpans.FirstOrDefault(s => s.Contains(index));
+            if (index <= span.Start) return false;
+
+            // The surrounding HTML attribute quote belongs to markup, outside the expression.
+            var lexer = new Lexer(text, span.Start, span.End);
+            for (Token token = lexer.Next(); token.Kind != TokenKind.EndOfInput && token.Span.Start < index; token = lexer.Next())
+            {
+                if (token.Kind != TokenKind.String || index > token.Span.End
+                    || index == token.Span.End && token.Error == null)
+                    continue;
+                if (text[token.Span.Start] == '"')
+                {
+                    var template = TemplateParser.ParseQuoted(text, token.Span.Start + 1, token.Span.End - (token.Error == null ? 1 : 0));
+                    if (template?.Expressions.Any(part => part.Span.Contains(index)) == true)
+                        return false;
+                }
+                return true;
+            }
+            return false;
         }
 
         private static Token? QuotedValueAt(DocumentAnalysis analysis, int offset)

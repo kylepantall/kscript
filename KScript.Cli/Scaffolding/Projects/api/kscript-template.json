@@ -21,7 +21,7 @@
       "description": "Sign-up and API tokens (KScript.Auth): POST /api/register and /api/tokens, GET /api/me, and notes that belong to who is signed in."
     },
     "cache": {
-      "question": "Cache the notes list (KScript.Cache)?",
+      "question": "Include caching?",
       "default": true,
       "description": "Cache the notes list (KScript.Cache) and answer repeat requests with 304 Not Modified."
     },

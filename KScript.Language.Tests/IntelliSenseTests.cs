@@ -1,6 +1,7 @@
 using KScript.Syntax;
 using KScript.Language.Analysis;
 using KScript.Language.Features;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Tests
 {
@@ -166,6 +167,217 @@ namespace KScript.Language.Tests
             Assert.Contains("title", Labels("title = 'Draft'\necho $.‸", "title.kscript"));
             Assert.Contains("title", Labels("<let name=\"title\" value=\"'Draft'\" /><p>{$.‸}</p>"));
             Assert.Contains("title", Labels("<let name=\"title\" value=\"'Draft'\" /><p>{$‸}</p>"));
+        }
+
+        private const string RouteComponentFile = "_components/site-nav.kscript";
+        private const string RouteComponent = """
+            import KScript.Web
+
+            type SiteNav extends Component {
+              fn render(): Component {
+                return ```html
+                <a href="{EXPRESSION}">Notes</a>
+                ```
+              }
+            }
+            """;
+
+        [Theory]
+        [InlineData("@")]
+        [InlineData("@ro")]
+        public void RouteCompletionCanImportHttpInsideAComponent(string prefix)
+        {
+            string text = RouteComponent.Replace("EXPRESSION", prefix + "‸");
+            CompletionItem route = Assert.Single(Complete(text, RouteComponentFile), item => item.Label == "route");
+            Assert.Equal("route($1)", route.InsertText);
+            Assert.Equal(prefix.Substring(1), text.Substring(route.ReplaceSpan.Start, route.ReplaceSpan.Length));
+            Assert.Equal("\nimport KScript.Http", Assert.Single(route.AdditionalEdits).NewText);
+
+            string imported = "import KScript.Http\n" + text;
+            Assert.Null(Assert.Single(Complete(imported, RouteComponentFile), item => item.Label == "route").AdditionalEdits);
+        }
+
+        [Fact]
+        public void ARouteCallInComponentHtmlOffersAnImportFix()
+        {
+            string text = RouteComponent.Replace("EXPRESSION", "@route('notes.index')");
+            DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, RouteComponentFile));
+            Diagnostic missing = Assert.Single(analysis.Errors, d => d.Code == DiagnosticCodes.MissingImport);
+            Assert.Equal("@route", analysis.Source[missing.Span]);
+            TextChange change = Assert.Single(Assert.Single(missing.Fixes).Changes);
+            string fixedText = text.Insert(change.Span.Start, change.NewText);
+            Assert.Empty(Service.Analyze(fixedText, Path.Combine(Site, RouteComponentFile)).Errors);
+        }
+
+        [Theory]
+        [InlineData("SiteNav")]
+        [InlineData("name: SiteNav")]
+        [InlineData("null")]
+        [InlineData("name: ''")]
+        [InlineData("'  '")]
+        public void ARouteNameMustBeNonemptyTextInsideComponentHtml(string argument)
+        {
+            string text = "import KScript.Http\n" + RouteComponent.Replace("EXPRESSION", $"@route({argument})");
+            DocumentAnalysis analysis = Service.Analyze(text, Path.Combine(Site, RouteComponentFile));
+            Diagnostic problem = Assert.Single(analysis.Errors, d => d.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Contains("nonempty route name", problem.Message);
+        }
+
+        [Theory]
+        [InlineData("@route('notes.index')", DiagnosticCodes.MissingImport)]
+        [InlineData("@http.route(null)", DiagnosticCodes.TypeMismatch)]
+        [InlineData("http.route(null)", DiagnosticCodes.TypeMismatch)]
+        [InlineData("null |> http.route()", DiagnosticCodes.TypeMismatch)]
+        [InlineData("null |> @http.route()", DiagnosticCodes.TypeMismatch)]
+        [InlineData("'' |> @http.route", DiagnosticCodes.TypeMismatch)]
+        [InlineData("@http.route(name)", DiagnosticCodes.NamedArgument)]
+        public void AliasedRouteCallsUseTheSameChecks(string expression, string diagnostic)
+        {
+            const string alias = "import KScript.Http as http\n";
+            string template = RouteComponent.Replace("EXPRESSION", expression);
+            var analysis = Service.Analyze(alias + template, Path.Combine(Site, RouteComponentFile));
+            var problem = Assert.Single(analysis.Errors);
+            Assert.Equal(diagnostic, problem.Code);
+            if (diagnostic == DiagnosticCodes.MissingImport)
+            {
+                TextChange change = Assert.Single(Assert.Single(problem.Fixes).Changes);
+                string repaired = (alias + template).Insert(change.Span.Start, change.NewText);
+                Assert.Empty(Service.Analyze(repaired, Path.Combine(Site, RouteComponentFile)).Errors);
+            }
+        }
+
+        [Theory]
+        [InlineData("@route(‸)", true)]
+        [InlineData("@route(name: ‸)", true)]
+        [InlineData("@route(name: 'admin.‸')", true)]
+        [InlineData("@route(name: 'admin.‸)", true)]
+        [InlineData("@route(name: 'admin.notes'‸)", false)]
+        [InlineData("@route('admin.notes'   ‸, id: 42)", false)]
+        public void CompletesNamedRoutesOnlyWhereTheRouteNameCanBeWritten(string expression, bool offersRoute)
+        {
+            string root = Directory.CreateTempSubdirectory("kscript-route-completion").FullName;
+            try
+            {
+                File.WriteAllText(Path.Combine(root, "kscript.json"), "{}");
+                File.WriteAllText(Path.Combine(root, "routes.kscript"), """
+                    import KScript.Http
+                    Routes {
+                      Group(name: 'admin.') {
+                        Get(path: /notes, name: 'notes') { return null }
+                      }
+                    }
+                    """);
+                var service = new LanguageService();
+                string marked = "import KScript.Http\n" + RouteComponent.Replace("EXPRESSION", expression);
+                (string text, int offset) = TestHelpers.WithCaret(marked);
+                var document = service.Analyze(text, Path.Combine(root, RouteComponentFile));
+                var items = service.GetCompletions(document, offset);
+                Assert.DoesNotContain(items, item => item.Label is "SiteNav" or "$this" or "@round");
+                if (offersRoute)
+                {
+                    CompletionItem route = Assert.Single(items, i => i.Label == "admin.notes");
+                    Assert.Equal("'admin.notes'", route.InsertText);
+                    string inserted = text.Remove(route.ReplaceSpan.Start, route.ReplaceSpan.Length).Insert(route.ReplaceSpan.Start, route.InsertText);
+                    Assert.Empty(service.Analyze(inserted, Path.Combine(root, RouteComponentFile)).Errors);
+                }
+                else
+                {
+                    Assert.Empty(items);
+                }
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Theory]
+        [InlineData("@route(name: '‸)")]
+        [InlineData("@route(name: 'notes.‸')")]
+        [InlineData("@route(name: 'SiteNav SiteNav S‸)")]
+        [InlineData("@route('@ro‸')")]
+        public void ComponentHtmlDoesNotSuggestExpressionsInsideQuotedText(string expression)
+        {
+            string text = "import KScript.Http\n" + RouteComponent.Replace("EXPRESSION", expression);
+            Assert.Empty(Complete(text, RouteComponentFile));
+        }
+
+        [Theory]
+        [InlineData("type Nav extends ‸", " ")]
+        [InlineData("type Nav extends Co‸ { }", null)]
+        public void TypeInheritanceCompletesOnlyContracts(string declaration, string trigger)
+        {
+            const string prefix = """
+                import KScript.Web
+                type Renderable { fn render(): Component; }
+                type Record { name: string }
+
+                """;
+            string marked = prefix + declaration + "\ntype Later { fn render(): Component; }";
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "contracts.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, trigger);
+            Assert.Equal(new[] { "Component", "Renderable" }, items.Select(i => i.Label));
+            Assert.Equal(trigger == null ? "Co" : "", analysis.Source[items[0].ReplaceSpan]);
+        }
+
+        [Theory]
+        [InlineData("model Note extends ‸", " ", true)]
+        [InlineData("model Note extends [UID, ‸] { title: string }", " ", false)]
+        [InlineData("model Note extends UID,‸ { title: string }", ",", false)]
+        public void ModelInheritanceCompletesEligibleBases(string declaration, string trigger, bool includeUid)
+        {
+            const string prefix = """
+                import KScript.Data
+                model UID(mixin, key: 'uid') { uid: uuid }
+                model Audit(mixin, timestamps)
+                type Caption with [string] { min: 1 }
+
+                """;
+            string marked = prefix + declaration;
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "note.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, trigger);
+            Assert.Contains(items, i => i.Label == "Audit");
+            Assert.Equal(includeUid, items.Any(i => i.Label == "UID"));
+            Assert.DoesNotContain(items, i => i.Label is "Caption" or "Note" or "Component");
+        }
+
+        [Fact]
+        public void ErrorInheritanceOffersOnlyErrorTypes()
+        {
+            const string marked = "error Missing extends ‸";
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "errors.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, " ");
+            Assert.Contains(items, i => i.Label == "NotFound");
+            Assert.DoesNotContain(items, i => i.Label is "Missing" or "Component");
+        }
+
+        [Fact]
+        public void InheritanceKeywordsAndBaseTypesHaveSemanticColour()
+        {
+            const string code = """
+                import KScript.Web
+                import KScript.Data
+                type Navigation extends Component {
+                  fn render(): Component {
+                    return ```html
+                    <nav></nav>
+                    ```
+                  }
+                }
+                model UID(mixin) { uid: uuid }
+                model Note extends [UID] { title: string }
+                error Unavailable extends NotFound
+                """;
+            var analysis = Service.Analyze(code, "navigation.kscript");
+            List<SemanticToken> tokens = Service.GetSemanticTokens(analysis);
+            Assert.Equal(3, tokens.Count(t => t.Type == SemanticTokenType.Keyword && analysis.Source[t.Span] == "extends"));
+            Assert.Equal(2, tokens.Count(t => t.Type == SemanticTokenType.Type && analysis.Source[t.Span] == "Component"));
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Type && analysis.Source[t.Span] == "NotFound");
+            int baseStart = code.IndexOf("[UID]", StringComparison.Ordinal) + 1;
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Type && t.Span.Start == baseStart);
         }
 
         [Fact]

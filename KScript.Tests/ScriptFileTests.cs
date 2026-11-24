@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using KScript.Runtime;
+using KScript.Syntax.Markup;
 
 namespace KScript.Tests;
 
@@ -12,6 +13,29 @@ public class ScriptFileTests
         var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         new Interpreter(KScriptHost.ForText(output, input)).RunFile(path);
         return output.ToString().Replace("\r\n", "\n");
+    }
+
+    [Theory]
+    [InlineData("note.kscript")]
+    [InlineData("note.ks.xml")]
+    public void ModelOptionsAndTypeOptionsWorkWithWhitespace(string path)
+    {
+        const string code = """
+            import KScript.Data
+
+            model Note (timestamps, index: [title]) {
+              title: string (min: 1)
+            }
+
+            note = Note(title: 'Draft')
+            echo $note.title
+            """;
+        string script = path.EndsWith(".ks.xml", StringComparison.Ordinal)
+            ? ScriptConverter.Convert(code, "note.kscript").Text
+            : code;
+        var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+        new Interpreter(KScriptHost.ForText(output)).RunText(script, path);
+        Assert.Equal("Draft\n", output.ToString());
     }
 
     [Fact]

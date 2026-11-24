@@ -25,6 +25,12 @@
     "workspaceContains:**/kscript.json"
   ],
   "contributes": {
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "kscript.docs",
+        "label": "KScript Docs"
+      }
+    ],
     "languages": [
       {
         "id": "kscript",

@@ -341,7 +341,7 @@ It works from pages, tests and scripts in the project (the folder with `kscript.
 
 A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
 
-The [fullstack project template](projects.md#a-web-app-with-its-api---template-fullstack) uses this: its pages get their notes from `/api/notes`, so the pages and other clients share one API.
+The Notes example in the [fullstack project template](projects.md#a-web-app-with-its-api---template-fullstack) uses this: its pages get their notes from `/api/notes`, so the pages and other clients share one API.
 
 ## Settings: kscript.json
 

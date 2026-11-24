@@ -263,7 +263,66 @@ namespace KScript.Data
             For(call.Host, call.Module?.Directory ?? call.Host.WorkingDirectory, name);
 
         /// <summary>The database a model's records live in.</summary>
-        public static Database For(CallContext call, ModelInfo model) => For(call, model.Connection);
+        public static Database For(CallContext call, ModelInfo model)
+        {
+            Database db = For(call, model.Connection);
+            if (model.AutoCreate) db.EnsureModelTable(call.Interpreter, model);
+            return db;
+        }
+
+        private readonly object modelTables = new object();
+
+        private void EnsureModelTable(Interpreter interpreter, ModelInfo model)
+        {
+            // A transaction may already own the database's write lock while another request waits for it.
+            if (transactions.TryGetValue(interpreter, out _))
+                Ensure();
+            else
+                lock (modelTables) Ensure();
+
+            void Ensure()
+            {
+                var existing = Tables(interpreter).ToHashSet(StringComparer.Ordinal);
+                Visit(model, new HashSet<string>(StringComparer.Ordinal), existing);
+            }
+
+            void Visit(ModelInfo current, HashSet<string> visiting, HashSet<string> existing)
+            {
+                if (existing.Contains(current.Table)) return;
+                if (!visiting.Add(current.Table))
+                    throw new KScriptException($"The models using '{current.Table}' reference one another. Create their tables with migrations.", "Config");
+
+                foreach (Relation relation in current.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo))
+                {
+                    ModelInfo target = relation.Target;
+                    if (target.Table != current.Table && target.AutoCreate && target.Connection == current.Connection)
+                        Visit(target, visiting, existing);
+                }
+                CreateModelTable(interpreter, current);
+                visiting.Remove(current.Table);
+                existing.Add(current.Table);
+            }
+        }
+
+        internal bool CreateModelTable(Interpreter interpreter, ModelInfo model)
+        {
+            bool existed = Tables(interpreter).Contains(model.Table);
+            foreach (string statement in Dialect.CreateTable(model, ifMissing: true))
+            {
+                Execute(interpreter, new SqlStatement(statement, Array.Empty<object>()), model.Table);
+            }
+            // A pivot table is made with the second of its two tables, so both are there for its foreign keys.
+            List<string> tables = Tables(interpreter);
+            foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.ManyToMany && tables.Contains(r.Target.Table) && !tables.Contains(r.Pivot)))
+            {
+                foreach (string statement in Dialect.CreatePivot(r, ifMissing: true))
+                {
+                    Execute(interpreter, new SqlStatement(statement, Array.Empty<object>()), r.Pivot);
+                }
+                tables.Add(r.Pivot);
+            }
+            return !existed;
+        }
 
         /// <summary>Every statement run in this process, newest last, when logging is on (tests turn it on).</summary>
         internal static List<SqlStatement> Log { get; set; }

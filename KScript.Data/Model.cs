@@ -81,6 +81,21 @@ namespace KScript.Data
 
         public bool SoftDeletes { get; set; }
 
+        public bool AutoCreate { get; private init; }
+
+        internal IReadOnlyDictionary<string, string> Options { get; private init; }
+
+        private HashSet<string> DeclaredFields { get; } = new(StringComparer.Ordinal);
+
+        private sealed record Mixin(ModelInfo Definition);
+
+        private static ModelInfo DefinitionOf(RecordType type) => type.Tag switch
+        {
+            ModelInfo model => model,
+            Mixin mixin => mixin.Definition,
+            _ => null,
+        };
+
         public List<List<string>> Unique { get; } = new List<List<string>>();
 
         public List<List<string>> Index { get; } = new List<List<string>>();
@@ -179,7 +194,7 @@ namespace KScript.Data
                 foreach (FieldDefinition f in Type.Fields.ToList())
                 {
                     if (f.Computed) continue;
-                    ModelInfo target = ModelOf(f.Type);
+                    ModelInfo target = ModelOf(f);
                     if (target == null) continue;
                     Relation r = Data.Relation.Infer(this, f, target);
                     relations[f.Name] = r;
@@ -204,20 +219,22 @@ namespace KScript.Data
         /// imported where it is named: one declared anywhere in the run is found, and then one in the project's
         /// models folder (paths.models), which is loaded. So two models can link to each other from their own files.
         /// </summary>
-        internal ModelInfo ModelOf(TypeRef type)
+        internal ModelInfo ModelOf(FieldDefinition field)
         {
+            RecordType owner = field.Owner ?? Type;
+            TypeRef type = field.Type;
             if (type.ListDepth > 1) return null;
             TypeRef item = type.ListDepth == 1 ? type.Item : type;
             if (item.Inline != null || item.IsBuiltIn || item.Args != null) return null;
             if (Values.IsDeclarable(item.Name)) return null;
-            if (Type.Closure.TryGet(item.Name, out object found)) return found is RecordType { Tag: ModelInfo m } ? m : null;
+            if (owner.Closure.TryGet(item.Name, out object found)) return found is RecordType { Tag: ModelInfo m } ? m : null;
             if (Interpreter == null) return null;
             ConcurrentDictionary<string, ModelInfo> declared = Declared.GetOrCreateValue(Interpreter);
             if (declared.TryGetValue(item.Name, out ModelInfo known)) return known;
-            ProjectConfig config = Type.Module?.Directory != null ? ProjectConfig.FindAndLoad(Type.Module.Directory) : null;
+            ProjectConfig config = owner.Module?.Directory != null ? ProjectConfig.FindAndLoad(owner.Module.Directory) : null;
             string file = config == null ? null : ProjectConfig.ModelFileFor(config.ModelFiles(), item.Name);
             if (file == null) return null;
-            Interpreter.ImportScript(Type.Module, file, Type.Closure.Child());
+            Interpreter.ImportScript(owner.Module, file, owner.Closure.Child());
             return declared.GetValueOrDefault(item.Name);
         }
 
@@ -259,7 +276,8 @@ namespace KScript.Data
             }
             else if (name == null)
             {
-                object resolved = Shapes.Resolve(b, Type.Closure, Type.Module);
+                RecordType owner = f.Owner ?? Type;
+                object resolved = Shapes.Resolve(b, owner.Closure, owner.Module);
                 switch (resolved)
                 {
                     case EnumType e:
@@ -315,8 +333,24 @@ namespace KScript.Data
         /// <summary>Builds the model a &lt;model&gt; element declares: a record type, with a table behind it.</summary>
         public static RecordType Declare(ElementRun run)
         {
-            // <model> has no with attribute, so what it declares is always a record type.
-            var type = (RecordType)Shapes.Declare(run);
+            if (!ModelComposition.TryReadBases(run.Raw("with"), out var bases, out string problem))
+                throw run.Error(problem, "with", "Syntax");
+
+            var parents = new List<(ModelInfo Model, ModelComposition.Base Entry)>();
+            foreach (var entry in bases)
+            {
+                if (!run.Scope.TryGet(entry.Name, out object value) || value is not RecordType parent)
+                    throw run.Error($"Unknown model or record type '{entry.Name}'. Declare or import it before this model.", "with", "Type");
+                parents.Add((DefinitionOf(parent), entry));
+            }
+
+            bool mixin = Flag(run, "mixin");
+            if (mixin && (run.Has("table") || run.Has("connection") || run.Has("auto_create")))
+                throw run.Error("A model mixin cannot set table, connection or auto_create.", "mixin", "Syntax");
+            var options = ModelComposition.Merge(parents.Select(p => (p.Model?.Options, p.Entry)), run.Element);
+            var type = (RecordType)Shapes.Declare(run, bases.Select(b => b.Name).ToList(),
+                (parent, field) => DefinitionOf(parent) is not ModelInfo parentModel || parentModel.DeclaredFields.Contains(field.Name),
+                allowEmpty: mixin || bases.Count > 0);
             var relationArgs = new Dictionary<string, IReadOnlyDictionary<string, object>>(StringComparer.Ordinal);
 
             // A relation's options are written as its type's arguments (posts: Post[](by: author)). They aren't rules
@@ -333,23 +367,35 @@ namespace KScript.Data
 
             var model = new ModelInfo(type)
             {
-                Table = run.Raw("table")?.Trim() ?? TableName(type.Name),
+                Table = mixin ? null : run.Raw("table")?.Trim() ?? TableName(type.Name),
                 Connection = run.Raw("connection")?.Trim(),
-                Key = run.Raw("key")?.Trim() ?? "id",
-                Timestamps = Flag(run, "timestamps"),
-                SoftDeletes = Flag(run, "soft_deletes"),
+                Key = options.GetValueOrDefault("key")?.Trim() ?? "id",
+                Timestamps = Flag(run, "timestamps", options),
+                SoftDeletes = Flag(run, "soft_deletes", options),
+                AutoCreate = !mixin && Flag(run, "auto_create"),
+                Options = options,
             };
+            model.DeclaredFields.UnionWith(type.Fields.Select(f => f.Name));
+            foreach (var entry in type.Bases.Select(DefinitionOf).Where(b => b != null))
+            {
+                foreach (var relation in entry.RelationArgs)
+                    if (ReferenceEquals(type.Field(relation.Key), entry.Type.Field(relation.Key)))
+                        relationArgs.TryAdd(relation.Key, relation.Value);
+            }
+            foreach (var entry in relationArgs) model.RelationArgs[entry.Key] = entry.Value;
+            type.Tag = mixin ? new Mixin(model) : model;
+            if (mixin) return type;
             if (!IsName(model.Table)) throw run.Error($"'{model.Table}' can't be a table name: use letters, digits and _.", "table", "Syntax");
 
-            foreach (List<string> group in Groups(run, "unique")) model.Unique.Add(group);
-            foreach (List<string> group in Groups(run, "index")) model.Index.Add(group);
-            foreach (string f in Names(run, "hidden")) model.Hidden.Add(f);
-            foreach (string f in Names(run, "guarded")) model.Guarded.Add(f);
+            foreach (List<string> group in Groups(run, "unique", options)) model.Unique.Add(group);
+            foreach (List<string> group in Groups(run, "index", options)) model.Index.Add(group);
+            foreach (string f in Names(run, "hidden", options)) model.Hidden.Add(f);
+            foreach (string f in Names(run, "guarded", options)) model.Guarded.Add(f);
 
             // The key comes first. Without one, a model has id: an int the database numbers.
             if (type.Field(model.Key) == null)
             {
-                if (run.Has("key")) throw run.Error($"{type.Name} has no field '{model.Key}' to be its key.", "key", "Syntax");
+                if (options.ContainsKey("key")) throw run.Error($"{type.Name} has no field '{model.Key}' to be its key.", "key", "Syntax");
                 type.InsertField(0, Field("id", "int", "The record's number, given by the database when it is saved."));
             }
             if (model.Timestamps)
@@ -368,11 +414,9 @@ namespace KScript.Data
                 }
             }
 
-            foreach (KeyValuePair<string, IReadOnlyDictionary<string, object>> kv in relationArgs) model.RelationArgs[kv.Key] = kv.Value;
             foreach (FieldDefinition f in type.Fields.Where(f => !f.Optional && !f.Computed)) model.Required.Add(f.Name);
             type.Kind = "model";
             type.RecordKind = "record";
-            type.Tag = model;
             model.Interpreter = run.Interpreter;
             Declared.GetOrCreateValue(run.Interpreter)[type.Name] = model;
             type.Hidden = model.Hidden.Count > 0 ? model.Hidden : null;
@@ -397,17 +441,17 @@ namespace KScript.Data
         private static FieldDefinition Field(string name, string type, string description) =>
             new FieldDefinition(name, TypeRef.Parse(type).WithOptional(true), null, new List<object> { name }, null, null, null, description, optional: true);
 
-        private static bool Flag(ElementRun run, string name)
+        private static bool Flag(ElementRun run, string name, IReadOnlyDictionary<string, string> options = null)
         {
-            string raw = run.Raw(name)?.Trim();
+            string raw = (options == null ? run.Raw(name) : options.GetValueOrDefault(name))?.Trim();
             if (raw == null) return false;
             return Values.ParseBool(raw) ?? throw run.Error($"{name} is true or false, not '{raw}'.", name, "Syntax");
         }
 
         /// <summary>The names of a list setting: <c>[a, b]</c> or <c>a, b</c>.</summary>
-        private static IEnumerable<string> Names(ElementRun run, string name)
+        private static IEnumerable<string> Names(ElementRun run, string name, IReadOnlyDictionary<string, string> options)
         {
-            foreach (List<string> group in Groups(run, name))
+            foreach (List<string> group in Groups(run, name, options))
             {
                 if (group.Count > 1) throw run.Error($"{name} lists field names: [{string.Join(", ", group)}] can't be one.", name, "Syntax");
                 yield return group[0];
@@ -418,9 +462,9 @@ namespace KScript.Data
         /// The groups of a list setting: <c>unique: [email, [team, slug]]</c> is one index on email and one on team and
         /// slug together.
         /// </summary>
-        internal static List<List<string>> Groups(ElementRun run, string name)
+        internal static List<List<string>> Groups(ElementRun run, string name, IReadOnlyDictionary<string, string> options = null)
         {
-            string raw = run.Raw(name)?.Trim();
+            string raw = (options == null ? run.Raw(name) : options.GetValueOrDefault(name))?.Trim();
             var groups = new List<List<string>>();
             if (string.IsNullOrEmpty(raw)) return groups;
             if (raw.StartsWith('[') && raw.EndsWith(']')) raw = raw.Substring(1, raw.Length - 2);

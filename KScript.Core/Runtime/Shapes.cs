@@ -247,10 +247,12 @@ namespace KScript.Runtime
         internal DecodedText DefaultText { get; }
         internal DecodedText ValueText { get; }
 
+        internal RecordType Owner { get; set; }
+
         internal bool HasDefault => DefaultNode != null || DefaultText != null;
 
         internal FieldDefinition WithType(TypeRef type, bool optional) =>
-            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional);
+            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional) { Owner = Owner };
 
         /// <summary>Parses a path such as <c>owner.login</c> or <c>items[0].name</c> into keys and indexes, or null.</summary>
         internal static List<object> ParsePath(string text)
@@ -334,6 +336,7 @@ namespace KScript.Runtime
 
         internal void SetField(FieldDefinition field)
         {
+            field.Owner ??= this;
             int at = fields.FindIndex(f => f.Name == field.Name);
             if (at >= 0) fields[at] = field;
             else fields.Add(field);
@@ -342,7 +345,11 @@ namespace KScript.Runtime
         public FieldDefinition Field(string name) => fields.FirstOrDefault(f => f.Name == name);
 
         /// <summary>Adds a field at a place in the list, such as a model's key first.</summary>
-        internal void InsertField(int index, FieldDefinition field) => fields.Insert(index, field);
+        internal void InsertField(int index, FieldDefinition field)
+        {
+            field.Owner ??= this;
+            fields.Insert(index, field);
+        }
 
         /// <summary>The types this one joins: <c>type Admin with [User, Auditable]</c>.</summary>
         public IReadOnlyList<RecordType> Bases => bases;
@@ -374,6 +381,13 @@ namespace KScript.Runtime
             foreach (RecordType parent in Bases)
                 if (parent.OwnMethods.TryGetValue(name, out var inherited) && inherited == declaration)
                     return parent.MethodOwner(name, declaration);
+            return this;
+        }
+
+        internal RecordType ValidatorOwner(Validator validator)
+        {
+            foreach (RecordType parent in Bases)
+                if (parent.Validators.Contains(validator)) return parent.ValidatorOwner(validator);
             return this;
         }
 
@@ -585,7 +599,8 @@ namespace KScript.Runtime
                 this[name] = value;
                 return;
             }
-            object converted = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", Type.Closure, Type.Module);
+            RecordType owner = field.Owner ?? Type;
+            object converted = Shapes.Convert(interpreter, value, field.Type.WithOptional(field.Optional), $"{Type.Name}.{name}", owner.Closure, owner.Module);
             // Every field is set when a record is made, so there is always an old value to put back.
             TryGetValue(name, out object old);
             this[name] = converted;
@@ -780,9 +795,10 @@ namespace KScript.Runtime
             var failures = new List<string>();
             foreach (Validator v in record.Type.Validators)
             {
-                Scope s = record.Type.Closure.Child();
+                RecordType owner = record.Type.ValidatorOwner(v);
+                Scope s = owner.Closure.Child();
                 foreach (KeyValuePair<string, object> kv in record) s.Declare(kv.Key, kv.Value);
-                if (!Values.Truthy(interpreter.EvaluateText(v.Test, s, record.Type.Module))) failures.Add(v.Failure);
+                if (!Values.Truthy(interpreter.EvaluateText(v.Test, s, owner.Module))) failures.Add(v.Failure);
             }
             return failures;
         }
@@ -799,12 +815,12 @@ namespace KScript.Runtime
         /// Builds the type a &lt;type&gt; element declares: a record type (fields, perhaps joining other record
         /// types with <c>with</c>), or a refinement of one other type (<c>with="int" min="0"</c>).
         /// </summary>
-        internal static IKObject Declare(ElementRun run)
+        internal static IKObject Declare(ElementRun run, List<string> bases = null, Func<RecordType, FieldDefinition, bool> inheritField = null, bool allowEmpty = false)
         {
             string name = run.VariableName("name");
             if (Values.IsDeclarable(name))
                 throw run.Error($"'{name}' is a built-in type, so a <type> can't use it as its name.", "name", "Syntax");
-            List<string> with = TypeNames(run.Raw("with"));
+            List<string> with = bases ?? TypeNames(run.Raw("with"));
             if (with.Count == 1 && IsRefinable(with[0], run.Scope))
             {
                 if (run.Has("extends") || run.ChildElements.Any(e => e.GetAttribute("signature") != null))
@@ -830,7 +846,7 @@ namespace KScript.Runtime
             // The loader has already checked extra is one of drop, keep and error.
             ExtraKeys extra = extraText == "keep" ? ExtraKeys.Keep : extraText == "error" ? ExtraKeys.Error : ExtraKeys.Drop;
             var type = new RecordType(name, run.Raw("description"), extra, run.Scope, run.Module) { DeclarationOffset = run.Element.NameSpan.Start };
-            Dictionary<string, string> conflicts = JoinBases(type, with, run);
+            Dictionary<string, string> conflicts = JoinBases(type, with, run, inheritField);
             type.Catches = TypeCatch.Collect(run, type.Bases.SelectMany(b => b.Catches), recordFields: true);
             if (run.Has("pattern"))
             {
@@ -875,7 +891,7 @@ namespace KScript.Runtime
                         throw run.Error($"{name} must {problem} to extend {contract}.", "extends", "Type");
                 }
             }
-            if (type.Fields.Count == 0 && type.OwnMethods.Count == 0 && type.Signatures.Count == 0 && !run.Has("extends"))
+            if (!allowEmpty && type.Fields.Count == 0 && type.OwnMethods.Count == 0 && type.Signatures.Count == 0 && !run.Has("extends"))
                 throw run.Error(KScript.Syntax.Markup.CodeArguments.TypeNeedsFields(name), null, "Syntax");
             return type;
         }
@@ -988,7 +1004,7 @@ namespace KScript.Runtime
         /// Copies the fields and rules of the types named in <c>with</c>, in order. Returns the fields two bases
         /// give different types, with the message to fail with unless the new type declares them itself.
         /// </summary>
-        private static Dictionary<string, string> JoinBases(RecordType type, List<string> with, ElementRun run)
+        private static Dictionary<string, string> JoinBases(RecordType type, List<string> with, ElementRun run, Func<RecordType, FieldDefinition, bool> inheritField)
         {
             var conflicts = new Dictionary<string, string>(StringComparer.Ordinal);
             var origin = new Dictionary<string, RecordType>(StringComparer.Ordinal);
@@ -1005,7 +1021,8 @@ namespace KScript.Runtime
                 }
                 if (b.IsA(type) || type.Bases.Contains(b)) throw run.Error($"<type name=\"{type.Name}\"> joins {b.Name} twice.", "with", "Syntax");
                 type.AddBase(b);
-                type.Validators.AddRange(b.Validators);
+                foreach (Validator validator in b.Validators)
+                    if (!type.Validators.Contains(validator)) type.Validators.Add(validator);
                 foreach (KeyValuePair<string, MarkupElement> m in b.OwnMethods)
                 {
                     if (type.OwnMethods.TryAdd(m.Key, m.Value)) methodOrigin[m.Key] = b;
@@ -1019,6 +1036,7 @@ namespace KScript.Runtime
                 type.Parse ??= b.Parse;
                 foreach (FieldDefinition f in b.Fields)
                 {
+                    if (inheritField != null && !inheritField(b, f)) continue;
                     FieldDefinition existing = type.Field(f.Name);
                     if (existing == null)
                     {
@@ -1209,9 +1227,10 @@ namespace KScript.Runtime
             {
                 // Hidden fields are never in a record's JSON.
                 if (type.Hidden?.Contains(f.Name) == true) continue;
+                RecordType owner = f.Owner ?? type;
                 Dictionary<string, object> property = links != null
                     ? WithListDepth(RecordSchema(links, root, defs, refBase), f.Type.ListDepth)
-                    : SchemaOf(f.Type, type.Closure, type.Module, root, defs, refBase, named: false);
+                    : SchemaOf(f.Type, owner.Closure, owner.Module, root, defs, refBase, named: false);
                 if (f.Description != null) property["description"] = f.Description;
                 if (f.Computed) property["readOnly"] = true;
                 properties[f.Name] = property;
@@ -1525,6 +1544,16 @@ namespace KScript.Runtime
             var record = new Record(type);
             var used = new HashSet<string>(StringComparer.Ordinal);
             var mapper = new ShapeMapper(interpreter, type.Closure, type.Module, normalize);
+            object ConvertField(FieldDefinition field, object raw, bool found, TypeRef target, string fieldPath)
+            {
+                RecordType owner = field.Owner ?? type;
+                if (owner == type) return mapper.Convert(raw, found, target, fieldPath, field.Name, depth + 1);
+                var inherited = new ShapeMapper(interpreter, owner.Closure, owner.Module, normalize);
+                object result = inherited.Convert(raw, found, target, fieldPath, field.Name, depth + 1);
+                mapper.Problems.AddRange(inherited.Problems);
+                return result;
+            }
+
             foreach (FieldDefinition f in type.Fields.Where(f => !f.Computed))
             {
                 bool found = TryRead(source, f.Path, out object raw, out string at, out string key);
@@ -1532,10 +1561,11 @@ namespace KScript.Runtime
                 string fieldPath = path + at;
                 if (raw == null && f.HasDefault)
                 {
-                    Scope s = type.Closure.Child();
-                    raw = f.DefaultNode != null ? interpreter.Evaluate(f.DefaultNode, s, new EvalContext(type.Module, null)) : interpreter.EvaluateText(f.DefaultText, s, type.Module);
+                    RecordType owner = f.Owner ?? type;
+                    Scope s = owner.Closure.Child();
+                    raw = f.DefaultNode != null ? interpreter.Evaluate(f.DefaultNode, s, new EvalContext(owner.Module, null)) : interpreter.EvaluateText(f.DefaultText, s, owner.Module);
                 }
-                record[f.Name] = mapper.Convert(raw, found, f.Type.WithOptional(f.Optional), fieldPath, f.Name, depth + 1);
+                record[f.Name] = ConvertField(f, raw, found, f.Type.WithOptional(f.Optional), fieldPath);
             }
             Problems.AddRange(mapper.Problems);
             mapper.Problems.Clear();
@@ -1549,10 +1579,11 @@ namespace KScript.Runtime
 
             foreach (FieldDefinition f in type.Fields.Where(f => f.Computed))
             {
-                Scope s = type.Closure.Child();
+                RecordType owner = f.Owner ?? type;
+                Scope s = owner.Closure.Child();
                 foreach (KeyValuePair<string, object> kv in record) s.Declare(kv.Key, kv.Value);
-                object computed = interpreter.EvaluateText(f.ValueText, s, type.Module);
-                record[f.Name] = mapper.Convert(computed, true, f.Type.WithOptional(true), path + Key(f.Name), f.Name, depth + 1);
+                object computed = interpreter.EvaluateText(f.ValueText, s, owner.Module);
+                record[f.Name] = ConvertField(f, computed, true, f.Type.WithOptional(true), path + Key(f.Name));
             }
             // Rules on the whole record only run once its fields fit, so they can rely on them.
             if (mapper.Problems.Count == 0 && !Problems.Any(p => p.Path.StartsWith(path, StringComparison.Ordinal)))

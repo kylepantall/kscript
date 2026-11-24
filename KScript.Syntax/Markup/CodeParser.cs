@@ -1097,12 +1097,18 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, keyword, start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             SkipSpaces();
-            if (TryWord("with"))
+            int clauseStart = pos;
+            if (keyword == "model" && (TryWord("extends") || TryWord("with")))
+            {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
+                (int from, int end) = ReadExpression(Stop.Header);
+                if (from == end)
+                    Error(new TextSpan(from, 0), DiagnosticCodes.MissingAttribute, "Name the models or mixins to extend.");
+                AddRawAttribute(e, "with", TextSpan.FromBounds(from, end), clause);
+            }
+            else if (TryWord("with"))
             {
                 // type Admin with [User, Auditable] { }: with="User, Auditable".
                 SkipSpaces();
@@ -1140,14 +1146,15 @@ namespace KScript.Syntax.Markup
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             SkipSpaces();
+            clauseStart = pos;
             if (keyword == "type" && TryWord("extends"))
             {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
                 SkipSpaces();
                 TextSpan contract = ReadNameSpan(allowDash: false);
                 if (contract.Length == 0)
                     Error(contract, DiagnosticCodes.MissingAttribute, "Write a type whose signature this type implements.");
-                else
-                    AddRawAttribute(e, "extends", contract);
+                AddRawAttribute(e, "extends", contract, clause);
                 SkipSpaces();
             }
             if (Peek(0) == '{')
@@ -1166,6 +1173,16 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        private void ParseDeclarationOptions(MarkupElement declaration)
+        {
+            int nameEnd = pos;
+            SkipSpaces();
+            if (Peek(0) == '(')
+                ParseAttributeList(declaration);
+            else
+                pos = nameEnd;
+        }
+
         /// <summary>
         /// <c>error NotFound(status: 404, message: "No {$kind} {$id}") extends Validation { kind: string; id: int }</c>:
         /// an &lt;error&gt;. The options, <c>extends</c> and the block of fields are all optional.
@@ -1175,28 +1192,24 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, "error", start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             int save = pos;
             SkipSpaces();
+            int clauseStart = pos;
             if (TryWord("extends"))
             {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
                 SkipSpaces();
                 TextSpan parentName = ReadNameSpan(allowDash: false);
                 if (parentName.Length == 0)
                 {
                     Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the error type it extends after 'extends', such as Validation.");
                 }
-                else
-                {
-                    AddRawAttribute(e, "extends", parentName);
-                }
+                AddRawAttribute(e, "extends", parentName, clause);
                 save = pos;
                 SkipSpaces();
             }
@@ -1222,10 +1235,7 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, "job", start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
@@ -1372,7 +1382,7 @@ namespace KScript.Syntax.Markup
         /// A model's settings (KScript.Data), written as lines of its block (<c>table: people</c>, <c>unique: [email]</c>)
         /// or as options (<c>model User(timestamps: yes)</c>). In a model, a line starting with one is always a setting.
         /// </summary>
-        public static readonly string[] ModelSettings = { "table", "connection", "key", "timestamps", "soft_deletes", "unique", "index", "hidden", "guarded" };
+        public static readonly string[] ModelSettings = { "table", "connection", "key", "timestamps", "soft_deletes", "unique", "index", "hidden", "guarded", "mixin", "auto_create" };
 
         /// <summary>True while parsing the block of a model, whose settings are lines too.</summary>
         private bool inModel;
@@ -1418,7 +1428,10 @@ namespace KScript.Syntax.Markup
             pos = end;
             SkipSpaces();
             // fn(x) is also shaped like a parameterised type; the arrow makes it a normalize callback.
-            bool normalizer = word == "normalize" && text.AsSpan(p).StartsWith("fn(") && Lookahead("=>");
+            int args = p + 2;
+            while (args < text.Length && text[args] is ' ' or '\t') args++;
+            bool normalizer = word == "normalize" && text.AsSpan(p).StartsWith("fn") && args < text.Length
+                && text[args] == '(' && Lookahead("=>");
             bool field = !normalizer && (AtStatementEnd() || Peek(0) == '=' || TryWord("from"));
             pos = saved;
             return field ? null : word;
@@ -2045,8 +2058,8 @@ namespace KScript.Syntax.Markup
             e.Children.Add(new MarkupText { Content = content, Parent = e, Span = span ?? content.SourceSpan });
 
         // Attributes implied by a keyword (let's name, if's test) have no name in the source: an empty name span.
-        private void AddRawAttribute(MarkupElement e, string name, TextSpan span) =>
-            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, new TextSpan(span.Start, 0), '\0');
+        private void AddRawAttribute(MarkupElement e, string name, TextSpan span, TextSpan? nameSpan = null) =>
+            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, nameSpan, '\0');
 
         private void AddAttribute(MarkupElement e, string name, DecodedText value, TextSpan span, TextSpan? nameSpan = null, char quote = '\0') =>
             e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? new TextSpan(span.Start, 0), Value = value, Span = span, Quote = quote, Owner = e });
@@ -2531,18 +2544,14 @@ namespace KScript.Syntax.Markup
                 {
                     p += 2;
                 }
-                else if (text[p] == '(')
-                {
-                    int close = ClosingBracket(p);
-                    if (close < 0)
-                    {
-                        return -1;
-                    }
-                    p = close + 1;
-                }
                 else
                 {
-                    break;
+                    int open = p;
+                    while (open < text.Length && text[open] is ' ' or '\t') open++;
+                    if (open >= text.Length || text[open] != '(') break;
+                    int close = ClosingBracket(open);
+                    if (close < 0) return -1;
+                    p = close + 1;
                 }
             }
             return p < text.Length && text[p] == '?' ? p + 1 : p;

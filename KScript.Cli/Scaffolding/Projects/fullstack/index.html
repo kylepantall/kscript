@@ -1,5 +1,6 @@
 <layout path="_layout.html" title="Home">
   <h1>Welcome to {{ title }}</h1>
+{{#if examples}}
   <p>{{ title }} is a website with its own JSON API. The <a href="/notes">Notes</a> page asks the API for its data with <code>@api('/api/notes')</code>, so the pages and any other client (a phone app, a script) share one set of rules.</p>
 
   <h2>How it fits together</h2>
@@ -12,6 +13,9 @@
     <li><code>lib/notes-client{{ ext }}</code>: how the pages call the API.</li>
     <li><code>tests/</code>: tests for the API and the client. Run them with <code>kscript test</code>.</li>
   </ul>
+{{else}}
+  <p>{{ title }} is a website with a JSON API. The API starts with a <a href="/api/health">health endpoint</a>. See its routes and responses in the <a href="/_api">API reference</a>.</p>
+{{/if}}
 
   <h2>Next steps</h2>
   <ul>

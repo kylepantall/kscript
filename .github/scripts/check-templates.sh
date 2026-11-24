@@ -27,9 +27,10 @@ cases=(
   "api|--template api --db none --no-auth --no-cache --syntax xml"
   "api|--template api --db postgres --docker"
   "fullstack|--template fullstack"
+  "fullstack|--template fullstack --examples"
   "fullstack|--template fullstack --auth"
-  "fullstack|--template fullstack --syntax xml --auth"
-  "fullstack|--template fullstack --db none --no-cache"
+  "fullstack|--template fullstack --examples --syntax xml --auth"
+  "fullstack|--template fullstack --examples --db none --no-cache"
   "fullstack|--template fullstack --db mysql --docker"
 )
 
@@ -59,7 +60,7 @@ for c in "${cases[@]}"; do
   echo "::endgroup::"
 done
 
-# Serve the api and fullstack projects made with their defaults, and ask them for a page and the API.
+# Serve the api and both fullstack variants, and ask them for a page and the API.
 serve_and_get() {
   local dir="$1" port="$2"; shift 2
   (cd "$dir" && exec $k serve --port "$port" > "$work/$dir.log" 2>&1) &
@@ -81,6 +82,8 @@ serve_and_get() {
 api=$(printf '%s\n' "${cases[@]}" | grep -n '^api|--template api$' | cut -d: -f1)
 full=$(printf '%s\n' "${cases[@]}" | grep -n '^fullstack|--template fullstack$' | cut -d: -f1)
 serve_and_get "api-$api" 8761 /api/health /_api /_openapi.json
-serve_and_get "fullstack-$full" 8762 / /notes /api/notes /_api
+full_examples=$(printf '%s\n' "${cases[@]}" | grep -n '^fullstack|--template fullstack --examples$' | cut -d: -f1)
+serve_and_get "fullstack-$full" 8762 / /api/health /_api
+serve_and_get "fullstack-$full_examples" 8763 / /notes /api/notes /_api
 
 echo "All ${#cases[@]} template projects check, format, test and serve cleanly."

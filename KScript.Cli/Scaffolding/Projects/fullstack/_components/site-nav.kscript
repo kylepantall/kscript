@@ -5,7 +5,9 @@ type SiteNav extends Component {
     return ```html
     <nav class="site-nav">
       <a href="/">Home</a>
+{{#if examples}}
       <a href="/notes">Notes</a>
+{{/if}}
       <a href="/_api">API</a>
     </nav>
     ```

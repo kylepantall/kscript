@@ -197,6 +197,32 @@ namespace KScript.Language.Tests
                 "  $err.message"), Fmt("fn recover() => @load()\ncatch Validation =>\n$err.message"));
         }
 
+        [Theory]
+        [InlineData("model", "Note", "timestamps, index: [user_id], hidden: [user_id]")]
+        [InlineData("type", "Note", "fields: 'user_id: string'")]
+        [InlineData("error", "Unavailable", "status: 503")]
+        [InlineData("job", "SendNotice", "queue: 'mail', tries: 3")]
+        public void DeclarationOptionsAreJoinedToTheName(string declaration, string name, string options)
+        {
+            string expected = Lines($"{declaration} {name}({options}) {{", "  user_id: string", "}");
+            string spaced = expected.Replace(name + "(", name + " \t (");
+            Assert.Equal(expected, Fmt(spaced));
+            string xml = ScriptConverter.Convert(spaced, "declaration.kscript").Text;
+            Assert.Equal(ScriptConverter.Convert(expected, "declaration.kscript").Text, xml);
+            FormatResult formattedXml = Formatter.Format(xml, "declaration.ks.xml");
+            Assert.True(formattedXml.Succeeded, formattedXml.Error);
+            Assert.Equal(xml, formattedXml.Text);
+        }
+
+        [Fact]
+        public void JoinsAFunctionSignatureAndTypeAnnotationsWithoutChangingTheirMeaning()
+        {
+            string expected = Lines("fn greet(): string(min: 1) {", "  who: string(min: 1) = 'hello'", "  return $who", "}",
+                "type Person {", "  names: string(min: 1)[](max: 5)", "}", "enum Size { small, large }");
+            string spaced = expected.Replace("greet(", "greet (").Replace("string(", "string (").Replace("[](", "[] (");
+            Assert.Equal(expected, Fmt(spaced));
+        }
+
         [Fact]
         public void KeepsTrailingCommaInMultilineModelOptions()
         {

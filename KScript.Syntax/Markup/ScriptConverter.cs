@@ -761,7 +761,8 @@ namespace KScript.Syntax.Markup
                             {
                                 // with="User, Auditable" is with [User, Auditable].
                                 string bases = with.Trim().TrimStart('[').TrimEnd(']');
-                                sb.Append(" with [").Append(string.Join(", ", bases.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0))).Append(']');
+                                if (e.Name == "model") sb.Append(" extends [").Append(bases.Trim()).Append(']');
+                                else sb.Append(" with [").Append(string.Join(", ", bases.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0))).Append(']');
                             }
                             if (Attr("extends") is string contract) sb.Append(" extends ").Append(contract.Trim());
                             if (!e.ChildElements.Any() && rules.Count == 0 && fieldLines == null && Attr("extends") == null)

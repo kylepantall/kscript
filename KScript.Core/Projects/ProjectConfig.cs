@@ -454,6 +454,9 @@ namespace KScript.Projects
         public TestSettings Test { get; } = new TestSettings();
         public ConfigSettings Config { get; } = new ConfigSettings();
 
+        /// <summary>Project-relative Markdown files to include in generated AGENTS.md, in order.</summary>
+        public IReadOnlyList<string> AgentMarkdown { get; private set; } = Array.Empty<string>();
+
         /// <summary>
         /// The options $config uses for scripts in this project. <paramref name="environment"/> (from kscript --env)
         /// wins over KSCRIPT_ENV, which wins over config.environment.
@@ -838,6 +841,9 @@ namespace KScript.Projects
                         case "format":
                             ReadFormat(prop.Value, config);
                             break;
+                        case "agents":
+                            ReadAgents(prop.Value, config);
+                            break;
                         case "app":
                             ReadApp(prop.Value, config);
                             break;
@@ -875,7 +881,7 @@ namespace KScript.Projects
                             }
                             break;
                         default:
-                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, extensions, paths, types, serve, http, queue, lint, test, config, format, make, app, library or libraries).");
+                            config.Warnings.Add($"unknown setting '{prop.Name}' (expected name, standard, packages, extensions, natives, paths, types, serve, http, queue, lint, test, config, format, agents, make, app, library or libraries).");
                             break;
                     }
                 }
@@ -1039,6 +1045,26 @@ namespace KScript.Projects
             Lint.Rules.Remove(key); // keep the spelling of the layer that set it last
             Lint.Rules[key] = severity;
             Set("lint.rules." + key);
+        }
+
+        private static void ReadAgents(JsonElement e, ProjectConfig config)
+        {
+            if (e.ValueKind != JsonValueKind.Object)
+                throw new ProjectConfigException($"{config.FilePath}: agents should be an object with an optional merge list.");
+
+            foreach (var p in e.EnumerateObject())
+            {
+                if (p.Name != "merge")
+                {
+                    config.Warnings.Add($"unknown setting 'agents.{p.Name}' (expected merge).");
+                    continue;
+                }
+                if (p.Value.ValueKind != JsonValueKind.Array
+                    || p.Value.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(item.GetString())))
+                    throw new ProjectConfigException($"{config.FilePath}: agents.merge should be a list of Markdown file paths, such as [\"docs/project-guidance.md\"].");
+
+                config.AgentMarkdown = p.Value.EnumerateArray().Select(item => item.GetString()).ToArray();
+            }
         }
 
         private static void ReadPaths(JsonElement e, ProjectConfig config)

@@ -22,7 +22,9 @@ fn configure(environment: string) {
   return {
     app: { name: $testing ? '{{ title }} (tests)' : '{{ title }}' }
 {{#if db is none}}
+{{#if examples}}
     notes: { file: $testing ? 'data/test/notes.json' : 'data/notes.json' }
+{{/if}}
 {{else}}
     database: {
       connections: {

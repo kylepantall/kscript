@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Syntax;
+using KScript.Syntax.Markup;
 
 namespace KScript.Language.Tests
 {
@@ -8,6 +9,30 @@ namespace KScript.Language.Tests
         private static Diagnostic[] UnknownFields(string source, string extension = ".kscript") =>
             Analyzer.Analyze(source, Path.Combine(AnalyzerCoverageTests.Folder, "license" + extension), EmptyFileSystem.Instance)
                 .Diagnostics.Where(d => d.Code == DiagnosticCodes.UnknownColumn).ToArray();
+
+        [Theory]
+        [InlineData("notes.kscript")]
+        [InlineData("notes.ks.xml")]
+        public void ModelCompositionIncludesInheritedFieldsAndEffectiveOptions(string path)
+        {
+            const string source = """
+                import KScript.Data
+
+                model UID(mixin, key: 'uid') { uid: uuid = @uuid() }
+                model Audit(mixin, timestamps)
+                model Base extends UID { title: string }
+                model Note(auto_create) extends [Base, Audit] { done: bool = false }
+                echo Note->first().uid
+                echo Note->first().created_at
+                """;
+            string input = path.EndsWith(".ks.xml", StringComparison.Ordinal) ? ScriptConverter.Convert(source, "notes.kscript").Text : source;
+            var analysis = Analyzer.Analyze(input, path);
+            Assert.Empty(analysis.Errors);
+            var note = Assert.Single(analysis.DeclaredTypes, item => item.Value.Name == "Note").Value;
+            Assert.Contains("uid", note.Fields.Keys);
+            Assert.Contains("created_at", note.Fields.Keys);
+            Assert.DoesNotContain("id", note.Fields.Keys);
+        }
 
         [Fact]
         public void OptionsCanNameFieldsDeclaredLaterInTheModel()

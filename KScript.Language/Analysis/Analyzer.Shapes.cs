@@ -44,7 +44,7 @@ namespace KScript.Language.Analysis
                 // A refinement type's values are its root's: an Age is a number, a Username a handle.
                 string refinedRoot = RefinedRoot(e);
                 TypeShape rootShape = refinedRoot != null ? TypeNamed(refinedRoot, 0) : null;
-                bool model = IsModelElement(e);
+                bool model = IsModelElement(e) && !IsModelMixin(e);
                 TypeShape instance = rootShape != null && !model
                     ? new TypeShape(rootShape.Type) { Name = name, Declared = rootShape.Declared, Element = rootShape.Element, RefinementBase = rootShape }
                     : new TypeShape(KType.Map) { Name = name, Closed = e.GetAttributeValue("extra")?.Trim() != "keep", Kind = model ? KType.Record : null };
@@ -136,7 +136,8 @@ namespace KScript.Language.Analysis
                 {
                     foreach (KeyValuePair<string, FieldInfo> f in baseShape.Fields)
                     {
-                        shape.Fields[f.Key] = f.Value;
+                        if (!IsModelElement(e) || baseShape.Kind != KType.Record || f.Value.Declaration.HasValue)
+                            shape.Fields[f.Key] = f.Value;
                     }
                 }
                 foreach (KeyValuePair<string, Symbol> method in baseShape.Methods) shape.Methods[method.Key] = method.Value;
@@ -144,7 +145,7 @@ namespace KScript.Language.Analysis
             if (!refined && shape.Type == KType.Map)
             {
                 FillFields(e, shape);
-                if (IsModelElement(e))
+                if (IsModelElement(e) && !IsModelMixin(e))
                 {
                     FillModelFields(e, shape);
                     result.ModelFieldsAtDeclaration[e] = shape.Fields.Values.OrderBy(f => !f.Declaration.HasValue).ToArray();
@@ -237,7 +238,7 @@ namespace KScript.Language.Analysis
                 string bare = TypeInference.WithoutTypeArguments(type).TrimEnd('?').TrimEnd();
                 bool list = bare.EndsWith("[]", StringComparison.Ordinal);
                 MarkupElement target = TypeElementNamed(list ? bare.Substring(0, bare.Length - 2).TrimEnd() : bare);
-                if (target == null || !IsModelElement(target))
+                if (target == null || !IsModelElement(target) || IsModelMixin(target))
                 {
                     continue;
                 }
@@ -257,9 +258,10 @@ namespace KScript.Language.Analysis
         /// The fields KScript.Data adds to a model: its key (id, unless it declares its own), created_at and updated_at with
         /// timestamps, and deleted_at with soft_deletes.
         /// </summary>
-        private static void FillModelFields(MarkupElement e, TypeShape shape)
+        private void FillModelFields(MarkupElement e, TypeShape shape)
         {
-            string key = e.GetAttributeValue("key")?.Trim();
+            var modelOptions = ModelOptions(e);
+            string key = modelOptions.GetValueOrDefault("key")?.Trim();
             if (string.IsNullOrEmpty(key) && !shape.Fields.ContainsKey("id"))
             {
                 var fields = shape.Fields.ToList();
@@ -270,12 +272,12 @@ namespace KScript.Language.Analysis
                     shape.Fields[f.Key] = f.Value;
                 }
             }
-            if (IsYes(e.GetAttributeValue("timestamps")))
+            if (IsYes(modelOptions.GetValueOrDefault("timestamps")))
             {
                 shape.Fields["created_at"] = new FieldInfo("created_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was added.", "date");
                 shape.Fields["updated_at"] = new FieldInfo("updated_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was last saved.", "date");
             }
-            if (IsYes(e.GetAttributeValue("soft_deletes")))
+            if (IsYes(modelOptions.GetValueOrDefault("soft_deletes")))
             {
                 shape.Fields["deleted_at"] = new FieldInfo("deleted_at", new TypeShape(KType.Date) { Declared = true }, null, "When the record was deleted, or null.", "date?");
             }
@@ -294,7 +296,7 @@ namespace KScript.Language.Analysis
                 string targetName = target.GetAttributeValue("name")?.Trim();
                 if (belongsTo)
                 {
-                    string key = target.GetAttributeValue("key")?.Trim() ?? "id";
+                    string key = ModelOptions(target).GetValueOrDefault("key")?.Trim() ?? "id";
                     string column = name + "_" + key;
                     if (!shape.Fields.ContainsKey(column))
                     {
@@ -456,7 +458,7 @@ namespace KScript.Language.Analysis
                 {
                     CheckModelOptions(e, info, instance.Name);
                 }
-                CheckDrift(e);
+                if (!IsModelMixin(e)) CheckDrift(e);
             }
             bool refined = instance?.RefinementBase != null;
             foreach (MarkupElement child in e.ChildElements)
@@ -484,7 +486,8 @@ namespace KScript.Language.Analysis
                 }
             }
             bool hasMembers = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null || e.GetAttribute("extends") != null
-                || (IsKScriptElementName(e, "type") && e.ChildElements.Any(c => IsKScriptElementName(c, "fn")));
+                || (IsModelElement(e) && IsModelMixin(e))
+                || ((IsKScriptElementName(e, "type") || IsModelElement(e)) && e.ChildElements.Any(c => IsKScriptElementName(c, "fn")));
             if (!hasMembers)
             {
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute, CodeArguments.TypeNeedsFields(e.GetAttributeValue("name")?.Trim()));
@@ -538,6 +541,7 @@ namespace KScript.Language.Analysis
         {
             if (type.GetAttribute("extends") is not { Value: not null } attr || shape == null) return;
             string contract = attr.ValueText.Trim();
+            if (contract.Length == 0) return;
             TextSpan span = TrimmedSpan(attr.Value);
             if (shape.RefinementBase != null)
             {
@@ -581,6 +585,11 @@ namespace KScript.Language.Analysis
             MarkupAttribute with = e.GetAttribute("with");
             if (with?.Value == null)
             {
+                return;
+            }
+            if (IsModelElement(e))
+            {
+                CheckModelBases(e, with);
                 return;
             }
             List<string> names = WithNames(e);
