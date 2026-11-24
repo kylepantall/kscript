@@ -260,6 +260,19 @@ namespace KScript.Language.Features
                     (r.IsDeclaration ? SemanticTokenModifiers.Declaration : 0) | (r.Symbol.IsConst ? SemanticTokenModifiers.Readonly : 0)));
             }
 
+            if (analysis.Kind != DocumentKind.Script)
+            {
+                var components = analysis.Links.Where(link => link.Kind == "component").Select(link => link.Span).ToHashSet();
+                foreach (MarkupElement element in analysis.Markup.DescendantElements())
+                {
+                    bool component = components.Contains(element.NameSpan);
+                    if (!component && !global::KScript.Pages.PageElementNames.KScript.Contains(element.Name)) continue;
+                    var type = component ? SemanticTokenType.Type : SemanticTokenType.Keyword;
+                    var modifiers = component ? SemanticTokenModifiers.None : SemanticTokenModifiers.DefaultLibrary;
+                    tokens.Add(new SemanticToken(element.NameSpan, type, modifiers));
+                    if (element.EndNameSpan is TextSpan end) tokens.Add(new SemanticToken(end, type, modifiers));
+                }
+            }
             AddTypeNameTokens(analysis, tokens);
 
             return tokens.Where(t => t.Span.Length > 0).GroupBy(t => t.Span.Start).Select(g => g.First()).OrderBy(t => t.Span.Start).ToList();

@@ -2,17 +2,22 @@
 fn configure(environment: string) {
   testing = $environment == 'test'
 {{#unless db is none}}
+  configured_url = @env('DATABASE_URL', default: '')
+  main = $testing ? { url: 'sqlite::memory:' } : { url: $configured_url }
+  if !$testing and $configured_url->is_blank() {
 {{#if db is sqlite}}
-  default_url = 'sqlite:data/app.sqlite'
+    main = { url: 'sqlite:data/app.sqlite' }
+{{else}}
+    main = {
+      driver: '{{ db }}'
+      host: @env('DB_HOST', default: 'localhost')
+      port: @env('DB_PORT', default: '{{#if db is postgres}}5432{{else}}3306{{/if}}')
+      database: @env('DB_NAME', default: '{{ snake }}')
+      username: @env('DB_USER', default: '{{ snake }}')
+      password: @env('DB_PASSWORD', default: 'secret')
+    }
 {{/if}}
-{{#if db is postgres}}
-  default_url = 'postgres://{{ snake }}:secret@localhost:5432/{{ snake }}'
-{{/if}}
-{{#if db is mysql}}
-  default_url = 'mysql://{{ snake }}:secret@localhost:3306/{{ snake }}'
-{{/if}}
-  configured_url = @env('DATABASE_URL', default: $default_url)
-  database_url = $testing ? 'sqlite::memory:' : $configured_url
+  }
 {{/unless}}
   return {
     app: { name: $testing ? '{{ title }} (tests)' : '{{ title }}' }
@@ -21,7 +26,7 @@ fn configure(environment: string) {
 {{else}}
     database: {
       connections: {
-        main: { url: $database_url }
+        main: $main
       }
     }
 {{/if}}

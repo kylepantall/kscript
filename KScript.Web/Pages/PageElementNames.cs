@@ -9,10 +9,13 @@ namespace KScript.Pages
     /// </summary>
     public static class PageElementNames
     {
+        /// <summary>Packages loaded by the renderer for every page.</summary>
+        public static readonly IReadOnlyList<string> DefaultPackages = Array.AsReadOnly(new[] { "KScript.IO", "KScript.Markdown", "KScript.Web" });
+
         public static readonly IReadOnlySet<string> KScript = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "case", "default", "do", "elif", "else", "for", "if", "import", "include", "layout", "let", "live", "markdown",
-            "match", "respond", "set", "slot", "state", "while",
+            "match", "prop", "respond", "set", "slot", "state", "while",
         };
 
         public static readonly IReadOnlySet<string> Html = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

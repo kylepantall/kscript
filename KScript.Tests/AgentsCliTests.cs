@@ -110,7 +110,7 @@ public sealed class AgentsCliTests : IDisposable
     [Fact]
     public async Task ServeKeepsTheAgentDocsUpToDate()
     {
-        Write("kscript.json", "{ \"name\": \"site\", \"serve\": { \"port\": 0, \"host\": \"127.0.0.1\" } }");
+        Write("kscript.json", $"{{ \"name\": \"site\", \"serve\": {{ \"port\": {TestServer.FreePort()}, \"host\": \"127.0.0.1\" }} }}");
         Write("index.html", "<h1>Hi</h1>");
         Write("lib/tasks.kscript", "fn one() => 1\n");
         Assert.Equal(0, Kscript("agents", dir).Code);

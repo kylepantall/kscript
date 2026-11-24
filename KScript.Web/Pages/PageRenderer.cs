@@ -107,6 +107,9 @@ namespace KScript.Pages
             public string File;
             public bool Markdown;
             public string Slot;
+            public IReadOnlyDictionary<string, object> Inputs;
+            public Action<object> Loaded;
+            public string Companion;
 
             /// <summary>Set after an empty slot on its own line, so the line's newline is dropped too.</summary>
             public bool SwallowNewline;
@@ -196,7 +199,8 @@ namespace KScript.Pages
             return globals.Child();
         }
 
-        private static string RenderFileInScope(PageContext ctx, string relativePath, Scope scope, string slot)
+        private static string RenderFileInScope(PageContext ctx, string relativePath, Scope scope, string slot,
+            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null)
         {
             if (++ctx.IncludeDepth > 32) throw new PageException($"Layouts, components or includes are nested more than 32 deep (at {relativePath}). Does one include itself?");
             try
@@ -204,8 +208,8 @@ namespace KScript.Pages
                 string text = ctx.ReadSiteFile(relativePath, "page");
                 string name = relativePath.Replace('\\', '/').TrimStart('/');
                 if (name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-                    return RenderMarkdownSource(text, name, ctx, scope, slot);
-                return RenderSource(text, 1, NewState(ctx, name, slot, false), scope);
+                    return RenderMarkdownSource(text, name, ctx, scope, slot, inputs, companion, loaded);
+                return RenderSource(text, 1, NewState(ctx, name, slot, false, inputs, companion, loaded), scope);
             }
             finally
             {
@@ -213,27 +217,37 @@ namespace KScript.Pages
             }
         }
 
-        private static string RenderMarkdownSource(string text, string name, PageContext ctx, Scope scope, string slot)
+        private static string RenderMarkdownSource(string text, string name, PageContext ctx, Scope scope, string slot,
+            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null)
         {
             var (meta, body, bodyLine) = PageMarkdown.SplitFrontMatter(text);
             var pageScope = scope.Child();
             foreach (var kv in meta) pageScope.Declare(kv.Key, kv.Value);
             pageScope.Declare("page", meta);
 
-            string markdown = RenderSource(body, bodyLine, NewState(ctx, name, slot, true), pageScope);
+            string markdown = RenderSource(body, bodyLine, NewState(ctx, name, slot, true, inputs, companion, loaded), pageScope);
             string html = PageMarkdown.ToHtml(markdown);
 
             if (meta.TryGetValue("layout", out var layout) && layout != null)
-                return RenderFileInScope(ctx, Values.ToStr(layout), pageScope, html);
+            {
+                var layoutInputs = new Dictionary<string, object>(StringComparer.Ordinal);
+                foreach (var entry in meta) layoutInputs[TemplateContract.VariableName(entry.Key)] = entry.Value;
+                return RenderFileInScope(ctx, Values.ToStr(layout), pageScope, html, layoutInputs);
+            }
             return html;
         }
 
-        private static RenderState NewState(PageContext ctx, string file, string slot, bool markdown)
+        private static RenderState NewState(PageContext ctx, string file, string slot, bool markdown,
+            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null)
         {
             string full;
             try { full = ctx.ResolveSitePath(file); }
             catch (PageException) { full = Path.Combine(ctx.SiteRoot, file); }
-            return new RenderState { Ctx = ctx, File = file, Slot = slot, Markdown = markdown, Module = ctx.Runtime.ModuleFor(file, full) };
+            return new RenderState
+            {
+                Ctx = ctx, File = file, Slot = slot, Markdown = markdown, Module = ctx.Runtime.ModuleFor(file, full),
+                Inputs = inputs, Companion = companion, Loaded = loaded,
+            };
         }
 
         private static string RenderSource(string text, int firstLine, RenderState state, Scope scope)
@@ -248,6 +262,21 @@ namespace KScript.Pages
                 ex.Location ??= state.File;
                 throw;
             }
+            CheckInputs(nodes, scope, state);
+            if (state.Companion != null || state.Loaded != null)
+            {
+                var props = new Dictionary<string, object>(state.Inputs ?? new Dictionary<string, object>(), StringComparer.Ordinal);
+                var exports = scope.Child();
+                if (state.Companion != null) state.Ctx.Runtime.ImportCompanion(state.Module, state.Companion, exports);
+                object data = exports.HasOwn("load") && exports.TryGet("load", out object hook) && hook is ICallable load
+                    ? state.Ctx.Runtime.Call(load, props, exports, state.Module)
+                    : null;
+                scope = exports.Child();
+                scope.Declare("props", props);
+                scope.Declare("data", data);
+                state.Loaded?.Invoke(data);
+            }
+
             // <import> elements at the top of the file run first, so everything in the file can use them.
             state.Imports = new HashSet<PageElement>(ReferenceEqualityComparer.Instance);
             foreach (var import in nodes.OfType<PageElement>().Where(e => e.Name == "import"))
@@ -267,6 +296,26 @@ namespace KScript.Pages
             var sb = new StringBuilder();
             RenderNodes(nodes, scope, sb, state);
             return sb.ToString();
+        }
+
+        private static void CheckInputs(List<PageNode> nodes, Scope scope, RenderState state)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var prop in nodes.OfType<PageElement>().Where(e => e.Name == "prop"))
+            {
+                string name = prop.Attr("name");
+                string where = $"{state.File}:{prop.Line}";
+                if (!TemplateContract.IsPropName(name))
+                    throw new PageException("Write a prop name such as title or page-title.") { Location = where };
+                string key = TemplateContract.VariableName(name);
+                if (!names.Add(key))
+                    throw new PageException($"The prop '{name}' is declared more than once.") { Location = where };
+                object value = null;
+                bool supplied = state.Inputs?.TryGetValue(key, out value) == true;
+                if (TemplateContract.IsRequired(prop.HasAttr("required"), prop.Attr("required")) && (!supplied || value == null))
+                    throw new PageException($"Pass the required '{name}' prop to {state.File}.") { Location = where };
+                scope.Declare(key, value);
+            }
         }
 
         private static void RenderNodes(List<PageNode> nodes, Scope scope, StringBuilder sb, RenderState state)
@@ -407,10 +456,13 @@ namespace KScript.Pages
                     var body = new StringBuilder();
                     RenderNodes(el.Children, inner, body, state);
                     var layoutScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) layoutScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
-                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), layoutScope, body.ToString()), state);
+                    var inputs = BindTemplateInputs(el, scope, layoutScope, state);
+                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), layoutScope, body.ToString(), inputs), state);
                     return;
                 }
+
+                case "prop":
+                    return;
 
                 case "slot":
                     if (state.Slot != null) AppendIndented(sb, state.Slot, state);
@@ -421,8 +473,8 @@ namespace KScript.Pages
                 {
                     string src = el.Attr("path") ?? throw new PageException(el.HasAttr("src") ? "<include src> was renamed: write <include path=\"...\" />." : "<include> needs a path attribute.");
                     var incScope = scope.Child();
-                    foreach (var a in el.Attributes.Where(a => a.Name != "path")) incScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
-                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), incScope, null), state);
+                    var inputs = BindTemplateInputs(el, scope, incScope, state);
+                    AppendIndented(sb, RenderFileInScope(state.Ctx, Interpolate(src, scope, state, EscapeMode.None), incScope, null, inputs), state);
                     return;
                 }
 
@@ -500,7 +552,18 @@ namespace KScript.Pages
             sb.Append(string.Join("\n" + indent, dedented.Split('\n').Select(l => l.TrimEnd())));
         }
 
-        private static string VarName(string attributeName) => attributeName.Replace('-', '_');
+        private static Dictionary<string, object> BindTemplateInputs(PageElement element, Scope caller, Scope target, RenderState state)
+        {
+            var inputs = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (PageAttribute attribute in element.Attributes.Where(a => a.Name != "path"))
+            {
+                string name = TemplateContract.VariableName(attribute.Name);
+                object value = AttributeValue(attribute, caller, state);
+                inputs[name] = value;
+                target.Declare(name, value);
+            }
+            return inputs;
+        }
 
         private static bool TryComponent(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
@@ -518,8 +581,27 @@ namespace KScript.Pages
             var root = scope;
             while (root.Parent != null) root = root.Parent;
             var componentScope = root.Child();
-            foreach (var a in el.Attributes) componentScope.Declare(VarName(a.Name), AttributeValue(a, scope, state));
-            AppendIndented(sb, RenderFileInScope(state.Ctx, path, componentScope, body.ToString()), state);
+            var inputs = new Dictionary<string, object>(StringComparer.Ordinal);
+            Action<object> loaded = null;
+            foreach (var a in el.Attributes)
+            {
+                object value = AttributeValue(a, scope, state);
+                if (TemplateContract.IsLoadCallback(a.Name))
+                {
+                    if (value is not ICallable callback) throw new PageException("onLoad needs a function such as {fn(data) => @note_loaded($data)}.");
+                    if (loaded != null) throw new PageException("Supply one onLoad callback per component.");
+                    loaded = data => state.Ctx.Runtime.Call(callback, data, scope, state.Module);
+                    continue;
+                }
+                string name = TemplateContract.VariableName(a.Name);
+                inputs[name] = value;
+                componentScope.Declare(name, value);
+            }
+
+            string companion = TemplateContract.CompanionPath(path);
+            if (companion != null && !state.Ctx.SiteFileExists(companion)) companion = null;
+            AppendIndented(sb, RenderFileInScope(state.Ctx, path, componentScope, body.ToString(), inputs,
+                companion == null ? null : state.Ctx.ResolveSitePath(companion, "component script"), loaded), state);
             return true;
         }
 

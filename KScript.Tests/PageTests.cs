@@ -269,6 +269,50 @@ public class PageSiteTests
     }
 
     [Fact]
+    public void Component_companion_loads_data_and_calls_the_parent_callback()
+    {
+        using var site = new TempSite(
+            ("_components/note.html", """
+                <prop name="title" required />
+                <article>{@heading($data.text)} <slot /></article>
+                """),
+            ("_components/note.kscript", """
+                fn load(props: map) => { text: $props.title->trim() }
+                fn heading(title: string) => $title->upper()
+                """),
+            ("callbacks.kscript", "fn mark(status: map, data: map) { status.text = $data.text }"),
+            ("index.html", """
+                <import path="callbacks.kscript" />
+                <let name="status" value="{}" />
+                <Note title="  first  " onLoad={fn(data) => @mark($status, $data)}><b>child</b></Note>
+                <p>{$status.text}</p>
+                """));
+
+        string html = site.Render("index.html").Body;
+        Assert.Contains("<article>FIRST <b>child</b></article>", html);
+        Assert.Contains("<p>first</p>", html);
+        Assert.DoesNotContain("<prop", html);
+        Assert.DoesNotContain("onLoad", html);
+    }
+
+    [Fact]
+    public void Required_props_are_checked_before_rendering_a_layout_or_component()
+    {
+        using var site = new TempSite(
+            ("_layout.html", "<prop name=\"page-title\" required /><prop name=\"subtitle\" /><h1>{$page_title}</h1><slot />"),
+            ("_components/note.html", "<prop name=\"title\" required /><p>{$title}</p>"),
+            ("index.html", "<layout path=\"_layout.html\"><p>body</p></layout>"),
+            ("null.html", "<Note title={null} />"),
+            ("valid.html", "<layout path=\"_layout.html\" page-title=\"Home\"><Note title=\"a\" /></layout>"),
+            ("valid.md", "---\nlayout: _layout.html\npage-title: About\n---\nPresent"));
+
+        Assert.Contains("required 'page-title'", Assert.Throws<PageException>(() => site.Render("index.html")).Message);
+        Assert.Contains("required 'title'", Assert.Throws<PageException>(() => site.Render("null.html")).Message);
+        Assert.Contains("<h1>Home</h1><p>a</p>", site.Render("valid.html").Body);
+        Assert.Contains("<h1>About</h1>", site.Render("valid.md").Body);
+    }
+
+    [Fact]
     public void Components_do_not_see_page_variables()
     {
         using var site = new TempSite(

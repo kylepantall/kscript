@@ -104,7 +104,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
         Assert.Empty(config.Warnings);
         Assert.Equal("test", config.Test.Env);
-        Assert.Contains("@env('DATABASE_URL', default: $default_url)", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
+        Assert.Contains("@env('DATABASE_URL', default: '')", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
         Assert.Contains("sqlite::memory:", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
 
         var (tested, report) = Test(root);
@@ -161,12 +161,16 @@ public sealed class ProjectTemplateApiTests : IDisposable
         string root = Path.Combine(parent.Root, "shop");
         string compose = File.ReadAllText(Path.Combine(root, "compose.yaml"));
         Assert.Contains("image: postgres:17-alpine", compose);
-        Assert.Contains("DATABASE_URL: postgres://shop:${DB_PASSWORD:-secret}@db:5432/shop", compose);
+        Assert.Contains("DB_HOST: db", compose);
+        Assert.Contains("DB_PASSWORD: ${DB_PASSWORD:-secret}", compose);
         Assert.Contains("CMD [\"kscript\", \"serve\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]", File.ReadAllText(Path.Combine(root, "Dockerfile")));
         Assert.True(File.Exists(Path.Combine(root, ".dockerignore")));
         Assert.Contains("up:\n\tdocker compose up --build", File.ReadAllText(Path.Combine(root, "Makefile")));
-        Assert.Contains("postgres://shop:secret@localhost:5432/shop", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
-        Assert.Contains("Note: the app keeps its data in postgres, at the url in config/config.kscript (DATABASE_URL overrides it), and docker compose up starts the database too.", output);
+        string generatedConfig = File.ReadAllText(Path.Combine(root, "config", "config.kscript"));
+        Assert.Contains("driver: 'postgres'", generatedConfig);
+        Assert.Contains("database: @env('DB_NAME', default: 'shop')", generatedConfig);
+        Assert.Contains("password: @env('DB_PASSWORD', default: 'secret')", generatedConfig);
+        Assert.Contains("the app keeps its data in postgres, using the connection settings in config/config.kscript (DATABASE_URL can override them)", output);
         Assert.Contains("docker compose up       run the API and its database in containers", output);
 
         Assert.Equal(0, Make(parent.Root, "lite", "--template", "api", "--docker").Code);

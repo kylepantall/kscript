@@ -234,11 +234,34 @@ async function declarationHandlers(folder) {
   assert.strictEqual(await vscode.commands.executeCommand('kscript.runTestsInFile', doc.uri), 0);
 }
 
+async function manifestCompletions(folder) {
+  const commit = '0123456789abcdef0123456789abcdef01234567';
+  const source = 'https://github.com/example/client';
+  const file = path.join(folder, 'kscript.json');
+  const library = path.join(folder, 'lib', 'client');
+  fs.mkdirSync(library, { recursive: true });
+  fs.writeFileSync(path.join(library, '.kscript-lib.json'), JSON.stringify({ commit, source, packages: ['KScript.Net'] }));
+  fs.writeFileSync(file, JSON.stringify({ libraries: { client: { commit, source } }, packages: [], types: { uuid: {} } }));
+  const doc = await vscode.workspace.openTextDocument(file);
+  await vscode.window.showTextDocument(doc);
+  const text = doc.getText();
+  async function suggests(needle, label, detail) {
+    const position = doc.positionAt(text.indexOf(needle) + needle.length);
+    return waitFor(async () => {
+      const result = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, position);
+      return result.items.some(item => item.label === label && item.detail === detail);
+    }, detail, 10000);
+  }
+  await suggests('"packages":[', 'KScript.Net', 'Required by client');
+  await suggests('"uuid":{', 'v', 'Option for uuid');
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'hello.ks.xml'));
   assert.strictEqual(doc.languageId, 'kscript', 'the .ks.xml file is KScript');
   await vscode.window.showTextDocument(doc);
+  await vscode.extensions.getExtension('kylepantall.kscript').activate();
 
   const diagnostics = await waitFor(() => {
     const d = vscode.languages.getDiagnostics(doc.uri);
@@ -277,6 +300,7 @@ async function run() {
   await vscode.window.showTextDocument(page);
   const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', page.uri);
   const scopeOf = (text) => (tokens.find((t) => t.c === text) || {}).t || '';
+  assert.match(scopeOf('layout'), /keyword\.control\.page\.kscript/, 'KScript page commands have their own scope');
   assert.match(scopeOf('p'), /entity\.name\.tag\.html/, 'HTML tags are highlighted: ' + JSON.stringify(tokens));
   assert.match(scopeOf('class'), /entity\.other\.attribute-name\.html/, 'HTML attributes are highlighted');
   assert.match(scopeOf('$title'), /variable\.other\.kscript/, 'KScript expressions are highlighted in pages');
@@ -292,6 +316,7 @@ async function run() {
   await licenseGuardWarnings(folder);
   await dispatchWorkflow(folder);
   await interpolatedLinks(folder);
+  await manifestCompletions(folder);
 
   console.log('VS Code integration test passed');
 }

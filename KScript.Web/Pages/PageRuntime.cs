@@ -30,12 +30,6 @@ namespace KScript.Pages
         /// <summary>Where packages find the request's <see cref="PageContext"/>.</summary>
         internal const string ContextKey = "KScript.Web.Page";
 
-        /// <summary>
-        /// The packages every page has without importing them. KScript.IO reads files (<c>@read_json</c>,
-        /// <c>@files</c>); in pages its paths start in the site folder, can't leave it, and files are read-only.
-        /// </summary>
-        internal static readonly string[] PagePackages = { "KScript.IO", "KScript.Markdown", "KScript.Web" };
-
         private readonly Dictionary<string, Module> modules = new Dictionary<string, Module>(StringComparer.Ordinal);
         private readonly Dictionary<(Module, int, string), DecodedText> texts = new Dictionary<(Module, int, string), DecodedText>();
 
@@ -71,7 +65,7 @@ namespace KScript.Pages
         {
             if (!modules.TryGetValue(file, out Module module))
             {
-                module = Interpreter.CreateModule(fullPath, PagePackages);
+                module = Interpreter.CreateModule(fullPath, PageElementNames.DefaultPackages);
                 modules[file] = module;
             }
             return module;
@@ -102,6 +96,16 @@ namespace KScript.Pages
                 return null;
             });
         }
+
+        public void ImportCompanion(Module module, string fullPath, Scope scope) =>
+            Run(module, () =>
+            {
+                Interpreter.ImportScript(module, fullPath, scope);
+                return null;
+            });
+
+        public object Call(ICallable function, object argument, Scope scope, Module module) =>
+            Run(module, () => Interpreter.Call(function, new[] { argument }, scope: scope, module: module));
 
         public object Evaluate(string expression, Scope scope, Module module) =>
             Run(module, () => Interpreter.EvaluateText(Text(module, 0, expression), scope, module));

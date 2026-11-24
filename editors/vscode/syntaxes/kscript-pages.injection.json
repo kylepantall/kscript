@@ -11,6 +11,9 @@
       "include": "source.kscript#tag-shorthand"
     },
     {
+      "include": "#page-command"
+    },
+    {
       "include": "#self-closing"
     },
     {
@@ -21,6 +24,24 @@
     "escaped": {
       "name": "constant.character.escape.kscript",
       "match": "\\{\\{|\\}\\}"
+    },
+    "page-command": {
+      "begin": "(</?)(?i:(case|default|do|elif|else|for|if|import|include|layout|let|live|markdown|match|prop|respond|set|slot|state|while))(?=[\\s/>])",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.kscript" },
+        "2": { "name": "entity.name.tag.kscript keyword.control.page.kscript" }
+      },
+      "end": "(/?>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.kscript" }
+      },
+      "name": "meta.tag.kscript",
+      "patterns": [
+        { "include": "source.kscript#attribute-value-double" },
+        { "include": "source.kscript#attribute-value-single" },
+        { "include": "source.kscript#interpolation" },
+        { "name": "entity.other.attribute-name.kscript", "match": "[A-Za-z_][\\w.:-]*(?=\\s|=|/?>)" }
+      ]
     },
     "self-closing": {
       "comment": "KScript pages close any element with />, e.g. <slot /> or <hero />. The HTML grammar marks the / on non-void elements as illegal.",

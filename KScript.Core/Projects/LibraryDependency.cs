@@ -6,6 +6,8 @@ namespace KScript.Projects;
 /// <summary>An installed source library and the immutable revision its consumer expects.</summary>
 public sealed record LibraryDependency(string Name, string Source, string Commit)
 {
+    public const string ReceiptFileName = ".kscript-lib.json";
+
     public static bool IsSafePathComponent(string part) => !string.IsNullOrEmpty(part) &&
         !part.EndsWith('.') && !part.EndsWith(' ') && !part.Any(char.IsControl) &&
         part.IndexOfAny("/\\<>:\"|?*".ToCharArray()) < 0 && !part.Equals(".git", StringComparison.OrdinalIgnoreCase) &&

@@ -207,6 +207,8 @@ Named libraries install into `lib/<library-name>/`. Direct installs use `lib/<re
 
 The installer reads the selected folder's `kscript.json`, validates its library metadata, and prints an import for `library.entry`. For older libraries without a `library` section, it still prefers a root `index.kscript` or `index.ks.xml`. The generated `.kscript-lib.json` receipt inside the installed folder records the source, exact commit and entry path, plus the name, version and runtime packages when declared.
 
+In VS Code, completions inside the project's `packages` array show which runtime packages the installed, pinned libraries require. Add a package there when you also want it available throughout your project. Completions under `types` use the running KScript version's built-in types and accepted options, such as `types.password.min` and `types.uuid.v`.
+
 ### Restoring a project's libraries
 
 `kscript lib add` records the source URL and full commit under `libraries` in the consuming project's `kscript.json`. If there is no project yet, a successful add creates this file in the current directory. Commit it so teammates and CI can restore the same revisions after cloning.

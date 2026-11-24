@@ -1,3 +1,4 @@
+using KScript.Syntax;
 using KScript.Language.Analysis;
 using KScript.Language.Features;
 
@@ -22,6 +23,9 @@ namespace KScript.Language.Tests
         private static readonly LanguageService Service = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
         {
             [Path.Combine(Site, "_layout.html")] = "<html><slot /></html>",
+            [Path.Combine(Site, "_layouts", "details.html")] = "<prop name=\"page-title\" required /><prop name=\"subtitle\" /><h1>{$page_title}</h1><slot />",
+            [Path.Combine(Site, "_components", "note.html")] = "<prop name=\"title\" required /><p>{@heading($data.title)}</p>",
+            [Path.Combine(Site, "_components", "note.kscript")] = "fn heading(title: string) => $title->upper()\nfn load(props: map) => $props\n",
             [Path.Combine(Site, "data", "people.json")] = "[{\"name\": \"Joan\", \"age\": 82, \"address\": {\"city\": \"Leeds\"}}, {\"name\": \"Ellie\", \"role\": null}]",
             [Path.Combine(Site, "_components", "person-card.html")] = "<div class=\"card\"><h2>{$person.name}</h2><p>{$caption ?? ''}</p><slot /></div>",
         }));
@@ -77,9 +81,9 @@ namespace KScript.Language.Tests
         public void ComponentPropsCompleteAsAttributes()
         {
             List<CompletionItem> items = Complete("<person-card ‸ />");
-            Assert.Equal(new[] { "person", "caption" }, items.Select(i => i.Label));
+            Assert.Equal(new[] { "person", "caption", "onLoad" }, items.Select(i => i.Label));
             Assert.All(items, i => Assert.Equal(CompletionKind.Attribute, i.Kind));
-            Assert.Equal(new[] { "caption" }, Labels("<person-card person=\"{$x}\" ‸ />"));
+            Assert.Equal(new[] { "caption", "onLoad" }, Labels("<person-card person=\"{$x}\" ‸ />"));
         }
 
         [Fact]
@@ -88,6 +92,39 @@ namespace KScript.Language.Tests
             CompletionItem card = Complete("<‸").Single(i => i.Label == "person-card");
             Assert.Equal("person-card person=\"$1\" caption=\"$2\" />", card.InsertText);
             Assert.Contains("person, caption", card.Documentation);
+        }
+
+        [Fact]
+        public void LayoutRequirementsAndComponentCallbacksAreAvailableInHtml()
+        {
+            const string layout = "<layout path=\"_layouts/details.html\"";
+            var missing = Service.Analyze(layout + "><Note title=\"A\" onLoad={fn(data) => $data} /></layout>", Path.Combine(Site, "index.html"));
+            Diagnostic required = Assert.Single(missing.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Equal(DiagnosticCodes.MissingAttribute, required.Code);
+            Assert.Contains("page-title", required.Message);
+            var published = Complete(layout + " ‸></layout>");
+            Assert.Contains(published, i => i.Label == "page-title" && i.Detail.Contains("Required"));
+            Assert.Contains(published, i => i.Label == "subtitle");
+            Assert.Contains(Complete("<Note ‸ />"), i => i.Label == "onLoad");
+            Assert.Contains(Service.Analyze("<Note title=\"A\" onLoad=\"hello\" />", Path.Combine(Site, "index.html")).Diagnostics,
+                d => d.Severity == DiagnosticSeverity.Error && d.Message.Contains("onLoad"));
+
+            var component = Service.Analyze("<prop name=\"title\" required /><p>{@heading($data.title)}</p>", Path.Combine(Site, "_components", "note.html"));
+            Assert.DoesNotContain(component.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Contains(component.ExternalDeclarations.Values, location => location.Path.EndsWith("note.kscript", StringComparison.Ordinal));
+            Assert.Contains(Service.GetSemanticTokens(missing), t =>
+                t.Type == SemanticTokenType.Keyword && missing.Source[t.Span] == "layout");
+            Assert.Contains(Service.GetSemanticTokens(missing), t =>
+                t.Type == SemanticTokenType.Type && missing.Source[t.Span] == "Note");
+        }
+
+        [Fact]
+        public void PageCommandSuggestionsFollowItsImports()
+        {
+            var local = Labels("<p>{@‸}</p>");
+            Assert.Contains("read_json", local);
+            Assert.DoesNotContain("api", local);
+            Assert.Contains("api", Labels("<import package=\"KScript.Net\" /><p>{@‸}</p>"));
         }
 
         [Fact]

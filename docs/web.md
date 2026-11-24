@@ -122,6 +122,41 @@ For controllers, JSON APIs and middleware, add a route file: see [Routes, contro
 
 See `Example Sites/team` for a complete site with a layout, a component, a Markdown page, a dynamic route and a JSON endpoint.
 
+## Template props and component scripts
+
+Declare required inputs at the top level of a layout or component.
+
+```html
+<!-- _layout.html -->
+<prop name="page-title" required />
+<prop name="subtitle" />
+<h1>{$page_title}</h1>
+<slot />
+```
+
+Call the layout with `<layout path="_layout.html" page-title="Home">…</layout>`. The editor suggests the declared props and reports missing required values for a known layout path. Rendering checks required props even for layout paths computed at runtime. Markdown pages pass layout props in front matter. Optional props default to `null` when omitted.
+
+Place `note.kscript` next to `_components/note.html`. The component template can call the companion's exported functions. An optional `load(props: map)` function receives the props and supplies `$data` to the template. The template can also read `$props` and its individual prop variables.
+
+```kscript
+fn load(props: map) => { title: $props.title->trim() }
+fn heading(title: string) => $title->upper()
+```
+
+```html
+<!-- _components/note.html -->
+<prop name="title" required />
+<article>{@heading($data.title)}<slot /></article>
+```
+
+```html
+<Note title="A note" onLoad={fn(data) => @note_loaded($data)}>
+  <p>Content supplied by the page</p>
+</Note>
+```
+
+`onLoad` is an optional server-side callback defined in the calling page. It receives the result of `load`, or `null` when the component has no load function. Loading can run again when the component renders, including during live redraws, so keep render-time hooks free of persistent writes.
+
 ## Reactive pages with `<live>` (no JavaScript)
 
 A `<live>` block reacts to clicks and typing without any JavaScript in the page. Its handlers are KScript statements; the server runs them and sends back just that block's new HTML.

@@ -93,6 +93,7 @@ namespace KScript.Language.Analysis
             ResolvePackages(root);
             DeclareBuiltIns(root);
             DeclareViewInputs(root);
+            DeclareTemplateContract(root);
             AnalyzeFrontMatter(root);
             HoistFunctions(root);
             HoistProjectNatives(root);
@@ -205,6 +206,12 @@ namespace KScript.Language.Analysis
                 if (entry.Key == "layout" && entry.Value.Value.Length > 0)
                 {
                     CheckPath(entry.Value.Value, entry.Value.SourceSpan, "layout");
+                    foreach ((string name, bool required) in TemplateContracts.Read(files, ResolvePath(entry.Value.Value)))
+                    {
+                        if (required && !fm.Entries.Any(p => global::KScript.Pages.TemplateContract.VariableName(p.Key) == global::KScript.Pages.TemplateContract.VariableName(name)))
+                            Report(entry.Value.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute,
+                                $"Pass the required '{name}' prop to {entry.Value.Value} in front matter.");
+                    }
                 }
             }
         }
@@ -711,6 +718,10 @@ namespace KScript.Language.Analysis
             }
 
             CheckAttributes(e, info);
+            if (Kind != DocumentKind.Script && info.Name is "layout" or "include")
+                CheckTemplateInputs(e, ResolvePath(e.GetAttributeValue("path")));
+            if (Kind != DocumentKind.Script && info.Name == "prop" && e.Parent != null)
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, "Declare props at the top level of the layout or component.");
             ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
             if (info.Name == "guard" && !GuardLeaves(e))
@@ -961,13 +972,18 @@ namespace KScript.Language.Analysis
 
             // Same rule as the page engine (KScript.Pages.PageElementNames): any non-HTML, non-KScript element can be a
             // component. Hyphenated names must have a file; other names (<hero>) are components only when one exists.
-            if (Kind != DocumentKind.Script && global::KScript.Pages.PageElementNames.CanBeComponent(e.Name))
-            {
-                CheckComponent(e, required: e.Name.Contains('-'));
-            }
+            string component = Kind != DocumentKind.Script && global::KScript.Pages.PageElementNames.CanBeComponent(e.Name)
+                ? CheckComponent(e, required: e.Name.Contains('-'))
+                : null;
+            if (component != null) CheckTemplateInputs(e, component);
 
             foreach (MarkupAttribute attr in e.Attributes)
             {
+                if (component != null && global::KScript.Pages.TemplateContract.IsLoadCallback(attr.Name))
+                {
+                    CheckLoadCallback(e, attr, scope);
+                    continue;
+                }
                 if (attr.Value == null)
                 {
                     continue;
@@ -1043,23 +1059,23 @@ namespace KScript.Language.Analysis
             return new QuickFix((renamed ? Fixer.RenameTitle : "Change to ") + (IsCode ? name : $"<{name}>"), changes.ToArray());
         }
 
-        private void CheckComponent(MarkupElement e, bool required)
+        private string CheckComponent(MarkupElement e, bool required)
         {
             string componentDir = FindUpwards("_components");
             if (componentDir == null)
             {
-                return;
+                return null;
             }
 
-            string file = System.IO.Path.Combine(componentDir, e.Name.ToLowerInvariant() + ".html");
-            if (files.FileExists(file))
+            string file = TemplateContracts.ComponentFile(files, componentDir, e.Name);
+            if (file != null)
             {
                 result.Links.Add(new DocumentLink(e.NameSpan, file, "component"));
-                return;
+                return file;
             }
             if (!required)
             {
-                return;
+                return null;
             }
 
             IEnumerable<string> known = files.ListFiles(componentDir, "*.html").Select(f => System.IO.Path.GetFileNameWithoutExtension(f));
@@ -1067,6 +1083,7 @@ namespace KScript.Language.Analysis
             Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownElement,
                 Wording.Of($"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist.") + (suggestion != null ? Wording.Of($" Did you mean <{suggestion}>?") : null),
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
+            return null;
         }
 
         private string FindUpwards(string folderName)

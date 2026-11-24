@@ -9,11 +9,9 @@ services:
       - "{{ port }}:{{ port }}"
     environment:
       KSCRIPT_ENV: production
-{{#if db is postgres}}
-      DATABASE_URL: postgres://{{ snake }}:${DB_PASSWORD:-secret}@db:5432/{{ snake }}
-{{/if}}
-{{#if db is mysql}}
-      DATABASE_URL: mysql://{{ snake }}:${DB_PASSWORD:-secret}@db:3306/{{ snake }}
+{{#if db in postgres, mysql}}
+      DB_HOST: db
+      DB_PASSWORD: ${DB_PASSWORD:-secret}
 {{/if}}
 {{#if cache}}
       CACHE_STORE: file

@@ -138,6 +138,12 @@ namespace KScript.Language.Analysis
             {
                 candidates.RemoveAll(s => s.Name == "configure" && s.DeclaringElement.Parent?.Name == "kscript");
             }
+            string component = result.Path == null ? null : Path.ChangeExtension(result.Path, ".html");
+            if (component != null && global::KScript.Pages.TemplateContract.CompanionPath(component) == result.Path
+                && (files.FileExists(component) || files.FileExists(Path.ChangeExtension(component, ".md"))))
+            {
+                candidates.RemoveAll(s => s.Name == "load" && s.DeclaringElement.Parent?.Name == "kscript");
+            }
             foreach (Symbol fn in candidates)
             {
                 ProjectUses uses = project();

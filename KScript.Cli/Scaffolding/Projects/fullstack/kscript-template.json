@@ -40,7 +40,7 @@
   "make": ["{{#if auth}}auth{{/if}}"],
   // Printed after the project is made. Lines that come out empty are left out.
   "notes": [
-    "{{#if db in postgres, mysql}}the app keeps its data in {{ db }}, at the url in config/config{{ ext }} (DATABASE_URL overrides it){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"
+    "{{#if db in postgres, mysql}}the app keeps its data in {{ db }}, using the connection settings in config/config{{ ext }} (DATABASE_URL can override them){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"
   ],
   // Printed after the project is made, under "Next:". Lines that come out empty are left out.
   "next": [
