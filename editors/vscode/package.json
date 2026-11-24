@@ -263,7 +263,7 @@
         "when": "editorTextFocus && editorLangId == kscript-code && !editorReadonly && !editorHasMultipleSelections && !suggestWidgetVisible && !inlineSuggestionVisible && !inSnippetMode && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualLine' && vim.mode != 'VisualBlock'"
       },
       {
-        "key": "f5",
+        "key": "ctrl+f5",
         "command": "kscript.run",
         "when": "editorTextFocus && (editorLangId == kscript || editorLangId == kscript-code) && !inDebugMode"
       }
@@ -512,22 +512,6 @@
       }
     ],
     "problemMatchers": [
-      {
-        "name": "kscript-run",
-        "label": "KScript: the error a script stopped with",
-        "owner": "kscript-run",
-        "source": "kscript",
-        "applyTo": "allDocuments",
-        "fileLocation": "absolute",
-        "severity": "error",
-        "pattern": {
-          "regexp": "ERROR\\s+(?:\\u001b\\[[0-9;]*m\\s*)?(.+?):(\\d+):(\\d+): (.*)$",
-          "file": 1,
-          "line": 2,
-          "column": 3,
-          "message": 4
-        }
-      },
       {
         "name": "kscript-check",
         "label": "KScript: problems found by kscript check",

@@ -2,11 +2,11 @@
 
 Three ways to run the script you have open:
 
-- press `F5`
+- press `Ctrl+F5`
 - click **▶ Run** above the first line
 - click the run button at the top right of the editor
 
-The output appears in the terminal below:
+The output appears in the terminal below. If the script stops with an error, Ctrl-click the file link (Cmd-click on macOS) to open the failing line.
 
 ```text
 Hello world!

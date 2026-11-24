@@ -3,7 +3,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const fs = require('node:fs');
 const { registerCommands } = require('../../src/commands');
 
 // Exercise the same command handlers the palette, toolbar and CodeLens invoke.
@@ -13,30 +12,22 @@ function setup(onTask = () => 0) {
   const commands = new Map();
   const tasks = [];
   const messages = [];
-  const diagnostics = new Map();
-  let documentChanged;
-  const edit = (uri, contentChanges = [{}]) => documentChanged({ document: { uri }, contentChanges });
   const workspace = {
     workspaceFolders: folders,
     textDocuments: [],
-    onDidChangeTextDocument: (handler) => { documentChanged = handler; },
     getWorkspaceFolder: (file) => folders.find((f) => file.fsPath.startsWith(f.uri.fsPath + path.sep)),
   };
+  let terminalLinks;
   const window = {
+    registerTerminalLinkProvider: (provider) => { terminalLinks = provider; },
     showWarningMessage: (message) => messages.push(message),
     showInformationMessage: (message) => messages.push(message),
   };
   const vscode = {
+    Position: class { constructor(line, character) { Object.assign(this, { line, character }); } },
+    Range: class { constructor(start, end) { Object.assign(this, { start, end }); } },
     workspace, window,
     Uri: { file: uri },
-    Range: class { constructor(...positions) { this.positions = positions; } },
-    Diagnostic: class { constructor(range, message, severity) { Object.assign(this, { range, message, severity }); } },
-    DiagnosticSeverity: { Error: 0 },
-    languages: { createDiagnosticCollection: () => ({
-      clear: () => diagnostics.clear(),
-      delete: (file) => diagnostics.delete(file.toString()),
-      set: (file, items) => diagnostics.set(file.toString(), items),
-    }) },
     commands: { registerCommand: (id, handler) => commands.set(id, handler) },
     TaskGroup: { Test: {} }, TaskScope: { Workspace: 1, Global: 2 }, TaskRevealKind: { Always: 1 },
     ProcessExecution: class { constructor(command, args, options) { Object.assign(this, { command, args, options }); } },
@@ -45,7 +36,7 @@ function setup(onTask = () => 0) {
       executeTask: async (task) => { tasks.push(task); return task; },
       onDidEndTaskProcess: (callback) => {
         const execution = tasks.at(-1);
-        queueMicrotask(() => callback({ execution, exitCode: onTask(execution, edit) }));
+        queueMicrotask(() => callback({ execution, exitCode: onTask(execution) }));
         return { dispose() {} };
       },
     },
@@ -57,7 +48,7 @@ function setup(onTask = () => 0) {
     workspace.textDocuments.push(doc);
     return doc;
   }
-  return { folders, commands, document, workspace, window, tasks, messages, diagnostics, edit };
+  return { folders, commands, document, workspace, window, tasks, messages, terminalLinks };
 }
 
 test('project commands use the active root and save only its dirty files', async () => {
@@ -122,26 +113,34 @@ test('Check This File saves its target and passes its path and matcher to the CL
   assert.equal(tasks.length, 1);
 });
 
-test('a runtime diagnostic survives until a text edit and ignores a result from before an edit', async () => {
-  let editDuringRun = false;
-  const { commands, document, window, diagnostics, edit } = setup((task, change) => {
-    const file = task.execution.args[0];
-    assert.deepEqual(task.matchers, []);
-    fs.writeFileSync(task.execution.options.env.KSCRIPT_RUN_ERROR_FILE, `ERROR ${file}:2:3: Network: Request failed\n`);
-    if (editDuringRun) change({ toString: () => file });
-    return 3;
-  });
-  const source = document(path.resolve('scripts'), 'main.kscript');
+test('Run uses terminal output with full source paths and no problem matcher', async () => {
+  const { commands, document, window, tasks } = setup(() => 3);
+  const source = document(path.resolve('scripts with spaces'), 'main.kscript');
   window.activeTextEditor = { document: source };
   assert.equal(await commands.get('kscript.run')(), 3);
-  const [error] = diagnostics.get(source.fileName);
-  assert.equal(error.message, 'Network: Request failed');
-  assert.deepEqual(error.range.positions, [1, 2, 1, 3]);
-  edit(source.uri, []);
-  assert.equal(diagnostics.size, 1);
-  edit(source.uri);
-  assert.equal(diagnostics.size, 0);
-  editDuringRun = true;
-  assert.equal(await commands.get('kscript.run')(), 3);
-  assert.equal(diagnostics.size, 0);
+  assert.deepEqual(tasks[0].execution.args, [source.fileName]);
+  assert.deepEqual(tasks[0].execution.options.env, { KSCRIPT_ERROR_PATHS: 'full' });
+  assert.deepEqual(tasks[0].matchers, []);
+});
+
+test('a terminal failure links to the reported source file and position, including paths with spaces', async () => {
+  const { workspace, window, terminalLinks } = setup();
+  const file = path.resolve('folder with spaces', 'another script.kscript');
+  const terminalLine = `   ERROR  ${file}:2:3: FileNotFound: no folder`;
+  const [link] = terminalLinks.provideTerminalLinks({ line: terminalLine });
+  assert.equal(terminalLine.slice(link.startIndex, link.startIndex + link.length), `${file}:2:3`);
+  assert.equal(terminalLinks.provideTerminalLinks({ line: `ERROR  ${file}:2: No column` })[0].column, 0);
+  assert.deepEqual(terminalLinks.provideTerminalLinks({ line: '   ERROR  Something went wrong' }), []);
+  const target = { validatePosition: (position) => position };
+  workspace.openTextDocument = async (uri) => {
+    assert.equal(uri.fsPath, file);
+    return target;
+  };
+  window.showTextDocument = async (doc, { selection }) => {
+    assert.equal(doc, target);
+    assert.equal(selection.start.line, 1);
+    assert.equal(selection.start.character, 2);
+    assert.equal(selection.start, selection.end);
+  };
+  await terminalLinks.handleTerminalLink(link);
 });

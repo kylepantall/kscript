@@ -865,12 +865,6 @@ namespace KScript
                     report = Path.GetFullPath(at.File) + report.Substring(Path.GetFileName(at.File).Length);
                 }
                 ErrorReport.WriteMessage(Error, report);
-                if (Environment.GetEnvironmentVariable("KSCRIPT_RUN_ERROR_FILE") is { Length: > 0 } errorFile)
-                {
-                    // Keep editor annotations independent of the terminal and its task problem matcher.
-                    try { File.WriteAllText(errorFile, "ERROR " + report); }
-                    catch (Exception writeError) when (writeError is IOException or UnauthorizedAccessException or ArgumentException) { }
-                }
                 return ExitCodes.ScriptError;
             }
             finally

@@ -52,7 +52,7 @@ async function snippetsFromOtherExtensions(folder) {
   }
 }
 
-// Run above a script, running it, and the line it stopped on marked as an error.
+// The Run lens uses the terminal. Check still reports editor diagnostics.
 async function runsScripts(folder) {
   const commands = await vscode.commands.getCommands(true);
   for (const id of ['kscript.run', 'kscript.runTest', 'kscript.runTestsInFile', 'kscript.serve', 'kscript.check', 'kscript.formatProject', 'kscript.newProject', 'kscript.newScript', 'kscript.openDocs', 'kscript.showReferences']) {
@@ -71,19 +71,15 @@ async function runsScripts(folder) {
   assert.strictEqual(await vscode.commands.executeCommand('kscript.run', ok.uri), 0, 'the script ran');
   assert.strictEqual(fs.readFileSync(path.join(folder, 'ran.txt'), 'utf8').trim(), 'it ran', 'the script wrote its file');
 
-  const bad = await vscode.workspace.openTextDocument(path.join(folder, 'stops.kscript'));
-  await vscode.window.showTextDocument(bad);
+  const bad = await vscode.workspace.openTextDocument(path.join(folder, 'stops here.kscript'));
+  await vscode.window.showTextDocument(bad, { selection: new vscode.Range(0, 0, 0, 0) });
   assert.strictEqual(await vscode.commands.executeCommand('kscript.run', bad.uri.toString()), 3, 'a script that stops with an error exits with 3');
-  const stopped = await waitFor(() => vscode.languages.getDiagnostics(bad.uri).find((d) => /out of stock/.test(d.message)), 'the run-time error on its line');
-  assert.strictEqual(stopped.range.start.line, 1, 'the error is on the line that threw: ' + JSON.stringify(stopped));
-  assert.strictEqual(stopped.severity, vscode.DiagnosticSeverity.Error);
-
-  const edit = new vscode.WorkspaceEdit();
-  edit.replace(bad.uri, bad.lineAt(1).range, 'echo "in stock"');
-  assert.ok(await vscode.workspace.applyEdit(edit));
-  await waitFor(() => !vscode.languages.getDiagnostics(bad.uri).some((d) => /out of stock/.test(d.message)),
-    'the stale runtime error to clear after an unsaved text edit');
-  assert.ok(bad.isDirty);
+  assert.deepStrictEqual(vscode.languages.getDiagnostics(bad.uri), [], 'Run did not add a runtime problem');
+  await vscode.commands.executeCommand('workbench.action.terminal.selectAll');
+  await vscode.commands.executeCommand('workbench.action.terminal.copySelection');
+  const output = (await vscode.env.clipboard.readText()).replace(/\r?\n/g, '');
+  assert.ok(output.includes(`${bad.uri.fsPath}:2:1: FileNotFound:`), 'the terminal reports the file, line, column and failure');
+  await vscode.commands.executeCommand('workbench.action.terminal.clearSelection');
 
   // New Script opens a script that is ready to run, with the first thing to change selected.
   const fresh = await vscode.commands.executeCommand('kscript.newScript');

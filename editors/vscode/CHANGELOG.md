@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Run Script** uses `Ctrl+F5` and reports failures in the terminal with file and line links. **Check** reports code diagnostics in Problems.
+
 - Words joined by `-`, `+`, `/` or `.`, such as `my-post`, `api.corp.com` and `1.4.2`, are recognised by a type's `pattern` like single words, and so are patterns on types built on `domain`, `semver` and other native types written as words.
 - **Check This File** saves and checks a single script and reports its diagnostics in Problems, including when no project is open.
 
