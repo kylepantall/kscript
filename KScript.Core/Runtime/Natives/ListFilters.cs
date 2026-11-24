@@ -11,24 +11,33 @@ namespace KScript.Runtime
     internal static class ListFilters
     {
         // An empty list has no item to inspect. Keep its known element type alongside the ordinary list value.
-        private static readonly ConditionalWeakTable<List<object>, NativeType> EmptyListTypes = new();
+        private static readonly ConditionalWeakTable<List<object>, string> EmptyListTypes = new();
+
+        internal static string DeclaredElementType(List<object> items) =>
+            EmptyListTypes.TryGetValue(items, out string type) ? type : null;
 
         internal static NativeType ElementTypeOf(List<object> items)
         {
-            if (items.Count == 0) return EmptyListTypes.TryGetValue(items, out NativeType declared) ? declared : null;
+            if (items.Count == 0) return NativeTypeRegistry.Get(DeclaredElementType(items));
             NativeType first = NativeTypeRegistry.Of(items[0]);
             return first != null && items.All(x => Values.Unwrap(x) is IKObject k && k.TypeName == first.Name) ? first : null;
         }
 
         internal static void RememberEmptyType(List<object> empty, string elementType)
         {
-            if (NativeTypeRegistry.Get(elementType) is NativeType type) EmptyListTypes.Add(empty, type);
+            if (elementType != null) EmptyListTypes.Add(empty, elementType);
         }
 
         internal static List<object> Where(List<object> items, Func<object, int, bool> predicate, string elementType = null)
         {
             List<object> result = items.Where(predicate).ToList();
-            if (result.Count == 0) RememberEmptyType(result, elementType ?? ElementTypeOf(items)?.Name);
+            if (result.Count == 0) RememberEmptyType(result, elementType switch
+            {
+                "int" or "float" => "number",
+                "text" => "string",
+                "list" => "any[]",
+                _ => elementType ?? Shapes.ListElementType(items),
+            });
             return result;
         }
 

@@ -43,6 +43,8 @@ What is left as a warning is style, not spelling: an `else` after a `return` (KS
 
 ## Types, models and errors
 
+If your script compares `->type()` with `'list'`, switch that test to `->is_a(list)`. The type name now includes the element type, such as `'number[]'` or `'any[]'`.
+
 | Before | Now | |
 | --- | --- | --- |
 | `$Repo`, `as: $Repo`, `$User->create(...)` | `Repo`, `as: Repo`, `User->create(...)`: a type is named bare | fix (KS6014) |

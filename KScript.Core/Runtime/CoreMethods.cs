@@ -41,7 +41,7 @@ namespace KScript.Runtime
         private static void RegisterMethods(PackageBuilder p)
         {
             // Any value.
-            p.Method(KType.Any, "type", "", "The value's type: string, number, bool, list, map, fn, date, error or null, or the name of the <type> that made a record.", KType.String, (t, c) => Shapes.TypeName(t));
+            p.Method(KType.Any, "type", "", "Returns the value's type name. A list with one element type returns its type followed by `[]`, such as `number[]`. Mixed or untyped empty lists return `any[]`. A record returns its declared type name.", KType.String, (t, c) => Shapes.RuntimeTypeName(t));
             p.Method(KType.Any, "to_string", "", "The value as text.", KType.String, (t, c) => Values.ToStr(t));
             p.Method(KType.Any, "to_json", "indented?: bool", "The value as JSON text.", KType.String, (t, c) => Values.ToJson(t, c.Bool(0)));
             p.Method(KType.Any, "to_yaml", "", "The value as YAML text.", KType.String, (t, c) => Yaml.Write(t));
@@ -99,9 +99,12 @@ namespace KScript.Runtime
                 var remaining = new List<object>();
                 for (int i = 0; i < items.Count; i++)
                     (Values.Truthy(Apply(c, fn, items[i], i)) ? matching : remaining).Add(items[i]);
-                var type = ListFilters.ElementTypeOf(items)?.Name;
-                if (matching.Count == 0) ListFilters.RememberEmptyType(matching, type);
-                if (remaining.Count == 0) ListFilters.RememberEmptyType(remaining, type);
+                if (matching.Count == 0 || remaining.Count == 0)
+                {
+                    string type = Shapes.ListElementType(items);
+                    if (matching.Count == 0) ListFilters.RememberEmptyType(matching, type);
+                    if (remaining.Count == 0) ListFilters.RememberEmptyType(remaining, type);
+                }
                 return new List<object> { matching, remaining };
             });
             p.Method(l, "pluck", "key", "One field from each item, or a map of the selected fields for each item when given a list of keys.", l, Pluck).Info.KeepsBareWords = true;

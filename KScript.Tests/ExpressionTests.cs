@@ -74,12 +74,28 @@ public class ExpressionTests
     [InlineData("3.14159->round(digits: 2)", "3.14")]
     [InlineData("1234567->format(pattern: 'N0')", "1,234,567")]
     [InlineData("'{\"a\": [1, 2]}'->json().a[1]", "2")]
-    [InlineData("[]->type()", "list")]
+    [InlineData("[]->type()", "any[]")]
+    [InlineData("[1, 2]->type()", "number[]")]
+    [InlineData("[1, 'two']->type()", "any[]")]
+    [InlineData("[1h, 2h]->type()", "duration[]")]
+    [InlineData("[[1], [2, 3]]->type()", "number[][]")]
+    [InlineData("[1, 2]->filter(fn(n) => false)->type()", "number[]")]
+    [InlineData("[1, 2]->is_a(list)", "true")]
     [InlineData("@max(3, 9, 2)", "9")]
     [InlineData("@range(3)->join(',')", "0,1,2")]
     public void Methods(string expression, string expected)
     {
         Assert.Equal(expected, Eval(expression));
+    }
+
+    [Fact]
+    public void Empty_typed_lists_remember_their_element_type()
+    {
+        Assert.Equal("number[] number[][]\n", RunBody("""
+            <let name="numbers" type="int[]" value="[]" />
+            <let name="rows" type="number[][]" value="[]" />
+            <echo>{$numbers->type()} {$rows->type()}</echo>
+            """));
     }
 
     [Fact]

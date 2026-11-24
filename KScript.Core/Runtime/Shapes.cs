@@ -82,6 +82,19 @@ namespace KScript.Runtime
             return "list";
         }
 
+        internal string RuntimeName(Scope scope)
+        {
+            var element = new TypeRef(Name, 0, false, Inline, ArgBase, Args, ArgsText);
+            string name = element.Root(scope) switch
+            {
+                "int" or "float" or "port" => "number",
+                "text" => "string",
+                "list" => "any[]",
+                string root => root,
+            };
+            return name + string.Concat(Enumerable.Repeat("[]", ListDepth));
+        }
+
         private TypeRef ListOf() => new TypeRef(Name, ListDepth + 1, false, Inline, ArgBase, Args, ArgsText);
 
         private TypeRef WithArgs(IReadOnlyDictionary<string, object> args, string text) => new TypeRef(Name, 0, false, null, this, args, text.Trim());
@@ -574,7 +587,7 @@ namespace KScript.Runtime
                     var result = new List<object>(list.Count);
                     copies[value] = result;
                     foreach (object member in list) result.Add(Clone(member));
-                    if (result.Count == 0) ListFilters.RememberEmptyType(result, ListFilters.ElementTypeOf(list)?.Name);
+                    if (result.Count == 0) ListFilters.RememberEmptyType(result, ListFilters.DeclaredElementType(list));
                     return result;
                 }
                 return value;
@@ -806,8 +819,34 @@ namespace KScript.Runtime
         /// <summary>JSON text becomes data; anything else is used as it is.</summary>
         internal static object ParseIfText(object value) => value is string s ? Values.ParseJson(s) : value;
 
-        /// <summary>The name a value's type has: a record's type name, or <see cref="Values.TypeOf"/>.</summary>
+        /// <summary>The kind of value, using the record's name where applicable.</summary>
         public static string TypeName(object value) => value is Record r ? r.Type.Name : value is ErrorValue ? "error" : Values.TypeOf(value);
+
+        internal static string RuntimeTypeName(object value) => Values.Unwrap(value) is List<object> list
+            ? ListElementType(list) + "[]" : TypeName(value);
+
+        internal static string ListElementType(List<object> list)
+        {
+            var elements = new Dictionary<List<object>, string>();
+            return Inspect(list, 0);
+
+            string Inspect(List<object> items, int depth)
+            {
+                if (items.Count == 0) return ListFilters.DeclaredElementType(items) ?? "any";
+                if (depth == 64) return "any";
+                if (elements.TryGetValue(items, out string known)) return known;
+                // A list reached again before inspection finishes has no finite element type.
+                elements.Add(items, null);
+                string element = ItemType(items[0]);
+                for (int i = 1; element != null && i < items.Count; i++)
+                    if (ItemType(items[i]) != element) element = null;
+                return elements[items] = element ?? "any";
+
+                string ItemType(object item) => Values.Unwrap(item) is List<object> nested
+                    ? Inspect(nested, depth + 1) is string type ? type + "[]" : null
+                    : TypeName(item);
+            }
+        }
 
         #region Declaring
 
@@ -1419,7 +1458,7 @@ namespace KScript.Runtime
                 TypeRef item = type.Item;
                 var result = new List<object>(list.Count);
                 for (int i = 0; i < list.Count; i++) result.Add(Convert(list[i], true, item, $"{path}[{i}]", field, depth + 1));
-                if (result.Count == 0) ListFilters.RememberEmptyType(result, item.Root(scope));
+                if (result.Count == 0) ListFilters.RememberEmptyType(result, item.RuntimeName(scope));
                 return result;
             }
             if (type.Args != null) return MapRefined(value, type.Refined(scope, module), path, field, depth, replaceRates: type.Args.ContainsKey("rates"));
