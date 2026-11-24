@@ -10,7 +10,7 @@ kscript mcp --http          # serve on http://localhost:4181/mcp instead
 
 For docs an assistant reads without a server, made from your own code, see [Coding agents](agents.md) (`kscript agents`).
 
-You don't usually run it yourself. Add it to your assistant once, as below, and the assistant starts it when it needs it.
+The KScript extension for VS Code discovers the server automatically. For other clients, add it once as shown below. The assistant starts it when it needs it.
 
 ## What the assistant gets
 
@@ -79,7 +79,9 @@ Add it to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json` for eve
 
 ### VS Code
 
-For GitHub Copilot's agent mode, add `.vscode/mcp.json` to your project (or run **MCP: Add Server** from the command palette):
+In a trusted workspace, the KScript extension automatically provides **KScript Docs** to agents that use VS Code's MCP servers. Find it under **MCP: List Servers** in the command palette and enable its tools in the agent's tools picker. The extension uses the same KScript installation as the editor, including `kscript.server.path` if set. In a Remote SSH workspace, install KScript on the remote host. Each workspace folder gets a server that uses that folder's syntax, lint and format settings.
+
+If you use VS Code without the KScript extension, you can add the server with **MCP: Add Server** or in `.vscode/mcp.json`:
 
 ```json
 {

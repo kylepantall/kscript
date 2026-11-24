@@ -419,6 +419,7 @@ namespace KScript.Language.Agents
                 : "Scripts are `.kscript` files (code syntax, shown below). Tests end in `.test.kscript`.\n\n");
 
             w.Append($"Start with the [function and type index]({Folder}/index.md) and [package references]({Folder}/packages/).\n\n");
+            w.Append("Use `search_docs` to find KScript APIs and `lookup` to confirm signatures and examples. In VS Code, the KScript extension provides these tools through KScript Docs. Other MCP clients can use `kscript mcp`.\n\n");
             int guidanceAt = w.Length;
             w.Append("## Syntax\n\n");
             w.Append(project.IsXml ? "```xml\n" + CrashCourseXml() + "\n```\n\n" : "```kscript\n" + CrashCourse + "\n```\n\n");

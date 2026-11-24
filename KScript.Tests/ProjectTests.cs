@@ -164,7 +164,11 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test,types", Keys(props));
+        Assert.Equal("$schema,agents,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test,types", Keys(props));
+        Assert.Equal("merge", Keys(props.GetProperty("agents").GetProperty("properties")));
+        var agents = Parse("""{ "agents": { "merge": ["docs/team.md", "docs/checks.md"] } }""");
+        Assert.Empty(agents.Warnings);
+        Assert.Equal(new[] { "docs/team.md", "docs/checks.md" }, agents.AgentMarkdown);
         var libraryForms = props.GetProperty("library").GetProperty("oneOf").EnumerateArray()
             .ToDictionary(form => form.GetProperty("type").GetString()!);
         Assert.Equal("entry,version", Keys(libraryForms["object"].GetProperty("properties")));
