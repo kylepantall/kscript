@@ -50,6 +50,8 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
+For a containerised development site, run `kscript serve --docker` with a Compose file. The source is bind-mounted so changes are visible on refresh. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
+
 ## Model forms
 
 Create a component for an existing model, or create the two files together.

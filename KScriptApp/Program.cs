@@ -87,6 +87,7 @@ namespace KScript
             bool? withDocs = null;
             int? docsPort = null;
             bool withWorker = false;
+            bool? withDocker = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -118,6 +119,10 @@ namespace KScript
                     case "--with-worker":
                         withWorker = true;
                         break;
+                    case "--docker":
+                    case "--no-docker":
+                        withDocker = args[i] == "--docker";
+                        break;
                     case "--docs-port":
                         if (i + 1 >= args.Length || !int.TryParse(args[++i], out int dp) || dp < 1 || dp > 65535)
                         {
@@ -145,8 +150,38 @@ namespace KScript
             }
 
             if (project != null)
-            {
                 foreach (string warning in project.Warnings) Error.WriteLine($"{project.FilePath}: {warning}");
+
+            if (watch && Environment.GetEnvironmentVariable(DockerServe.ContainerMarker) != "1"
+                && (withDocker ?? project?.Serve.Docker.Enabled) == true)
+            {
+                string root = project?.Directory ?? Path.GetFullPath(folder ?? ".");
+                if (folder != null && project != null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)).Equals(
+                    root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                {
+                    Error.WriteLine("Use the project folder with --docker. Set serve.root for the site served inside Docker.");
+                    return ExitCodes.Usage;
+                }
+                if (port.HasValue || host != null || withDocs.HasValue || docsPort.HasValue || withWorker)
+                {
+                    Error.WriteLine("Set Docker ports and the service command in Compose, or use --no-docker with local server options.");
+                    return ExitCodes.Usage;
+                }
+                using var dockerStop = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
+                ConsoleCancelEventHandler interrupt = (_, e) => e.Cancel = StopOnFirstCtrlC(dockerStop);
+                Console.CancelKeyPress += interrupt;
+                try
+                {
+                    return DockerServe.Run(root, project?.Serve.Docker ?? new DockerServeSettings(), Error, dockerStop.Token);
+                }
+                finally
+                {
+                    Console.CancelKeyPress -= interrupt;
+                }
+            }
+
+            if (project != null)
+            {
                 // `kscript serve` (or `kscript serve <project folder>`) serves the project's site root. A folder
                 // inside the project is served as given, with the project's port and host.
                 string given = folder == null ? null : Path.GetFullPath(folder);

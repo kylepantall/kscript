@@ -110,6 +110,31 @@ KSCRIPT_SOURCE=/absolute/path/to/kscript docker compose up --build
 
 The app runs as an unprivileged user with a read-only application directory. Compose keeps KScript.Storage, authentication state and project-relative SQLite files in the `app-state` volume at `/var/lib/kscript`. The volume survives container replacement. `KSCRIPT_PROJECT_DATA_ROOT` places configured relative auth and SQLite paths under that folder. For an absolute path or a separate database server, configure the corresponding mount or connection for your deployment. Restart `kscript serve` when changing storage paths so it refreshes the private files excluded from public serving. Secrets can be supplied as runtime environment variables. The generated `.dockerignore` excludes dotfiles, common credential files, local databases and runtime state. Add any project-specific secret filenames before building.
 
+### Running the development site in Docker
+
+Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Edit pages, styles, or route files locally, then refresh the browser to see the changes without rebuilding. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply.
+
+Add this to `kscript.json` to use Docker whenever you run `kscript serve`.
+
+```json
+{
+  "serve": {
+    "docker": {
+      "compose_file": "compose.yaml",
+      "service": "app",
+      "mount": "/app",
+      "build": true
+    }
+  }
+}
+```
+
+`"docker": true` uses those defaults. Set `enabled: false` to keep the settings and opt in with `--docker`, or use `--no-docker` for a local run. Set `mount` to the app directory in a custom image. Set `mount: null` to serve the files baked into the image, or `build: false` to reuse an existing image. Use `kscript serve --docker --env test` to select test settings. Compose controls the published ports and the service command. Ctrl+C stops the development app container. Its dependencies can remain running, and `docker compose down` stops them.
+
+Use `COMPOSE_PROJECT_NAME=myapp-test kscript serve --docker --env test` to put test services and their Compose-managed volumes in a separate project. Use a separate host port in the test Compose file if both sites run at once.
+
+`docker compose up --build` serves the source copied into the generated image. For a custom image that invokes `kscript serve` directly, set `KSCRIPT_SERVE_IN_DOCKER=1` inside the container so it starts the web server.
+
 ### The setup wizard
 
 `kscript make project` at a terminal with no options asks for everything instead: the folder (unless you gave one), the kind of project, and each of that template's options, with its default ready for Enter. Give any option, or `-n` (`--no-interaction`), and nothing is asked: what you didn't give takes its default, which is what scripts and CI want. When the input or output isn't a terminal, nothing is asked either.

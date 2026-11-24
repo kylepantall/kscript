@@ -28,6 +28,19 @@ namespace KScript.Projects
 
         /// <summary>The port the docs are served on; null picks 4180, or a free port if that is in use.</summary>
         public int? DocsPort { get; set; }
+        public DockerServeSettings Docker { get; } = new DockerServeSettings();
+    }
+
+    /// <summary>How kscript serve launches the project's Docker Compose service.</summary>
+    public sealed class DockerServeSettings
+    {
+        public bool Enabled { get; set; }
+        public string ComposeFile { get; set; }
+        public string Service { get; set; } = "app";
+        public bool Build { get; set; } = true;
+
+        /// <summary>Container directory for the read-only project mount. Null uses the image's files.</summary>
+        public string Mount { get; set; } = "/app";
     }
 
     /// <summary>The <c>app</c> section: what <c>kscript compile</c> builds and how the program is named.</summary>
@@ -1462,8 +1475,48 @@ namespace KScript.Projects
                         if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out int docsPort) && docsPort > 0 && docsPort < 65536) config.Serve.DocsPort = docsPort;
                         else config.Warnings.Add($"serve.docs_port should be a number from 1 to 65535.");
                         break;
+                    case "docker":
+                        ReadDockerServe(p.Value, config);
+                        break;
                     default:
-                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port, host, docs or docs_port).");
+                        config.Warnings.Add($"unknown setting 'serve.{p.Name}' (expected root, port, host, docs, docs_port or docker).");
+                        break;
+                }
+            }
+        }
+
+        private static void ReadDockerServe(JsonElement value, ProjectConfig config)
+        {
+            var docker = config.Serve.Docker;
+            if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                docker.Enabled = value.GetBoolean();
+                return;
+            }
+            if (!Object(value, "serve.docker", config)) return;
+            docker.Enabled = true;
+            foreach (var property in value.EnumerateObject())
+            {
+                switch (property.Name)
+                {
+                    case "enabled":
+                        docker.Enabled = Bool(property.Value, "serve.docker.enabled", config) ?? false;
+                        break;
+                    case "build":
+                        docker.Build = Bool(property.Value, "serve.docker.build", config) ?? true;
+                        break;
+                    case "compose_file":
+                        docker.ComposeFile = String(property.Value, "serve.docker.compose_file", config);
+                        break;
+                    case "service":
+                        docker.Service = String(property.Value, "serve.docker.service", config) ?? "app";
+                        break;
+                    case "mount":
+                        docker.Mount = property.Value.ValueKind == JsonValueKind.Null
+                            ? null : String(property.Value, "serve.docker.mount", config) ?? "/app";
+                        break;
+                    default:
+                        config.Warnings.Add($"unknown setting 'serve.docker.{property.Name}' (expected enabled, build, compose_file, service or mount).");
                         break;
                 }
             }

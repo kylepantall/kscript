@@ -129,7 +129,19 @@
         "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8080, "description": "The port to listen on." },
         "host": { "type": "string", "default": "localhost", "description": "localhost, an IP address to listen on, or * for every address." },
         "docs": { "type": "boolean", "default": false, "description": "Also serve the KScript docs, with a page about this project's routes, functions and types, on localhost while you work (like kscript serve --with-docs). Never on for compiled programs or the production environment." },
-        "docs_port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 4180, "description": "The port the docs are served on. Without it, 4180, or a free port if that is in use." }
+        "docs_port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 4180, "description": "The port the docs are served on. Without it, 4180, or a free port if that is in use." },
+        "docker": {
+          "type": ["boolean", "object"],
+          "description": "Run kscript serve through Docker Compose. True uses the default app service and mounts the working tree for development.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true, "description": "Launch Docker Compose by default." },
+            "compose_file": { "type": "string", "description": "Compose file relative to the project folder." },
+            "service": { "type": "string", "default": "app", "description": "The Compose service that runs the site." },
+            "build": { "type": "boolean", "default": true, "description": "Build the service image before starting." },
+            "mount": { "type": ["string", "null"], "default": "/app", "description": "Container path for a read-only project bind mount. Null uses the image's files." }
+          }
+        }
       }
     },
     "http": {
