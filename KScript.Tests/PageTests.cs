@@ -601,6 +601,96 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void Live_bindings_update_one_map_field_and_retain_its_siblings()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="draft">
+              <state name="draft" value="{ title: 'Before', count: 3 }" />
+              <input bind="draft.title">
+              <input bind="draft.count" type="number">
+              <p>{$draft.title}: {$draft.count + 1}</p>
+            </live>
+            """));
+        string original = site.Render("index.html").Body;
+        Assert.Contains("data-ks-bind=\"draft.title\" value=\"Before\"", original);
+        var updated = Event(site, "index.html", "draft", -1, Attr(original, "data-ks-state"),
+            binds: new() { ["draft.title"] = "After", ["draft.count"] = "8", ["draft.unknown"] = "ignored" });
+        Assert.Contains("<p>After: 9</p>", updated.Body);
+        var draft = Assert.IsType<Dictionary<string, object>>(PageLive.Verify(Attr(updated.Body, "data-ks-state"))["draft"]);
+        Assert.False(draft.ContainsKey("unknown"));
+    }
+
+    [Fact]
+    public void Live_bindings_render_checkbox_radio_and_select_state_and_accept_a_list()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="settings">
+              <state name="color" value="'blue'" />
+              <state name="roles" value="['editor']" />
+              <input type="radio" bind="color" value="red" checked>
+              <input type="radio" bind="color" value="blue">
+              <select bind="roles" bind-on="action" multiple>
+                <option value="reader" selected>Read</option>
+                <option value="editor">Edit</option>
+              </select>
+              <p>{$color}|{$roles->join(',')}</p>
+            </live>
+            """));
+        string before = site.Render("index.html").Body;
+        Assert.Contains("name=\"color\" value=\"red\">", before);
+        Assert.Contains("data-ks-bind=\"color\" checked name=\"color\" value=\"blue\">", before);
+        Assert.Contains("data-ks-bind-on=\"action\"", before);
+        Assert.DoesNotContain("value=\"reader\" selected", before);
+        Assert.Contains("value=\"editor\" selected", before);
+
+        var after = Event(site, "index.html", "settings", -1, Attr(before, "data-ks-state"),
+            binds: new() { ["color"] = "red", ["roles"] = new List<object> { "reader", "editor" } });
+        Assert.Contains("<p>red|reader,editor</p>", after.Body);
+        Assert.Contains("value=\"reader\" selected", after.Body);
+        Assert.Contains("value=\"editor\" selected", after.Body);
+    }
+
+    [Fact]
+    public void Query_backed_live_state_preserves_the_default_type_and_reports_changes()
+    {
+        const string page = """
+            <live id="query">
+              <state name="page" value="1" query="p" />
+              <button on-click="page += 1">Next</button>
+              <p>{$page}</p>
+            </live>
+            """;
+        using var site = new TempSite(("index.html", page));
+        string html = site.Render("index.html", new() { ["query"] = new Dictionary<string, object> { ["p"] = "3" } }).Body;
+        Assert.Contains("<p>3</p>", html);
+        Assert.Equal("{\"p\":3}", Attr(html, "data-ks-query"));
+
+        var next = Event(site, "index.html", "query", 0, Attr(html, "data-ks-state"));
+        Assert.Contains("<p>4</p>", next.Body);
+        Assert.Equal("{\"p\":4}", Attr(next.Body, "data-ks-query"));
+    }
+
+    [Fact]
+    public void Live_controls_render_lifecycle_handlers_and_interaction_attributes()
+    {
+        string html = PageRenderer.RenderString("""
+            <live id="controls">
+              <state name="count" value="0" />
+              <p on-init="count += 1" on-visible="count += 1">{$count}</p>
+              <span live-loading role="status">Working</span>
+              <span live-offline>Offline</span>
+              <button live-confirm="Really?" live-disable on-click="count = 0">Reset</button>
+              <div live-key="row" live-replace>A row</div>
+            </live>
+            """).Body;
+        Assert.Contains("data-ks-on-init=\"0\" data-ks-on-visible=\"1\"", html);
+        Assert.Contains("data-ks-live-loading role=\"status\" hidden", html);
+        Assert.Contains("data-ks-live-offline hidden", html);
+        Assert.Contains("data-ks-live-confirm=\"Really?\" data-ks-live-disable data-ks-on-click=\"2\"", html);
+        Assert.Contains("data-ks-live-key=\"row\" data-ks-live-replace", html);
+    }
+
+    [Fact]
     public void Loop_variables_are_passed_to_handlers_and_binds_update_state()
     {
         const string page = "<live id=\"t\"><state name=\"items\" value=\"['a', 'b', 'c']\" /><state name=\"draft\" value=\"''\" />" +

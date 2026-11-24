@@ -60,6 +60,29 @@ namespace KScript.Pages
             return (string)Evaluate("@csrf_token()", authModule.Globals, authModule);
         }
 
+        internal bool TryGetSessionState(string key, out object value)
+        {
+            authModule ??= Interpreter.CreateModule(null, new[] { "KScript.Auth" });
+            var scope = authModule.Globals.Child();
+            scope.Declare("key", "kscript.live." + key);
+            if (!Values.Truthy(Evaluate("$session->has($key)", scope, authModule)))
+            {
+                value = null;
+                return false;
+            }
+            value = Evaluate("$session->get($key)", scope, authModule);
+            return true;
+        }
+
+        internal void SetSessionState(string key, object value)
+        {
+            authModule ??= Interpreter.CreateModule(null, new[] { "KScript.Auth" });
+            var scope = authModule.Globals.Child();
+            scope.Declare("key", "kscript.live." + key);
+            scope.Declare("value", value);
+            Evaluate("$session->set($key, $value)", scope, authModule);
+        }
+
         /// <summary>The module of a page, layout or component file: the packages and scripts it imports.</summary>
         public Module ModuleFor(string file, string fullPath)
         {

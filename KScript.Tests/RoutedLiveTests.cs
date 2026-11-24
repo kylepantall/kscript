@@ -71,6 +71,150 @@ public sealed class RoutedLiveTests : AuthSiteFixture
     }
 
     [Fact]
+    public void SessionStatePersistsForOneBrowserAndLockedStateRejectsClientBindings()
+    {
+        Write("_components/counter.html", """
+            <live id="item-{$item}">
+              <state name="count" value="0" session="counter" locked />
+              <state name="draft" value="''" />
+              <input bind="draft">
+              <button on-click="count += 1">Add</button>
+              <p>{$count}</p>
+            </live>
+            """);
+        var app = App();
+        var first = new Browser(app);
+        var second = new Browser(app);
+        first.Get("/sign-in");
+        second.Get("/sign-in");
+        PageResult page = first.Get("/edit/7");
+        Assert.Contains("<p>0</p>", page.Body);
+        Assert.Equal(409, Click(first, page, field: "count").Status);
+        Assert.Contains("<p>1</p>", Click(first, page).Body);
+        Assert.Contains("<p>1</p>", first.Get("/edit/7").Body);
+        Assert.Contains("<p>0</p>", second.Get("/edit/7").Body);
+    }
+
+    [Fact]
+    public void ADownloadActionSuppliesTheFileAndRejectsNamesWithPaths()
+    {
+        Write("_components/counter.html", """
+            <live id="item-{$item}">
+              <state name="draft" value="''" /><input bind="draft">
+              <button on-click="@live_download('report.txt', bytes: 'Hello'->to_base64())">Download</button>
+              <button on-click="@live_download('../report.txt', bytes: 'Hello'->to_base64())">Invalid</button>
+            </live>
+            """);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var original = browser.Get("/edit/7");
+        var file = Click(browser, original);
+        Assert.True(file.Status == 200, file.Body);
+        Assert.Equal("{\"name\":\"report.txt\",\"bytes\":\"SGVsbG8=\"}", Attribute(file, "data-ks-download"));
+        var invalid = Click(browser, original, handler: 1, args: Attribute(original, "data-ks-args-1"));
+        Assert.True(invalid.Status >= 400);
+        Assert.DoesNotContain("data-ks-download", invalid.Body);
+    }
+
+    [Fact]
+    public void ARenderlessActionReturnsUpdatedStateWithoutReplacingTheComponent()
+    {
+        Write("_components/counter.html", """
+            <live id="item-{$item}">
+              <state name="count" value="0" /><state name="draft" value="''" />
+              <input bind="draft">
+              <button on-click="count += 1; @skip_render()">Update quietly</button>
+              <button on-click="count += 1">Refresh</button>
+              <p>{$count} {$draft}</p>
+            </live>
+            """);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var original = browser.Get("/edit/7");
+        var quiet = Click(browser, original);
+        Assert.True(quiet.Status == 200, quiet.Body);
+        Assert.Contains(" data-ks-live-preserve", quiet.Body);
+        Assert.DoesNotContain("<p>", quiet.Body);
+        var fresh = Click(browser, original, handler: 1,
+            args: Attribute(original, "data-ks-args-1"), state: Attribute(quiet, "data-ks-state"));
+        Assert.Contains("<p>2 bio</p>", fresh.Body);
+    }
+
+    [Fact]
+    public void LazyBlocksOnlyAcceptTheMountRequestForTheirSignedPlaceholders()
+    {
+        Write("_components/counter.html", """
+            <live id="item-{$item}" lazy>
+              <placeholder><p>Loading</p></placeholder>
+              <state name="name" value="'Ready'" />
+              <p>{$name}</p>
+            </live>
+            """);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var waiting = browser.Get("/edit/7");
+        Assert.Contains("data-ks-live-lazy=\"visible\"", waiting.Body);
+        Assert.Contains("<p>Loading</p>", waiting.Body);
+        Assert.DoesNotContain("<p>Ready</p>", waiting.Body);
+        PageResult Mount(PageResult page, int handler) =>
+            browser.Send("POST", "/edit/7", headers: new() { ["x-kscript-live"] = Attribute(page, "data-ks-route") },
+                json: Values.ToJson(new Dictionary<string, object>
+                {
+                    ["block"] = "item-7", ["handler"] = (double)handler, ["state"] = Attribute(page, "data-ks-state"),
+                }));
+        Assert.Equal(409, Mount(waiting, -1).Status);
+        var loaded = Mount(waiting, -2);
+        Assert.Equal(200, loaded.Status);
+        Assert.Contains("<p>Ready</p>", loaded.Body);
+        Assert.DoesNotContain("<p>Loading</p>", loaded.Body);
+        Assert.Equal(409, Mount(loaded, -2).Status);
+    }
+
+    [Fact]
+    public void NestedActionsUseTheirOwnStateAndRequireSignedParentState()
+    {
+        Write("_components/counter.html", """
+            <live id="item-{$item}">
+              <state name="factor" value="1" />
+              <button on-click="factor += 1">Increase factor</button>
+              <live id="total-{$item}">
+                <state name="total" value="0" />
+                <button on-click="total += $factor">Add factor</button>
+                <p>{$total}</p>
+              </live>
+            </live>
+            """);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        PageResult page = browser.Get("/edit/7");
+        var parts = page.Body.Split("data-ks-live=\"total-7\"", 2);
+        Assert.Equal(2, parts.Length);
+        var firstChild = new PageResult { Body = parts[1] };
+
+        PageResult Update(string block, PageResult component, object parents = null) =>
+            browser.Send("POST", "/edit/7", headers: new() { ["x-kscript-live"] = Attribute(page, "data-ks-route") },
+                json: Values.ToJson(new Dictionary<string, object>
+                {
+                    ["block"] = block, ["handler"] = 0d, ["state"] = Attribute(component, "data-ks-state"),
+                    ["args"] = Attribute(component, "data-ks-args-0"), ["parents"] = parents,
+                }));
+
+        static List<object> Parents(PageResult parent) => new()
+        {
+            new Dictionary<string, object> { ["id"] = "item-7", ["state"] = Attribute(parent, "data-ks-state") },
+        };
+
+        PageResult child = Update("total-7", firstChild, Parents(page));
+        Assert.Equal(200, child.Status);
+        Assert.Contains("<p>1</p>", child.Body);
+        PageResult parent = Update("item-7", page);
+        Assert.Equal(200, parent.Status);
+        Assert.Contains("<p>3</p>", Update("total-7", child, Parents(parent)).Body);
+        Assert.Equal(409, Update("total-7", child).Status);
+        Assert.Equal(409, Update("total-7", child, Parents(child)).Status);
+    }
+
+    [Fact]
     public void ProofsBelongToTheRenderedSessionRouteActionAndEditableFields()
     {
         var app = App();

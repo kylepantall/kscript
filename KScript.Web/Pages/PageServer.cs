@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -510,14 +511,19 @@ namespace KScript.Pages
         public static Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request) => BuildRequestAsync(request, null);
 
         public const int MaxLiveBodyBytes = 1024 * 1024;
+        private const int MaxLiveFileBytes = 8 * 1024 * 1024;
+        public const string LiveFilesKey = "__kscriptLiveFiles";
 
         public static bool IsLiveRequest(HttpRequest request) => HttpMethods.IsPost(request.Method) && request.Headers.ContainsKey("X-KScript-Live");
 
         public static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadPageRequestAsync(HttpRequest request, bool live)
         {
             if (!live) return (await BuildRequestAsync(request), null);
-            if (!System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type) ||
-                !string.Equals(type.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+            if (!System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type))
+                return (null, new PageResult { Status = 415 });
+            if (string.Equals(type.MediaType, "multipart/form-data", StringComparison.OrdinalIgnoreCase))
+                return await ReadLiveUploadAsync(request);
+            if (!string.Equals(type.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
                 return (null, new PageResult { Status = 415 });
             if (request.ContentLength > MaxLiveBodyBytes) return (null, new PageResult { Status = 413 });
 
@@ -532,6 +538,60 @@ namespace KScript.Pages
             }
             string body = Encoding.UTF8.GetString(bytes.GetBuffer(), 0, (int)bytes.Length);
             return (await BuildRequestAsync(request, body), null);
+        }
+
+        private static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadLiveUploadAsync(HttpRequest request)
+        {
+            const int wireLimit = MaxLiveFileBytes + MaxLiveBodyBytes + 64 * 1024;
+            if (request.ContentLength > wireLimit) return (null, new PageResult { Status = 413 });
+            var max = request.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (max != null && !max.IsReadOnly && (max.MaxRequestBodySize == null || max.MaxRequestBodySize > wireLimit))
+                max.MaxRequestBodySize = wireLimit;
+
+            IFormCollection form;
+            try
+            {
+                form = await new FormFeature(request, new FormOptions
+                {
+                    MultipartBodyLengthLimit = MaxLiveFileBytes,
+                    ValueCountLimit = 17,
+                    ValueLengthLimit = MaxLiveBodyBytes,
+                }).ReadFormAsync(request.HttpContext.RequestAborted);
+            }
+            catch (BadHttpRequestException ex)
+            {
+                return (null, new PageResult { Status = ex.StatusCode });
+            }
+            catch (InvalidDataException)
+            {
+                return (null, new PageResult { Status = 400 });
+            }
+
+            if (form.Count != 1 || !form.TryGetValue("state", out var parts) || parts.Count != 1 || form.Files.Count == 0)
+                return (null, new PageResult { Status = 400 });
+            string body = parts[0] ?? string.Empty;
+            if (Encoding.UTF8.GetByteCount(body) > MaxLiveBodyBytes || form.Files.Sum(file => file.Length) > MaxLiveFileBytes)
+                return (null, new PageResult { Status = 413 });
+
+            var files = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (IFormFile file in form.Files)
+            {
+                if (string.IsNullOrEmpty(file.Name)) return (null, new PageResult { Status = 400 });
+                var bytes = new byte[(int)file.Length];
+                using (Stream content = file.OpenReadStream())
+                    await content.ReadExactlyAsync(bytes, request.HttpContext.RequestAborted);
+                if (!files.TryGetValue(file.Name, out object entries)) files[file.Name] = entries = new List<object>();
+                ((List<object>)entries).Add(new Dictionary<string, object>
+                {
+                    ["name"] = Path.GetFileName(file.FileName.Replace('\\', '/')),
+                    ["type"] = file.ContentType,
+                    ["size"] = (double)file.Length,
+                    ["bytes"] = Convert.ToBase64String(bytes),
+                });
+            }
+            var result = await BuildRequestAsync(request, body);
+            result[LiveFilesKey] = files;
+            return (result, null);
         }
 
         private static async Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request, string readBody)

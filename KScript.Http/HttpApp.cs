@@ -307,13 +307,15 @@ namespace KScript.Http
                 return null;
             if (ctx.Auth.SessionId == null) throw new LiveExpiredException();
             PageLive.Verify(proof, ctx.LiveProofScope);
+            request.Remove(PageServer.LiveFilesKey, out object uploads);
             string type = BuiltInMiddleware.Header(request, "content-type");
-            if (!string.Equals(type?.Split(';')[0].Trim(), "application/json", StringComparison.OrdinalIgnoreCase))
+            if (uploads == null && !string.Equals(type?.Split(';')[0].Trim(), "application/json", StringComparison.OrdinalIgnoreCase))
                 return new PageResult { Status = 415 };
             string body = Values.ToStr(request["body"]);
             if (Encoding.UTF8.GetByteCount(body) > PageServer.MaxLiveBodyBytes) return new PageResult { Status = 413 };
             try { ctx.Live = PageLive.ParseRequest(body, routed: true).Event; }
             catch (PageException) { return new PageResult { Status = 400 }; }
+            ctx.Live.Files = uploads as Dictionary<string, object>;
             // Render the original GET again. Event payloads reach only the signed component.
             request["method"] = "GET";
             request["body"] = string.Empty;

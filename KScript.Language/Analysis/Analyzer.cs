@@ -1008,7 +1008,10 @@ namespace KScript.Language.Analysis
                 {
                     // <input bind="query">: two-way binding to a <state> variable.
                     RequireLive(e, attr);
-                    if (ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
+                    int dot = attr.Value.Value.IndexOf('.');
+                    DecodedText target = dot < 0 ? attr.Value : new DecodedText(attr.Value.Value[..dot],
+                        Enumerable.Range(0, dot + 1).Select(attr.Value.ToSource).ToArray());
+                    if (ReferenceVariableByName(target, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
                     {
                         boundVariables.Add(bound);
                     }
