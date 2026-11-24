@@ -33,7 +33,12 @@ namespace KScript.Runtime
             Scope scope = closure.Child();
             if (recordFields && receiver is Record record)
             {
-                foreach (var field in record) scope.Declare(field.Key, field.Value);
+                foreach (var field in record)
+                {
+                    if (record.BoundFields?.Contains(field.Key) == true)
+                        scope.BindField(record, field.Key, record.Type.Module.Interpreter);
+                    else scope.Declare(field.Key, field.Value);
+                }
             }
             if (!recordFields) scope.Declare("value", Values.Unwrap(receiver));
             scope.Declare("this", receiver);

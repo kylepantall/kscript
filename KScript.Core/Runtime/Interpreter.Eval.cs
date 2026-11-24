@@ -858,7 +858,7 @@ namespace KScript.Runtime
         /// What a field or item is set on, as an expression to read: the name an assignment starts with is written
         /// bare (<c>user.name = 'Ada'</c>, <c>totals[0] += 1</c>), and it is the variable.
         /// </summary>
-        private static ExprNode AssignedThrough(ExprNode node) => node switch
+        internal static ExprNode AssignedThrough(ExprNode node) => node switch
         {
             IdentifierNode id => new VariableNode { Name = id.Name, Span = id.Span },
             MemberNode m when AssignedThrough(m.Target) is ExprNode inner && !ReferenceEquals(inner, m.Target) =>

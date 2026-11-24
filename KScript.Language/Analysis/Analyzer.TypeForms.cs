@@ -73,7 +73,9 @@ namespace KScript.Language.Analysis
                 if (argument.Name != null)
                 {
                     if (instance == null || !instance.Fields.TryGetValue(argument.Name, out FieldInfo field)) continue;
-                    expected = field.DeclaredType;
+                    expected = field.ValueType;
+                    if (expected != null && !ExpectsShapeError(region.Element))
+                        CheckTypedLiteral(argument.Value, expected, region.Source, scope, span.Start);
                 }
                 if (expected == null) continue;
                 if (argument.Value is IdentifierNode word && pendingBare.Contains(argument) && RawTextKindOf(expected, scope, span.Start) != null)
@@ -95,6 +97,21 @@ namespace KScript.Language.Analysis
                 }
             }
             return true;
+        }
+
+        private static bool ExpectsShapeError(MarkupElement element)
+        {
+            for (; element != null; element = element.Parent)
+            {
+                string filter = element.Name switch
+                {
+                    "expect" => element.GetAttributeValue("throws"),
+                    "expect_error" => element.GetAttributeValue("type") ?? "Error",
+                    _ => null,
+                };
+                if (filter != null && KScript.Runtime.ErrorTypes.BuiltIn["Shape"].IsA(filter.Trim())) return true;
+            }
+            return false;
         }
 
         /// <summary>

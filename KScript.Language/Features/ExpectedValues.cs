@@ -9,7 +9,7 @@ namespace KScript.Language.Features
     public sealed partial class LanguageService
     {
         // In a typed map, field values are ordinary expressions. Its text values need quotes.
-        private readonly record struct ExpectedValueSlot(string Type, bool InMap = false, bool InContainer = false);
+        private readonly record struct ExpectedValueSlot(string Type, bool InMap = false, bool InContainer = false, bool IsField = false, TypeShape Shape = null);
 
         private static bool IsFiniteRefinement(DocumentAnalysis analysis, string type) =>
             FiniteValueChoices(analysis, type) != null;
@@ -67,16 +67,22 @@ namespace KScript.Language.Features
         private ExpectedValueSlot? ExpectedSlotAt(DocumentAnalysis analysis, int start)
         {
             const int maxContainerDepth = 32;
-            if (AssignmentTypeAt(analysis, start) is string declared) return new ExpectedValueSlot(declared);
+            if (XmlFieldValueAt(analysis, start) is MarkupAttribute attrValue
+                && analysis.Source.Text.AsSpan(attrValue.Value.SourceSpan.Start, start - attrValue.Value.SourceSpan.Start).Trim().IsEmpty
+                && analysis.Markup.FindElementAt(start)?.GetAttributeValue("type") is string fieldType)
+                return new ExpectedValueSlot(fieldType, IsField: true);
+            if (AssignmentTypeAt(analysis, start) is string declared)
+                return new ExpectedValueSlot(declared, IsField: BlockOwnerAt(analysis, start) != null);
             string text = analysis.Source.Text;
             int before = start;
             while (before > 0 && char.IsWhiteSpace(text[before - 1])) before--;
+            if (before > 0 && text[before - 1] == '=') return AssignedFieldSlot(analysis, before - 1);
             if (before == 0 || text[before - 1] is not ('[' or ',' or ':')) return null;
 
             // A trailing comma or a missing field value can leave the expression parser without a child at
             // the cursor. Lex just the containing statement so punctuation inside strings stays opaque.
             MarkupElement element = analysis.Markup.FindElementAt(before - 1);
-            var attr = element?.GetAttribute("value");
+            var attr = XmlFieldValueAt(analysis, before - 1) ?? element?.GetAttribute("value");
             bool inValue = attr?.Value != null && attr.Value.SourceSpan.Contains(before - 1);
             bool code = analysis.Markup.Syntax == SourceSyntax.Code;
             if (!code && !inValue) return null;
@@ -91,17 +97,19 @@ namespace KScript.Language.Features
                 {
                     string type = inValue ? element.GetAttributeValue("type") : null;
                     type ??= AssignmentTypeAt(analysis, tokens[index].Span.Start);
-                    return type == null ? null : new ExpectedValueSlot(type);
+                    return type == null ? null : new ExpectedValueSlot(type, IsField: element?.Name == "field");
                 }
                 Token previous = tokens[index - 1];
-                if (previous.Is("=") && AssignmentTypeAt(analysis, previous.Span.End) is string typeName)
-                    return new ExpectedValueSlot(typeName);
+                if (previous.Is("="))
+                    return AssignmentTypeAt(analysis, previous.Span.End) is string typeName
+                        ? new ExpectedValueSlot(typeName, IsField: BlockOwnerAt(analysis, previous.Span.End) != null)
+                        : AssignedFieldSlot(analysis, previous.Span.Start);
                 if (previous.Is("[") || previous.Is(","))
                 {
                     int open = previous.Is("[") ? index - 1 : EnclosingDelimiter(index - 1);
                     if (open < 0 || !tokens[open].Is("[") || SlotBefore(open, depth + 1) is not ExpectedValueSlot list) return null;
                     TypeRef type = TypeRef.Parse(list.Type);
-                    return type?.ListDepth > 0 ? new ExpectedValueSlot(type.Item.ToString(), list.InMap, true) : null;
+                    return type?.ListDepth > 0 ? new ExpectedValueSlot(type.Item.ToString(), list.InMap, true, list.IsField, list.Shape?.Element) : null;
                 }
                 if (!previous.Is(":") || index < 3) return null;
 
@@ -110,17 +118,19 @@ namespace KScript.Language.Features
                 int container = EnclosingDelimiter(index - 2);
                 if (container < 0) return null;
                 Token opening = tokens[container];
-                string owner;
+                TypeShape record;
                 if (opening.Is("{"))
-                    owner = SlotBefore(container, depth + 1)?.Type;
+                {
+                    ExpectedValueSlot? owner = SlotBefore(container, depth + 1);
+                    record = owner?.Shape ?? analysis.ScopeAt(start).Lookup(SplitType(owner?.Type).Name, start)?.Shape.Instance;
+                }
                 else if (opening.Is("(") && container > 0 && tokens[container - 1].Kind == TokenKind.Identifier
                     && (container < 2 || !tokens[container - 2].Is("->") && !tokens[container - 2].Is(".")))
-                    owner = tokens[container - 1].Text;
+                    record = analysis.ScopeAt(start).Lookup(tokens[container - 1].Text, start)?.Shape.Instance;
                 else return null;
 
-                TypeShape record = owner == null ? null : analysis.ScopeAt(start).Lookup(SplitType(owner).Name, start)?.Shape.Instance;
-                return record?.Fields.TryGetValue(key.Text, out FieldInfo field) == true && field.DeclaredType != null
-                    ? new ExpectedValueSlot(field.DeclaredType, opening.Is("{"), true) : null;
+                return record?.Fields.TryGetValue(key.Text, out FieldInfo field) == true && field.ValueType is string valueType
+                    ? new ExpectedValueSlot(valueType, opening.Is("{"), true, IsField: true, field.Shape) : null;
             }
 
             int EnclosingDelimiter(int index)
@@ -138,6 +148,32 @@ namespace KScript.Language.Features
                 }
                 return -1;
             }
+        }
+
+        private static MarkupAttribute XmlFieldValueAt(DocumentAnalysis analysis, int offset)
+        {
+            if (analysis.Markup.Syntax != SourceSyntax.Xml || analysis.Markup.FindElementAt(offset) is not { Name: "field" } field) return null;
+            return field.Attributes.FirstOrDefault(a => a.Name is "default" or "value" && a.Value?.SourceSpan.Contains(offset) == true);
+        }
+
+        private ExpectedValueSlot? AssignedFieldSlot(DocumentAnalysis analysis, int equals)
+        {
+            ExpressionRegion region = analysis.RegionAt(equals);
+            if (region == null) return null;
+            int index = region.Source.FromSource(equals);
+            AssignmentNode assignment = region.Nodes.OfType<AssignmentNode>().FirstOrDefault(a => a.Operator == "="
+                && a.Target.Span.End <= index && index < a.Value.Span.Start);
+            (ExprNode owner, string key) = assignment?.Target switch
+            {
+                MemberNode member => (member.Target, member.Name),
+                IndexNode { Index: LiteralNode { Kind: LiteralKind.String } name } item => (item.Target, name.Value),
+                _ => (null, null),
+            };
+            if (owner == null) return null;
+            TypeShape receiver = InferAt(analysis, region, Interpreter.AssignedThrough(owner));
+            // Assignment evaluates an ordinary expression, so text choices need quotes here.
+            return receiver.Fields.TryGetValue(key, out FieldInfo field) && field.ValueType is string type
+                ? new ExpectedValueSlot(type, InMap: true, IsField: true, Shape: field.Shape) : null;
         }
     }
 }

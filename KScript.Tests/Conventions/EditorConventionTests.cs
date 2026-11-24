@@ -13,11 +13,28 @@ namespace KScript.Tests.Conventions;
 /// </summary>
 public sealed class EditorConventionTests
 {
-    private static JsonElement Grammar()
+    private static JsonElement Grammar(string file = "kscript-code.tmLanguage.json")
     {
-        string path = Path.Combine(CliConventionTests.RepoRoot(), "editors", "vscode", "syntaxes", "kscript-code.tmLanguage.json");
+        string path = Path.Combine(CliConventionTests.RepoRoot(), "editors", "vscode", "syntaxes", file);
         using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
         return doc.RootElement.Clone();
+    }
+
+    [Fact]
+    public void Every_live_attribute_has_a_directive_scope_in_the_editor()
+    {
+        var rules = Grammar("kscript-live-attributes.injection.json").GetProperty("patterns").EnumerateArray()
+            .SelectMany(p => p.GetProperty("beginCaptures").EnumerateObject()
+                .Where(c => c.Value.GetProperty("name").GetString() == "keyword.control.directive.kscript")
+                .Select(c => (Pattern: new Regex(p.GetProperty("begin").GetString()!), Group: int.Parse(c.Name))))
+            .ToArray();
+        foreach (var attribute in KScript.Pages.LiveAttributes.All)
+        {
+            string name = attribute.Name == "live-use-" ? "live-use-focus" : attribute.Name;
+            Assert.Contains(rules, r => r.Pattern.Match(" " + name + ">").Groups[r.Group].Value == name);
+            Assert.Contains(rules, r => r.Pattern.Match(" @" + name + "()").Groups[r.Group].Value == "@" + name);
+        }
+        Assert.DoesNotContain(rules, r => r.Pattern.IsMatch(" live-actino>") || r.Pattern.IsMatch(" @custom()") || r.Pattern.IsMatch(" class="));
     }
 
     private static IEnumerable<JsonElement> Patterns(string rule) =>

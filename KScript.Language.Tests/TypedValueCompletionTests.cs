@@ -55,6 +55,80 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain(Complete("x = ‸"), i => i.Kind == CompletionKind.Value);
         }
 
+        [Theory]
+        [InlineData("echo Board(mode: ‸)")]
+        [InlineData("board: Board = { mode: ‸ }")]
+        [InlineData("board = Board(mode: quiet)\nboard.mode = ‸")]
+        [InlineData("board = Board(mode: quiet)\nboard['mode'] = ‸")]
+        [InlineData("echo Board(modes: [quiet, ‸])")]
+        [InlineData("board = Board(mode: quiet)\nboard.modes = ['quiet', ‸]")]
+        [InlineData("type Defaults {\n  mode: Mode = ‸\n}")]
+        public void Enum_field_choices_are_exhaustive(string use)
+        {
+            const string declarations = "enum Mode { quiet, loud }\ntype Board {\n mode: Mode\n modes: Mode[]\n}\ntext = 'quiet'\n";
+            List<CompletionItem> items = Complete(declarations + use);
+            Assert.Equal(new[] { "quiet", "loud" }, items.Select(i => i.Label));
+            Assert.All(items, i => Assert.Equal(CompletionKind.Value, i.Kind));
+            if (use.Contains(" = ‸") && !use.StartsWith("type "))
+                Assert.Equal("'quiet'", items[0].InsertText);
+        }
+
+        [Theory]
+        [InlineData("echo Board(count: ‸)", "$count", "@total")]
+        [InlineData("board: Board = { count: ‸ }", "$count", "@total")]
+        [InlineData("board = { count: 1 }\nboard.count = ‸", "$count", "@total")]
+        [InlineData("echo Board(count: $‸)", "count", null)]
+        [InlineData("echo Board(count: @‸)", null, "total")]
+        public void Record_field_expressions_match_the_fields_type(string use, string variable, string function)
+        {
+            const string declarations = "type Board { count: int }\ncount = 3\nlabel = 'three'\nfn total() => 3\nfn title() => 'three'\n";
+            List<CompletionItem> items = Complete(declarations + use);
+            if (variable != null) Assert.Contains(items, i => i.Label == variable);
+            if (function != null) Assert.Contains(items, i => i.Label == function);
+            Assert.DoesNotContain(items, i => i.FilterText is "label" or "title" or "Board" || i.Label == "null");
+        }
+
+        [Theory]
+        [InlineData("echo Board(mode: ‸)", "quiet")]
+        [InlineData("board: Board = { mode: ‸ }", "quiet")]
+        [InlineData("row = { count: 1 }\nrow.count = ‸", "$count")]
+        [InlineData("echo Board(mode: quiet ‸)", null)]
+        [InlineData("echo 'Board(mode: ‸)'", null)]
+        [InlineData("// Board(mode: ‸)", null)]
+        [InlineData("empty = ‸", null)]
+        public void A_space_triggers_only_at_the_start_of_a_known_field_value(string use, string expected)
+        {
+            const string declarations = "enum Mode { quiet, loud }\ntype Board { mode: Mode }\ncount = 2\nlabel = 'text'\n";
+            var (analysis, offset) = At(declarations + use);
+            var items = Service.GetCompletions(analysis, offset, " ");
+            if (expected == null) Assert.Empty(items);
+            else
+            {
+                Assert.Contains(items, i => i.Label == expected);
+                Assert.DoesNotContain(items, i => i.Label == "$label");
+            }
+        }
+
+        [Fact]
+        public void An_optional_enum_field_also_offers_null()
+        {
+            var items = Complete("enum Mode { quiet, loud }\ntype Board { mode?: Mode }\necho Board(mode: ‸)");
+            Assert.Equal(new[] { "quiet", "loud", "null" }, items.Select(i => i.Label));
+        }
+
+        [Theory]
+        [InlineData("[‸]", "[")]
+        [InlineData("[1,‸]", ",")]
+        [InlineData("[1, ‸]", " ")]
+        public void List_item_triggers_offer_compatible_expressions_even_without_named_literal_values(string list, string trigger)
+        {
+            var (analysis, offset) = At("type Board { counts: int[] }\ncount = 12\nlabel = 'bad'\nfn total() => 1\necho Board(counts: " + list + ")");
+            var items = Service.GetCompletions(analysis, offset, trigger);
+            Assert.Contains(items, i => i.Label == "$count");
+            Assert.Contains(items, i => i.Label == "@total");
+            Assert.DoesNotContain(items, i => i.Label == "$label");
+        }
+
         [Fact]
         public void Arguments_offer_the_values_of_their_parameters_type()
         {

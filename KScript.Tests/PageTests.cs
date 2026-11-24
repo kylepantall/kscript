@@ -654,6 +654,84 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void CallStyleLiveDirectivesUseTheSameBindingAndActionPathAsAttributes()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="editor">
+              <state name="draft" value="'Initial'" />
+              <state name="count" value="0" />
+              <input @bind('draft') @bind-on('blur') @live-use-autosize()>
+              <button @live-disable() @on-click(count += (')'->count() + (1 + 2)))>Run</button>
+              <p>{$count}</p>
+            </live>
+            """));
+        string body = site.Render("index.html").Body;
+        Assert.Contains("data-ks-bind=\"draft\"", body);
+        Assert.Contains("data-ks-bind-on=\"blur\"", body);
+        Assert.Contains("live-use-autosize", body);
+        Assert.Contains("data-ks-live-disable data-ks-on-click=\"0\"", body);
+        var result = Event(site, "index.html", "editor", 0, Attr(body, "data-ks-state"));
+        Assert.True(result.Status == 200, result.Body);
+        Assert.Contains("<p>4</p>", result.Body);
+        Assert.Contains("@custom=\"keep\"", PageRenderer.RenderString("<div @custom='keep'></div>").Body);
+    }
+
+    [Theory]
+    [InlineData("@live-action(save)", "quoted action name")]
+    [InlineData("@live-action('save')", "needs an on-action handler")]
+    [InlineData("@live-action('save') live-action='other'", "set more than once")]
+    public void Invalid_named_action_reports_the_problem_in_page_markup(string action, string error)
+    {
+        var exception = Assert.Throws<PageException>(() => PageRenderer.RenderString($"<live id='x'><span {action}></span></live>"));
+        Assert.Contains(error, exception.Message);
+    }
+
+    [Fact]
+    public void Standalone_class_components_keep_instance_state_and_only_accept_visible_bindings()
+    {
+        using var site = new TempSite(("index.html", "<edit-box live-id='a' /><edit-box live-id='b' />"),
+            ("_components/edit-box.kscript", """
+                import KScript.Web
+                type EditBox extends Component {
+                  count: int = 1
+                  server: string = 'server'
+                  fn render(): Component {
+                    return ```html
+                    <input bind="count"><p>{$count}</p><button on-click="count += 1">Add</button>
+                    ```
+                  }
+                }
+                """));
+        string page = site.Render("index.html").Body;
+        string initial = Attr(page, "data-ks-state"), action = Attr(page, "data-ks-args-0");
+        var first = Event(site, "index.html", "a", 0, initial, action, new() { ["count"] = "7" });
+        Assert.Equal(200, first.Status);
+        Assert.Contains("<p>8</p>", first.Body);
+        Assert.Equal(409, Event(site, "index.html", "b", 0, initial, action).Status);
+        Assert.Equal(409, Event(site, "index.html", "a", 0, initial, action, new() { ["server"] = "changed" }).Status);
+        string sibling = page.Split("data-ks-live=\"b\"", 2)[1];
+        var second = Event(site, "index.html", "b", 0, Attr(sibling, "data-ks-state"), Attr(sibling, "data-ks-args-0"));
+        Assert.Contains("<p>2</p>", second.Body);
+    }
+
+    [Fact]
+    public void Display_only_class_fields_do_not_activate_live_rendering()
+    {
+        using var site = new TempSite(("index.html", "<plain-card caption='hello' />"), ("_components/plain-card.kscript", """
+            import KScript.Web
+            type PlainCard extends Component {
+              caption: string
+              fn render(): Component {
+                return ```html
+                <span>{$caption}</span>
+                ```
+              }
+            }
+            """));
+        Assert.Equal("<span>hello</span>", site.Render("index.html").Body.Trim());
+    }
+
+    [Fact]
     public void Live_bindings_update_one_map_field_and_retain_its_siblings()
     {
         using var site = new TempSite(("index.html", """

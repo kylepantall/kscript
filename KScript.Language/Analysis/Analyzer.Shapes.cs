@@ -337,9 +337,9 @@ namespace KScript.Language.Analysis
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)
             {
-                foreach ((string name, string type, TextSpan span, string description) in InlineFields(fields.Value))
+                foreach ((string name, string type, TextSpan span, bool optional) in InlineFields(fields.Value))
                 {
-                    shape.Fields[name] = new FieldInfo(name, TypeNamed(type, span.Start) ?? TypeShape.Unknown, span, description, type);
+                    shape.Fields[name] = new FieldInfo(name, TypeNamed(type, span.Start) ?? TypeShape.Unknown, span, optional ? "Optional." : null, type, optional);
                 }
             }
 
@@ -356,7 +356,8 @@ namespace KScript.Language.Analysis
                 string description = field.GetAttributeValue("description");
                 string detail = from != null ? $"Read from {from}." : field.GetAttribute("value") != null ? "Worked out from the other fields." : null;
                 description = description != null && detail != null ? description + " " + detail : description ?? detail;
-                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type);
+                bool optional = nameAttr.ValueText.TrimEnd().EndsWith('?') || IsYes(field.GetAttributeValue("optional")) || field.GetAttribute("default") != null;
+                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional);
             }
         }
 
@@ -367,8 +368,8 @@ namespace KScript.Language.Analysis
             return name.Length > 0 && !Lexer.IsIdentStart(name[0]) ? "_" + name : name;
         }
 
-        /// <summary>The parts of <c>fields="login: string, id?: int = 0"</c>: name, type, the name's span and a description.</summary>
-        private static IEnumerable<(string Name, string Type, TextSpan Span, string Description)> InlineFields(DecodedText value)
+        /// <summary>The name, type, source span and optionality of each field in <c>fields="login: string, id?: int = 0"</c>.</summary>
+        private static IEnumerable<(string Name, string Type, TextSpan Span, bool Optional)> InlineFields(DecodedText value)
         {
             foreach ((string part, int start) in SplitTopLevel(value.Value))
             {
@@ -389,7 +390,7 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
-                yield return (name, type, value.ToSource(new TextSpan(at, name.Length)), optional || eq >= 0 ? "Optional." : null);
+                yield return (name, type, value.ToSource(new TextSpan(at, name.Length)), optional || eq >= 0);
             }
         }
 

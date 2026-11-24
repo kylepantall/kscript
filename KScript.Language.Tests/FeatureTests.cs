@@ -368,6 +368,56 @@ namespace KScript.Language.Tests
             Assert.Contains(tokens, t => a.Source[t.Span] == "gt" && t.Type == SemanticTokenType.Keyword);
         }
 
+        [Theory]
+        [InlineData("index.html")]
+        [InlineData("_components/actions.kscript")]
+        public void LiveDirectiveNamesHaveExactKeywordSpans(string path)
+        {
+            const string markup = """
+                <live id="board">
+                  <span title="live-action" @live-action('move-note') on-action="@skip_render()" hidden></span>
+                  <button live-action="restore" on-action="@skip_render()" live-disable>live-disable</button>
+                  <input @bind('draft') @bind-on('blur')>
+                  <button @on-click(count += (')'->count() + (1 + 2))) @live-disable()>Run</button>
+                </live>
+                """;
+            string text = path.EndsWith(".html") ? markup : """
+                import KScript.Web
+                type Actions extends Component {
+                  fn render(): Component {
+                    return ```html
+                    MARKUP
+                    ```
+                  }
+                }
+                """.Replace("MARKUP", markup.Replace("\n", "\n    "));
+            var analysis = Service.Analyze(text, path);
+            var tokens = Service.GetSemanticTokens(analysis);
+            string[] directiveNames = { "@live-action", "on-action", "live-action", "on-action", "live-disable",
+                "@bind", "@bind-on", "@on-click", "@live-disable" };
+            Assert.Equal(directiveNames, tokens.Where(t => t.Type == SemanticTokenType.Keyword
+                && t.Modifiers.HasFlag(SemanticTokenModifiers.DefaultLibrary) && analysis.Source[t.Span] != "live")
+                .Select(t => analysis.Source[t.Span]));
+            Assert.DoesNotContain(tokens, t => analysis.Source[t.Span] is "hidden" or "title" or "id");
+            Assert.DoesNotContain(tokens, t => t.Span.Contains(text.IndexOf("live-action\"", StringComparison.Ordinal))
+                || t.Span.Contains(text.IndexOf(">live-disable", StringComparison.Ordinal) + 1));
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Function && analysis.Source[t.Span] == "@skip_render");
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Method && analysis.Source[t.Span] == "count");
+            Assert.True(tokens.Zip(tokens.Skip(1), (left, right) => left.Span.End <= right.Span.Start).All(ordered => ordered));
+        }
+
+        [Fact]
+        public void ComponentInputsArePropertiesAndLiveIdIsADirective()
+        {
+            var site = Path.Combine(Path.GetTempPath(), "kscript-prop-tokens");
+            var service = new LanguageService(files: new MemoryFiles()
+                .Add(Path.Combine(site, "_components", "note-card.html"), "<prop name='title' />"));
+            var analysis = service.Analyze("<note-card title='Draft' live-id='note' /><button title='Draft'></button>", Path.Combine(site, "index.html"));
+            var tokens = service.GetSemanticTokens(analysis);
+            Assert.Single(tokens, t => t.Type == SemanticTokenType.Property && analysis.Source[t.Span] == "title");
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Keyword && analysis.Source[t.Span] == "live-id");
+        }
+
         [Fact]
         public void QuickFixesAreOfferedForTheRange()
         {

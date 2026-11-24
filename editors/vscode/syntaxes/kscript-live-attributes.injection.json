@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "kscript.live-attributes.injection",
+  "injectionSelector": "L:text.html meta.tag -source -comment -string -meta.attribute-value.kscript -meta.embedded.expression.kscript -markup.fenced_code -markup.inline.raw, L:source.kscript-code meta.embedded.block.html meta.tag -comment -string -meta.attribute-value.kscript -meta.embedded.expression.kscript -source.js -source.css",
+  "patterns": [
+    {
+      "begin": "(?<!\\S)(@(?i:on-(?:action|cancel|change|click|close|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)))\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.directive.kscript" },
+        "2": { "name": "punctuation.section.arguments.begin.kscript" }
+      },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "punctuation.section.arguments.end.kscript" } },
+      "contentName": "meta.embedded.expression.kscript",
+      "patterns": [{ "include": "#handler-body" }]
+    },
+    {
+      "begin": "(?<!\\S)@(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every)(?=\\s*\\()",
+      "beginCaptures": {
+        "0": { "name": "keyword.control.directive.kscript" }
+      },
+      "end": "\\)|(?=[<>])",
+      "patterns": [
+        { "name": "string.quoted.single.kscript", "begin": "'", "end": "'" },
+        { "name": "string.quoted.double.kscript", "begin": "\"", "end": "\"" }
+      ]
+    },
+    {
+      "begin": "(?<!\\S)(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|on-(?:action|cancel|change|click|close|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every)(?=\\s|=|/?>)",
+      "beginCaptures": {
+        "0": { "name": "keyword.control.directive.kscript" }
+      },
+      "end": "(?=\\s*+[^=\\s])",
+      "patterns": [
+        { "include": "text.html.basic#attribute-interior" }
+      ]
+    }
+  ],
+  "repository": {
+    "handler-body": {
+      "patterns": [
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "patterns": [{ "include": "#handler-body" }]
+        },
+        { "include": "source.kscript-code#comments" },
+        { "include": "source.kscript-code#expression" }
+      ]
+    }
+  }
+}

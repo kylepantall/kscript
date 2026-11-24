@@ -359,6 +359,22 @@ namespace KScript.Syntax.Markup
                 }
 
                 int nameStart = pos;
+                if (IsHtml && c == '@' && LiveAttributeDirective.TryRead(text, pos, out var directive))
+                {
+                    pos = directive.End;
+                    var liveAttribute = new MarkupAttribute
+                    {
+                        Name = directive.Name,
+                        NameSpan = directive.NameSpan,
+                        Span = TextSpan.FromBounds(nameStart, pos),
+                        Quote = directive.Quote,
+                        Value = directive.Value is TextSpan value ? DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start) : null,
+                        Owner = element,
+                    };
+                    if (directive.Error != null) Error(liveAttribute.Span, DiagnosticCodes.InvalidAttribute, directive.Error);
+                    AddAttribute(element, liveAttribute);
+                    continue;
+                }
                 while (pos < text.Length && !char.IsWhiteSpace(text[pos]) && text[pos] != '=' && text[pos] != '>'
                        && text[pos] != '<' && !(text[pos] == '/' && Peek(1) == '>') && text[pos] != '"' && text[pos] != '\'')
                 {
@@ -402,14 +418,17 @@ namespace KScript.Syntax.Markup
                 }
 
                 attribute.Span = TextSpan.FromBounds(nameStart, pos);
-
-                if (element.Attributes.Any(a => string.Equals(a.Name, attribute.Name, IsHtml ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
-                {
-                    Error(attribute.NameSpan, DiagnosticCodes.DuplicateAttribute, $"The attribute '{attribute.Name}' is set more than once.");
-                }
-
-                element.Attributes.Add(attribute);
+                AddAttribute(element, attribute);
             }
+        }
+
+        private void AddAttribute(MarkupElement element, MarkupAttribute attribute)
+        {
+            if (element.Attributes.Any(a => string.Equals(a.Name, attribute.Name, IsHtml ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
+            {
+                Error(attribute.NameSpan, DiagnosticCodes.DuplicateAttribute, $"The attribute '{attribute.Name}' is set more than once.");
+            }
+            element.Attributes.Add(attribute);
         }
 
         private void ParseAttributeValue(MarkupAttribute attribute)

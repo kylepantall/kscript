@@ -13,6 +13,16 @@ namespace KScript.Runtime
         private PatternLiteralScope inheritedPatterns;
         private PatternLiteralScope visiblePatterns;
 
+        // A component method and its live template can share a typed record field as a lexical variable.
+        private sealed record FieldBinding(Record Record, string Name, Interpreter Interpreter)
+        {
+            internal object Value => Record.Get(Name);
+            internal void Set(object value) => Record.Set(Interpreter, Name, value);
+        }
+
+        internal void BindField(Record record, string field, Interpreter interpreter) =>
+            Declare(field, new FieldBinding(record, field, interpreter));
+
         public Scope(Scope parent = null) { Parent = parent; }
 
         public Scope Parent { get; }
@@ -46,7 +56,11 @@ namespace KScript.Runtime
                 }
                 lock (s.vars)
                 {
-                    if (s.vars.TryGetValue(name, out value)) return true;
+                    if (s.vars.TryGetValue(name, out value))
+                    {
+                        if (value is FieldBinding field) value = field.Value;
+                        return true;
+                    }
                 }
             }
             value = null;
@@ -80,10 +94,11 @@ namespace KScript.Runtime
             {
                 lock (s.vars)
                 {
-                    if (!s.vars.ContainsKey(name)) continue;
+                    if (!s.vars.TryGetValue(name, out object old)) continue;
                     if (s.constants != null && s.constants.Contains(name))
                         throw new KScriptException($"${name} is const, so it can't be changed.", "Const");
-                    s.SetValue(name, value);
+                    if (old is FieldBinding field) field.Set(value);
+                    else s.SetValue(name, value);
                     return;
                 }
             }
@@ -130,7 +145,11 @@ namespace KScript.Runtime
         /// <summary>The variables declared in this scope itself.</summary>
         public IReadOnlyList<KeyValuePair<string, object>> OwnVariables
         {
-            get { lock (vars) return vars.ToList(); }
+            get
+            {
+                lock (vars) return vars.Select(entry => entry.Value is FieldBinding field
+                    ? new KeyValuePair<string, object>(entry.Key, field.Value) : entry).ToList();
+            }
         }
 
         /// <summary>Every visible variable name, innermost first.</summary>

@@ -1,3 +1,4 @@
+using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
 using System;
 using System.Collections.Generic;
@@ -215,6 +216,20 @@ namespace KScript.Pages
                         if (text[j] == '>') { j++; closed = true; break; }
                         if (text[j] == '/' && j + 1 < text.Length && text[j + 1] == '>') { el.SelfClosing = true; j += 2; closed = true; break; }
 
+                        if (text[j] == '@' && LiveAttributeDirective.TryRead(text, j, out var directive))
+                        {
+                            if (directive.Error != null) throw new PageException($"Line {startLine}: {directive.Error}");
+                            AddAttribute(el, new PageAttribute
+                            {
+                                Name = directive.Name,
+                                SourceName = directive.Name,
+                                Value = directive.Value is TextSpan value ? text.Substring(value.Start, value.Length) : null,
+                                Quote = directive.Quote,
+                            });
+                            j = directive.End;
+                            continue;
+                        }
+
                         int ns = j;
                         while (j < text.Length && !char.IsWhiteSpace(text[j]) && text[j] != '=' && text[j] != '>' && !(text[j] == '/' && j + 1 < text.Length && text[j + 1] == '>')) j++;
                         if (j == ns) { j++; continue; }
@@ -250,7 +265,7 @@ namespace KScript.Pages
                                 attr.Value = text.Substring(vs, j - vs);
                             }
                         }
-                        el.Attributes.Add(attr);
+                        AddAttribute(el, attr);
                     }
 
                     if (!closed)
@@ -304,6 +319,13 @@ namespace KScript.Pages
             DedentControlBodies(root.Children, null);
             TidyWhitespace(root.Children);
             return root.Children;
+        }
+
+        private static void AddAttribute(PageElement element, PageAttribute attribute)
+        {
+            if (LiveAttributes.IsDirective(attribute.Name) && element.HasAttr(attribute.Name))
+                throw new PageException($"Line {element.Line}: the attribute '{attribute.Name}' is set more than once.");
+            element.Attributes.Add(attribute);
         }
 
         private static readonly HashSet<string> ClosesParagraph = new HashSet<string>(StringComparer.Ordinal)

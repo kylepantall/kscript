@@ -115,6 +115,89 @@ namespace KScript.Language.Tests
             Assert.Empty(doc.Diagnostics);
         }
 
+        [Theory]
+        [InlineData("@live-action('move-note')", "move-note", '\'')]
+        [InlineData("@live-action ( \"move-note\" )", "move-note", '"')]
+        [InlineData("@live-action('move->board')", "move->board", '\'')]
+        public void NamedActionShorthandKeepsSourceRanges(string directive, string actionName, char quote)
+        {
+            string source = $"<span hidden {directive} on-action='save = true'></span>";
+            var document = Html(source);
+            Assert.Empty(document.Diagnostics);
+            var action = Assert.Single(document.RootElements).GetAttribute("live-action");
+            Assert.Equal("@live-action", source.Substring(action.NameSpan.Start, action.NameSpan.Length));
+            Assert.Equal(directive, source.Substring(action.Span.Start, action.Span.Length));
+            Assert.Equal(actionName, action.ValueText);
+            Assert.Equal(actionName, source.Substring(action.Value.SourceSpan.Start, action.Value.SourceSpan.Length));
+            Assert.Equal(quote, action.Quote);
+        }
+
+        [Theory]
+        [InlineData("@live-action(save)", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("@live-action('save'", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("@live-action('')", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("@live-action('save') live-action='other'", DiagnosticCodes.DuplicateAttribute)]
+        [InlineData("live-action='other' @live-action('save')", DiagnosticCodes.DuplicateAttribute)]
+        public void ReportsInvalidNamedActionAndRecoversAtNextAttribute(string directive, string code)
+        {
+            var doc = Html($"<span {directive} on-action='save = true'></span>");
+            Assert.Equal(code, Assert.Single(doc.Diagnostics).Code);
+            Assert.Equal("save = true", Assert.Single(doc.RootElements).GetAttributeValue("on-action"));
+        }
+
+        [Theory]
+        [InlineData("@bind('draft')", "bind", "draft")]
+        [InlineData("@bind-on(\"blur\")", "bind-on", "blur")]
+        [InlineData("@live-disable()", "live-disable", null)]
+        [InlineData("@live-use-autosize()", "live-use-autosize", null)]
+        [InlineData("@on-click(count += (')'->count() + (1 + 2)))", "on-click", "count += (')'->count() + (1 + 2))")]
+        public void LiveDirectivesPreserveArgumentAndNameSpans(string directive, string name, string value)
+        {
+            string source = $"<button {directive} title='ordinary'></button>";
+            var doc = Html(source);
+            Assert.Empty(doc.Diagnostics);
+            var attribute = doc.RootElements.Single().GetAttribute(name);
+            Assert.Equal("@" + name, source.Substring(attribute.NameSpan.Start, attribute.NameSpan.Length));
+            Assert.Equal(value, attribute.ValueText);
+            if (value != null) Assert.Equal(value, source.Substring(attribute.Value.SourceSpan.Start, attribute.Value.SourceSpan.Length));
+        }
+
+        [Theory]
+        [InlineData("@bind(draft)", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("@on-click()", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("@live-disable('yes')", DiagnosticCodes.InvalidAttribute)]
+        [InlineData("bind='draft' @bind('draft')", DiagnosticCodes.DuplicateAttribute)]
+        public void InvalidOrDuplicateDirectivesHaveAStartTagDiagnostic(string directives, string code)
+        {
+            var doc = Html($"<button {directives} title='ordinary'></button>");
+            Assert.Equal(code, Assert.Single(doc.Diagnostics).Code);
+            Assert.Equal("ordinary", doc.RootElements.Single().GetAttributeValue("title"));
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("dra")]
+        public void AnUnquotedDirectiveArgumentKeepsItsEditableSourceRange(string partial)
+        {
+            string source = $"<input @bind({partial})>";
+            var doc = Html(source);
+            Assert.Contains(doc.Diagnostics, d => d.Code == DiagnosticCodes.InvalidAttribute);
+            var argument = Assert.Single(doc.RootElements).GetAttribute("bind").Value;
+            Assert.Equal(partial, argument.Value);
+            Assert.Equal(source.IndexOf('(') + 1, argument.SourceSpan.Start);
+            Assert.Equal(partial.Length, argument.SourceSpan.Length);
+        }
+
+        [Fact]
+        public void AnUnfinishedHandlerStopsAtItsTagAndKeepsFollowingMarkup()
+        {
+            var doc = Html("<button @on-click(count += 1>Run</button><input @bind('draft')>");
+            var diagnostic = Assert.Single(doc.Diagnostics);
+            Assert.Equal(DiagnosticCodes.InvalidAttribute, diagnostic.Code);
+            Assert.Equal("count += 1", doc.RootElements.First().GetAttributeValue("on-click"));
+            Assert.Equal("draft", doc.RootElements.Last().GetAttributeValue("bind"));
+        }
+
         [Fact]
         public void HtmlStillReportsUnclosedKScriptElements()
         {

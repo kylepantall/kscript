@@ -993,12 +993,21 @@ namespace KScript.Language.Analysis
                 }
                 if (component == null && Kind != DocumentKind.Script &&
                     global::KScript.Pages.TemplateContract.NeedsLiveOwner(attr.Name))
+                {
                     RequireLive(e, attr);
+                    if (attr.Name.Equals("live-action", StringComparison.OrdinalIgnoreCase) && e.GetAttribute("on-action") == null)
+                        Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute,
+                            "A live-action name needs an on-action handler.");
+                    if (attr.Name.Equals("bind-on", StringComparison.OrdinalIgnoreCase) && (e.GetAttribute("bind") == null ||
+                        !global::KScript.Pages.LiveAttributes.Get("bind-on").Options.Contains(attr.ValueText)))
+                        Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                            "Use bind-on with bind and choose input, change, blur or action.");
+                }
                 if (attr.Value == null)
                 {
                     continue;
                 }
-                if (component == null && attr.Name.StartsWith("on-", StringComparison.Ordinal) && Kind != DocumentKind.Script)
+                if (component == null && attr.Name.StartsWith("on-", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {
                     // <button on-click="count += 1">: statements run on the server when the event fires.
                     // $event (value, checked, key) describes the browser event the handler runs for.
@@ -1006,16 +1015,9 @@ namespace KScript.Language.Analysis
                     handlerScope.Declare(BuiltIn("event"), e.Span.Start);
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                 }
-                else if (component == null && attr.Name == "bind" && Kind != DocumentKind.Script)
+                else if (component == null && attr.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {
-                    // <input bind="query">: two-way binding to a <state> variable.
-                    int dot = attr.Value.Value.IndexOf('.');
-                    DecodedText target = dot < 0 ? attr.Value : new DecodedText(attr.Value.Value[..dot],
-                        Enumerable.Range(0, dot + 1).Select(attr.Value.ToSource).ToArray());
-                    if (ReferenceVariableByName(target, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
-                    {
-                        boundVariables.Add(bound);
-                    }
+                    CheckBinding(e, attr, scope);
                 }
                 else
                 {
