@@ -305,7 +305,7 @@ namespace KScript.Pages
         /// null, the request goes to the site's pages and files. <paramref name="onStarted"/> gets the address once the
         /// server is listening.
         /// </summary>
-        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default, Action<string> onStarted = null)
+        public static async Task<int> RunAsync(PageSite site, int port, string host, TextWriter log, Func<HttpRequest, Task<PageResult>> handler, CancellationToken stop = default, Action<string> onStarted = null, string reloadRoot = null)
         {
             CliOutput cli = log == null ? null : new CliOutput(log);
 
@@ -319,10 +319,13 @@ namespace KScript.Pages
             });
 
             var app = builder.Build();
+            using var reload = reloadRoot == null ? null : new BrowserReload(reloadRoot);
             var types = new FileExtensionContentTypeProvider();
 
             app.Run(async http =>
             {
+                if (reload != null && await reload.TryHandleAsync(http, app.Lifetime.ApplicationStopping)) return;
+                string revision = reload?.Revision;
                 var started = DateTime.UtcNow;
                 PageResult result;
                 try
@@ -337,6 +340,7 @@ namespace KScript.Pages
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
                 }
 
+                if (revision != null) BrowserReload.Inject(result, http.Request, revision);
                 http.Response.StatusCode = result.Status;
                 http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
                 foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;

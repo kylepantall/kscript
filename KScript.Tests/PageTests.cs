@@ -345,6 +345,28 @@ public class PageSiteTests
     }
 
     [Fact]
+    public void Markdown_examples_preserve_tags_and_expressions_literally()
+    {
+        var result = PageRenderer.RenderString("""
+            Use `<let name="a">` and `{ expression }` when writing an example.
+
+            ~~~html
+            <for each="x" in="$missing">
+            {$missing}
+            ~~~
+
+            <let name="answer" value="42" />
+            Answer is {$answer}.
+            """, markdown: true, fileName: "example.md");
+
+        Assert.Equal(200, result.Status);
+        Assert.Contains("<code>&lt;let name=", result.Body);
+        Assert.Contains("<code>{ expression }</code>", result.Body);
+        Assert.Contains("{$missing}", result.Body);
+        Assert.Contains("Answer is 42.", result.Body);
+    }
+
+    [Fact]
     public void Read_markdown_returns_html_and_meta()
     {
         using var site = new TempSite(
@@ -423,6 +445,47 @@ public class PageSiteTests
         Assert.Equal(PageRoute.RouteKind.NotFound, routes.Resolve("/script.xml").Kind);
         Assert.Equal(PageRoute.RouteKind.NotFound, routes.Resolve("/../etc/passwd").Kind);
         Assert.Equal(PageRoute.RouteKind.NotFound, routes.Resolve("/nope").Kind);
+    }
+
+    [Fact]
+    public async Task DevelopmentServerNotifiesTheBrowserWhenAStylesheetChanges()
+    {
+        using var site = new TempSite(("index.html", "<body><p>Development</p></body>"),
+            ("site.ks.css", "body { color: red; }"), ("api.json", "{\"ok\":true}"));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        int port = FreePort();
+        var ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = PageServer.RunAsync(new PageSite(site.Root), port, "127.0.0.1", null, null, stop.Token,
+            onStarted: url => ready.TrySetResult(url), reloadRoot: site.Root);
+        try
+        {
+            using var http = new HttpClient { BaseAddress = new Uri(await ready.Task.WaitAsync(stop.Token)) };
+            string html = await http.GetStringAsync("/", stop.Token);
+            Assert.Contains(BrowserReload.ScriptPath, html);
+            Assert.Contains("</script></body>", html);
+            Assert.Equal("{\"ok\":true}", await http.GetStringAsync("/api.json", stop.Token));
+            Assert.Contains("EventSource", await http.GetStringAsync(BrowserReload.ScriptPath, stop.Token));
+
+            using var events = await http.GetAsync(BrowserReload.EventsPath, HttpCompletionOption.ResponseHeadersRead, stop.Token);
+            events.EnsureSuccessStatusCode();
+            Assert.Equal("text/event-stream", events.Content.Headers.ContentType.MediaType);
+            using var reader = new StreamReader(await events.Content.ReadAsStreamAsync(stop.Token));
+            string before = await reader.ReadLineAsync(stop.Token);
+            Assert.StartsWith("data: ", before);
+            Assert.Contains($"data-revision=\"{before[6..]}\"", html);
+            Assert.Empty(await reader.ReadLineAsync(stop.Token));
+
+            site.Write("site.ks.css", "body { color: blue; }");
+            string after = await reader.ReadLineAsync(stop.Token);
+            Assert.StartsWith("data: ", after);
+            Assert.NotEqual(before, after);
+            Assert.Contains("color: blue", await http.GetStringAsync("/site.css", stop.Token));
+        }
+        finally
+        {
+            stop.Cancel();
+            await server.WaitAsync(TimeSpan.FromSeconds(10));
+        }
     }
 
     [Fact]

@@ -134,6 +134,18 @@ namespace KScript.Syntax.Markup
             int textStart = pos;
             while (pos < text.Length)
             {
+                if (kind == DocumentKind.Markdown && MarkdownCode.EndAt(text, pos) is int end && end > pos)
+                {
+                    FlushText(textStart, pos);
+                    AddNode(new MarkupText
+                    {
+                        Content = DecodedText.Plain(text.Substring(pos, end - pos), pos),
+                        Span = TextSpan.FromBounds(pos, end),
+                        IsCData = true,
+                    });
+                    pos = textStart = end;
+                    continue;
+                }
                 if (text[pos] == '<' && TryParseMarkup(textStart))
                 {
                     textStart = pos;

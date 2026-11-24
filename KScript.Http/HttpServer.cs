@@ -15,7 +15,7 @@ namespace KScript.Http
         /// null to let them); <paramref name="started"/> gets the address once the server is listening.
         /// </summary>
         public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default,
-            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null)
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null, bool liveReload = false)
         {
             var app = new HttpApp(siteFolder, project, log);
             app.LoadStartupConfig();
@@ -43,7 +43,8 @@ namespace KScript.Http
                 await before(request) ?? (routes == null ? null : await routes(request));
             LocalApi.Install();
             LocalApi.Serve(app);
-            return RunAndForget(app, PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started));
+            return RunAndForget(app, PageServer.RunAsync(site, port, host, log, handler, stop, onStarted: started,
+                reloadRoot: liveReload ? project?.Directory ?? site.Root : null));
         }
 
         internal static void ProtectStorage(PageSite site, string projectRoot, AuthSettings settings, ConfigValue config = null)

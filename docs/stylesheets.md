@@ -38,6 +38,10 @@ h1 { font-size: {@fluid(28, 48)}; }            /* 28px on phones, growing to 48p
 - **Building.** `kscript css` compiles every stylesheet in the current folder (or the files and folders you name), skipping `node_modules`, `.git` and partials whose names start with `_`. `--out public/css` writes the results to another folder, and `--var dark=true` sets `$vars.dark`. From a script, `@stylesheet(path, vars)` returns the CSS: `@write_text('public/theme.css', @stylesheet('theme.ks.css', { dark: true }))`. `$config` works in stylesheets too.
 - **Serving.** `kscript serve` serves `theme.css` compiled from `theme.ks.css` on each request, unless a real `theme.css` is there, and never serves the `.ks.css` source itself. If a stylesheet fails, the error comes back as a CSS comment with status 500.
 
+The Team example site defines its styles in `Example Sites/team/site.ks.css` and links to `/site.css` from its layout. For a new site stylesheet, run `kscript make css` with a name. If the project uses Sass, run `kscript css` on the `.ks.scss` source before running the project's Sass compiler.
+
+Use `.ks.css` to derive palettes, responsive sizes and theme variants from data. For a group of components that share a tint, border, blur or shadow, put the shared values in CSS custom properties and override them locally. When a project needs parameterized groups of declarations, Sass mixins can handle them in a `.ks.scss` workflow.
+
 ## Adjusting lightness
 
 `@adjust_lightness` adds to the HSL lightness channel, clamps it to 0–100%, and returns CSS text. Use a positive amount for a lighter colour and a negative amount for a darker one. The existing stylesheet commands can be written with the explicit name and produce the same output.

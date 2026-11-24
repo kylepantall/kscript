@@ -15,9 +15,10 @@ namespace KScript;
 internal static class DockerServe
 {
     internal const string ContainerMarker = "KSCRIPT_SERVE_IN_DOCKER";
+    internal const string ReloadSetting = "KSCRIPT_LIVE_RELOAD";
     private static readonly string[] ComposeFiles = { "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml" };
 
-    internal static ProcessStartInfo CreateStartInfo(string root, DockerServeSettings settings, string containerName, string environment)
+    internal static ProcessStartInfo CreateStartInfo(string root, DockerServeSettings settings, string containerName, string environment, bool liveReload = true)
     {
         string file = FindComposeFile(root, settings);
         if (string.IsNullOrWhiteSpace(settings.Service) || settings.Service.StartsWith("-", StringComparison.Ordinal))
@@ -39,6 +40,11 @@ internal static class DockerServe
         {
             start.ArgumentList.Add("--env");
             start.ArgumentList.Add("KSCRIPT_ENV=" + environment);
+        }
+        if (!liveReload)
+        {
+            start.ArgumentList.Add("--env");
+            start.ArgumentList.Add(ReloadSetting + "=0");
         }
         start.ArgumentList.Add(settings.Service);
         return start;
@@ -146,13 +152,13 @@ internal static class DockerServe
         }
     }
 
-    internal static int Run(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop)
+    internal static int Run(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop, bool liveReload = true)
     {
         if (stop.IsCancellationRequested) return 0;
         string name = "kscript-serve-" + Guid.NewGuid().ToString("N");
         try
         {
-            var start = CreateStartInfo(root, settings, name, Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
+            var start = CreateStartInfo(root, settings, name, Environment.GetEnvironmentVariable("KSCRIPT_ENV"), liveReload);
             if (settings.Mount != null)
             {
                 int prepared = PrepareVolumeMounts(root, settings, error, stop);

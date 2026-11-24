@@ -77,7 +77,7 @@ namespace KScript.Pages
             "layout", "prop", "slot", "markdown", "respond", "redirect", "include", "live", "state",
         };
 
-        public static List<PageNode> Parse(string text, int firstLine = 1)
+        public static List<PageNode> Parse(string text, int firstLine = 1, bool markdown = false)
         {
             var root = new PageElement { Name = "#root" };
             var stack = new Stack<PageElement>();
@@ -105,6 +105,13 @@ namespace KScript.Pages
             while (i < text.Length)
             {
                 char c = text[i];
+                if (markdown && KScript.Syntax.Markup.MarkdownCode.EndAt(text, i) is int codeEnd && codeEnd > i)
+                {
+                    FlushText();
+                    stack.Peek().Children.Add(new PageText { Text = text.Substring(i, codeEnd - i), Raw = true, Line = line });
+                    Advance(codeEnd);
+                    continue;
+                }
 
                 // A { expression } in text is kept whole, so '<' inside it (in a string, say) isn't read as a tag.
                 if (c == '{' && i + 1 < text.Length && text[i + 1] != '{')

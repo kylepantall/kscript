@@ -1,3 +1,5 @@
+<let name="controlBorder" value="'#bbb'" />
+
 body { font: 16px/1.5 system-ui, sans-serif; margin: 40px auto; max-width: 720px; padding: 0 20px; }
 nav a { margin-right: 12px; }
 .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin: 12px 0; }
@@ -7,9 +9,9 @@ nav a { margin-right: 12px; }
 .demo h2 { font-size: 18px; }
 .big { font-size: 36px; font-weight: 700; margin: 8px 0; }
 .note { color: #666; font-size: 14px; }
-button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid {$controlBorder}; background: #fff; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-input { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid #bbb; }
+input { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid {$controlBorder}; }
 input[type=range] { width: 100%; margin-top: 8px; }
 .todos { list-style: none; padding: 0; }
 .todos li { display: flex; justify-content: space-between; padding: 4px 0; }

@@ -30,7 +30,7 @@ namespace KScript.Pages
         /// <summary>Current values of inputs with bind="name".</summary>
         public Dictionary<string, object> Binds { get; set; } = new Dictionary<string, object>();
 
-        /// <summary>Details of the DOM event: value, key, checked.</summary>
+        /// <summary>Browser-supplied event details such as input state, key modifiers, coordinates and drag value.</summary>
         public Dictionary<string, object> Event { get; set; } = new Dictionary<string, object>();
 
         /// <summary>The re-rendered block, set by the renderer.</summary>

@@ -114,7 +114,7 @@ The app runs as an unprivileged user with a read-only application directory. Com
 
 ### Running the development site in Docker
 
-Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Edit pages, styles, or route files locally, then refresh the browser to see the changes without rebuilding. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.
+Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Open the site and edit pages, styles, or route files locally. The browser reloads when the container sees the edits. Use `--no-reload` to refresh manually. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.
 
 Add this to `kscript.json` to use Docker whenever you run `kscript serve`.
 

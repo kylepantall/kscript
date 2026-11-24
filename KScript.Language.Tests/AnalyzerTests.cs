@@ -439,7 +439,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void MarkdownFrontMatterDeclaresVariables()
         {
-            string md = "---\ntitle: Team\nlayout: _layout.html\n---\n# { $title } { $nope }\n<for each=\"p\" in=\"[1]\">\n- {$p}\n</for>\n";
+            string md = "---\ntitle: Team\nlayout: _layout.html\n---\n# { $title } { $nope }\n" +
+                "`<let>` and `{ expression }`\n\n```html\n<for>\n{$literal}\n```\n\n" +
+                "<for each=\"p\" in=\"[1]\">\n- {$p}\n</for>\n";
             DocumentAnalysis a = Analyze(md, Path.Combine(Site, "team.md"), SiteFiles());
             Diagnostic d = AssertSingle(a, DiagnosticCodes.UndefinedVariable);
             Assert.Equal("nope", a.Source[d.Span]);
