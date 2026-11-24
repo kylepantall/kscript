@@ -1,31 +1,24 @@
-// What the Run and test commands need that isn't the vscode API: reading kscript's output and its JUnit report.
+// What the Run and test commands need that isn't the vscode API: preparing a task and reading the JUnit report.
 // Kept free of the vscode API so it can be unit tested.
 'use strict';
 
 const os = require('os');
 const path = require('path');
 
-const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
-
-/** Text without terminal colour codes. */
-function stripAnsi(text) {
-  return String(text).replace(ANSI, '');
-}
-
 /** Set on the scripts the editor runs, so an error names its file with the whole path. */
 const RUN_ENV = { KSCRIPT_ERROR_PATHS: 'full' };
 
-/**
- * The location and message of the error a script stopped with, from kscript's output:
- *   ERROR  /work/hello.kscript:3:5: Type: '-' needs a number, but got the string 'a'.
- * Null when the output has none.
- */
-function parseRunError(output) {
-  for (const line of stripAnsi(output).split(/\r?\n/)) {
-    const m = /^\s*ERROR\s+(.+?):(\d+)(?::(\d+))?: (.*)$/.exec(line);
-    if (m) return { file: m[1], line: Number(m[2]), column: m[3] ? Number(m[3]) : 1, message: m[4] };
-  }
-  return null;
+/** Find the source location in a KScript error on a terminal line. */
+function runErrorLink(text) {
+  const match = /^(\s*ERROR\s+)((.+?):([1-9]\d*)(?::([1-9]\d*))?):\s/.exec(text);
+  if (!match || !path.isAbsolute(match[3])) return undefined;
+  return {
+    startIndex: match[1].length,
+    length: match[2].length,
+    file: match[3],
+    line: Number(match[4]) - 1,
+    column: match[5] ? Number(match[5]) - 1 : 0,
+  };
 }
 
 /** Where a new, unsaved script is written so it can run: the editor's name for it, with the extension its language needs. */
@@ -137,4 +130,4 @@ function docsArgs(word) {
   return text && /^(->)?[\w.:-]+$/.test(text) && !/^-(?!>)/.test(text) ? ['docs', text] : ['docs'];
 }
 
-module.exports = { docsArgs, stripAnsi, RUN_ENV, parseRunError, untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError };
+module.exports = { docsArgs, RUN_ENV, runErrorLink, untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError };

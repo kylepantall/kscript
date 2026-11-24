@@ -7,7 +7,7 @@ Language support for [KScript](https://github.com/kylepantall/kscript): scripts 
 - Hover documentation and signature help
 - Go to definition, find references and rename
 - Outline, semantic highlighting and syntax highlighting, including `{ expressions }` in pages
-- Run a script with the **Run** button, `F5` or the **▶ Run** line above its first statement, with the error it stops on marked on its line
+- Run a script with the **Run** button, `Ctrl+F5` or the **▶ Run** line above its first statement, with runtime errors reported in the terminal
 - Tests in the Testing view and a **▶ Run test** line above each one
 - Suggestions with the everyday statements and methods first, parameter names shown beside plain values, and hovers with an example and an **Open docs** link
 - How many times each function is used, shown above it, and **Go to Symbol in Workspace** (`Ctrl+T`) across every script
@@ -58,7 +58,7 @@ The `format` section of `kscript.json` sets the formatting style (`"indent": 4`,
 - **KScript: Restart Language Server**: after updating `kscript` or changing settings.
 - **KScript: Show Language Server Output**: the server's log, also opened by clicking **KScript** in the status bar.
 - **KScript: New Script** (also in **File > New File…**): opens a short script that runs as it is, as a place to start.
-- **KScript: Run Script** (`F5`, or the run button in the editor title bar): saves and runs the open script in the terminal. If it stops with an error, the line is underlined and listed in Problems. A new file that hasn't been saved yet runs too.
+- **KScript: Run Script** (`Ctrl+F5`, or the run button in the editor title bar): saves and runs the open script in the terminal. Runtime errors appear in the terminal with a link to the file and line. Use **Check This File** or **Check Project** for diagnostics in Problems. A new file that hasn't been saved yet runs too.
 - **KScript: Run Tests**: runs `kscript test` for the workspace folder in a task.
 - **KScript: Run Tests in This File**: runs the open test file. Test files (`*.test.kscript`, `*.test.ks.xml`) also get a run button in the editor title bar, and every test is listed in the Testing view, where it can be run on its own.
 - **KScript: Serve Site**: runs `kscript serve` in the project's folder.

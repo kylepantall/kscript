@@ -4,7 +4,7 @@
  * What KScript: New Script opens: a short script that runs as it is and shows a variable, text that fills in a
  * value, a function, a list and a loop. Each part says what it is, so the file is the first lesson.
  */
-const STARTER = `// Your first script. Press F5, or click Run above the next line, to run it.
+const STARTER = `// Your first script. Press Ctrl+F5, or click Run above the next line, to run it.
 name = "world"
 echo "Hello {$name}!"
 

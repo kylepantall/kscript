@@ -3,16 +3,7 @@
 const assert = require('assert');
 const path = require('path');
 const { test } = require('node:test');
-const { stripAnsi, parseRunError, untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError } = require('../../src/run');
-
-test('finds the error a script stopped with, colours or not', () => {
-  const plain = "hi\n   ERROR  /work/my app/hello.kscript:3:5: Type: '-' needs a number, but got the string 'a'.\n";
-  assert.deepStrictEqual(parseRunError(plain), { file: '/work/my app/hello.kscript', line: 3, column: 5, message: "Type: '-' needs a number, but got the string 'a'." });
-  const coloured = '\u001b[1;97;41m ERROR \u001b[0m C:\\work\\hello.kscript:12: Name: $x is not defined.\r\n';
-  assert.deepStrictEqual(parseRunError(coloured), { file: 'C:\\work\\hello.kscript', line: 12, column: 1, message: 'Name: $x is not defined.' });
-  assert.strictEqual(parseRunError('all fine\n'), null);
-  assert.strictEqual(stripAnsi('\u001b[32mok\u001b[0m'), 'ok');
-});
+const { untitledPath, isTestFile, parseJUnit, filterFor, namePattern, outcomeOf, loadError } = require('../../src/run');
 
 test('gives a new unsaved script a path to run from', () => {
   assert.strictEqual(untitledPath('Untitled-1', 'kscript-code', '/tmp'), path.join('/tmp', 'kscript-untitled', 'Untitled-1.kscript'));
