@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -66,6 +67,7 @@ namespace KScript.Pages
         internal bool SkipLiveRender { get; set; }
         internal bool ContainsModelForm;
         internal int LiveCounter;
+        internal Dictionary<(string File, int Line, int Offset, string Tag), int> LiveComponentOccurrences = new();
         internal int IncludeDepth;
 
         // A model form contains this session's CSRF token and may contain private record values.
@@ -121,6 +123,8 @@ namespace KScript.Pages
     /// </summary>
     public static class PageRenderer
     {
+        private sealed record ComponentCall(string File, int Line, int Offset, string Tag, string LiveId);
+
         private sealed class RenderState
         {
             public PageContext Ctx;
@@ -228,7 +232,8 @@ namespace KScript.Pages
         }
 
         private static string RenderFileInScope(PageContext ctx, string relativePath, Scope scope, string slot,
-            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null)
+            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null,
+            ComponentCall component = null)
         {
             if (++ctx.IncludeDepth > 32) throw new PageException($"Layouts, components or includes are nested more than 32 deep (at {relativePath}). Does one include itself?");
             try
@@ -236,8 +241,8 @@ namespace KScript.Pages
                 string text = ctx.ReadSiteFile(relativePath, "page");
                 string name = relativePath.Replace('\\', '/').TrimStart('/');
                 if (name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-                    return RenderMarkdownSource(text, name, ctx, scope, slot, inputs, companion, loaded);
-                return RenderSource(text, 1, NewState(ctx, name, slot, false, inputs, companion, loaded), scope);
+                    return RenderMarkdownSource(text, name, ctx, scope, slot, inputs, companion, loaded, component);
+                return RenderSource(text, 1, NewState(ctx, name, slot, false, inputs, companion, loaded), scope, component);
             }
             finally
             {
@@ -246,14 +251,15 @@ namespace KScript.Pages
         }
 
         private static string RenderMarkdownSource(string text, string name, PageContext ctx, Scope scope, string slot,
-            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null)
+            IReadOnlyDictionary<string, object> inputs = null, string companion = null, Action<object> loaded = null,
+            ComponentCall component = null)
         {
             var (meta, body, bodyLine) = PageMarkdown.SplitFrontMatter(text);
             var pageScope = scope.Child();
             foreach (var kv in meta) pageScope.Declare(kv.Key, kv.Value);
             pageScope.Declare("page", meta);
 
-            string markdown = RenderSource(body, bodyLine, NewState(ctx, name, slot, true, inputs, companion, loaded), pageScope);
+            string markdown = RenderSource(body, bodyLine, NewState(ctx, name, slot, true, inputs, companion, loaded), pageScope, component);
             string html = PageMarkdown.ToHtml(markdown);
 
             if (meta.TryGetValue("layout", out var layout) && layout != null)
@@ -278,7 +284,7 @@ namespace KScript.Pages
             };
         }
 
-        private static string RenderSource(string text, int firstLine, RenderState state, Scope scope)
+        private static string RenderSource(string text, int firstLine, RenderState state, Scope scope, ComponentCall component = null)
         {
             List<PageNode> nodes;
             try
@@ -322,8 +328,35 @@ namespace KScript.Pages
             }
 
             var sb = new StringBuilder();
-            RenderNodes(nodes, scope, sb, state);
+            if (component != null && (component.LiveId != null || UsesLiveFeatures(nodes, state.Ctx)))
+            {
+                var live = new PageElement { Name = "live", Line = firstLine };
+                live.Children.AddRange(nodes);
+                RenderLive(live, scope, sb, state, ComponentLiveId(component, state.Ctx));
+            }
+            else RenderNodes(nodes, scope, sb, state);
             return sb.ToString();
+        }
+
+        private static bool UsesLiveFeatures(IEnumerable<PageNode> nodes, PageContext ctx) =>
+            nodes.OfType<PageElement>().Any(el => el.Name != "live" &&
+                (el.Name == "state" ||
+                 (!PageTemplate.ControlElements.Contains(el.Name) &&
+                  el.Attributes.Any(attr => TemplateContract.NeedsLiveOwner(attr.Name)) &&
+                  (!PageElementNames.CanBeComponent(el.Name) || ctx.ComponentFile(el.Name) == null)) ||
+                 UsesLiveFeatures(el.Children, ctx)));
+
+        private static string ComponentLiveId(ComponentCall component, PageContext ctx)
+        {
+            if (component.LiveId != null) return component.LiveId;
+
+            var site = (component.File, component.Line, component.Offset, component.Tag);
+            int occurrence = ctx.LiveComponentOccurrences.GetValueOrDefault(site) + 1;
+            ctx.LiveComponentOccurrences[site] = occurrence;
+            string identity = FormattableString.Invariant(
+                $"{string.Join("\0", ctx.LiveParents)}\0{component.File}\0{component.Line}\0{component.Offset}\0{component.Tag}\0{occurrence}");
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+            return "component-" + Convert.ToHexString(hash.AsSpan(0, 12)).ToLowerInvariant();
         }
 
         private static void CheckInputs(List<PageNode> nodes, Scope scope, RenderState state)
@@ -610,8 +643,14 @@ namespace KScript.Pages
             var componentScope = root.Child();
             var inputs = new Dictionary<string, object>(StringComparer.Ordinal);
             Action<object> loaded = null;
+            string liveId = null;
             foreach (var a in el.Attributes)
             {
+                if (a.Name == "live-id")
+                {
+                    liveId = Values.ToStr(AttributeValue(a, scope, state));
+                    continue;
+                }
                 object value = AttributeValue(a, scope, state);
                 if (TemplateContract.IsLoadCallback(a.Name))
                 {
@@ -625,6 +664,7 @@ namespace KScript.Pages
                 componentScope.Declare(name, value);
             }
 
+            var call = new ComponentCall(state.File, el.Line, el.Offset, el.Name, liveId);
             if (global::KScript.Syntax.Markup.ScriptFiles.IsScript(path))
             {
                 if (loaded != null) throw new PageException("onLoad is available on components with companion load functions.");
@@ -639,7 +679,7 @@ namespace KScript.Pages
                     var templateScope = component.Scope.Child();
                     if (!templateScope.TryGet("request", out object request) || request == null)
                         templateScope.Declare("request", state.Ctx.Request);
-                    AppendIndented(sb, RenderSource(component.Html, component.FirstLine, componentState, templateScope), state);
+                    AppendIndented(sb, RenderSource(component.Html, component.FirstLine, componentState, templateScope, call), state);
                 }
                 finally
                 {
@@ -651,7 +691,7 @@ namespace KScript.Pages
                 string companion = TemplateContract.CompanionPath(path);
                 if (companion != null && !state.Ctx.SiteFileExists(companion)) companion = null;
                 AppendIndented(sb, RenderFileInScope(state.Ctx, path, componentScope, body.ToString(), inputs,
-                    companion == null ? null : state.Ctx.ResolveSitePath(companion, "component script"), loaded), state);
+                    companion == null ? null : state.Ctx.ResolveSitePath(companion, "component script"), loaded, call), state);
             }
             return true;
         }
@@ -811,6 +851,8 @@ namespace KScript.Pages
                     sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(Values.HtmlEscape(directiveValue)).Append('"');
                     continue;
                 }
+                if (a.Name.StartsWith("live-use-", StringComparison.Ordinal) && state.LiveScope == null)
+                    throw new PageException($"{a.Name} needs a live component or a <live> block.");
                 if (a.Name is "live-loading" or "live-offline" or "live-disable" or "live-confirm" or "live-key" or "live-replace"
                     or "live-dirty" or "live-cloak" or "live-ignore" or "live-error")
                 {
@@ -954,14 +996,14 @@ namespace KScript.Pages
         /// A &lt;live&gt; block is re-rendered on the server when its handlers run in the browser.
         /// Its &lt;state&gt; travels with the page, signed, so the server keeps nothing between requests.
         /// </summary>
-        private static void RenderLive(PageElement el, Scope scope, StringBuilder sb, RenderState state)
+        private static void RenderLive(PageElement el, Scope scope, StringBuilder sb, RenderState state, string inferredId = null)
         {
             if (state.InPlaceholder) throw new PageException("A live placeholder cannot contain another live block.");
             var ctx = state.Ctx;
             int depth = ctx.LiveParents.Count;
-            if (depth > 0 && !el.HasAttr("id")) throw new PageException("A nested live component needs an explicit ID.");
-            string id = el.Attr("id") is string explicitId ? Interpolate(explicitId, scope, state, EscapeMode.None) : $"live-{++ctx.LiveCounter}";
-            if (id.Length == 0 || ctx.LiveParents.Contains(id, StringComparer.Ordinal) || depth == 32)
+            if (depth > 0 && inferredId == null && !el.HasAttr("id")) throw new PageException("A nested live component needs an explicit ID.");
+            string id = inferredId ?? (el.Attr("id") is string explicitId ? Interpolate(explicitId, scope, state, EscapeMode.None) : $"live-{++ctx.LiveCounter}");
+            if (string.IsNullOrWhiteSpace(id) || ctx.LiveParents.Contains(id, StringComparer.Ordinal) || depth == 32)
                 throw new PageException("Live components need distinct, nonempty IDs and no more than 32 parents.");
             string proof = ctx.RouteProof;
             string actionScope = proof == null ? null : proof + "\0" + state.File + "\0" + id +
@@ -1087,7 +1129,9 @@ namespace KScript.Pages
                 else html.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(Interpolate(a.Value, scope, state, EscapeMode.Html).Replace("\"", "&quot;")).Append('"');
             }
             html.Append(" id=\"").Append(Values.HtmlEscape(id)).Append("\">");
-            html.Append(body).Append("</").Append(tag).Append('>');
+            if (inferredId != null && state.Markdown) html.Append(PageMarkdown.ToHtml(body.ToString()));
+            else html.Append(body);
+            html.Append("</").Append(tag).Append('>');
 
             if (target)
             {
@@ -1160,6 +1204,8 @@ namespace KScript.Pages
         private static void RenderLiveChildren(PageElement el, string id, Scope scope, StringBuilder output, RenderState state, bool waiting = false)
         {
             var parents = state.Ctx.LiveParents;
+            var occurrences = state.Ctx.LiveComponentOccurrences;
+            state.Ctx.LiveComponentOccurrences = new();
             parents.Add(id);
             try
             {
@@ -1178,7 +1224,11 @@ namespace KScript.Pages
                     RenderNodes(children, scope, output, state);
                 }
             }
-            finally { parents.RemoveAt(parents.Count - 1); }
+            finally
+            {
+                parents.RemoveAt(parents.Count - 1);
+                state.Ctx.LiveComponentOccurrences = occurrences;
+            }
         }
 
         private static void CheckVisibleControls(PageElement el, string id, RenderState state, Scope liveScope, List<string> stateNames, string actionScope,

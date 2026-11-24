@@ -178,6 +178,8 @@ fn heading(title: string) => $title->upper()
 
 A `<live>` block reacts to clicks and typing without any JavaScript in the page. Its handlers are KScript statements; the server runs them and sends back just that block's new HTML.
 
+Reusable components become live automatically when their templates use state, event handlers, bindings or live directives. Use a `<live>` block in a page, or when a component needs to customize its live root.
+
 ```html
 <live id="counter">
   <state name="count" value="0" />

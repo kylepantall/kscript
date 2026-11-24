@@ -45,9 +45,17 @@ public sealed class RoutedLiveTests : AuthSiteFixture
                 ["args"] = args ?? Attribute(page, "data-ks-args-0"), ["binds"] = new Dictionary<string, object> { [field] = "bio" },
             }));
 
-    [Fact]
-    public void RedrawReentersTheGetRouteAndReturnsOnlyTheKeyedComponent()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RedrawReentersTheGetRouteAndReturnsOnlyTheKeyedComponent(bool automatic)
     {
+        if (automatic)
+        {
+            Write("views/editor.html", """<h1>Editor</h1><counter live-id="item-{$request.params.id}" />""");
+            Write("_components/counter.html", Read("_components/counter.html")
+                .Replace("""<live id="item-{$item}">""", "").Replace("</live>", ""));
+        }
         var browser = new Browser(App());
         browser.Get("/sign-in");
         PageResult page = browser.Get("/edit/7");
@@ -68,6 +76,41 @@ public sealed class RoutedLiveTests : AuthSiteFixture
         // Change the access rule after the component was rendered.
         Write("routes/web.kscript", Read("routes/web.kscript").Replace("auth:session", "auth:token"));
         Assert.True(Click(browser, saved).Status is 401 or 302);
+    }
+
+    [Fact]
+    public void An_inferred_child_keeps_its_identity_during_the_parent_probe_and_redraw()
+    {
+        Write("_components/counter.html", """
+            <state name="count" value="0" /><state name="draft" value="''" />
+            <input bind="draft" /><button on-click="count += 1">Add</button>
+            <mini-counter />
+            """);
+        Write("_components/mini-counter.html", """
+            <state name="count" value="0" />
+            <p>{$count}</p><button on-click="count += 1">Add</button>
+            """);
+        Write("views/editor.html", """<counter live-id="item-{$request.params.id}" />""");
+
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var page = browser.Get("/edit/7");
+        var children = Regex.Matches(page.Body, "data-ks-live=\"([^\"]+)\"");
+        Assert.Equal(2, children.Count);
+        string childId = children[1].Groups[1].Value;
+        var parent = Click(browser, page);
+        Assert.Equal(200, parent.Status);
+        string marker = $"data-ks-live=\"{childId}\"";
+        var child = new PageResult { Body = parent.Body.Split(marker, 2)[1] };
+        var update = browser.Send("POST", "/edit/7", headers: new() { ["x-kscript-live"] = Attribute(parent, "data-ks-route") },
+            json: System.Text.Json.JsonSerializer.Serialize(new
+            {
+                block = childId, handler = 0d, state = Attribute(child, "data-ks-state"),
+                args = Attribute(child, "data-ks-args-0"),
+                parents = new[] { new { id = "item-7", state = Attribute(parent, "data-ks-state") } },
+            }));
+        Assert.Equal(200, update.Status);
+        Assert.Contains("<p>1</p>", update.Body);
     }
 
     [Fact]

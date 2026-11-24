@@ -556,6 +556,30 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void Only_components_with_live_features_mount_automatically()
+    {
+        using var site = new TempSite(
+            ("index.html", "<plain-card /><hook-card /><hook-card /><plain-card live-id=\"custom\" />"),
+            ("plain.html", "<plain-card />"),
+            ("navigation.html", "<links-card />"),
+            ("_components/plain-card.html", "<p>Read only</p>"),
+            ("_components/links-card.html", "<a href=\"/plain\" live-navigate>Home</a>"),
+            ("_components/hook-card.html", "<input live-use-autosize><button live-client=\"copy\">Copy</button>"));
+        string html = site.Render("index.html").Body;
+        var mounts = System.Text.RegularExpressions.Regex.Matches(html, "data-ks-live=\"([^\"]+)\"");
+        Assert.Equal(3, mounts.Count);
+        Assert.NotEqual(mounts[0].Groups[1].Value, mounts[1].Groups[1].Value);
+        Assert.Equal("custom", mounts[2].Groups[1].Value);
+        Assert.Contains("live-use-autosize", html);
+        Assert.Contains("data-ks-live-client=\"copy\"", html);
+        Assert.Contains("/_ks/live.js", html);
+        Assert.DoesNotContain("/_ks/live.js", site.Render("plain.html").Body);
+        Assert.DoesNotContain("data-ks-live=", site.Render("plain.html").Body);
+        Assert.DoesNotContain("data-ks-live=", site.Render("navigation.html").Body);
+        Assert.Contains("/_ks/live.js", site.Render("navigation.html").Body);
+    }
+
+    [Fact]
     public void Events_run_the_handler_and_return_only_the_block()
     {
         using var site = new TempSite(("index.html", "<h1>Title</h1>" + Counter));

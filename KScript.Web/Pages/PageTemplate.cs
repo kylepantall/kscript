@@ -45,6 +45,7 @@ namespace KScript.Pages
         public string SourceName { get; set; }
         public List<PageAttribute> Attributes { get; } = new List<PageAttribute>();
         public List<PageNode> Children { get; } = new List<PageNode>();
+        public int Offset { get; set; }
         public bool SelfClosing { get; set; }
         public bool Void { get; set; }
 
@@ -193,7 +194,7 @@ namespace KScript.Pages
                     int j = i + 1;
                     while (j < text.Length && IsNameChar(text[j])) j++;
                     string tagName = text.Substring(i + 1, j - i - 1);
-                    var el = new PageElement { Name = tagName.ToLowerInvariant(), SourceName = tagName, Line = startLine };
+                    var el = new PageElement { Name = tagName.ToLowerInvariant(), SourceName = tagName, Line = startLine, Offset = i };
 
                     // Attributes, or a shorthand head: <if $ready> means <if test="$ready">.
                     bool closed = false;

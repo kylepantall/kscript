@@ -1,43 +1,49 @@
 # Components
 
-A component is a reusable part of a KScript website. Give it typed inputs, render it with a tag, and add a `<live>` block when the interface needs to respond to the browser. The page runtime takes care of sending actions and updating the page.
+A component is a reusable part of a KScript website. Give it typed inputs and render it with a tag. State, event handlers, bindings and directives such as `live-use-focus` automatically make the component live. The page runtime sends actions and updates the component.
 
 ## Build your first component
 
-Save this file as `_components/click-counter.kscript` inside a site folder.
+Create `_components/click-counter.html` inside your site folder.
+
+```html
+<state name="count" value="0" />
+<button type="button" on-click="count += 1">Count is {$count}</button>
+```
+
+Create `index.html` in the same site folder.
+
+```html
+<h1>Counters</h1>
+<click-counter />
+<click-counter />
+```
+
+Run `kscript serve` from the site folder and open the address it prints. Click the first button. It reads **Count is 1**, and the second still reads **Count is 0**.
+
+KScript gives each counter its own live root because the template declares state and a click handler. Put `<state>` at the top level of the template. The automatic root is a `div`.
+
+An explicit `<live>` block lets you choose the root element with `as`, defer rendering, or make only a portion of a component live. Use explicit blocks for interactive markup directly in a page. Plain display components render without loading the live runtime.
+
+## Component inputs, rendering and slots
+
+Give a component typed inputs by defining a KScript type. Save this as `_components/hello-card.kscript`.
 
 ````kscript
 import KScript.Web
 
-type ClickCounter extends Component {
-  instance_id: string
-  start: int = 0
+type HelloCard extends Component {
+  name: string
 
   fn render(): Component {
     return ```html
-    <live id="{$instance_id}">
-      <state name="count" value="$start" />
-      <output>{$count}</output>
-      <button type="button" on-click="count += 1">Add one</button>
-    </live>
+    <p>Hello, {$name}!</p>
     ```
   }
 }
 ````
 
-Add these calls to `index.html`. Attribute names use kebab-case. A lone expression passes its typed value, so `{3}` gives the component an integer.
-
-```html
-<h1>Counters</h1>
-<click-counter instance-id="first" start="{3}" />
-<click-counter instance-id="second" />
-```
-
-Run `kscript serve` inside the folder and open the address it prints. Each button updates its own counter. Use distinct live IDs when rendering several instances, including repeated components in a loop.
-
-`kscript make component ClickCounter --live` generates a starting file. For a component that only renders display markup, return the HTML without a live block.
-
-## Component inputs, rendering and slots
+Add `<hello-card name="Sam" />` to `index.html` to render **Hello, Sam!**. Use kebab-case for attributes like `display-name` and underscores for fields like `display_name`. An attribute that consists of one expression passes its original type. For example, `start="{3}"` passes an integer.
 
 | Part | How it works |
 | --- | --- |
@@ -52,7 +58,7 @@ The page may render more than once during an action. Keep render methods, comput
 
 ## How a live update works
 
-1. On the first request, KScript evaluates the `<state>` defaults and renders the live block. The HTML includes signed state and action arguments.
+1. On the first request, KScript evaluates the `<state>` defaults and renders the live root. The HTML includes signed state and action arguments.
 2. On an event, the browser sends the state, the event, and any bound input values to the URL that rendered the page. The original GET route and middleware run again when the page comes from a controller.
 3. KScript verifies the route, session, block and action. It checks that the submitted action and fields are still rendered and then runs the handler.
 4. The browser applies the result to that block. Matching DOM nodes stay in place, including correctly keyed rows and independent nested live blocks.
@@ -61,7 +67,7 @@ HTML escapes ordinary `{ expression }` output. Signed values are still visible t
 
 ## State and binding
 
-Use `<state name="…" value="…" />` directly inside a live block. Read it with `$name` and assign it with `name = …`. A normal state value survives actions on that rendered block.
+Use `<state name="…" value="…" />` at the top level of a component template or directly inside a `<live>` block. Read it with `$name` and assign it with `name = …`. A normal state value survives actions on that rendered block.
 
 | Need | Markup |
 | --- | --- |
@@ -108,22 +114,21 @@ For sortable siblings, give each item a unique `sort-item="{$item.id}"` and put 
 
 ## Forms, uploads and loading feedback
 
-A form with `on-submit` can send several bindings in one action. Use HTML controls such as `required` for immediate feedback and KScript types or rules for server validation. For persistence to a model, [model forms](web.md#model-forms) support explicit saves and autosave with allowlisted fields, ownership checks and CSRF protection.
+A form with `on-submit` can send several bindings in one action. Paste this block into `index.html`, enter a name, and click **Greet** to see the result. The binding is sent when you submit the form.
 
 ```html
-<live id="note-form">
-  <state name="draft" value="{ title: '' }" />
-  <state name="status" value="''" />
-  <form on-submit="status = $draft.title->trim() == '' ? 'Enter a title' : 'Title accepted'">
-    <label>Title <input bind="draft.title" bind-on="action" required></label>
-    <button live-disable>Check title</button>
+<live id="greeting-form">
+  <state name="name" value="''" />
+  <state name="message" value="''" />
+  <form on-submit="message = 'Hello, ' + $name + '!'">
+    <label>Name <input bind="name" bind-on="action" required></label>
+    <button live-disable>Greet</button>
   </form>
-  <p live-dirty="draft.title">Unsaved title</p>
-  <p live-loading role="status">Checking…</p>
-  <p live-error role="alert"></p>
-  <p>{$status}</p>
+  <p role="status">{$message}</p>
 </live>
 ```
+
+Use HTML controls such as `required` for immediate feedback and KScript types or rules for server validation. To save to a database, use [model forms](web.md#model-forms).
 
 | Attribute | Browser behavior |
 | --- | --- |
@@ -140,8 +145,9 @@ Use `@live_download('report.txt', bytes: $report->to_base64())` to offer bytes g
 
 ## Nesting, identity and lazy rendering
 
-A live block can contain an independent child block. Give the child an explicit stable ID. A parent update keeps the child's DOM and state, and a child action uses the signed ancestor state to reconstruct the context it was rendered in. Changing the child's ID mounts a new instance. To update a mounted child from the parent, send it an event.
+A live component can contain an independent child component. A parent update keeps the child's DOM and state, and a child action uses the signed ancestor state to reconstruct the context it was rendered in. Changing the child's ID mounts a new instance. To update a mounted child from the parent, send it an event.
 
+- For a list of components that can reorder or change membership, pass each one a unique ID such as `<row-editor live-id="editor-{$row.id}" record="{$row}" />`. For an explicit `<live>` block, set its `id` attribute.
 - Use `live-key="{$item.id}"` for repeated siblings whose DOM identity should survive a reorder.
 - Use `live-ignore` for a browser-owned widget. Keep KScript's bound controls and action handlers outside that widget.
 - Use `live-replace` to build a fresh node on each redraw.
@@ -167,16 +173,16 @@ The browser dispatches `kscript:navigating` before an in-page visit and `kscript
 
 ## Stream an action's output
 
-Mark an element with `live-stream="name"` and call `@stream('name', value)` from a live action. The browser can display each chunk while the action is still running. The action stays on the original signed route, and the target must be rendered in that component.
+Paste this block into `index.html` and click **Run**. The action sends text to the element named `progress`. In a longer action, each chunk can appear before the action finishes.
 
 ```html
-<live id="report">
+<live id="stream-demo">
   <p live-stream="progress" role="status"></p>
-  <button on-click="@stream('progress', 'Starting…'); @stream('progress', 'Ready', mode: 'replace'); @skip_render()">Run report</button>
+  <button on-click="@stream('progress', 'Ready'); @skip_render()">Run</button>
 </live>
 ```
 
-Chunks append by default. Use `mode: 'replace'` for a progress label, and `html: true` only with markup you trust. A successful action normally replaces the preview with its final rendered fragment. Use `@skip_render()` to keep the streamed output. A failed action restores the pre-stream content. Actions that change session cookies, such as signing in or out, need a regular response.
+Call `@stream()` more than once to send several chunks. The target must be rendered in the same component. Chunks append by default. Use `mode: 'replace'` for a progress label, and `html: true` only with markup you trust. A successful action normally replaces the preview with its final rendered fragment. Use `@skip_render()` to keep the streamed output. A failed action restores the pre-stream content. Actions that change session cookies, such as signing in or out, need a regular response.
 
 ## Portals
 
@@ -196,22 +202,28 @@ A portal moves its template contents to a matching HTML container outside the li
 
 ## Client-side extensions
 
-Applications can optionally register JavaScript when the runtime fires `kscript:init`. That event fires once per browser document. Registrations survive in-page navigation.
+Give a field focus when a component mounts. Save this as `_components/focus-field.html`.
 
-```javascript
-document.addEventListener("kscript:init", () => {
-  KScriptLive.directive("autosize", ({ element, signal }) => {
-    const resize = () => {
-      element.style.height = "auto";
-      element.style.height = element.scrollHeight + "px";
-    };
-    element.addEventListener("input", resize, { signal });
-    resize();
-  });
-}, { once: true });
+```html
+<label>Search <input type="search" live-use-focus></label>
 ```
 
-Use `live-use-autosize` on a component element to activate that directive. The directive receives its element, owning component, attribute value, and an abort signal. It can return a cleanup function. The runtime aborts and cleans up when the element, owning component, or directive value changes.
+Add the component and its directive to `index.html`.
+
+```html
+<focus-field />
+<script>
+document.addEventListener("kscript:init", () => {
+  KScriptLive.directive("focus", ({ element }) => {
+    element.focus();
+  });
+}, { once: true });
+</script>
+```
+
+Reload the page. The field receives focus, and `live-use-focus` gives its component a live root automatically. The runtime fires `kscript:init` once per browser document. Registrations survive in-page navigation. The directive receives its element, owning component, attribute value, and an abort signal. It can return a cleanup function. The runtime aborts and cleans up when the element, owning component, or directive value changes.
+
+To mount a display component so a JavaScript lifecycle hook can observe it, give the invocation a `live-id`, such as `<hello-card name="Sam" live-id="welcome" />`.
 
 `KScriptLive.on(name, callback)` subscribes to `mount`, `unmount`, `request`, `response`, `stream`, `morph`, `commit`, `error`, `navigate:leave`, or `navigate`. It returns an unsubscribe function. Component hooks include the owning element as `component`. The request hook also receives `url`, `event` and `signal`. The response hook receives `status`, `streamed` and the HTTP `response`. A stream hook receives `element` and the incoming `frame`. Use `commit` to react after the DOM is updated.
 
@@ -245,7 +257,7 @@ KScript uses its own component syntax. These are the common workflows and their 
 
 | Livewire 4 | KScript |
 | --- | --- |
-| Component template and properties | `extends Component`, typed fields and `<live>` state |
+| Component template and properties | `extends Component`, typed fields and `<state>` |
 | `wire:model` | `bind` and `bind-on` |
 | `wire:click` and `wire:submit` | `on-click` and `on-submit` |
 | Dispatch and listeners | `@emit_event()` and `on-event` |
