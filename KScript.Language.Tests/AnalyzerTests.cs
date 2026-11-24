@@ -299,12 +299,23 @@ namespace KScript.Language.Tests
         [InlineData("<live id=\"x\"><button on-click=\"1 + 2\">+</button></live>", DiagnosticCodes.StatementSyntax, "1 + 2")]
         [InlineData("<live id=\"x\"><input bind=\"ghost\"></live>", DiagnosticCodes.SetUndeclared, "ghost")]
         [InlineData("<state name=\"n\" value=\"0\" />", DiagnosticCodes.MisplacedElement, "state")]
-        [InlineData("<live><state name=\"n\" value=\"0\" /></live>", DiagnosticCodes.MissingAttribute, "live")]
         public void LiveBlockProblems(string page, string code, string marked)
         {
             DocumentAnalysis a = Analyze(page, Path.Combine(Site, "p.html"), SiteFiles());
             Diagnostic d = AssertSingle(a, code);
             Assert.Equal(marked, a.Source[d.Span]);
+        }
+
+        [Fact]
+        public void LiveBlockCanUseAnAutomaticId()
+        {
+            const string page = """
+                <live>
+                  <state name="n" value="0" />
+                  <button on-click="n += 1">{$n}</button>
+                </live>
+                """;
+            AssertClean(Analyze(page, Path.Combine(Site, "p.html"), SiteFiles()));
         }
 
         [Fact]
