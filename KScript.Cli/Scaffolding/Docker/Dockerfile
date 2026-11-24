@@ -14,7 +14,7 @@ COPY --from=build /out /opt/kscript
 RUN printf '#!/bin/sh\nexec dotnet /opt/kscript/KScript.dll "$@"\n' > /usr/local/bin/kscript \
     && chmod 755 /usr/local/bin/kscript \
     && install -d -o app -g app -m 700 /var/lib/kscript
-ENV KSCRIPT_ENV=production KSCRIPT_STORAGE_ROOT=/var/lib/kscript/storage KSCRIPT_PROJECT_DATA_ROOT=/var/lib/kscript/project
+ENV KSCRIPT_SERVE_IN_DOCKER=1 KSCRIPT_ENV=production KSCRIPT_STORAGE_ROOT=/var/lib/kscript/storage KSCRIPT_PROJECT_DATA_ROOT=/var/lib/kscript/project
 WORKDIR /app
 COPY . .
 USER app

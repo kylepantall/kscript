@@ -228,7 +228,7 @@ public sealed class ProjectDocsTests : IDisposable
         Assert.Null(config.Serve.DocsPort);
         Assert.Contains("serve.docs should be true or false.", config.Warnings);
         Assert.Contains("serve.docs_port should be a number from 1 to 65535.", config.Warnings);
-        Assert.Contains("unknown setting 'serve.nope' (expected root, port, host, docs or docs_port).", config.Warnings);
+        Assert.Contains("unknown setting 'serve.nope' (expected root, port, host, docs, docs_port or docker).", config.Warnings);
     }
 
     [Fact]

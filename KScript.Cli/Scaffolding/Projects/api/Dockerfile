@@ -12,7 +12,7 @@ RUN apt-get update \
 ARG KSCRIPT_VERSION=latest
 RUN curl -fsSL https://raw.githubusercontent.com/kylepantall/kscript/master/install.sh \
   | KSCRIPT_VERSION=$KSCRIPT_VERSION KSCRIPT_INSTALL=/opt/kscript KSCRIPT_NO_MODIFY_PATH=1 sh
-ENV PATH="/opt/kscript/bin:$PATH"
+ENV PATH="/opt/kscript/bin:$PATH" KSCRIPT_SERVE_IN_DOCKER=1
 
 WORKDIR /app
 COPY . .
