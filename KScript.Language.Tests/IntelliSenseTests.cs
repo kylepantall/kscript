@@ -119,6 +119,20 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void CompanionFunctionsCalledByTheirTemplateAreNotUnused()
+        {
+            string script = Path.Combine(Site, "_components", "note.kscript");
+            const string functions = """
+                fn heading(title: string) => $title->upper()
+                fn load(props: map) => $props
+                fn spare() => 0
+                """;
+            DocumentAnalysis analysis = Service.Analyze(functions, script);
+            Diagnostic warning = Assert.Single(analysis.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction);
+            Assert.Contains("spare", warning.Message);
+        }
+
+        [Fact]
         public void PageCommandSuggestionsFollowItsImports()
         {
             var local = Labels("<p>{@‸}</p>");
