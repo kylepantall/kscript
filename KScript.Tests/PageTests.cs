@@ -556,6 +556,30 @@ public class PageLiveTests
     }
 
     [Fact]
+    public void Only_components_with_live_features_mount_automatically()
+    {
+        using var site = new TempSite(
+            ("index.html", "<plain-card /><hook-card /><hook-card /><plain-card live-id=\"custom\" />"),
+            ("plain.html", "<plain-card />"),
+            ("navigation.html", "<links-card />"),
+            ("_components/plain-card.html", "<p>Read only</p>"),
+            ("_components/links-card.html", "<a href=\"/plain\" live-navigate>Home</a>"),
+            ("_components/hook-card.html", "<input live-use-autosize><button live-client=\"copy\">Copy</button>"));
+        string html = site.Render("index.html").Body;
+        var mounts = System.Text.RegularExpressions.Regex.Matches(html, "data-ks-live=\"([^\"]+)\"");
+        Assert.Equal(3, mounts.Count);
+        Assert.NotEqual(mounts[0].Groups[1].Value, mounts[1].Groups[1].Value);
+        Assert.Equal("custom", mounts[2].Groups[1].Value);
+        Assert.Contains("live-use-autosize", html);
+        Assert.Contains("data-ks-live-client=\"copy\"", html);
+        Assert.Contains("/_ks/live.js", html);
+        Assert.DoesNotContain("/_ks/live.js", site.Render("plain.html").Body);
+        Assert.DoesNotContain("data-ks-live=", site.Render("plain.html").Body);
+        Assert.DoesNotContain("data-ks-live=", site.Render("navigation.html").Body);
+        Assert.Contains("/_ks/live.js", site.Render("navigation.html").Body);
+    }
+
+    [Fact]
     public void Events_run_the_handler_and_return_only_the_block()
     {
         using var site = new TempSite(("index.html", "<h1>Title</h1>" + Counter));
@@ -598,6 +622,125 @@ public class PageLiveTests
         string state = Attr(site.Render("index.html").Body, "data-ks-state");
         string forged = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("{\"count\":999}")) + state.Substring(state.LastIndexOf('.'));
         Assert.Equal(409, Event(site, "index.html", "c", 0, forged).Status);
+    }
+
+    [Fact]
+    public void Live_markup_keeps_portals_inert_and_signs_client_callable_actions()
+    {
+        var site = PageRenderer.RenderString("""
+            <div id="outlet"></div>
+            <live id="notes">
+              <state name="draft" value="''" />
+              <template live-portal="#outlet">
+                <input bind="draft" live-use-autosize>
+                <span live-stream="progress"></span>
+                <span live-action="save" on-action="draft = $event.data"></span>
+                <button live-client="edit">Edit</button>
+              </template>
+            </live>
+            """);
+        Assert.Contains("<template data-ks-live-portal=\"#outlet\">", site.Body);
+        Assert.Contains("data-ks-bind=\"draft\" value=\"\" name=\"draft\" live-use-autosize", site.Body);
+        Assert.Contains("data-ks-live-stream=\"progress\"", site.Body);
+        Assert.Contains("data-ks-live-action=\"save\" data-ks-on-action=\"0\"", site.Body);
+        Assert.Contains("data-ks-live-client=\"edit\"", site.Body);
+    }
+
+    [Fact]
+    public void A_navigation_only_page_loads_the_live_runtime()
+    {
+        string html = PageRenderer.RenderString("<a live-navigate href=\"/notes\">Notes</a>").Body;
+        Assert.Contains("src=\"/_ks/live.js\"", html);
+    }
+
+    [Fact]
+    public void Live_bindings_update_one_map_field_and_retain_its_siblings()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="draft">
+              <state name="draft" value="{ title: 'Before', count: 3 }" />
+              <input bind="draft.title">
+              <input bind="draft.count" type="number">
+              <p>{$draft.title}: {$draft.count + 1}</p>
+            </live>
+            """));
+        string original = site.Render("index.html").Body;
+        Assert.Contains("data-ks-bind=\"draft.title\" value=\"Before\"", original);
+        var updated = Event(site, "index.html", "draft", -1, Attr(original, "data-ks-state"),
+            binds: new() { ["draft.title"] = "After", ["draft.count"] = "8", ["draft.unknown"] = "ignored" });
+        Assert.Contains("<p>After: 9</p>", updated.Body);
+        var draft = Assert.IsType<Dictionary<string, object>>(PageLive.Verify(Attr(updated.Body, "data-ks-state"))["draft"]);
+        Assert.False(draft.ContainsKey("unknown"));
+    }
+
+    [Fact]
+    public void Live_bindings_render_checkbox_radio_and_select_state_and_accept_a_list()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="settings">
+              <state name="color" value="'blue'" />
+              <state name="roles" value="['editor']" />
+              <input type="radio" bind="color" value="red" checked>
+              <input type="radio" bind="color" value="blue">
+              <select bind="roles" bind-on="action" multiple>
+                <option value="reader" selected>Read</option>
+                <option value="editor">Edit</option>
+              </select>
+              <p>{$color}|{$roles->join(',')}</p>
+            </live>
+            """));
+        string before = site.Render("index.html").Body;
+        Assert.Contains("name=\"color\" value=\"red\">", before);
+        Assert.Contains("data-ks-bind=\"color\" checked name=\"color\" value=\"blue\">", before);
+        Assert.Contains("data-ks-bind-on=\"action\"", before);
+        Assert.DoesNotContain("value=\"reader\" selected", before);
+        Assert.Contains("value=\"editor\" selected", before);
+
+        var after = Event(site, "index.html", "settings", -1, Attr(before, "data-ks-state"),
+            binds: new() { ["color"] = "red", ["roles"] = new List<object> { "reader", "editor" } });
+        Assert.Contains("<p>red|reader,editor</p>", after.Body);
+        Assert.Contains("value=\"reader\" selected", after.Body);
+        Assert.Contains("value=\"editor\" selected", after.Body);
+    }
+
+    [Fact]
+    public void Query_backed_live_state_preserves_the_default_type_and_reports_changes()
+    {
+        const string page = """
+            <live id="query">
+              <state name="page" value="1" query="p" />
+              <button on-click="page += 1">Next</button>
+              <p>{$page}</p>
+            </live>
+            """;
+        using var site = new TempSite(("index.html", page));
+        string html = site.Render("index.html", new() { ["query"] = new Dictionary<string, object> { ["p"] = "3" } }).Body;
+        Assert.Contains("<p>3</p>", html);
+        Assert.Equal("{\"p\":3}", Attr(html, "data-ks-query"));
+
+        var next = Event(site, "index.html", "query", 0, Attr(html, "data-ks-state"));
+        Assert.Contains("<p>4</p>", next.Body);
+        Assert.Equal("{\"p\":4}", Attr(next.Body, "data-ks-query"));
+    }
+
+    [Fact]
+    public void Live_controls_render_lifecycle_handlers_and_interaction_attributes()
+    {
+        string html = PageRenderer.RenderString("""
+            <live id="controls">
+              <state name="count" value="0" />
+              <p on-init="count += 1" on-visible="count += 1">{$count}</p>
+              <span live-loading role="status">Working</span>
+              <span live-offline>Offline</span>
+              <button live-confirm="Really?" live-disable on-click="count = 0">Reset</button>
+              <div live-key="row" live-replace>A row</div>
+            </live>
+            """).Body;
+        Assert.Contains("data-ks-on-init=\"0\" data-ks-on-visible=\"1\"", html);
+        Assert.Contains("data-ks-live-loading role=\"status\" hidden", html);
+        Assert.Contains("data-ks-live-offline hidden", html);
+        Assert.Contains("data-ks-live-confirm=\"Really?\" data-ks-live-disable data-ks-on-click=\"2\"", html);
+        Assert.Contains("data-ks-live-key=\"row\" data-ks-live-replace", html);
     }
 
     [Fact]

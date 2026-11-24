@@ -135,7 +135,8 @@ const modelForms = (function () {
   }
 
   function checkpoint(block) {
-    return new Map(Array.from(block.querySelectorAll(selector), form => {
+    return new Map(livePortals.query(block, selector)
+      .filter(form => livePortals.owner(form) === block).map(form => {
       const state = stateOf(form);
       return [state, state.saved];
     }));
@@ -150,9 +151,11 @@ const modelForms = (function () {
   // Reapply drafts only to matching controls in the newly authorized markup. Hidden metadata, disabled
   // controls, field choices and removed records always come from the new server response.
   function restore(block, fresh, checkpoint, active) {
-    const incoming = Array.from(fresh.querySelectorAll(selector));
+    const incoming = livePortals.query(fresh, selector).filter(form =>
+      livePortals.owner(form) === fresh && !form.closest("[data-ks-live-ignore]"));
     let focus = null;
-    for (const old of block.querySelectorAll(selector)) {
+    for (const old of livePortals.query(block, selector)) {
+      if (livePortals.owner(old) !== block) continue;
       const state = states.get(old);
       if (!state && active?.form !== old) continue;
       const oldIdentity = identity(old);
@@ -203,5 +206,5 @@ const modelForms = (function () {
     return keep;
   }
 
-  return { handle, checkpoint, restore, keepExpiredDraft, composingIn: block => composing && block.contains(composing) };
+  return { handle, checkpoint, restore, keepExpiredDraft, composingIn: block => composing && livePortals.owner(composing) === block };
 }());

@@ -31,6 +31,53 @@ public sealed class LiveTransportTests
     }
 
     [Fact]
+    public async Task Live_uploads_reach_only_signed_actions_with_a_visible_named_file_input()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="uploads">
+              <state name="content" value="''" />
+              <form on-submit="content = $event.files.attachment->first().bytes">
+                <input type="file" name="attachment" live-upload>
+                <button type="submit">Upload</button>
+              </form>
+              <p>{$content}</p>
+            </live>
+            """));
+        using var stop = new CancellationTokenSource();
+        var listening = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var server = HttpServer.RunAsync(site.Root, null, TestServer.FreePort(), "127.0.0.1", null, stop.Token,
+            started: url => listening.SetResult(url));
+        try
+        {
+            using var http = new HttpClient { BaseAddress = new Uri(await listening.Task.WaitAsync(TimeSpan.FromSeconds(10))) };
+            string html = await http.GetStringAsync("/");
+            string Attribute(string name) => WebUtility.HtmlDecode(Regex.Match(html, name + "=\"([^\"]+)\"").Groups[1].Value);
+            http.DefaultRequestHeaders.Add("X-KScript-Live", Attribute("data-ks-route"));
+            var action = new { block = "uploads", handler = 0, state = Attribute("data-ks-state"), args = Attribute("data-ks-args-0") };
+
+            async Task<HttpResponseMessage> Upload(string field)
+            {
+                using var multipart = new MultipartFormDataContent();
+                multipart.Add(new StringContent(System.Text.Json.JsonSerializer.Serialize(action)), "state");
+                multipart.Add(new ByteArrayContent(new byte[] { 0x61, 0x62, 0x63 }), field, "example.txt");
+                return await http.PostAsync("/", multipart);
+            }
+
+            using var denied = await Upload("unknown");
+            Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
+            using var allowed = await Upload("attachment");
+            string response = await allowed.Content.ReadAsStringAsync();
+            Assert.True(allowed.StatusCode == HttpStatusCode.OK, response);
+            Assert.Contains("<p>YWJj</p>", response);
+        }
+        finally
+        {
+            stop.Cancel();
+            await server;
+        }
+    }
+
+    [Fact]
     public async Task Served_file_pages_use_the_same_signed_session_as_controller_views()
     {
         using var site = new TempSite(

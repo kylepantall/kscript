@@ -991,24 +991,28 @@ namespace KScript.Language.Analysis
                         CheckLoadCallback(e, attr, scope);
                     continue;
                 }
+                if (component == null && Kind != DocumentKind.Script &&
+                    global::KScript.Pages.TemplateContract.NeedsLiveOwner(attr.Name))
+                    RequireLive(e, attr);
                 if (attr.Value == null)
                 {
                     continue;
                 }
-                if (attr.Name.StartsWith("on-", StringComparison.Ordinal) && Kind != DocumentKind.Script)
+                if (component == null && attr.Name.StartsWith("on-", StringComparison.Ordinal) && Kind != DocumentKind.Script)
                 {
                     // <button on-click="count += 1">: statements run on the server when the event fires.
-                    RequireLive(e, attr);
                     // $event (value, checked, key) describes the browser event the handler runs for.
                     Scope handlerScope = new Scope(scope, e.Span);
                     handlerScope.Declare(BuiltIn("event"), e.Span.Start);
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                 }
-                else if (attr.Name == "bind" && Kind != DocumentKind.Script)
+                else if (component == null && attr.Name == "bind" && Kind != DocumentKind.Script)
                 {
                     // <input bind="query">: two-way binding to a <state> variable.
-                    RequireLive(e, attr);
-                    if (ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
+                    int dot = attr.Value.Value.IndexOf('.');
+                    DecodedText target = dot < 0 ? attr.Value : new DecodedText(attr.Value.Value[..dot],
+                        Enumerable.Range(0, dot + 1).Select(attr.Value.ToSource).ToArray());
+                    if (ReferenceVariableByName(target, scope, isWrite: true, mustBeMutable: true) is Symbol bound)
                     {
                         boundVariables.Add(bound);
                     }
@@ -1182,6 +1186,8 @@ namespace KScript.Language.Analysis
                     : e.Parent != null && info.MustBeInside.Contains(ElementInfo.BareName(e.Parent.Name), StringComparer.OrdinalIgnoreCase);
                 if (!ok && info.Name == "return")
                     ok = e.Ancestors().Any(a => a.Name == "catch" && a.Parent?.Name is "type" or "model");
+                if (!ok && info.Name == "state" && (inComponentHtml || IsComponentPage))
+                    ok = e.Parent == null;
                 if (!ok)
                 {
                     Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
@@ -1494,7 +1500,7 @@ namespace KScript.Language.Analysis
 
         private void RequireLive(MarkupElement e, MarkupAttribute attr)
         {
-            if (!e.Ancestors().Any(a => a.Name == "live"))
+            if (!inComponentHtml && !IsComponentPage && !e.Ancestors().Any(a => a.Name == "live"))
             {
                 Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
                     $"{attr.Name} only works inside a <live> block, e.g. <live id=\"counter\">...</live>.");

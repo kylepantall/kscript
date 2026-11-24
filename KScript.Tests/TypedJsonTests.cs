@@ -39,6 +39,7 @@ public class TypedJsonTests
     [InlineData("Repo(" + Good + ").license ?? 'none'", "none")]
     [InlineData("Repo(" + Good + ")->keys()->join(',')", "name,stars,owner,owner_name,topics,license,visibility,label")]
     [InlineData("Repo(" + Good + ")->type()", "Repo")]
+    [InlineData("[Repo(" + Good + ")]->type()", "Repo[]")]
     [InlineData("Repo(" + Good + ") |> type()", "Repo")]
     [InlineData("Repo(" + Good + ").owner->type()", "User")]
     [InlineData("Repo->type()", "type")]

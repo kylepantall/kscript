@@ -21,6 +21,12 @@ namespace KScript.Pages
         public static bool IsLoadCallback(string name) =>
             name.Equals("onLoad", StringComparison.OrdinalIgnoreCase) || name.Equals("on-load", StringComparison.OrdinalIgnoreCase);
 
+        public static bool NeedsLiveOwner(string name) =>
+            name.StartsWith("on-", StringComparison.Ordinal) || name.StartsWith("live-use-", StringComparison.Ordinal) ||
+            name is "bind" or "bind-on" or "sort-item" or "live-upload" or "live-stream" or "live-portal" or
+                "live-action" or "live-client" or "live-loading" or "live-offline" or "live-disable" or "live-confirm" or
+                "live-key" or "live-replace" or "live-dirty" or "live-cloak" or "live-ignore" or "live-error";
+
         public static string CompanionPath(string template) => template != null &&
             string.Equals(Path.GetFileName(Path.GetDirectoryName(template)), "_components", StringComparison.OrdinalIgnoreCase)
                 ? Path.ChangeExtension(template, ".kscript")

@@ -294,6 +294,8 @@ fn show(repo: Repo, tags: string[]) {
 
 `as:` takes the type as a value (`as: Repo`) or as text (`as: 'Repo[]'`). `$repo->type()` is `'Repo'`. A record still works everywhere a map does, but reading or setting a field the type doesn't have is an error, and setting a field converts the value to the field's type.
 
+`->type()` reports a list's element type. `[1, 2]->type()` returns `'number[]'`, and a list of `Repo` records returns `'Repo[]'`. Mixed lists and untyped empty lists return `'any[]'`. Use `->is_a(list)` to test whether a value is any kind of list.
+
 When the data doesn't fit, mapping fails with one `Shape` error that lists every problem with its JSON path:
 
 ```text

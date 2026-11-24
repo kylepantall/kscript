@@ -145,6 +145,28 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void Component_markup_can_declare_live_state_and_handlers_without_a_wrapper()
+        {
+            const string template = """
+                <state name="count" value="0" />
+                <button on-click="count += 1" live-use-tint>{$count}</button>
+                """;
+            const string page = "_components/counter.html";
+            AssertClean(Check(template, page, new Files((page, template))));
+            AssertClean(Check("!" + """"
+                import KScript.Web
+                type Counter extends Component {
+                  fn render(): Component {
+                    return ```html
+                    <state name="count" value="0" />
+                    <button on-click="count += 1" live-use-tint>{$count}</button>
+                    ```
+                  }
+                }
+                """", "_components/counter.kscript"));
+        }
+
+        [Fact]
         public void Analysing_text_that_was_never_saved()
         {
             DocumentAnalysis a = Analyzer.Analyze(Script("<import package=\"KScript.IO\" /><let name=\"d\" value=\"@read_json('data.json')\" /><echo>{$d.a}</echo>"));

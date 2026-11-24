@@ -26,12 +26,14 @@ namespace KScript.Pages
 
         internal string StateToken { get; set; }
         internal string ArgsToken { get; set; }
+        internal IReadOnlyList<(string Id, string State)> Parents { get; set; } = Array.Empty<(string, string)>();
 
         /// <summary>Current values of inputs with bind="name".</summary>
         public Dictionary<string, object> Binds { get; set; } = new Dictionary<string, object>();
 
         /// <summary>Browser-supplied event details such as input state, key modifiers, coordinates and drag value.</summary>
         public Dictionary<string, object> Event { get; set; } = new Dictionary<string, object>();
+        public Dictionary<string, object> Files { get; set; }
 
         /// <summary>The re-rendered block, set by the renderer.</summary>
         internal string Output { get; set; }
@@ -90,6 +92,7 @@ namespace KScript.Pages
             {
                 foreach (var child in el.Children.OfType<PageElement>())
                 {
+                    if (child.Name == "placeholder") continue;
                     foreach (var a in child.Attributes.Where(a => a.Name.StartsWith("on-", StringComparison.Ordinal)))
                     {
                         a.HandlerIndex = list.Count;
@@ -106,7 +109,10 @@ namespace KScript.Pages
         public static string Script => BrowserRuntime.Value;
 
         private static readonly Lazy<string> BrowserRuntime = new Lazy<string>(() =>
-            "(function () {\n" + ReadScript("model-forms.js") + "\n" + ReadScript("live.js") + "\n}());\n" + ReadScript("passkeys.js"));
+            "(function () {\n" + ReadScript("live-portals.js") + "\n" + ReadScript("live-hooks.js") + "\n"
+                + ReadScript("model-forms.js") + "\n" + ReadScript("live-dom.js") + "\n" + ReadScript("live-sort.js") + "\n"
+                + ReadScript("live-navigation.js") + "\n" + ReadScript("live-stream.js") + "\n" + ReadScript("live.js")
+                + "\n}());\n" + ReadScript("passkeys.js"));
 
         private static string ReadScript(string name)
         {
@@ -132,6 +138,20 @@ namespace KScript.Pages
                 Binds = body.TryGetValue("binds", out var b) && b is Dictionary<string, object> bm ? bm : new Dictionary<string, object>(),
                 Event = body.TryGetValue("event", out var e) && e is Dictionary<string, object> em ? em : new Dictionary<string, object>(),
             };
+            if (body.TryGetValue("parents", out object parents) && parents != null)
+            {
+                if (!routed || parents is not List<object> list || list.Count > 32)
+                    throw new PageException("Invalid live component ancestry.");
+                var chain = new List<(string, string)>();
+                foreach (object parent in list)
+                {
+                    if (parent is not Dictionary<string, object> record || record.GetValueOrDefault("id") is not string id ||
+                        record.GetValueOrDefault("state") is not string token)
+                        throw new PageException("Invalid live component ancestry.");
+                    chain.Add((id, token));
+                }
+                ev.Parents = chain;
+            }
             if (!routed)
             {
                 ev.State = Verify(ev.StateToken);

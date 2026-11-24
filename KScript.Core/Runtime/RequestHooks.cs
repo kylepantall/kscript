@@ -11,6 +11,43 @@ namespace KScript.Runtime
     {
         private static readonly ConditionalWeakTable<Dictionary<string, object>, List<Func<IEnumerable<string>>>> Steps =
             new ConditionalWeakTable<Dictionary<string, object>, List<Func<IEnumerable<string>>>>();
+        private static readonly ConditionalWeakTable<Dictionary<string, object>, ResponseHeaders> Headers = new();
+
+        private sealed class ResponseHeaders
+        {
+            public bool Committed;
+            public List<Action> Checks { get; } = new();
+        }
+
+        /// <summary>Checks that a request can start sending its headers before it has finished running.</summary>
+        public static void BeforeCommitHeaders(Dictionary<string, object> request, Action check)
+        {
+            var headers = Headers.GetValue(request, _ => new ResponseHeaders());
+            lock (headers) headers.Checks.Add(check);
+        }
+
+        /// <summary>Freezes cookie-producing operations before the first frame of a streamed response.</summary>
+        public static void CommitHeaders(Dictionary<string, object> request)
+        {
+            var headers = Headers.GetValue(request, _ => new ResponseHeaders());
+            lock (headers)
+            {
+                if (headers.Committed) return;
+                foreach (Action check in headers.Checks) check();
+                headers.Committed = true;
+            }
+        }
+
+        /// <summary>Rejects operations that would change cookies after response headers have already been sent.</summary>
+        public static void RequireWritableCookies(Dictionary<string, object> request)
+        {
+            if (request == null || !Headers.TryGetValue(request, out var headers)) return;
+            lock (headers)
+            {
+                if (headers.Committed)
+                    throw new KScriptException("This action already started streaming and cannot change a response cookie.", "Context");
+            }
+        }
 
         /// <summary>
         /// Runs <paramref name="step"/> once the request is answered. It returns Set-Cookie header values (or none).

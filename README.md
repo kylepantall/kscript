@@ -232,6 +232,7 @@ Run `kscript docs` to open the full documentation in your browser. It is built i
 - [Installing KScript](docs/install.md): installers, updating, manual downloads and editor setup
 - [The language](docs/language.md): values, expressions, control flow, functions, errors, settings, logging, translations, language models and every package
 - [Web pages and `<live>`](docs/web.md): `kscript serve`, layouts, components, routing and reactive blocks
+- [Components](docs/components.md): reusable component classes, live actions, forms, streaming, navigation and client extensions
 - [Stylesheets](docs/stylesheets.md): `.ks.css`, `.ks.scss` and `.ks.sass`, and `kscript css`
 - [Routes, controllers and middleware](docs/http.md): KScript.Http route files, JSON APIs, views and middleware
 - [Projects and generators](docs/projects.md): `kscript make project`, `kscript.json` and `kscript make`

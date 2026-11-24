@@ -312,6 +312,25 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Guide_topics_have_their_own_pages_and_keep_the_original_section_links()
+    {
+        var site = Site.Value;
+        var guide = site.Find("/guide/data");
+        var models = site.Find("/guide/data/models");
+        Assert.NotNull(models);
+        Assert.Contains("id=\"models\"", guide.Body);
+        Assert.Contains("<h1 id=\"models\">Models</h1>", models.Body);
+        Assert.Contains("id=\"extending-models\"", models.Body);
+        Assert.DoesNotContain("id=\"queries\"", models.Body);
+        string rendered = site.Render(models);
+        Assert.Contains("href=\"/guide/data/models\" aria-current=\"page\"", rendered);
+        Assert.Contains("href=\"/guide/data/queries\"", rendered);
+        Assert.Contains("href=\"/guide/data\">", rendered);
+        Assert.Contains("data-lang=\"kscript\"", site.Find("/guide/components/component-inputs-rendering-and-slots").Body);
+        Assert.Contains("@contrast_color", site.Find("/guide/stylesheets/stylesheet-cheatsheet").Body);
+    }
+
+    [Fact]
     public void Links_in_guides_point_at_the_site_or_github()
     {
         Assert.Equal("/guide/http#views", DocsSite.LinkTarget("http.md", "#views"));

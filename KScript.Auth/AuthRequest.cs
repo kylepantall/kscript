@@ -53,6 +53,7 @@ namespace KScript.Auth
                 var created = new AuthRequest(app, request);
                 Requests.Add(request, created);
                 RequestHooks.OnFinish(request, created.Finish);
+                RequestHooks.BeforeCommitHeaders(request, created.CheckPendingCookie);
                 return created;
             }
         }
@@ -133,6 +134,7 @@ namespace KScript.Auth
         /// <summary>Starts a new session with a new id (keeping <paramref name="data"/>), and drops the old one.</summary>
         private void Start(Dictionary<string, object> data)
         {
+            RequestHooks.RequireWritableCookies(Request);
             if (sessionId != null) App.Sessions.Delete(AuthApp.KeyOf(sessionId));
             sessionId = AuthApp.NewSecret();
             session = new Dictionary<string, object>(StringComparer.Ordinal)
@@ -306,6 +308,7 @@ namespace KScript.Auth
 
         private Dictionary<string, object> Login(object user, bool remember, bool passkeyVerified)
         {
+            RequestHooks.RequireWritableCookies(Request);
             string id = UserStore.IdOf(user, "@login()");
             if (!passkeyVerified && PasskeyStore.IsUserId(id))
                 throw new KScriptException("This account signs in with a verified passkey.", "Unauthorized");
@@ -327,6 +330,7 @@ namespace KScript.Auth
         /// <summary>Signs out: the session ends and its cookie is taken away. <paramref name="everywhere"/> ends the user's other sessions too.</summary>
         public void Logout(bool everywhere)
         {
+            RequestHooks.RequireWritableCookies(Request);
             Dictionary<string, object> s = Session(create: false);
             if (s != null)
             {
@@ -364,6 +368,12 @@ namespace KScript.Auth
         #endregion
 
         #region Finishing
+
+        private void CheckPendingCookie()
+        {
+            if (sendCookie || clearCookie)
+                throw new KScriptException("An action that changes the session cookie cannot start streaming.", "Context");
+        }
 
         /// <summary>Saves the session and returns the Set-Cookie header (if the cookie changed). Run once the request is answered.</summary>
         public IEnumerable<string> Finish()

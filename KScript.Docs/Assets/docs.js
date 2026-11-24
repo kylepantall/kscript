@@ -159,7 +159,10 @@
     while ((m = fence.exec(src))) {
       out += hlKscriptCode(src.slice(last, m.index));
       var body = m[0].slice(m[1].length + m[2].length);
-      out += span('str', esc(m[1])) + (m[2].trim() ? span('type', esc(m[2])) : esc(m[2])) + span('str', m[2].trim() ? esc(body) : hlTemplate(body));
+      var lang = m[2].trim();
+      out += span('str', esc(m[1])) + (lang ? span('type', esc(m[2])) : esc(m[2]));
+      if (lang === 'html') out += hlXml(body.slice(0, -m[1].length)) + span('str', esc(m[1]));
+      else out += span('str', lang ? esc(body) : hlTemplate(body));
       last = m.index + m[0].length;
     }
     return out + hlKscriptCode(src.slice(last));
@@ -295,9 +298,32 @@
     return esc(code);
   }
 
+  function highlightInline(code) {
+    if (/^<\/?[A-Za-z][\w.:-]*(?:\s|\/?>)/.test(code) && />$/.test(code)) return hlXml(code);
+    if (/^(?:@media\s|:root\s*\{|[\w-]+:\s*\{)/.test(code) && /\{\s*[@$]/.test(code)) return hlCss(code);
+
+    var signature = /^([A-Z][\w.]*)\(([a-z_]\w*(?:\s*:\s*[a-z_]\w*)?(?:\s*,\s*[a-z_]\w*(?:\s*:\s*[a-z_]\w*)?)*)\)$/.exec(code);
+    if (signature) {
+      return span('tag', esc(signature[1])) + '(' + esc(signature[2]).replace(/(^|,\s*)([a-z_]\w*)/g,
+        function (_, before, name) { return before + span('attr', name); }) + ')';
+    }
+
+    var listType = /^([A-Za-z_]\w*)((?:\[\])+\??)$/.exec(code);
+    if (listType) return span('type', listType[1]) + esc(listType[2]);
+    if (/^(?:[\w.]+\s*\(|\$[A-Za-z_]|@[A-Za-z_]|->\s*[A-Za-z_])/.test(code) ||
+        (code.startsWith('[') && code.includes('->'))) return hlKscript(code);
+    return null;
+  }
+
   document.querySelectorAll('.code').forEach(function (block) {
     var code = block.querySelector('code');
     if (code) code.innerHTML = highlight(code.textContent, block.dataset.lang);
+  });
+
+  document.querySelectorAll('.doc :not(pre) > code').forEach(function (code) {
+    if (code.childElementCount) return;
+    var html = highlightInline(code.textContent);
+    if (html !== null) code.innerHTML = html;
   });
 
   // ---------- Copy and open in playground ----------
