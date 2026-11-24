@@ -147,8 +147,8 @@ namespace KScript.Runtime
         {
             get
             {
-                lock (vars) return vars.Select(entry => entry.Value is FieldBinding field
-                    ? new KeyValuePair<string, object>(entry.Key, field.Value) : entry).ToList();
+                lock (vars) return vars.Select(entry => entry.Value is FieldBinding binding
+                    ? new KeyValuePair<string, object>(entry.Key, binding.Value) : entry).ToList();
             }
         }
 
