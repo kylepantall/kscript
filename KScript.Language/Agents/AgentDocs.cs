@@ -36,6 +36,8 @@ namespace KScript.Language.Agents
         /// <summary>The project functions it calls (from the code), as @names.</summary>
         public IReadOnlyList<string> Calls { get; init; } = Array.Empty<string>();
 
+        internal IReadOnlyList<(string File, string Name)> CallTargets { get; init; } = Array.Empty<(string, string)>();
+
         /// <summary>The project functions that call it, filled in once every file is read.</summary>
         public List<string> CalledBy { get; } = new List<string>();
 
@@ -71,8 +73,11 @@ namespace KScript.Language.Agents
 
         public int Pages { get; init; }
 
-        /// <summary>The site's routes as <c>kscript routes</c> prints them, or null when there are none.</summary>
+        /// <summary>The site's declared routes, or null when there are none.</summary>
         public string Routes { get; init; }
+
+        /// <summary>Markdown from the project's agents.merge files, in manifest order.</summary>
+        public IReadOnlyList<string> Markdown { get; init; } = Array.Empty<string>();
 
         /// <summary>app.main from kscript.json, when set.</summary>
         public string Main { get; init; }
@@ -87,7 +92,7 @@ namespace KScript.Language.Agents
     /// <c>kscript mcp</c>. Only the part of AGENTS.md between <see cref="Begin"/> and <see cref="End"/> is generated,
     /// so notes written around it are kept.
     /// </summary>
-    public static class AgentDocs
+    public static partial class AgentDocs
     {
         public const string AgentsFile = "AGENTS.md";
 
@@ -139,6 +144,8 @@ namespace KScript.Language.Agents
             root = Path.GetFullPath(root);
             string configFile = Path.Combine(root, ProjectConfig.FileName);
             ProjectConfig config = File.Exists(configFile) ? ProjectConfig.Load(configFile) : null;
+            var markdown = ReadMarkdown(root, config);
+            var markdownPaths = markdown.Select(fragment => fragment.Path).ToHashSet(AgentPathComparer);
 
             var packages = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "KScript.Core" };
             foreach (string p in config?.Packages ?? new List<string>())
@@ -149,7 +156,7 @@ namespace KScript.Language.Agents
             var symbols = new List<AgentSymbol>();
             var scripts = new List<string>();
             int tests = 0, pages = 0;
-            foreach (string file in FilesUnder(root).Where(f => skip?.Contains(f) != true).OrderBy(f => f, StringComparer.Ordinal))
+            foreach (string file in FilesUnder(root).Where(f => !markdownPaths.Contains(f) && skip?.Contains(f) != true).OrderBy(f => f, StringComparer.Ordinal))
             {
                 string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
                 bool page = file.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
@@ -172,18 +179,19 @@ namespace KScript.Language.Agents
                 scripts.Add(relative);
                 DocumentAnalysis analysis = Analyzer.Analyze(text, file, catalog: catalog);
                 foreach (string p in analysis.ImportedPackages) packages.Add(p);
-                symbols.AddRange(SymbolsOf(analysis, relative));
+                symbols.AddRange(SymbolsOf(analysis, relative, root));
             }
 
             // The call graph: who calls each function, from the calls found in each one's body.
-            var byName = symbols.Where(x => x.Kind == "fn").GroupBy(x => x.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+            var byDeclaration = symbols.Where(symbol => symbol.Kind == "fn").ToLookup(symbol => (symbol.File, symbol.Name));
             foreach (AgentSymbol caller in symbols)
             {
-                foreach (string call in caller.Calls)
+                foreach (var target in caller.CallTargets)
                 {
-                    if (byName.TryGetValue(call.TrimStart('@'), out List<AgentSymbol> callees))
+                    foreach (AgentSymbol callee in byDeclaration[target])
                     {
-                        foreach (AgentSymbol callee in callees.Where(c => c != caller && !c.CalledBy.Contains("@" + caller.Name))) callee.CalledBy.Add("@" + caller.Name);
+                        string name = "@" + caller.Name;
+                        if (callee != caller && !callee.CalledBy.Contains(name)) callee.CalledBy.Add(name);
                     }
                 }
             }
@@ -199,26 +207,9 @@ namespace KScript.Language.Agents
                 Tests = tests,
                 Pages = pages,
                 Main = config?.App.Main,
-                Routes = RoutesOf(config?.SiteRoot ?? root, config, skip),
+                Routes = RoutesOf(config?.SiteRoot ?? root, config, catalog, skip),
+                Markdown = markdown.Select(fragment => fragment.Text).Where(text => !string.IsNullOrWhiteSpace(text)).ToArray(),
             };
-        }
-
-        /// <summary>The route table of a site with KScript.Http route files, or null.</summary>
-        private static string RoutesOf(string site, ProjectConfig config, ISet<string> skip)
-        {
-            var table = new StringWriter();
-            if (KScript.Http.HttpServer.ListRoutes(site, config, table, TextWriter.Null, plain: true) != 0)
-            {
-                return null;
-            }
-            // Route files kscript convert just replaced are still on disk, so name their new versions instead.
-            string text = table.ToString().Replace("\r\n", "\n").TrimEnd();
-            foreach (string old in skip ?? new HashSet<string>())
-            {
-                string name = Path.GetRelativePath(site, old).Replace('\\', '/');
-                text = text.Replace(" " + name + ":", " " + ScriptConverter.ConvertedPath(name) + ":", StringComparison.Ordinal);
-            }
-            return text;
         }
 
         private static IEnumerable<string> FilesUnder(string root)
@@ -231,22 +222,23 @@ namespace KScript.Language.Agents
                 foreach (string sub in Directory.EnumerateDirectories(dir))
                 {
                     string name = Path.GetFileName(sub);
-                    if (!name.StartsWith(".", StringComparison.Ordinal) && !SkippedFolders.Contains(name)) pending.Push(sub);
+                    if (!name.StartsWith(".", StringComparison.Ordinal) && !SkippedFolders.Contains(name)
+                        && !File.GetAttributes(sub).HasFlag(FileAttributes.ReparsePoint)) pending.Push(sub);
                 }
                 foreach (string file in Directory.EnumerateFiles(dir))
                 {
-                    if (IsScriptOrPage(file)) yield return file;
+                    if (IsScriptOrPage(file) && !File.GetAttributes(file).HasFlag(FileAttributes.ReparsePoint)) yield return file;
                 }
             }
         }
 
         private static bool IsScriptOrPage(string file) =>
             new[] { ".kscript", ".ks.xml", ".html", ".md" }.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase))
-            && !string.Equals(Path.GetFileName(file), AgentsFile, StringComparison.OrdinalIgnoreCase)
+            && !ProjectConfig.IsAgentFile(Path.GetFileName(file))
             && !string.Equals(Path.GetFileName(file), "README.md", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>The top-level fn, type, enum and const declarations of a script, minus _names and @agent hide.</summary>
-        public static IEnumerable<AgentSymbol> SymbolsOf(DocumentAnalysis analysis, string file)
+        public static IEnumerable<AgentSymbol> SymbolsOf(DocumentAnalysis analysis, string file, string root = null)
         {
             foreach (Symbol s in analysis.Symbols)
             {
@@ -274,6 +266,7 @@ namespace KScript.Language.Agents
                 {
                     continue;
                 }
+                var calls = kind == "fn" ? CallsIn(analysis, s).ToArray() : Array.Empty<Symbol>();
                 yield return new AgentSymbol
                 {
                     Kind = kind,
@@ -285,7 +278,10 @@ namespace KScript.Language.Agents
                     Pitfalls = doc?.Pitfalls ?? Array.Empty<string>(),
                     Example = ShortExample(doc?.Examples.FirstOrDefault()),
                     Deprecated = doc?.Deprecated != null,
-                    Calls = kind == "fn" ? CallsIn(analysis, s) : Array.Empty<string>(),
+                    Calls = calls.Select(call => "@" + (call.Alias == null ? call.Name : call.Alias.Name + "." + call.Name))
+                        .Distinct(StringComparer.Ordinal).ToArray(),
+                    CallTargets = calls.Select(call => (call.SourcePath == null || root == null ? file
+                        : Path.GetRelativePath(root, call.SourcePath).Replace('\\', '/'), call.Name)).Distinct().ToArray(),
                     Throws = kind == "fn" ? s.EscapingErrors : Array.Empty<string>(),
                     File = file,
                     Line = analysis.Source.GetPosition(s.DeclarationSpan.Start).Line + 1,
@@ -294,12 +290,12 @@ namespace KScript.Language.Agents
         }
 
         /// <summary>The other functions a function's body calls: its own file's and imported ones.</summary>
-        private static IReadOnlyList<string> CallsIn(DocumentAnalysis analysis, Symbol fn)
+        private static IEnumerable<Symbol> CallsIn(DocumentAnalysis analysis, Symbol fn)
         {
             TextSpan body = fn.DeclaringElement.Span;
             return analysis.References
                 .Where(r => !r.IsDeclaration && r.Symbol != fn && r.Symbol.Kind == SymbolKind.Function && body.Contains(r.Span.Start))
-                .Select(r => "@" + r.Symbol.Name).Distinct(StringComparer.Ordinal).ToList();
+                .Select(r => r.Symbol).Distinct();
         }
 
         private static string SignatureOf(Symbol s, string kind) => kind switch
@@ -342,9 +338,13 @@ namespace KScript.Language.Agents
             {
                 fields.AddRange(inline.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0));
             }
-            string options = string.Concat(type.Attributes.Where(a => a.Name is "extra" or "path").Select(a => $"({a.Name}: {a.ValueText?.Trim()})"));
-            var bases = Analyzer.WithNames(type);
-            string head = $"{type.Name} {s.Name}{options}" + (bases.Count == 0 ? "" : $" with [{string.Join(", ", bases)}]");
+            bool model = type.Name == "model";
+            string options = string.Join(", ", type.Attributes.Where(a => a.Name is "extra" or "path"
+                || model && CodeParser.ModelSettings.Contains(a.Name)).Select(a => TypeOption(a, model)));
+            var bases = Shapes.TypeNames(type.GetAttributeValue("with"));
+            string head = $"{type.Name} {s.Name}" + (options.Length == 0 ? string.Empty : $"({options})");
+            if (bases.Count > 0) head += (model ? " extends [" : " with [") + string.Join(", ", bases) + "]";
+            if (type.GetAttributeValue("extends") is string contract) head += " extends " + contract;
             foreach (var rule in type.Attributes.Where(a => TypeRules.Attributes.Contains(a.Name)))
                 fields.Add($"{rule.Name}: {rule.ValueText}");
             foreach (var rule in type.ChildElements.Where(c => c.Name is "normalize" or "validate"))
@@ -353,6 +353,22 @@ namespace KScript.Language.Agents
                 fields.AddRange(s.Shape.Instance.Methods.Values.Where(m => m.DeclaringElement?.Parent == type
                     && !m.Name.StartsWith('_') && m.Doc?.AgentHidden != true).Select(m => m.TypedSignature));
             return fields.Count == 0 ? $"{head} {{ }}" : $"{head} {{ {string.Join(", ", fields)} }}";
+        }
+
+        private static string TypeOption(MarkupAttribute attribute, bool model)
+        {
+            string name = attribute.Name;
+            string value = attribute.ValueText?.Trim() ?? string.Empty;
+            if (model)
+            {
+                if (name is "timestamps" or "soft_deletes" or "mixin" or "auto_create")
+                    return IsYes(value) ? name : $"{name}: {value}";
+                if (name is "unique" or "index" or "hidden" or "guarded")
+                    return $"{name}: " + (value.StartsWith('[') ? value : $"[{value}]");
+            }
+            if (name is "path" or "table" or "connection" or "key")
+                value = "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+            return $"{name}: {value}";
         }
 
         private static readonly HashSet<string> FieldBasics = new HashSet<string>(StringComparer.Ordinal) { "name", "type", "from", "default", "optional", "value", "description" };
@@ -402,12 +418,14 @@ namespace KScript.Language.Agents
                 ? "Scripts are XML (`.ks.xml`): elements for statements, `{ }` and attributes for expressions. Tests end in `.test.ks.xml`.\n\n"
                 : "Scripts are `.kscript` files (code syntax, shown below). Tests end in `.test.kscript`.\n\n");
 
+            w.Append($"Start with the [function and type index]({Folder}/index.md) and [package references]({Folder}/packages/).\n\n");
+            int guidanceAt = w.Length;
             w.Append("## Syntax\n\n");
             w.Append(project.IsXml ? "```xml\n" + CrashCourseXml() + "\n```\n\n" : "```kscript\n" + CrashCourse + "\n```\n\n");
             w.Append(Rules);
 
             w.Append("\n## Required project conventions\n\n");
-            w.Append("- Before editing, read `kscript.json`, `.kscript/agents/index.md` and a neighboring feature. Follow the configured syntax and paths. Verify APIs in the generated package reference or MCP. Reuse existing types and operations.\n");
+            w.Append("- Before editing, read `kscript.json` and a neighboring feature. Follow the configured syntax and paths. Verify APIs in the generated package reference or MCP. Reuse existing types and operations.\n");
             w.Append("- Type domain values at the boundary. Use built-in types such as `email`, `uuid` and `duration`. Define shared domain rules once with `kscript make native`. Put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
             w.Append("- Use records for known shapes (`kscript make type`) and models and migrations for persisted rows. Validate external JSON with `as: Type` where supported. Use `map` for open keys and `any` for genuinely dynamic values.\n");
             if (project.Packages.Contains("KScript.Http") || project.Routes != null)
@@ -438,8 +456,8 @@ namespace KScript.Language.Agents
             w.Append($"- {Count(project.Scripts.Count, "script")}, {Count(project.Tests, "test file")}{(project.Pages > 0 ? ", " + Count(project.Pages, "page") : string.Empty)}. ");
             int fns = project.Symbols.Count(s => s.Kind == "fn");
             int others = project.Symbols.Count - fns;
-            w.Append($"Its own {Count(fns, "function")} and {Count(others, "type, enum and const", "types, enums and consts")} are listed in `.kscript/agents/index.md` with their signatures.\n");
-            w.Append("- Packages (each has its own file in `.kscript/agents/packages/`):\n");
+            w.Append($"The index lists {Count(fns, "function")} and {Count(others, "type, enum and const", "types, enums and consts")}.\n");
+            w.Append("- Packages:\n");
             foreach (string package in project.Packages)
             {
                 string description = catalog.Packages.TryGetValue(package, out string d) ? Summarize(d, 90) : null;
@@ -447,32 +465,15 @@ namespace KScript.Language.Agents
             }
             w.Append(End).Append('\n');
             // The raw string constants have the source file's line endings (CRLF in a Windows checkout).
-            return Fit(w.ToString().Replace("\r\n", "\n"), AgentsBudget);
+            string generated = Fit(w.ToString().Replace("\r\n", "\n"), AgentsBudget);
+            if (project.Markdown.Count == 0) return generated;
+
+            // Keep project instructions whole. Budgets apply only to the generated reference.
+            string guidance = "## Project guidance\n\n" + string.Join("\n\n", project.Markdown.Select(text => text.TrimEnd('\n'))) + "\n\n";
+            return generated.Insert(Math.Min(guidanceAt, generated.IndexOf(End, StringComparison.Ordinal)), guidance);
         }
 
         private static string Count(int n, string one, string many = null) => $"{n} {(n == 1 ? one : many ?? one + "s")}";
-
-        /// <summary>
-        /// AGENTS.md with its generated section replaced by <paramref name="section"/>. Text outside the markers is
-        /// kept; a file without markers gets the section at the end, and a missing file is just the section.
-        /// </summary>
-        public static string Merge(string existing, string section)
-        {
-            if (string.IsNullOrEmpty(existing))
-            {
-                return section;
-            }
-            string text = existing.Replace("\r\n", "\n");
-            int begin = text.IndexOf("<!-- kscript agents: begin", StringComparison.Ordinal);
-            int end = begin < 0 ? -1 : text.IndexOf(End, begin, StringComparison.Ordinal);
-            if (begin < 0 || end < 0)
-            {
-                return text.TrimEnd('\n') + "\n\n" + section;
-            }
-            int after = end + End.Length;
-            if (after < text.Length && text[after] == '\n') after++;
-            return text.Substring(0, begin) + section + text.Substring(after);
-        }
 
         /// <summary>A small program that shows most of the syntax. In XML projects it is converted.</summary>
         internal const string CrashCourse = """
@@ -555,7 +556,7 @@ namespace KScript.Language.Agents
             var entries = new List<string>();
             if (project.Routes != null)
             {
-                entries.Add("\n## Routes (kscript routes)\n\n```text\n" + project.Routes + "\n```\n");
+                entries.Add("\n## Declared routes\n\nRun `kscript routes` for the resolved table.\n\n```text\n" + project.Routes + "\n```\n");
             }
             if (project.Symbols.Count == 0)
             {
@@ -717,7 +718,11 @@ namespace KScript.Language.Agents
             }
             string note = "\n… cut to keep this file short. Use the `kscript mcp` server for the rest.\n" + End + "\n";
             int cut = text.LastIndexOf('\n', Math.Max(0, budget - note.Length));
-            return text.Substring(0, Math.Max(0, cut)) + note;
+            int open = text.IndexOf("\n```", StringComparison.Ordinal);
+            int close = open < 0 ? -1 : text.IndexOf("\n```", open + 4, StringComparison.Ordinal);
+            if (open >= 0 && cut > open && (close < 0 || cut < close + 4))
+                cut = open;
+            return text.Substring(0, Math.Max(Begin.Length, cut)) + note;
         }
 
         #endregion
@@ -739,8 +744,8 @@ namespace KScript.Language.Agents
             {
                 files[$"{Folder}/packages/{package}.md"] = Package(package, catalog, project.Format);
             }
-            // Always \n, so --check agrees with what was written whatever the platform's newline is.
-            return files.ToDictionary(f => f.Key, f => f.Value.Replace("\r\n", "\n"), StringComparer.Ordinal);
+            // Preserve AGENTS.md's handwritten line endings. The generated reference files use LF.
+            return files.ToDictionary(f => f.Key, f => f.Key == AgentsFile ? f.Value : f.Value.Replace("\r\n", "\n"), StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -756,7 +761,8 @@ namespace KScript.Language.Agents
             foreach (var (relative, text) in files)
             {
                 string path = Path.Combine(project.Root, relative);
-                string old = File.Exists(path) ? File.ReadAllText(path).Replace("\r\n", "\n") : null;
+                string old = File.Exists(path) ? File.ReadAllText(path) : null;
+                if (relative != AgentsFile) old = old?.Replace("\r\n", "\n");
                 if (old == text)
                 {
                     continue;
@@ -772,7 +778,7 @@ namespace KScript.Language.Agents
             string packagesFolder = Path.Combine(project.Root, Folder, "packages");
             if (Directory.Exists(packagesFolder))
             {
-                foreach (string stale in Directory.GetFiles(packagesFolder, "*.md"))
+                foreach (string stale in Directory.GetFiles(packagesFolder, "KScript.*.md").OrderBy(path => path, StringComparer.Ordinal))
                 {
                     string relative = $"{Folder}/packages/{Path.GetFileName(stale)}";
                     if (files.ContainsKey(relative)) continue;

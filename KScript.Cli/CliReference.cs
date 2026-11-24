@@ -49,7 +49,7 @@ namespace KScript
                 },
                 "kscript check\nkscript check scripts/ --warnings-as-errors\nkscript check --fix", "standards") { Group = "code" },
             new CliCommand("agents", "kscript agents [folder] [--check] [--print]",
-                "Write AGENTS.md and .kscript/agents: compact docs for coding agents, made from the project's code and packages.",
+                "Write AGENTS.md and .kscript/agents from project code, packages and Markdown listed in agents.merge.",
                 new[]
                 {
                     O("--check", "Write nothing; fail if the agent docs are out of date (for CI)."),

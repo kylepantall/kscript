@@ -21,7 +21,10 @@ namespace KScript.Language.Features
         private static void AddTypeNameTokens(DocumentAnalysis analysis, List<SemanticToken> tokens)
         {
             HashSet<string> declared = new HashSet<string>(analysis.Symbols.Where(s => s.EnumValues != null || s.Shape?.Type == KType.Type).Select(s => s.Name), StringComparer.Ordinal);
-            bool IsType(string name) => BuiltInTypeNames.Contains(name) || declared.Contains(name);
+            bool IsType(string name) => BuiltInTypeNames.Contains(name) || declared.Contains(name) || name == ComponentScript.Contract;
+            HashSet<string> errors = analysis.Symbols.Where(s => s.Shape?.Type == KType.ErrorType).Select(s => s.Name)
+                .Concat(KScript.Runtime.ErrorTypes.BuiltIn.Keys).ToHashSet(StringComparer.Ordinal);
+            bool code = analysis.Markup.Syntax == SourceSyntax.Code;
 
             foreach (MarkupElement e in analysis.Markup.DescendantElements())
             {
@@ -39,6 +42,20 @@ namespace KScript.Language.Features
                 if (e.Name is "let" or "set" or "state" or "const" or "field" && e.GetAttribute("type")?.Value is DecodedText type)
                 {
                     AddTypeWords(type, IsType, tokens);
+                }
+                if (e.Name == "fn" && e.GetAttribute("returns")?.Value is DecodedText returns)
+                {
+                    AddTypeWords(returns, IsType, tokens);
+                }
+                if (e.Name is "type" or "error" or "model")
+                {
+                    MarkupAttribute inheritance = e.GetAttribute(e.Name == "model" ? "with" : "extends");
+                    if (inheritance?.Value is DecodedText bases)
+                    {
+                        if (code && inheritance.NameSpan.Length > 0)
+                            tokens.Add(new SemanticToken(inheritance.NameSpan, SemanticTokenType.Keyword, SemanticTokenModifiers.None));
+                        AddTypeWords(bases, e.Name == "error" ? errors.Contains : IsType, tokens);
+                    }
                 }
                 if (e.Name == "type")
                 {

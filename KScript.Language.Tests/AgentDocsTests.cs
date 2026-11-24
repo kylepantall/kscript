@@ -3,6 +3,7 @@ using KScript.Language.Agents;
 using KScript.Language.Catalog;
 using KScript.LanguageServer;
 using KScript.Metadata;
+using KScript.Projects;
 using KScript.Runtime;
 using KScript.Syntax.Markup;
 
@@ -185,6 +186,36 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ReverseCallGraphUsesTheResolvedFile()
+        {
+            Write("first.kscript", "fn show() => 'first'");
+            Write("second.kscript", "fn show() => 'second'");
+            Write("main.kscript", "import \"first.kscript\" as first\nfn caller() => @first.show()");
+
+            AgentProject project = AgentDocs.Read(dir);
+            Assert.Equal(new[] { "@caller" }, project.Symbols.Single(s => s.File == "first.kscript").CalledBy);
+            Assert.Empty(project.Symbols.Single(s => s.File == "second.kscript").CalledBy);
+            Assert.Equal(new[] { "@first.show" }, project.Symbols.Single(s => s.Name == "caller").Calls);
+        }
+
+        [Fact]
+        public void ModelSignaturesKeepOptionsAndBaseArguments()
+        {
+            Write("models/note.kscript", """
+                import KScript.Data
+                model UID(mixin, key: "uid") { uid: uuid }
+                model Audit(mixin, timestamps)
+                model Note(table: "notes", auto_create, index: [title]) extends [UID, Audit(timestamps: false)] {
+                  title: string
+                }
+                """);
+
+            string index = AgentDocs.Index(AgentDocs.Read(dir));
+            Assert.Contains("model UID(mixin, key: \"uid\")", index);
+            Assert.Contains("model Note(table: \"notes\", auto_create, index: [title]) extends [UID, Audit(timestamps: false)]", index);
+        }
+
+        [Fact]
         public void CallGraphListsAreCapped()
         {
             string callees = string.Concat(Enumerable.Range(1, 10).Select(i => $"fn f{i}() => @hub()\n"));
@@ -225,9 +256,13 @@ namespace KScript.Language.Tests
             string section = AgentDocs.Begin + "\nnew\n" + AgentDocs.End + "\n";
             Assert.Equal(section, AgentDocs.Merge(null, section));
             Assert.Equal("# Mine\n\n" + section, AgentDocs.Merge("# Mine\n", section));
-            Assert.Equal("top\n" + section + "bottom\n", AgentDocs.Merge("top\r\n<!-- kscript agents: begin -->\nold\n" + AgentDocs.End + "\nbottom\n", section));
-            Assert.Equal("top\n" + section + "tail", AgentDocs.Merge("top\n<!-- kscript agents: begin -->\n" + AgentDocs.End + "tail", section));
-            Assert.Equal("top\n" + section, AgentDocs.Merge("top\n<!-- kscript agents: begin -->", section).Replace("<!-- kscript agents: begin -->\n\n", string.Empty));
+            Assert.Equal("top\r\n" + section + "bottom\n", AgentDocs.Merge("top\r\n<!-- kscript agents: begin -->\nold\n" + AgentDocs.End + "\nbottom\n", section));
+            Assert.Throws<ProjectConfigException>(() => AgentDocs.Merge("top\n<!-- kscript agents: begin -->\n" + AgentDocs.End + "tail", section));
+            Assert.Throws<ProjectConfigException>(() => AgentDocs.Merge("top\n<!-- kscript agents: begin -->", section));
+            Assert.Equal("See `" + AgentDocs.End + "`.\r\n\r\n" + section.Replace("\n", "\r\n"),
+                AgentDocs.Merge("See `" + AgentDocs.End + "`.\r\n", section));
+            string fenced = "~~~md\n<!-- kscript agents: begin -->\n" + AgentDocs.End + "\n~~~\n";
+            Assert.Equal(fenced + "\n" + section, AgentDocs.Merge(fenced, section));
             Assert.Equal("x\n" + section, AgentDocs.Merge("x\n" + AgentDocs.Begin + "\nold\n" + AgentDocs.End, section));
         }
 
@@ -238,10 +273,11 @@ namespace KScript.Language.Tests
             Write("main.kscript", "fn one() => 1\n");
             string section = AgentDocs.AgentsSection(AgentDocs.Read(dir));
             Assert.StartsWith(AgentDocs.Begin, section);
+            Assert.Contains("Start with the [function and type index](.kscript/agents/index.md) and [package references](.kscript/agents/packages/).\n\n## Syntax", section);
             Assert.EndsWith(AgentDocs.End + "\n", section);
             Assert.Contains("```kscript\nimport KScript.IO", section);
             Assert.Contains("kscript check --output json", section);
-            Assert.Contains("1 script, 0 test files. Its own 1 function and 0 types, enums and consts", section);
+            Assert.Contains("1 script, 0 test files. The index lists 1 function and 0 types, enums and consts", section);
             Assert.Contains("runs `*.test.kscript` files", section);
             Assert.Contains("Required project conventions", section);
             Assert.Contains("kscript fmt --check", section);
@@ -448,13 +484,109 @@ namespace KScript.Language.Tests
             Write("api.ks.xml", "<KScript.Routes prefix=\"/api\"><import path=\"controllers/ping.ks.xml\" as=\"ping\" /><Get path=\"/ping\" to=\"ping.show\" /></KScript.Routes>");
             Write("controllers/ping.ks.xml", "<kscript><fn name=\"show\" value=\"'pong'\" /></kscript>");
             string index = AgentDocs.Index(AgentDocs.Read(dir));
-            Assert.Contains("## Routes (kscript routes)", index);
+            Assert.Contains("## Declared routes", index);
+            Assert.Contains("Run `kscript routes` for the resolved table", index);
             Assert.Contains("/api/ping", index);
             Assert.Contains("api.ks.xml:", index);
 
             // kscript convert names the new files while the old ones are still there.
+            Write("api.kscript", "import KScript.Http\nRoutes(prefix: /api) { Get(path: /ping) { return null } }");
             string renamed = AgentDocs.Index(AgentDocs.Read(dir, skip: new HashSet<string> { Path.Combine(dir, "api.ks.xml") }));
             Assert.Contains("api.kscript:", renamed);
+        }
+
+        [Fact]
+        public void ManifestMarkdownMergesInOrderAndUpdatesWithoutChangingHandwrittenNotes()
+        {
+            Write("kscript.json", """
+                { "agents": { "merge": ["guide/team.md", "guide/review.markdown", "./guide/team.md"] } }
+                """);
+            Write("guide/team.md", "## Team conventions\r\n\r\nKeep API responses stable.  \r\nDocument new fields.\r\n");
+            Write("guide/review.markdown", "## Review\n\nAsk for a migration plan.\n");
+            const string before = "# Maintainer notes\r\n\r\n";
+            const string after = "\r\n## Local notes\r\nKeep these notes.  \r\n";
+            Write("AGENTS.md", before + AgentDocs.Begin + "\r\nOld content\r\n" + AgentDocs.End + "\r\n" + after);
+
+            Assert.Equal(0, AgentDocs.Read(dir).Pages);
+            AgentDocs.Write(dir);
+            string merged = Read("AGENTS.md");
+            Assert.StartsWith(before, merged);
+            Assert.EndsWith(after, merged);
+            Assert.Contains("## Project guidance\r\n\r\n## Team conventions\r\n\r\nKeep API responses stable.  \r\nDocument new fields.\r\n\r\n## Review", merged);
+            Assert.Equal(1, merged.Split("## Team conventions", StringSplitOptions.None).Length - 1);
+            Assert.Empty(AgentDocs.Write(dir, check: true));
+
+            Write("guide/team.md", "Changed team notes.");
+            Assert.Equal(new[] { "AGENTS.md" }, AgentDocs.Write(dir, check: true));
+            Assert.Equal(merged, Read("AGENTS.md"));
+            using var written = new StringWriter();
+            Assert.Equal(0, AgentsCommand.Run(new[] { dir, "--print" }, written));
+            Assert.Contains("Changed team notes.", written.ToString());
+            Assert.DoesNotContain("Local notes", written.ToString());
+            Assert.Equal(merged, Read("AGENTS.md"));
+            Assert.Equal(new[] { "AGENTS.md" }, AgentDocs.Write(dir));
+            Assert.EndsWith(after, Read("AGENTS.md"));
+            Assert.Empty(AgentDocs.Write(dir, check: true));
+            Write("kscript.json", "{}");
+            AgentDocs.Write(dir);
+            Assert.DoesNotContain("Changed team notes", Read("AGENTS.md"));
+            Assert.EndsWith(after, Read("AGENTS.md"));
+        }
+
+        [Theory]
+        [InlineData("\"docs/missing.md\"", "could not be read")]
+        [InlineData("\"../outside.md\"", "relative Markdown file")]
+        [InlineData("\"https://example.test/file.md\"", "relative Markdown file")]
+        [InlineData("\"AGENTS.md\"", "cannot include an agent output file")]
+        [InlineData("\".kscript/agents/index.md\"", "cannot include an agent output file")]
+        [InlineData("\"guide/markers.md\"", "reserved AGENTS.md marker")]
+        public void InvalidMergeInputsDoNotChangeExistingGuidance(string path, string expected)
+        {
+            Write("kscript.json", "{ \"agents\": { \"merge\": [" + path + "] } }");
+            Write("guide/markers.md", AgentDocs.End + "\n");
+            const string notes = "# Handwritten notes\n";
+            Write("AGENTS.md", notes);
+            using var output = new StringWriter();
+            Assert.Equal(2, AgentsCommand.Run(new[] { dir }, output));
+            Assert.Contains("agents.merge", output.ToString());
+            Assert.Contains(expected, output.ToString());
+            Assert.Equal(notes, Read("AGENTS.md"));
+            Assert.False(Directory.Exists(Path.Combine(dir, AgentDocs.Folder)));
+        }
+
+        [Fact]
+        public void APartialGeneratedSectionDoesNotCauseNotesToBeDeleted()
+        {
+            string notes = AgentDocs.Begin + "\n\n## These notes are handwritten\n";
+            Write("AGENTS.md", notes);
+            using var output = new StringWriter();
+            Assert.Equal(2, AgentsCommand.Run(new[] { dir }, output));
+            Assert.Contains("one matching begin and end marker", output.ToString());
+            Assert.Equal(notes, Read("AGENTS.md"));
+            Assert.False(Directory.Exists(Path.Combine(dir, AgentDocs.Folder)));
+        }
+
+        [Fact]
+        public void CheckingAgentDocsDoesNotExecuteRouteTopLevelCode()
+        {
+            Write("kscript.json", """{ "name": "route-scan" }""");
+            Write("routes.kscript", """
+                import KScript.Http
+                import KScript.IO
+
+                Routes(prefix: /v1, name: "v1.") {
+                  @write_text("ran.txt", "should not run")
+                  Group(prefix: /notes, name: "notes.", middleware: log) {
+                    Get(path: /all, name: "index") { return null }
+                  }
+                }
+                """);
+            string index = AgentDocs.Index(AgentDocs.Read(dir));
+            Assert.Contains("/v1/notes/all", index);
+            Assert.Contains("v1.notes.index", index);
+            Assert.NotEmpty(AgentDocs.Write(dir, check: true));
+            Assert.False(File.Exists(Path.Combine(dir, "ran.txt")));
+            Assert.False(File.Exists(Path.Combine(dir, "AGENTS.md")));
         }
 
         [Fact]

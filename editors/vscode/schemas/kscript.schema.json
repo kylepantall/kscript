@@ -456,6 +456,19 @@
         }
       }
     },
+    "agents": {
+      "type": "object",
+      "description": "Settings for generated AGENTS.md.",
+      "additionalProperties": false,
+      "properties": {
+        "merge": {
+          "type": "array",
+          "description": "Project-relative Markdown files to include in AGENTS.md, in the listed order.",
+          "items": { "type": "string", "minLength": 1 },
+          "examples": [["docs/project-guidance.md"]]
+        }
+      }
+    },
     "format": {
       "type": "object",
       "description": "Used by kscript fmt and the editor's Format Document. Values set here win over the editor's tab settings.",

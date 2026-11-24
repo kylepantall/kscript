@@ -541,6 +541,7 @@ namespace KScript.Language.Analysis
         {
             if (type.GetAttribute("extends") is not { Value: not null } attr || shape == null) return;
             string contract = attr.ValueText.Trim();
+            if (contract.Length == 0) return;
             TextSpan span = TrimmedSpan(attr.Value);
             if (shape.RefinementBase != null)
             {

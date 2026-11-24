@@ -1099,13 +1099,14 @@ namespace KScript.Syntax.Markup
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
             ParseDeclarationOptions(e);
             SkipSpaces();
+            int clauseStart = pos;
             if (keyword == "model" && (TryWord("extends") || TryWord("with")))
             {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
                 (int from, int end) = ReadExpression(Stop.Header);
                 if (from == end)
                     Error(new TextSpan(from, 0), DiagnosticCodes.MissingAttribute, "Name the models or mixins to extend.");
-                else
-                    AddRawAttribute(e, "with", TextSpan.FromBounds(from, end));
+                AddRawAttribute(e, "with", TextSpan.FromBounds(from, end), clause);
             }
             else if (TryWord("with"))
             {
@@ -1145,14 +1146,15 @@ namespace KScript.Syntax.Markup
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             SkipSpaces();
+            clauseStart = pos;
             if (keyword == "type" && TryWord("extends"))
             {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
                 SkipSpaces();
                 TextSpan contract = ReadNameSpan(allowDash: false);
                 if (contract.Length == 0)
                     Error(contract, DiagnosticCodes.MissingAttribute, "Write a type whose signature this type implements.");
-                else
-                    AddRawAttribute(e, "extends", contract);
+                AddRawAttribute(e, "extends", contract, clause);
                 SkipSpaces();
             }
             if (Peek(0) == '{')
@@ -1197,18 +1199,17 @@ namespace KScript.Syntax.Markup
             }
             int save = pos;
             SkipSpaces();
+            int clauseStart = pos;
             if (TryWord("extends"))
             {
+                TextSpan clause = TextSpan.FromBounds(clauseStart, pos);
                 SkipSpaces();
                 TextSpan parentName = ReadNameSpan(allowDash: false);
                 if (parentName.Length == 0)
                 {
                     Error(new TextSpan(pos, 0), DiagnosticCodes.MissingAttribute, "Write the error type it extends after 'extends', such as Validation.");
                 }
-                else
-                {
-                    AddRawAttribute(e, "extends", parentName);
-                }
+                AddRawAttribute(e, "extends", parentName, clause);
                 save = pos;
                 SkipSpaces();
             }
@@ -2057,8 +2058,8 @@ namespace KScript.Syntax.Markup
             e.Children.Add(new MarkupText { Content = content, Parent = e, Span = span ?? content.SourceSpan });
 
         // Attributes implied by a keyword (let's name, if's test) have no name in the source: an empty name span.
-        private void AddRawAttribute(MarkupElement e, string name, TextSpan span) =>
-            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, new TextSpan(span.Start, 0), '\0');
+        private void AddRawAttribute(MarkupElement e, string name, TextSpan span, TextSpan? nameSpan = null) =>
+            AddAttribute(e, name, DecodedText.Plain(text.Substring(span.Start, span.Length), span.Start), span, nameSpan, '\0');
 
         private void AddAttribute(MarkupElement e, string name, DecodedText value, TextSpan span, TextSpan? nameSpan = null, char quote = '\0') =>
             e.Attributes.Add(new MarkupAttribute { Name = name, NameSpan = nameSpan ?? new TextSpan(span.Start, 0), Value = value, Span = span, Quote = quote, Owner = e });

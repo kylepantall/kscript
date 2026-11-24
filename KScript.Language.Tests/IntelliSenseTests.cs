@@ -302,6 +302,84 @@ namespace KScript.Language.Tests
             Assert.Empty(Complete(text, RouteComponentFile));
         }
 
+        [Theory]
+        [InlineData("type Nav extends ‸", " ")]
+        [InlineData("type Nav extends Co‸ { }", null)]
+        public void TypeInheritanceCompletesOnlyContracts(string declaration, string trigger)
+        {
+            const string prefix = """
+                import KScript.Web
+                type Renderable { fn render(): Component; }
+                type Record { name: string }
+
+                """;
+            string marked = prefix + declaration + "\ntype Later { fn render(): Component; }";
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "contracts.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, trigger);
+            Assert.Equal(new[] { "Component", "Renderable" }, items.Select(i => i.Label));
+            Assert.Equal(trigger == null ? "Co" : "", analysis.Source[items[0].ReplaceSpan]);
+        }
+
+        [Theory]
+        [InlineData("model Note extends ‸", " ", true)]
+        [InlineData("model Note extends [UID, ‸] { title: string }", " ", false)]
+        [InlineData("model Note extends UID,‸ { title: string }", ",", false)]
+        public void ModelInheritanceCompletesEligibleBases(string declaration, string trigger, bool includeUid)
+        {
+            const string prefix = """
+                import KScript.Data
+                model UID(mixin, key: 'uid') { uid: uuid }
+                model Audit(mixin, timestamps)
+                type Caption with [string] { min: 1 }
+
+                """;
+            string marked = prefix + declaration;
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "note.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, trigger);
+            Assert.Contains(items, i => i.Label == "Audit");
+            Assert.Equal(includeUid, items.Any(i => i.Label == "UID"));
+            Assert.DoesNotContain(items, i => i.Label is "Caption" or "Note" or "Component");
+        }
+
+        [Fact]
+        public void ErrorInheritanceOffersOnlyErrorTypes()
+        {
+            const string marked = "error Missing extends ‸";
+            int offset = marked.IndexOf('‸');
+            var analysis = Service.Analyze(marked.Remove(offset, 1), "errors.kscript");
+            List<CompletionItem> items = Service.GetCompletions(analysis, offset, " ");
+            Assert.Contains(items, i => i.Label == "NotFound");
+            Assert.DoesNotContain(items, i => i.Label is "Missing" or "Component");
+        }
+
+        [Fact]
+        public void InheritanceKeywordsAndBaseTypesHaveSemanticColour()
+        {
+            const string code = """
+                import KScript.Web
+                import KScript.Data
+                type Navigation extends Component {
+                  fn render(): Component {
+                    return ```html
+                    <nav></nav>
+                    ```
+                  }
+                }
+                model UID(mixin) { uid: uuid }
+                model Note extends [UID] { title: string }
+                error Unavailable extends NotFound
+                """;
+            var analysis = Service.Analyze(code, "navigation.kscript");
+            List<SemanticToken> tokens = Service.GetSemanticTokens(analysis);
+            Assert.Equal(3, tokens.Count(t => t.Type == SemanticTokenType.Keyword && analysis.Source[t.Span] == "extends"));
+            Assert.Equal(2, tokens.Count(t => t.Type == SemanticTokenType.Type && analysis.Source[t.Span] == "Component"));
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Type && analysis.Source[t.Span] == "NotFound");
+            int baseStart = code.IndexOf("[UID]", StringComparison.Ordinal) + 1;
+            Assert.Contains(tokens, t => t.Type == SemanticTokenType.Type && t.Span.Start == baseStart);
+        }
+
         [Fact]
         public void ClassComponentCompletesPropsOnItsTagAndFieldsInsideTheFence()
         {

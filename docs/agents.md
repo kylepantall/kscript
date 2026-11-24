@@ -58,15 +58,39 @@ It ignores its own files, hidden folders (such as `.git` and `.kscript`), `bin`,
 
 | File | What it holds | Size |
 | --- | --- | --- |
-| `AGENTS.md` | A crash course in KScript (a small program in the project's format), the rules agents get wrong, the mistakes to avoid, the commands to run after each change, and the project's packages | about 1,000 tokens |
+| `AGENTS.md` | Links to the symbol index and package references, project guidance, a short KScript example, and a checklist | about 1,000 tokens plus project guidance |
 | `CLAUDE.md` | `@AGENTS.md`, so Claude Code reads the same file (made by `kscript make project`) | 1 line |
 | `.kscript/agents/index.md` | The project's routes, then one line per top-level `fn`, `type`, `enum` and `const`, by file | up to about 4,000 tokens |
 | `.kscript/agents/packages/<name>.md` | One line per command, method and statement of each package the project imports | up to about 7,000 tokens each |
 
 Only packages the project uses get a file, and a file whose package is no longer imported is removed. When a file
 would go over its budget, it stops at a whole entry and says how many were left out; the [`kscript mcp`](mcp.md) server has the
-rest. AGENTS.md only replaces the part between its two `<!-- kscript agents -->` lines, so anything you write above or
-below them is kept. Neither file is checked, formatted, tested or served.
+rest. KScript leaves AGENTS.md and CLAUDE.md out of script checking, formatting, testing and serving.
+
+## Add project guidance
+
+Write project instructions above the generated block in AGENTS.md or on a new line below
+`<!-- kscript agents: end -->`. KScript keeps both sections when it updates the file. Keep the two generated
+marker comments on their own lines.
+
+To maintain guidance in separate Markdown files, list them in `kscript.json`:
+
+```json
+{
+  "agents": {
+    "merge": ["docs/team-guidance.md", "docs/review-checklist.md"]
+  }
+}
+```
+
+Run `kscript agents` to include the files in a **Project guidance** section near the top of the generated
+block, in the order listed. Edit the source Markdown and regenerate. File paths are relative to
+`kscript.json`. Each file must be a local `.md` or `.markdown` file inside the project. Generated files, symbolic
+links and reserved marker lines outside code fences are rejected. Close any code fences within each source file.
+Missing or invalid inputs leave the current AGENTS.md untouched.
+
+`kscript agents --print` includes the merged guidance and `kscript agents --check` detects changes to it
+without updating files. The built-in reference budget leaves the project guidance whole.
 
 ## Made from the code
 
@@ -88,8 +112,9 @@ You don't need to tag anything for the docs to be useful. For each function, typ
   - calls: @add_task
 ```
 
-For a site with [KScript.Http](http.md) routes, the index starts with the same table `kscript routes` prints:
-method, path, name, controller and middleware.
+For a site with [KScript.Http](http.md) routes, the index starts with a summary of explicit route declarations.
+The generator reads them without running startup code, imports or route files. Run `kscript routes` for the
+resolved table, including routes added by resource controllers or conditional code.
 
 Names that start with `_`, test files and pages are left out.
 

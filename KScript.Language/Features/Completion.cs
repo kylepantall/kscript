@@ -44,16 +44,15 @@ namespace KScript.Language.Features
             {
                 return new List<CompletionItem>();
             }
-            List<CompletionItem> modelOptions = ModelOptionCompletionsAt(analysis, offset);
-            // A typed space retriggers the model's suggestions after a separator. Leave ordinary spaces quiet.
-            if (trigger == " ") return modelOptions ?? new List<CompletionItem>();
-            List<CompletionItem> items = modelOptions ?? GetCompletionsAt(analysis, offset);
+            List<CompletionItem> declarationOptions = InheritanceCompletionsAt(analysis, offset) ?? ModelOptionCompletionsAt(analysis, offset);
+            if (trigger == " ") return declarationOptions ?? new List<CompletionItem>();
+            List<CompletionItem> items = declarationOptions ?? GetCompletionsAt(analysis, offset);
             if (trigger == "[" && offset > 0 && analysis.Source.Text[offset - 1] == '['
-                && modelOptions == null && !items.Any(i => i.Kind == CompletionKind.Value))
+                && declarationOptions == null && !items.Any(i => i.Kind == CompletionKind.Value))
             {
                 return new List<CompletionItem>();
             }
-            if (modelOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind is CompletionKind.Parameter or CompletionKind.Value or CompletionKind.Attribute
+            if (declarationOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind is CompletionKind.Parameter or CompletionKind.Value or CompletionKind.Attribute
                 || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
                 return new List<CompletionItem>();
