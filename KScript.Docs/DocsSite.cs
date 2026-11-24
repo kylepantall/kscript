@@ -5,6 +5,8 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using KScript.Language.Catalog;
+using Markdig.Renderers.Html;
+using Markdig.Syntax;
 
 namespace KScript.Docs
 {
@@ -35,6 +37,10 @@ namespace KScript.Docs
 
         /// <summary>The file in docs/ the page was made from, or null for generated pages.</summary>
         public string Source { get; init; }
+
+        internal string ParentPath { get; init; }
+        internal string TopicMarkdown { get; init; }
+        internal List<DocPage> Topics { get; } = new();
     }
 
     /// <summary>One thing search can find: a page, a heading or a reference entry.</summary>
@@ -178,9 +184,10 @@ namespace KScript.Docs
 
         #region Guides
 
-        private static readonly Regex Fence = new Regex(@"^```([^\n]*)\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.Compiled);
+        internal static readonly Regex Fence = new Regex(@"^(`{3,})(?!`)([^`\n]*)\n(.*?)^\1`*[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex Heading = new Regex(@"<h([1-3]) id=""([^""]+)"">(.*?)</h\1>", RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex Href = new Regex(@"href=""([^""#:]*)(#[^""]*)?""", RegexOptions.Compiled);
+        private static readonly Regex LocalLink = new Regex(@"href=""#([^""]+)""", RegexOptions.Compiled);
 
         /// <summary>The URL of a link in a guide: other guides stay on the site; files in the repository go to GitHub.</summary>
         internal static string LinkTarget(string target, string anchor, bool includeInstallGuide = true)
@@ -203,11 +210,11 @@ namespace KScript.Docs
             var blocks = new List<string>();
             string withPlaceholders = Fence.Replace(markdown.Replace("\r\n", "\n"), m =>
             {
-                string[] info = m.Groups[1].Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                string[] info = m.Groups[2].Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 string language = info.Length > 0 ? info[0] : guide.FenceLanguage;
                 if (language == "try") language = guide.FenceLanguage;
                 bool runnable = info.Contains("try") && (language == "xml" || language == "kscript");
-                string code = m.Groups[2].Value;
+                string code = m.Groups[3].Value;
                 blocks.Add(runnable ? Html.Try(code, language) : Html.Code(code, language));
                 return $"\n<div data-block=\"{blocks.Count - 1}\"></div>\n";
             });
@@ -235,11 +242,53 @@ namespace KScript.Docs
                 Body = html,
                 Source = guide.File,
             };
-            AddHeadings(page);
             Add(page);
+            AddGuideTopics(page, markdown);
+            AddHeadings(page, index: page.Topics.Count == 0);
         }
 
-        private void AddHeadings(DocPage page)
+        private void AddGuideTopics(DocPage parent, string markdown)
+        {
+            var sourceHeadings = Markdig.Markdown.Parse(markdown, Html.Pipeline)
+                .OfType<HeadingBlock>().Where(h => h.Level == 2).ToArray();
+            var rendered = Heading.Matches(parent.Body).Where(h => h.Groups[1].Value == "2").ToArray();
+            var sourceById = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (int i = 0; i < sourceHeadings.Length; i++)
+            {
+                var source = sourceHeadings[i];
+                int end = i + 1 < sourceHeadings.Length ? sourceHeadings[i + 1].Span.Start : markdown.Length;
+                if (source.GetAttributes().Id is string id) sourceById[id] = markdown[(source.Span.End + 1)..end];
+            }
+
+            for (int i = 0; i < rendered.Length; i++)
+            {
+                var heading = rendered[i];
+                string id = heading.Groups[2].Value;
+                if (!sourceById.TryGetValue(id, out string topicMarkdown)) continue;
+                int end = i + 1 < rendered.Length ? rendered[i + 1].Index : parent.Body.Length;
+                string body = parent.Body[(heading.Index + heading.Length)..end];
+                body = LocalLink.Replace(body, m => body.Contains($"id=\"{m.Groups[1].Value}\"", StringComparison.Ordinal) || m.Groups[1].Value == id
+                    ? m.Value : $"href=\"{parent.Path}#{m.Groups[1].Value}\"");
+                string title = Html.Text(heading.Groups[3].Value);
+                var topic = new DocPage
+                {
+                    Path = parent.Path + "/" + id,
+                    ParentPath = parent.Path,
+                    Title = title,
+                    Section = parent.Title,
+                    Description = Shorten(Html.Text(Regex.Match(body, "<p>(.*?)</p>", RegexOptions.Singleline).Groups[1].Value)),
+                    Body = $"<p class=\"topic-parent\"><a href=\"{parent.Path}\">{Html.H(parent.NavTitle ?? parent.Title)}</a></p>"
+                        + $"<h1 id=\"{id}\">{heading.Groups[3].Value}</h1>" + body,
+                    Source = parent.Source,
+                    TopicMarkdown = "# " + title + "\n\n" + topicMarkdown.TrimStart('\r', '\n'),
+                };
+                parent.Topics.Add(topic);
+                Add(topic);
+                AddHeadings(topic);
+            }
+        }
+
+        private void AddHeadings(DocPage page, bool index = true)
         {
             foreach (Match m in Heading.Matches(page.Body))
             {
@@ -247,7 +296,8 @@ namespace KScript.Docs
                 if (level < 2) continue;
                 string text = Html.Text(m.Groups[3].Value);
                 page.Toc.Add((level, m.Groups[2].Value, text));
-                Search.Add(new SearchEntry { Title = text, Url = page.Path + "#" + m.Groups[2].Value, Section = page.Title, Kind = "heading", Text = string.Empty });
+                if (index)
+                    Search.Add(new SearchEntry { Title = text, Url = page.Path + "#" + m.Groups[2].Value, Section = page.Title, Kind = "heading", Text = string.Empty });
             }
         }
 
@@ -272,7 +322,7 @@ namespace KScript.Docs
 
         /// <summary>The sidebar: sections in order, each with its pages.</summary>
         public IEnumerable<(string Section, List<DocPage> Pages)> Navigation() =>
-            Pages.Where(p => p.Section != null)
+            Pages.Where(p => p.Section != null && p.ParentPath == null)
                  .GroupBy(p => p.Section)
                  .OrderBy(g => Array.IndexOf(SectionOrder, g.Key) is int i && i >= 0 ? i : 99)
                  .Select(g => (g.Key, g.ToList()));

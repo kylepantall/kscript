@@ -31,7 +31,7 @@ namespace KScript.Docs
         {
             DocPage home = Find("/");
             var cards = new StringBuilder();
-            foreach (DocPage guide in Pages.Where(p => p.Source != null)) cards.Append(Card(guide));
+            foreach (DocPage guide in Pages.Where(p => p.Source != null && p.ParentPath == null)) cards.Append(Card(guide));
             home.Body = home.Body.Replace("<h2 id=\"guides\">Guides</h2><div class=\"cards\"></div>", $"<h2 id=\"guides\">Guides</h2><div class=\"cards\">{cards}</div>");
         }
 
@@ -121,16 +121,26 @@ namespace KScript.Docs
             sb.Append("<div class=\"layout\"><nav class=\"sidebar\" aria-label=\"Docs\">");
             foreach (var (section, pages) in Navigation())
             {
-                bool open = pages.Any(p => p.Path == page.Path) || section != "Methods by type";
+                bool open = pages.Any(p => p.Path == (page.ParentPath ?? page.Path)) || section != "Methods by type";
                 sb.Append($"<details class=\"nav-section\"{(open ? " open" : "")}><summary>{Html.H(section)}</summary><ul>");
                 foreach (DocPage p in pages)
-                    sb.Append($"<li><a href=\"{p.Path}\"{(p.Path == page.Path ? " aria-current=\"page\"" : "")}>{Html.H(p.NavTitle ?? p.Title)}</a></li>");
+                {
+                    sb.Append($"<li><a href=\"{p.Path}\"{(p.Path == page.Path ? " aria-current=\"page\"" : "")}>{Html.H(p.NavTitle ?? p.Title)}</a>");
+                    if (p.Topics.Count > 0 && p.Path == (page.ParentPath ?? page.Path))
+                    {
+                        sb.Append("<ul class=\"nav-topics\">");
+                        foreach (var topic in p.Topics)
+                            sb.Append($"<li><a href=\"{topic.Path}\"{(topic.Path == page.Path ? " aria-current=\"page\"" : "")}>{Html.H(topic.Title)}</a></li>");
+                        sb.Append("</ul>");
+                    }
+                    sb.Append("</li>");
+                }
                 sb.Append("</ul></details>");
             }
             sb.Append("</nav>");
 
             sb.Append($"<main class=\"content\" id=\"content\"><article class=\"doc\">{page.Body}</article>");
-            var order = Navigation().SelectMany(n => n.Pages).ToList();
+            var order = Navigation().SelectMany(n => n.Pages).SelectMany(p => p.Topics.Prepend(p)).ToList();
             int at = order.FindIndex(p => p.Path == page.Path);
             if (at >= 0)
             {

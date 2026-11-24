@@ -1,6 +1,39 @@
 # Stylesheets: kscript css
 
-A file ending in `.ks.css`, `.ks.scss` or `.ks.sass` is a stylesheet written in KScript. It is ordinary CSS (or Sass), with KScript elements such as `<let>`, `<for>` and `<if>` between the rules and `{$name}` or `{ @fn(...) }` in the text. `theme.ks.css` compiles to `theme.css`, `theme.ks.scss` to `theme.scss` and `theme.ks.sass` to `theme.sass`, so a theme kept in JSON becomes a stylesheet:
+A file ending in `.ks.css`, `.ks.scss` or `.ks.sass` is a stylesheet written in KScript. It is ordinary CSS or Sass with KScript expressions and control tags. `theme.ks.css` compiles to `theme.css`. Sass sources compile to ordinary Sass and then go through your Sass compiler.
+
+## Stylesheet cheatsheet
+
+Stylesheets import `KScript.Style` automatically. Wrap a helper call in braces when you put it in a CSS declaration or media query.
+
+| Use | Paste into a stylesheet |
+| --- | --- |
+| Convert pixels to rem | `padding: {@rem(24)};` gives `1.5rem`. The optional second argument sets the base, which defaults to 16. |
+| Scale a value across screen widths | `font-size: {@fluid(28, 48)};` scales from 28 px at 640 px to 48 px at 1280 px. Pass `@fluid(28, 48, 'sm', 'lg')` to choose the endpoints. |
+| Apply a minimum or maximum width | `@media {@up('md')}` starts at 768 px. `@media {@down('md')}` ends just below it. |
+| Limit a rule to a range | `@media {@between('sm', 'lg')}` covers 640 px up to 1024 px. The upper bound is exclusive. |
+| Set a colour's opacity | `background: {@alpha('#3355ff', 0.2)};` |
+| Blend two colours | `background: {@mix('#3355ff', 'white', 0.25)};` moves a quarter of the way to white. Omit the amount for a 50/50 mix. |
+| Lighten or darken a colour | `background: {@adjust_lightness('#3355ff', '-10%')};` subtracts 10 percentage points of HSL lightness. Use a positive amount with `@lighten(color, amount)` or `@darken(color, amount)`. |
+| Choose readable text | `color: {@contrast_color('#3355ff')};` chooses black or white. Pass custom dark and light colours as the second and third arguments. |
+| Read a CSS custom property with a fallback | `gap: {@css_var('gap', '4px')};` gives `var(--gap, 4px)`. |
+| Generate CSS custom properties | `:root { { @css_vars($theme, 'theme') } }` turns a map entry such as `primary: '#3355ff'` into `--theme-primary: #3355ff;`. Nested keys are joined with hyphens. |
+
+The default breakpoints are `sm` 640, `md` 768, `lg` 1024, `xl` 1280 and `xxl` 1536, in pixels. Use a number such as `@up(900)` or a width such as `@up('48em')` in place of a name. Set `<let name="breakpoints" value="{ md: 800 }" />` near the top of a stylesheet to define your own named breakpoints.
+
+Colour helpers accept common colour names, `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()` and `hsl()`.
+
+| Get values from | Write |
+| --- | --- |
+| A variable | `{$name}` |
+| A JSON file | `<let name="theme" value="@read_json('theme.json')" />` |
+| Project configuration | `{$config.theme.accent}` |
+| Build arguments | Read `$vars.dark` after running `kscript css --var dark=true`. |
+| A KScript script | `@stylesheet('theme.ks.css', { dark: true })` compiles and returns the stylesheet as text. In a script, add `import KScript.Style` first. |
+
+Keep `<let>`, `<if>` and `<for>` tags on their own lines between CSS rules. Run `kscript docs KScript.Style` for the package reference.
+
+## Generate a stylesheet from JSON
 
 ```json
 { "colors": { "primary": "#3355ff", "surface": "#ffffff" }, "space": { "sm": 4, "md": 8, "lg": 16 } }
@@ -32,9 +65,6 @@ h1 { font-size: {@fluid(28, 48)}; }            /* 28px on phones, growing to 48p
 ```
 
 - **Braces.** A `{` is KScript only when `$name`, `@name(` or `!` comes next. Every other brace is CSS, and Sass's own `#{$var}` is left alone. An element alone on its line leaves no blank line behind.
-- **Screen widths.** `@up('md')` gives `(min-width: 768px)`, `@down('md')` gives `(max-width: 767.98px)`, and there is `@between('sm', 'lg')`. The names are sm 640, md 768, lg 1024, xl 1280 and xxl 1536, and `<let name="breakpoints" value="{ md: 800 }" />` sets your own. A number (`@up(900)`), `'900px'` or `'48em'` works too.
-- **Sizes.** `@rem(24)` gives `1.5rem`. `@fluid(min, max, from?, to?)` gives a `clamp()` that grows from `min` px on screens up to `from` (default 640) to `max` px from `to` (default 1280).
-- **Colours.** `@adjust_lightness(color, amount)`, `@mix(color, other, amount)` (amount is how far towards the other colour, 0.5 by default), `@alpha(color, opacity)` and `@contrast_color(color, dark?, light?)` (the text colour that reads best on a background) read `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `hsl()` and the common names. `@css_var('gap', '4px')` gives `var(--gap, 4px)`.
 - **Building.** `kscript css` compiles every stylesheet in the current folder (or the files and folders you name), skipping `node_modules`, `.git` and partials whose names start with `_`. `--out public/css` writes the results to another folder, and `--var dark=true` sets `$vars.dark`. From a script, `@stylesheet(path, vars)` returns the CSS: `@write_text('public/theme.css', @stylesheet('theme.ks.css', { dark: true }))`. `$config` works in stylesheets too.
 - **Serving.** `kscript serve` serves `theme.css` compiled from `theme.ks.css` on each request, unless a real `theme.css` is there, and never serves the `.ks.css` source itself. If a stylesheet fails, the error comes back as a CSS comment with status 500.
 

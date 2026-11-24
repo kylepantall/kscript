@@ -141,6 +141,8 @@ mark { background: none; color: var(--accent); font-weight: 700; }
 .nav-section a { display: block; padding: 5px 10px; border-radius: 7px; color: var(--fg-soft); }
 .nav-section a:hover { color: var(--fg); background: var(--bg-soft); text-decoration: none; }
 .nav-section a[aria-current="page"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.nav-section .nav-topics { margin: 4px 0 8px 12px; padding-left: 6px; border-left: 1px solid var(--border); font-size: 13px; }
+.doc .topic-parent { font-size: .9em; margin: 0 0 .65em; }
 .content { min-width: 0; padding: 36px 48px 80px; }
 .doc { max-width: 780px; margin: 0 auto; }
 .toc { position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; padding: 32px 16px 40px 8px; font-size: 13.5px; }

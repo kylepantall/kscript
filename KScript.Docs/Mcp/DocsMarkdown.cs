@@ -16,8 +16,6 @@ namespace KScript.Docs.Mcp
         /// <summary>The URI scheme of the docs resources: kscript://docs/guide/language is the site's /guide/language.</summary>
         public const string UriPrefix = "kscript://docs";
 
-        private static readonly Regex Fence = new Regex(@"^```([^\n]*)\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.Compiled);
-
         private readonly Func<string, string> readGuide;
 
         public DocsMarkdown(DocsSite site, Func<string, string> readGuide = null)
@@ -63,8 +61,9 @@ namespace KScript.Docs.Mcp
             if (path == null) return null;
             if (path.StartsWith("/guide/", StringComparison.Ordinal))
             {
-                DocsSite.Guide guide = DocsSite.Guides.FirstOrDefault(g => "/guide/" + g.Slug == path);
-                string markdown = guide == null ? null : readGuide(guide.File);
+                DocPage topic = Site.Find(path);
+                DocsSite.Guide guide = DocsSite.Guides.FirstOrDefault(g => "/guide/" + g.Slug == (topic?.ParentPath ?? path));
+                string markdown = topic?.TopicMarkdown ?? (guide == null ? null : readGuide(guide.File));
                 return markdown == null ? null : Guide(markdown, guide.FenceLanguage, format);
             }
             if (path == "/") return Home();
@@ -104,11 +103,12 @@ namespace KScript.Docs.Mcp
 
         /// <summary>A guide's Markdown, with each script example in the reader's format where it converts.</summary>
         internal static string Guide(string markdown, string fenceLanguage, string format) =>
-            Fence.Replace(markdown.Replace("\r\n", "\n"), m =>
+            DocsSite.Fence.Replace(markdown.Replace("\r\n", "\n"), m =>
             {
-                string[] info = m.Groups[1].Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                string[] info = m.Groups[2].Value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 string language = info.Length == 0 || info[0] == "try" ? fenceLanguage : info[0];
-                return "```" + Code(m.Groups[2].Value, language, format, out _) + "```";
+                string fence = m.Groups[1].Value;
+                return fence + Code(m.Groups[3].Value, language, format, out _) + fence;
             });
 
         /// <summary>
@@ -146,7 +146,8 @@ namespace KScript.Docs.Mcp
         {
             var sb = new StringBuilder("# KScript docs\n\n");
             sb.Append($"KScript {Site.Version}. A small scripting language for automating your computer, building web pages and APIs, and making desktop apps. Scripts are XML (`.ks.xml`) or the brace-style `.kscript` format.\n\n## Guides\n\n");
-            foreach (DocPage g in Site.Pages.Where(p => p.Source != null)) sb.Append($"- [{g.Title}]({UriOf(g.Path)}): {g.Description}\n");
+            foreach (DocPage g in Site.Pages.Where(p => p.Source != null && p.ParentPath == null))
+                sb.Append($"- [{g.Title}]({UriOf(g.Path)}): {g.Description}\n");
             sb.Append($"\n## Reference\n\n- [Reference]({UriOf("/reference")}): every package, and methods by type\n- [Built-in variables]({UriOf("/reference/variables")})\n- [Command line]({UriOf("/cli")})\n");
             return sb.ToString();
         }

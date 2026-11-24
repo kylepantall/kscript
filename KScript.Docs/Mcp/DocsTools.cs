@@ -197,7 +197,11 @@ namespace KScript.Docs.Mcp
                 foreach (var section in docs.Site.Navigation())
                 {
                     sb.Append($"{section.Section}:\n");
-                    foreach (DocPage p in section.Pages.Where(p => p.Path != "/playground")) sb.Append($"- {p.Title}: {DocsMarkdown.UriOf(p.Path)}\n");
+                    foreach (DocPage p in section.Pages.Where(p => p.Path != "/playground"))
+                    {
+                        sb.Append($"- {p.Title}: {DocsMarkdown.UriOf(p.Path)}\n");
+                        foreach (var topic in p.Topics) sb.Append($"  - {topic.Title}: {DocsMarkdown.UriOf(topic.Path)}\n");
+                    }
                 }
                 return new ToolResult(sb.ToString());
             }

@@ -156,6 +156,11 @@ public sealed class McpTests : IDisposable
         Assert.Equal("/guide/language", docs.Resolve("/guide/language"));
         Assert.Equal("/guide/language", docs.Resolve("language"));
         Assert.Equal("/guide/language", docs.Resolve("language.md"));
+        Assert.Equal("/guide/data/models", docs.Resolve("kscript://docs/guide/data/models"));
+        string models = docs.Page("/guide/data/models", "kscript");
+        Assert.StartsWith("# Models", models);
+        Assert.Contains("### Extending models", models);
+        Assert.DoesNotContain("## Queries", models);
         Assert.Equal("/", docs.Resolve("kscript://docs"));
         Assert.Equal("/reference/io", docs.Resolve("KScript.IO"));
         Assert.Equal("/reference/io", docs.Resolve("io"));
