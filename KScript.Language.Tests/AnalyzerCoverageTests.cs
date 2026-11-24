@@ -136,6 +136,7 @@ namespace KScript.Language.Tests
         [InlineData("<include path=\"nope.html\" />", DiagnosticCodes.InvalidAttributeValue, "File not found: nope.html")]
         [InlineData("<include path=\"{$x}.html\" />", null, null)]
         [InlineData("<p hidden>x</p>", null, null)]
+        [InlineData("<live id='x'><span @live-action('save')></span></live>", DiagnosticCodes.MissingAttribute, "needs an on-action handler")]
         [InlineData("<p>{ $request.nope }</p>", DiagnosticCodes.UnknownMethod, "$request has no field 'nope'.")]
         public void Pages(string body, string code, string fragment)
         {

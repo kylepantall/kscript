@@ -86,6 +86,9 @@ namespace KScript.Language.Features
             {
                 ElementInfo info = Catalog.GetElement(cursor.TagElement.Name);
                 AttributeInfo a = info?.GetAttribute(cursor.Attribute.Name);
+                if (a == null && analysis.MarkupAt(offset).Kind != DocumentKind.Script &&
+                    !global::KScript.Pages.PageElementNames.KScript.Contains(cursor.TagElement.Name) && ComponentFile(analysis.Path, cursor.TagElement.Name) == null)
+                    a = global::KScript.Pages.LiveAttributes.Get(cursor.Attribute.Name);
                 if (a != null)
                 {
                     return new HoverResult($"**{a.Name}** ({KindLabel(a.Kind)}{(a.Required ? ", required" : string.Empty)})\n\n{DeprecationLine(a.Deprecated, a.Name)}{a.Description}{OptionsLine(a)}", cursor.Attribute.NameSpan);

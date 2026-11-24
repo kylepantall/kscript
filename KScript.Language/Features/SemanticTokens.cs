@@ -111,8 +111,8 @@ namespace KScript.Language.Features
         }
 
         /// <summary>
-        /// Tokens for the KScript inside attributes and text, so editors colour expressions instead of showing them as
-        /// plain strings. Markup itself is left to the editor's XML/HTML grammar.
+        /// Tokens for KScript expressions, page commands, component tags and live directives.
+        /// The editor's XML/HTML grammar colours the surrounding markup.
         /// </summary>
         public List<SemanticToken> GetSemanticTokens(DocumentAnalysis analysis)
         {
@@ -277,18 +277,28 @@ namespace KScript.Language.Features
                     (r.IsDeclaration ? SemanticTokenModifiers.Declaration : 0) | (r.Symbol.IsConst ? SemanticTokenModifiers.Readonly : 0)));
             }
 
-            if (analysis.Kind != DocumentKind.Script)
+            var pages = analysis.ComponentMarkup.Select(fragment => fragment.Markup);
+            if (analysis.Kind != DocumentKind.Script) pages = pages.Prepend(analysis.Markup);
+            var components = analysis.Links.Where(link => link.Kind == "component").Select(link => link.Span).ToHashSet();
+            foreach (MarkupElement element in pages.SelectMany(page => page.DescendantElements()))
             {
-                var components = analysis.Links.Where(link => link.Kind == "component").Select(link => link.Span).ToHashSet();
-                foreach (MarkupElement element in analysis.Markup.DescendantElements())
+                bool component = components.Contains(element.NameSpan);
+                bool command = global::KScript.Pages.PageElementNames.KScript.Contains(element.Name);
+                foreach (MarkupAttribute attribute in element.Attributes)
                 {
-                    bool component = components.Contains(element.NameSpan);
-                    if (!component && !global::KScript.Pages.PageElementNames.KScript.Contains(element.Name)) continue;
-                    var type = component ? SemanticTokenType.Type : SemanticTokenType.Keyword;
-                    var modifiers = component ? SemanticTokenModifiers.None : SemanticTokenModifiers.DefaultLibrary;
-                    tokens.Add(new SemanticToken(element.NameSpan, type, modifiers));
-                    if (element.EndNameSpan is TextSpan end) tokens.Add(new SemanticToken(end, type, modifiers));
+                    bool directive = component
+                        ? attribute.Name.Equals("live-id", StringComparison.OrdinalIgnoreCase) || global::KScript.Pages.TemplateContract.IsLoadCallback(attribute.Name)
+                        : !command && global::KScript.Pages.LiveAttributes.IsDirective(attribute.Name);
+                    if (directive)
+                        tokens.Add(new SemanticToken(attribute.NameSpan, SemanticTokenType.Keyword, SemanticTokenModifiers.DefaultLibrary));
+                    else if (component)
+                        tokens.Add(new SemanticToken(attribute.NameSpan, SemanticTokenType.Property, SemanticTokenModifiers.None));
                 }
+                if (!component && !command) continue;
+                var type = component ? SemanticTokenType.Type : SemanticTokenType.Keyword;
+                var modifiers = component ? SemanticTokenModifiers.None : SemanticTokenModifiers.DefaultLibrary;
+                tokens.Add(new SemanticToken(element.NameSpan, type, modifiers));
+                if (element.EndNameSpan is TextSpan end) tokens.Add(new SemanticToken(end, type, modifiers));
             }
             AddTypeNameTokens(analysis, tokens);
 

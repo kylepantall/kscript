@@ -1,5 +1,6 @@
 using KScript.Language.Analysis;
 using KScript.Language.Catalog;
+using TypeRef = KScript.Runtime.TypeRef;
 using KScript.Syntax.Markup;
 using KScript.Syntax;
 using KScript.Syntax.Text;
@@ -45,14 +46,27 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
             List<CompletionItem> declarationOptions = InheritanceCompletionsAt(analysis, offset) ?? ModelOptionCompletionsAt(analysis, offset);
-            if (trigger == " ") return declarationOptions ?? new List<CompletionItem>();
+            if (analysis.MarkupAt(offset).Kind != DocumentKind.Script)
+            {
+                Cursor cursor = Locate(analysis, offset);
+                if (cursor.InAttributeValue && ComponentPropValues(analysis, cursor) is List<CompletionItem> propValues)
+                    return propValues;
+                if (cursor.InAttributeValue && LiveAttributeValues(analysis, cursor) is List<CompletionItem> liveValues)
+                    return liveValues;
+                if (cursor.InStartTag && !cursor.InElementName && !cursor.InAttributeValue)
+                    return PageAttributePosition(analysis.Source.Text, offset)
+                        ? AttributeCompletions(analysis, cursor.TagElement, offset) : new List<CompletionItem>();
+            }
+            if (trigger == " " && declarationOptions == null && ExpectedSlotAt(analysis, offset) is not { IsField: true })
+                return new List<CompletionItem>();
             List<CompletionItem> items = declarationOptions ?? GetCompletionsAt(analysis, offset);
+            bool typedField = trigger is "[" or "," && ExpectedSlotAt(analysis, offset) is { IsField: true };
             if (trigger == "[" && offset > 0 && analysis.Source.Text[offset - 1] == '['
-                && declarationOptions == null && !items.Any(i => i.Kind == CompletionKind.Value))
+                && declarationOptions == null && !typedField && !items.Any(i => i.Kind == CompletionKind.Value))
             {
                 return new List<CompletionItem>();
             }
-            if (declarationOptions == null && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind is CompletionKind.Parameter or CompletionKind.Value or CompletionKind.Attribute
+            if (declarationOptions == null && !typedField && (trigger == "(" || trigger == ",") && !items.Any(i => i.Kind is CompletionKind.Parameter or CompletionKind.Value or CompletionKind.Attribute
                 || (i.Kind == CompletionKind.Keyword && i.Detail == "flag")))
             {
                 return new List<CompletionItem>();
@@ -381,7 +395,7 @@ namespace KScript.Language.Features
         /// <summary>The component file for a tag such as &lt;person-card&gt;, found in the nearest _components folder.</summary>
         internal string ComponentFile(string documentPath, string tag)
         {
-            if (string.IsNullOrEmpty(documentPath) || string.IsNullOrEmpty(tag))
+            if (string.IsNullOrEmpty(documentPath) || string.IsNullOrEmpty(tag) || !global::KScript.Pages.PageElementNames.CanBeComponent(tag))
             {
                 return null;
             }
@@ -390,7 +404,7 @@ namespace KScript.Language.Features
             {
                 return null;
             }
-            return global::KScript.Pages.PageElementNames.CanBeComponent(tag) ? TemplateContracts.ComponentFile(Files, dir, tag) : null;
+            return TemplateContracts.ComponentFile(Files, dir, tag);
         }
 
         /// <summary>A component's props, in the order the component first uses them. $slot and the like are left out.</summary>
@@ -443,10 +457,13 @@ namespace KScript.Language.Features
                 start--;
             }
 
-            if (analysis.Kind != DocumentKind.Script)
+            if (analysis.MarkupAt(offset).Kind != DocumentKind.Script)
             {
                 bool wrapper = e.Name is "layout" or "include";
                 string file = wrapper ? LayoutFile(e.GetAttributeValue("path")) : ComponentFile(analysis.Path, e.Name);
+                if (start > 0 && text[start - 1] == '@') start--;
+                AddLiveAttributeCompletions(analysis, e, file != null && !wrapper, start, offset, items);
+                if (start < offset && text[start] == '@') return items;
                 if (file != null)
                 {
                     var declared = TemplateContracts.Read(Files, file).DistinctBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -477,7 +494,8 @@ namespace KScript.Language.Features
                         });
                 }
             }
-            if (info == null) return items;
+            if (info == null || analysis.MarkupAt(offset).Kind != DocumentKind.Script &&
+                (!info.Context.HasFlag(ElementContext.Page) || info.HtmlWins)) return items;
 
             string LayoutFile(string relative)
             {
@@ -1184,18 +1202,21 @@ namespace KScript.Language.Features
                 return null;
             }
             TextSpan replace = TextSpan.FromBounds(wordStart, offset);
+            ExpectedValueSlot? slot = ExpectedSlotAt(analysis, sigilOffset);
             if (sigil == '$')
             {
                 List<CompletionItem> variables = VariableCompletions(analysis, offset, replace, withSigil: false);
-                string expectedType = ExpectedTypeAt(analysis, sigilOffset) ?? CallArgumentTypeAt(analysis, sigilOffset);
-                return RankVariables(analysis, offset, variables, expectedType);
+                string expectedType = slot?.Type ?? CallArgumentTypeAt(analysis, sigilOffset);
+                return RankVariables(analysis, offset, variables, expectedType, matchingOnly: slot?.IsField == true);
             }
-            if (ExpectedTypeAt(analysis, wordStart - 1) is string expected && SplitType(expected).Name == "handle")
+            if (slot is { Type: string expected } && SplitType(expected).Name == "handle")
             {
                 return null;
             }
             List<CompletionItem> commands = CommandCompletions(analysis, replace, withSigil: false, suggestRouteImport: true);
-            if (ExpectedTypeAt(analysis, wordStart - 1) is string type)
+            if (slot is { IsField: true } field)
+                return MatchingFieldCommands(analysis, offset, field.Type, commands);
+            if (slot is { Type: string type })
             {
                 string want = SplitType(type).Name;
                 HashSet<string> giving = new HashSet<string>(Catalog.Commands.Where(c => c.ReturnType == want).Select(c => c.Name), StringComparer.Ordinal);
@@ -1222,9 +1243,6 @@ namespace KScript.Language.Features
         /// The type the value starting at <paramref name="valueStart"/> must have, when the line says: <c>tz: timezone = ‸</c>,
         /// or <c>tz = ‸</c> for a variable declared with a type. Null when it isn't known.
         /// </summary>
-        internal string ExpectedTypeAt(DocumentAnalysis analysis, int valueStart) =>
-            ExpectedSlotAt(analysis, valueStart)?.Type;
-
         private string AssignmentTypeAt(DocumentAnalysis analysis, int valueStart)
         {
             if (analysis.Markup.Syntax != SourceSyntax.Code)
@@ -1259,9 +1277,11 @@ namespace KScript.Language.Features
         {
             string text = analysis.Source.Text;
             int start = RawValueStart(text, offset);
+            MarkupAttribute fieldAttribute = XmlFieldValueAt(analysis, offset);
+            if (fieldAttribute != null) start = Math.Max(start, fieldAttribute.Value.SourceSpan.Start);
             bool quoted = false;
             string typed = text.Substring(start, offset - start);
-            TextSpan replace = TextSpan.FromBounds(start, RawValueEnd(text, offset));
+            TextSpan replace = TextSpan.FromBounds(start, Math.Min(RawValueEnd(text, offset), fieldAttribute?.Value.SourceSpan.End ?? text.Length));
             ExpectedValueSlot? expected = ExpectedSlotAt(analysis, start);
             if ((expected == null || typed.StartsWith('\'') || typed.StartsWith('"')) && QuotedValueAt(analysis, offset) is Token token)
             {
@@ -1273,14 +1293,41 @@ namespace KScript.Language.Features
             }
             if (expected is not ExpectedValueSlot slot || (!quoted && typed.Length > 0 && typed[0] is '$' or '@')) return null;
             List<CompletionItem> items = ValueItems(analysis, slot, typed, replace, quoted);
-            if (items.Count == 0)
-            {
-                return null;
-            }
             if (quoted) return items;
             TextSpan word = TextSpan.FromBounds(WordStart(text, offset), offset);
+            if (TypeRef.Parse(slot.Type)?.Optional == true && !items.Any(i => i.Label == "null"))
+                items.Add(new CompletionItem { Label = "null", Kind = CompletionKind.Value, ReplaceSpan = replace, SortText = "001null" });
+            if (EnumValuesOf(analysis, SplitType(slot.Type).Name) != null || IsFiniteRefinement(analysis, slot.Type))
+                return items;
+            if (slot.IsField && new TypeInference(Catalog, analysis).TypeNamed(slot.Type, offset) is { Type: not KType.Any })
+            {
+                items.AddRange(RankVariables(analysis, offset, VariableCompletions(analysis, offset, word, withSigil: true), slot.Type, matchingOnly: true));
+                items.AddRange(MatchingFieldCommands(analysis, offset, slot.Type, CommandCompletions(analysis, word, withSigil: true)));
+                return items;
+            }
+            if (items.Count == 0) return null;
             items.AddRange(ExpressionStartCompletions(analysis, offset, word, template: false).Where(i => i.Kind != CompletionKind.Keyword || i.Label == "null"));
             return items;
+        }
+
+        private List<CompletionItem> MatchingFieldCommands(DocumentAnalysis analysis, int offset, string type, List<CompletionItem> commands)
+        {
+            var inference = new TypeInference(Catalog, analysis);
+            TypeShape expected = inference.TypeNamed(type, offset);
+            if (expected == null || expected.Type == KType.Any) return commands;
+            TypeRef target = TypeRef.Parse(type);
+            bool isEnum = target != null && EnumValuesOf(analysis, target.Name) != null;
+            Scope scope = analysis.ScopeAt(offset);
+            return commands.Where(item =>
+            {
+                string name = item.FilterText ?? item.Label;
+                Symbol fn = item.Kind == CompletionKind.Function ? scope.Lookup(name, offset) : null;
+                string result = item.Kind == CompletionKind.Function
+                    ? fn?.DeclaringElement?.GetAttributeValue("returns") : Catalog.GetCommand(name)?.ReturnType;
+                TypeRef declared = TypeRef.Parse(result);
+                if ((isEnum && declared?.Name != target.Name) || (declared?.Optional == true && target?.Optional != true)) return false;
+                return MatchesValueShape(expected, fn?.ReturnShape ?? inference.TypeNamed(result, offset));
+            }).ToList();
         }
 
         /// <summary>Completion items for the values a slot accepts, sorted before other expressions.</summary>
@@ -1289,8 +1336,8 @@ namespace KScript.Language.Features
             string name = SplitType(slot.Type).Name;
             bool finite = IsFiniteRefinement(analysis, slot.Type);
             bool quote = quoted || (slot.InMap || finite) && IsTextualChoice(analysis, slot.Type);
-            MarkupAttribute attribute = analysis.Markup.Syntax == SourceSyntax.Code ? null
-                : analysis.Markup.FindElementAt(replace.Start)?.GetAttribute("value");
+            MarkupAttribute attribute = XmlFieldValueAt(analysis, replace.Start) ?? (analysis.Markup.Syntax == SourceSyntax.Code ? null
+                : analysis.Markup.FindElementAt(replace.Start)?.GetAttribute("value"));
             string Insertion(string value)
             {
                 string insert = quote ? QuotedValue(value) : slot.InContainer ? ArgumentText(value) : null;

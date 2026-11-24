@@ -7,6 +7,11 @@ namespace KScript.Syntax.Markup
     {
         public const string Contract = "Component";
 
+        public static bool IsComponentType(MarkupElement type) =>
+            type?.Name == "type" && type.GetAttributeValue("extends") == Contract;
+
+        public static bool IsStoredField(MarkupElement field) => field?.Name == "field" && field.GetAttribute("value") == null;
+
         public static IReadOnlyList<string> Extensions { get; } = new[] { ScriptFiles.Code, ScriptFiles.Xml, ".html", ".md" };
 
         public static string Tag(string path)
@@ -34,7 +39,7 @@ namespace KScript.Syntax.Markup
         {
             string name = tag.Replace("-", "").Replace("_", "");
             return script.RootElements.SelectMany(e => e.Name == "kscript" ? e.ChildElements : new[] { e })
-                .FirstOrDefault(e => e.Name == "type" && e.GetAttributeValue("extends") == Contract
+                .FirstOrDefault(e => IsComponentType(e)
                     && (string.Equals(e.GetAttributeValue("name"), name, StringComparison.OrdinalIgnoreCase)
                         || string.Equals(e.GetAttributeValue("name"), name + Contract, StringComparison.OrdinalIgnoreCase)));
         }

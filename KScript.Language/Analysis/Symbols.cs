@@ -191,13 +191,14 @@ namespace KScript.Language.Analysis
 
     public sealed class FieldInfo
     {
-        public FieldInfo(string name, TypeShape shape, TextSpan? declaration, string description = null, string declaredType = null)
+        public FieldInfo(string name, TypeShape shape, TextSpan? declaration, string description = null, string declaredType = null, bool optional = false)
         {
             Name = name;
             Shape = shape;
             Declaration = declaration;
             Description = description;
             DeclaredType = declaredType;
+            Optional = optional;
         }
 
         public string Name { get; }
@@ -208,6 +209,20 @@ namespace KScript.Language.Analysis
 
         public string Description { get; }
         internal string DeclaredType { get; }
+        private bool Optional { get; }
+
+        internal string ValueType
+        {
+            get
+            {
+                string type = DeclaredType ?? InferredType(Shape);
+                return Optional && type != null && !type.EndsWith('?') ? type + "?" : type;
+            }
+        }
+
+        private static string InferredType(TypeShape shape) => shape == null || shape.IsVague ? null
+            : shape.Type == KType.List && InferredType(shape.Element) is string item ? item + "[]"
+            : shape.Name ?? shape.Type;
     }
 
     /// <summary>A declared name: a variable, parameter, function or import.</summary>

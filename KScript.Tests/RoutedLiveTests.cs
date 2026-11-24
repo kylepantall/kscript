@@ -78,8 +78,109 @@ public sealed class RoutedLiveTests : AuthSiteFixture
         Assert.True(Click(browser, saved).Status is 401 or 302);
     }
 
-    [Fact]
-    public void An_inferred_child_keeps_its_identity_during_the_parent_probe_and_redraw()
+    [Theory]
+    [InlineData("@live-action('move-note')")]
+    [InlineData("live-action=\"move-note\"")]
+    public void NamedActionInFencedComponentDispatchesItsSignedHandler(string action)
+    {
+        Write("views/editor.html", """<board-actions live-id="item-7" />""");
+        Write("_components/board-actions.kscript", $$"""
+            import KScript.Web
+            type BoardActions extends Component {
+              fn render(): Component {
+                return ```html
+                <state name="moves" value="0" />
+                <state name="draft" value="''" />
+                <input bind="draft">
+                <span hidden {{action}} on-action="moves += 1"></span>
+                <p>{$moves}</p>
+                ```
+              }
+            }
+            """);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var page = browser.Get("/edit/7");
+        Assert.Contains("data-ks-live-action=\"move-note\"", page.Body);
+        Assert.DoesNotContain("@live-action", page.Body);
+        Assert.Equal("0", Attribute(page, "data-ks-on-action"));
+        var saved = Click(browser, page);
+        Assert.Equal(200, saved.Status);
+        Assert.Contains("<p>1</p>", saved.Body);
+        Assert.Equal(409, Click(browser, page, args: "invalid").Status);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClassStateRestoresTypedFieldsAndRefreshesServerProps(bool explicitRoot)
+    {
+        const string controls = """
+            <input bind="count"><input bind="mode">
+            <select bind="numbers" multiple><option value="2">Two</option></select>
+            <button on-click="count += 1">Add</button>
+            <button on-click="$this->increment()">Add via the class</button>
+            <button on-click="numbers[0] = 'bad'">Invalid item</button>
+            <p>{$caption}|{$count}|{$this.count}|{$.count}|{$mode}|{$numbers->first()}</p>
+            """;
+        string template = explicitRoot ? "<live id='board'>\n" + controls + "\n</live>" : controls;
+        Write("_components/counter.kscript", """
+            import KScript.Web
+            enum DisplayMode { compact, expanded }
+            type Counter extends Component {
+              caption: string
+              private_data: map
+              count: int = 0
+              mode: DisplayMode = 'compact'
+              numbers: int[] = [1]
+              fn increment() { count += 1 }
+              fn render(): Component {
+                return ```html
+                CONTROLS
+                ```
+              }
+            }
+            """.Replace("CONTROLS", template.Replace("\n", "\n    ")));
+        string view = "<counter caption='fresh' private-data=\"{ { token: 'server only' } }\"" + (explicitRoot ? " />" : " live-id='board' />");
+        Write("views/editor.html", view);
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var page = browser.Get("/edit/7");
+        Assert.True(page.Status == 200, page.Body);
+        Assert.Contains("<p>fresh|0|0|0|compact|1</p>", page.Body);
+        Assert.Single(Regex.Matches(page.Body, "data-ks-live="));
+        string StatePayload(PageResult result) => System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(Attribute(result, "data-ks-state").Split('.')[0]));
+        Assert.DoesNotContain("server only", StatePayload(page));
+        Assert.DoesNotContain("caption", StatePayload(page));
+
+        PageResult Action(PageResult prior, int handler, object binds) => browser.Send("POST", "/edit/7",
+            headers: new() { ["x-kscript-live"] = Attribute(prior, "data-ks-route") },
+            json: System.Text.Json.JsonSerializer.Serialize(new
+            {
+                block = "board", handler, state = Attribute(prior, "data-ks-state"), args = Attribute(prior, "data-ks-args-" + handler), binds,
+            }));
+
+        Write("views/editor.html", view.Replace("fresh", "changed"));
+        var updated = Action(page, 0, new { count = "3", mode = "expanded", numbers = new[] { "2" } });
+        Assert.True(updated.Status == 200, updated.Body);
+        Assert.Contains("<p>changed|4|4|4|expanded|2</p>", updated.Body);
+        Assert.DoesNotContain("server only", StatePayload(updated));
+        Assert.DoesNotContain("caption", StatePayload(updated));
+        var second = Action(updated, 1, new { });
+        Assert.True(second.Status == 200, second.Body);
+        Assert.Contains("<p>changed|5|5|5|expanded|2</p>", second.Body);
+        Assert.Equal(422, Action(second, 0, new { count = "no" }).Status);
+        Assert.Equal(422, Action(second, 0, new { mode = "unknown" }).Status);
+        Assert.Equal(422, Action(second, 0, new { numbers = new[] { "invalid" } }).Status);
+        Assert.Equal(409, Action(second, 0, new { caption = "client value" }).Status);
+        Assert.True(Action(second, 2, new { }).Status >= 400);
+        Assert.Contains("<p>changed|6|6|6|expanded|2</p>", Action(second, 0, new { }).Body);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void An_inferred_child_keeps_its_identity_during_the_parent_probe_and_redraw(bool classFields)
     {
         Write("_components/counter.html", """
             <state name="count" value="0" /><state name="draft" value="''" />
@@ -91,6 +192,34 @@ public sealed class RoutedLiveTests : AuthSiteFixture
             <p>{$count}</p><button on-click="count += 1">Add</button>
             """);
         Write("views/editor.html", """<counter live-id="item-{$request.params.id}" />""");
+        if (classFields)
+        {
+            Write("_components/counter.kscript", """
+                import KScript.Web
+                type Counter extends Component {
+                  count: int = 0
+                  draft: string = ''
+                  fn render(): Component {
+                    return ```html
+                    <input bind="draft"><button on-click="count += 1">Add</button>
+                    <mini-counter parent-count="{$count}" />
+                    ```
+                  }
+                }
+                """);
+            Write("_components/mini-counter.kscript", """
+                import KScript.Web
+                type MiniCounter extends Component {
+                  parent_count: int
+                  count: int = 0
+                  fn render(): Component {
+                    return ```html
+                    <p>{$count}</p><small>Parent {$parent_count}</small><button on-click="count += 1">Add</button>
+                    ```
+                  }
+                }
+                """);
+        }
 
         var browser = new Browser(App());
         browser.Get("/sign-in");
@@ -111,6 +240,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
             }));
         Assert.Equal(200, update.Status);
         Assert.Contains("<p>1</p>", update.Body);
+        if (classFields) Assert.Contains("<small>Parent 1</small>", update.Body);
     }
 
     [Fact]

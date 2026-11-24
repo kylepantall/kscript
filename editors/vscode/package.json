@@ -123,6 +123,11 @@
         }
       },
       {
+        "scopeName": "kscript.live-attributes.injection",
+        "path": "./syntaxes/kscript-live-attributes.injection.json",
+        "injectTo": ["text.html.derivative", "text.html.basic", "text.html.markdown", "source.kscript-code"]
+      },
+      {
         "scopeName": "kscript.pages.injection",
         "path": "./syntaxes/kscript-pages.injection.json",
         "injectTo": [

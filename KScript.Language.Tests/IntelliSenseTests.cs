@@ -1,6 +1,7 @@
 using KScript.Syntax;
 using KScript.Language.Analysis;
 using KScript.Language.Features;
+using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
 
 namespace KScript.Language.Tests
@@ -46,6 +47,23 @@ namespace KScript.Language.Tests
             [Path.Combine(Site, "_components", "note.kscript")] = "fn heading(title: string) => $title->upper()\nfn load(props: map) => $props\n",
             [Path.Combine(Site, "data", "people.json")] = "[{\"name\": \"Joan\", \"age\": 82, \"address\": {\"city\": \"Leeds\"}}, {\"name\": \"Ellie\", \"role\": null}]",
             [Path.Combine(Site, "_components", "note-card.kscript")] = ScriptComponent,
+            [Path.Combine(Site, "_components", "board-card.kscript")] = """
+                import KScript.Web
+                import "../types/board-mode.kscript"
+                type BoardCard extends Component {
+                  mode: BoardMode
+                  count: int
+                  enabled: bool
+                  labels: string[]?
+                  maximum: int = 5
+                  fn render(): Component {
+                    return ```html
+                    <p>{$mode}: {$count}</p>
+                    ```
+                  }
+                }
+                """,
+            [Path.Combine(Site, "types", "board-mode.kscript")] = "enum BoardMode { compact, expanded }",
             [Path.Combine(Site, "models", "note.kscript")] = "import KScript.Data\nmodel Note { title: string; body: string }",
             [Path.Combine(Site, "_components", "person-card.html")] = "<div class=\"card\"><h2>{$person.name}</h2><p>{$caption ?? ''}</p><slot /></div>",
         }));
@@ -61,6 +79,84 @@ namespace KScript.Language.Tests
         }
 
         private static List<string> Labels(string textWithCaret, string file = "index.html") => Complete(textWithCaret, file).Select(i => i.Label).ToList();
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ClassComponentPropValuesUseTheFieldTypeAndCallersScope(bool fenced)
+        {
+            const string wrapper = """
+                import KScript.Web
+                type Board extends Component {
+                  fn render(): Component {
+                    return ```html
+                    CONTENT
+                    ```
+                  }
+                }
+                """;
+            List<CompletionItem> At(string prop)
+            {
+                string html = "<let name='total' value='3' /><let name='caption' value=\"'text'\" /><board-card " + prop + " />";
+                return Complete(fenced ? wrapper.Replace("CONTENT", html) : html, fenced ? "_components/board.kscript" : "index.html");
+            }
+
+            var modes = At("mode=\"‸\"");
+            Assert.Equal(new[] { "compact", "expanded" }, modes.Select(i => i.Label));
+            Assert.Equal("compact", modes[0].InsertText);
+            Assert.Equal("'expanded'", Assert.Single(At("mode=\"{exp‸}\"")).InsertText);
+            Assert.Equal("'compact'", Assert.Single(At("mode=\"{'com‸'}\"")).InsertText);
+            var count = At("count=\"‸\"");
+            Assert.Contains(count, i => i.Label == "0" && i.InsertText == "{0}");
+            Assert.Contains(count, i => i.Label == "$total" && i.InsertText == "{$total}");
+            Assert.DoesNotContain(count, i => i.Label == "$caption");
+            Assert.Equal("$total", Assert.Single(At("count=\"{$to‸}\"")).InsertText);
+            Assert.Contains(At("enabled=\"‸\""), i => i.Label == "true" && i.InsertText == "{true}");
+            var list = At("labels=\"‸\"");
+            Assert.Contains(list, i => i.Label == "[]" && i.InsertText == "{[]}");
+            Assert.Contains(list, i => i.Label == "null" && i.InsertText == "{null}");
+            Assert.DoesNotContain(list, i => i.Label is "$total" or "$caption");
+            Assert.Contains(At("maximum=\"‸\""), i => i.Label == "null" && i.InsertText == "{null}");
+        }
+
+        [Theory]
+        [InlineData("label='‸'", "Sam's & {board}")]
+        [InlineData("label=\"‸\"", "A &amp; B")]
+        [InlineData("label=\"{‸}\"", "Say \"Hi\"")]
+        public void AcceptedPropOptionRendersItsExactValue(string attribute, string option)
+        {
+            var folder = Directory.CreateTempSubdirectory();
+            try
+            {
+                string components = Directory.CreateDirectory(Path.Combine(folder.FullName, "_components")).FullName;
+                File.WriteAllText(Path.Combine(components, "label-card.kscript"), """
+                    import KScript.Web
+                    type Label with [string] { one_of: ["Sam's & {board}", 'A &amp; B', 'Say "Hi"'] }
+                    type LabelCard extends Component {
+                      label: Label
+                      fn render(): Component {
+                        return ```html
+                        <span>{$label}</span>
+                        ```
+                      }
+                    }
+                    """);
+                string path = Path.Combine(folder.FullName, "index.html");
+                string markup = $"<label-card {attribute} />";
+                int offset = markup.IndexOf('‸');
+                markup = markup.Remove(offset, 1);
+                var service = new LanguageService();
+                var choices = service.GetCompletions(service.Analyze(markup, path), offset);
+                var choice = Assert.Single(choices, i => i.Label == option);
+                string edited = markup.Remove(choice.ReplaceSpan.Start, choice.ReplaceSpan.Length)
+                    .Insert(choice.ReplaceSpan.Start, choice.InsertText ?? choice.Label);
+                Assert.Empty(MarkupParser.Parse(edited, DocumentKind.Page).Diagnostics);
+                File.WriteAllText(path, edited);
+                var result = KScript.Pages.PageRenderer.RenderFile(new KScript.Pages.PageContext(folder.FullName), "index.html");
+                Assert.Equal($"<span>{option}</span>", System.Net.WebUtility.HtmlDecode(result.Body).Trim());
+            }
+            finally { folder.Delete(recursive: true); }
+        }
 
         [Theory]
         [InlineData(People + "<p>{$people->first().‸}</p>")]
@@ -101,9 +197,9 @@ namespace KScript.Language.Tests
         public void ComponentPropsCompleteAsAttributes()
         {
             List<CompletionItem> items = Complete("<person-card ‸ />");
-            Assert.Equal(new[] { "person", "caption", "onLoad" }, items.Select(i => i.Label));
+            Assert.Equal(new[] { "@live-id", "person", "caption", "onLoad" }, items.Select(i => i.Label));
             Assert.All(items, i => Assert.Equal(CompletionKind.Attribute, i.Kind));
-            Assert.Equal(new[] { "caption", "onLoad" }, Labels("<person-card person=\"{$x}\" ‸ />"));
+            Assert.Equal(new[] { "@live-id", "caption", "onLoad" }, Labels("<person-card person=\"{$x}\" ‸ />"));
         }
 
         [Fact]
@@ -383,7 +479,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void ClassComponentCompletesPropsOnItsTagAndFieldsInsideTheFence()
         {
-            Assert.Equal(new[] { "record", "caption" }, Labels("<note-card ‸ />"));
+            Assert.Equal(new[] { "@live-id", "record", "caption" }, Labels("<note-card ‸ />"));
             var analysis = Service.Analyze(ScriptComponent, Path.Combine(Site, "_components", "note-card.kscript"));
             Assert.Empty(analysis.Errors);
             var fields = Labels(ScriptComponent.Replace("{$record.title}", "{$record.‸}"), "_components/note-card.kscript");

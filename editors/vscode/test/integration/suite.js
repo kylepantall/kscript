@@ -186,6 +186,69 @@ async function interpolatedLinks(folder) {
   }
 }
 
+async function liveAttributeScopes(folder) {
+  const markup = [
+    '<live id="actions">',
+    '  <span title="live-action" @live-action(\'move-note\') on-action="@skip_render()">on-action</span>',
+    '  <button live-action="save" on-action="@skip_render()" live-disable>Save</button>',
+    '  <input @bind(\'draft\') @bind-on(\'blur\')>',
+    "  <button @on-click(count += (')'->count() + (1 + 2))) @live-disable()>Run</button>",
+    '</live>',
+  ];
+  for (const [file, lines] of [
+    ['live-attributes.html', markup],
+    ['live-attributes.kscript', [
+      'import KScript.Web', 'type Actions extends Component {', '  fn render(): Component {',
+      '    return ```html', ...markup.map(line => '    ' + line), '    ```', '  }', '}',
+    ]],
+  ]) {
+    const fixture = path.join(folder, file);
+    fs.writeFileSync(fixture, lines.join('\n'));
+    const doc = await vscode.workspace.openTextDocument(fixture);
+    await vscode.window.showTextDocument(doc);
+    const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', doc.uri);
+    const directives = tokens.filter(token => /keyword\.control\.directive\.kscript/.test(token.t)).map(token => token.c);
+    assert.deepStrictEqual(directives, ['@live-action', 'on-action', 'live-action', 'on-action', 'live-disable',
+      '@bind', '@bind-on', '@on-click', '@live-disable'], file);
+    assert.ok(tokens.some(token => token.c === 'title' && /entity\.other\.attribute-name\.html/.test(token.t)), file);
+    assert.ok(tokens.some(token => token.c === 'count' && /meta\.embedded\.expression\.kscript.*support\.function\.kscript/.test(token.t)), file);
+  }
+}
+
+async function componentStateFields(folder) {
+  const componentFolder = path.join(folder, '_components');
+  fs.mkdirSync(componentFolder, { recursive: true });
+  const file = path.join(componentFolder, 'note-editor.kscript');
+  const lines = [
+    'import KScript.Web',
+    'type NoteEditor extends Component {',
+    '  caption => $title',
+    "  title: string = 'New note'",
+    '  edits: int = 0',
+    '  fn render(): Component {',
+    '    return ```html',
+    '    <input bind="">',
+    "    <input @bind('')>",
+    '    <button @on-click(edits += 1)>Save</button>',
+    '    <output>{$title} | {$edits}</output>',
+    '    ```',
+    '  }',
+    '}',
+  ];
+  fs.writeFileSync(file, lines.join('\n'));
+  const doc = await vscode.workspace.openTextDocument(file);
+  await vscode.window.showTextDocument(doc);
+  for (const [source, trigger] of [['bind="', '"'], ["@bind('", "'"]]) {
+    const position = doc.positionAt(doc.getText().indexOf(source) + source.length);
+    const choices = await waitFor(async () => {
+      const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, position, trigger);
+      const labels = list.items.map(item => item.label.label || item.label);
+      return labels.includes('title') && labels;
+    }, 'writable component fields in ' + source);
+    assert.deepStrictEqual(choices.sort(), ['edits', 'title'], 'computed properties cannot be bound');
+  }
+}
+
 async function dispatchWorkflow(folder) {
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'dispatch-workflow.test.kscript'));
   await vscode.window.showTextDocument(doc);
@@ -252,6 +315,77 @@ async function manifestCompletions(folder) {
   await suggests('"uuid":{', 'v', 'Option for uuid');
 }
 
+async function componentAndFieldCompletions(folder) {
+  async function open(name, text) {
+    const file = path.join(folder, name);
+    fs.writeFileSync(file, text);
+    const doc = await vscode.workspace.openTextDocument(file);
+    const editor = await vscode.window.showTextDocument(doc);
+    return { doc, editor };
+  }
+  const componentDir = path.join(folder, '_components');
+  fs.mkdirSync(componentDir, { recursive: true });
+  fs.writeFileSync(path.join(componentDir, 'view-mode.kscript'), [
+    'import KScript.Web',
+    'enum Mode { compact, expanded }',
+    'type ViewMode extends Component {',
+    '  mode: Mode',
+    '  fn render(): Component {',
+    '    return ```html',
+    '    <p>{$mode}</p>',
+    '    ```',
+    '  }',
+    '}',
+  ].join('\n'));
+  const board = await open('board-actions.kscript', [
+    'import KScript.Web',
+    'type BoardActions extends Component {',
+    '  fn render(): Component {',
+    '    return ```html',
+    '    <live id="board"><state name="count" value="0" />',
+    '      <span hidden @ on-action="count += 1"></span>',
+    '      <view-mode mode="" />',
+    '    </live>',
+    '    ```',
+    '  }',
+    '}',
+  ].join('\n'));
+  const at = board.doc.positionAt(board.doc.getText().indexOf('hidden @') + 'hidden @'.length);
+  const action = await waitFor(async () => {
+    const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', board.doc.uri, at, '@');
+    return list.items.find(i => (i.label.label || i.label) === '@live-action');
+  }, 'live action completion after @ in a component');
+  assert.ok(action.insertText instanceof vscode.SnippetString);
+  await board.editor.insertSnippet(action.insertText, action.range.replacing || action.range);
+  assert.ok(board.doc.getText().includes(`<span hidden @live-action('name') on-action="count += 1">`),
+    'accepting the suggestion replaces the sigil and keeps the existing handler');
+  const modeAt = board.doc.positionAt(board.doc.getText().indexOf('mode=""') + 'mode="'.length);
+  const modes = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', board.doc.uri, modeAt, '"');
+  assert.deepStrictEqual(modes.items.filter(i => i.kind === vscode.CompletionItemKind.Value)
+    .map(i => i.label.label || i.label).sort(), ['compact', 'expanded']);
+
+  const { doc } = await open('typed-board.kscript', [
+    'enum Mode { quiet, loud }',
+    'type Board { mode: Mode }',
+    'label = "some text"',
+    'count = 3',
+    'row = { count: 1 }',
+    'row.count = $count',
+    'echo Board(mode: )',
+  ].join('\n'));
+  const inside = doc.positionAt(doc.getText().lastIndexOf('mode: ') + 'mode: '.length);
+  const choices = await waitFor(async () => {
+    const list = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, inside, ' ');
+    const labels = list.items.filter(i => i.kind !== vscode.CompletionItemKind.Snippet).map(i => i.label.label || i.label);
+    return labels.includes('quiet') && labels;
+  }, 'enum field choices');
+  assert.deepStrictEqual(choices.sort(), ['loud', 'quiet']);
+  const countAt = doc.positionAt(doc.getText().indexOf('row.count = $') + 'row.count = $'.length);
+  const matching = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', doc.uri, countAt, '$');
+  const variables = matching.items.map(i => i.label.label || i.label);
+  assert.ok(variables.includes('count') && !variables.includes('label'), 'an inferred numeric field offers numeric variables');
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'hello.ks.xml'));
@@ -311,6 +445,9 @@ async function run() {
   await declarationHandlers(folder);
   await licenseGuardWarnings(folder);
   await dispatchWorkflow(folder);
+  await componentAndFieldCompletions(folder);
+  await componentStateFields(folder);
+  await liveAttributeScopes(folder);
   await interpolatedLinks(folder);
   await manifestCompletions(folder);
 

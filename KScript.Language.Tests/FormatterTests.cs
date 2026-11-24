@@ -329,6 +329,20 @@ namespace KScript.Language.Tests
                 "</html>"), Fmt(input, "_layout.html"));
         }
 
+        [Theory]
+        [InlineData("@live-action('move-note')")]
+        [InlineData("@bind('draft')")]
+        [InlineData("@bind-on('blur')")]
+        [InlineData("@live-disable()")]
+        [InlineData("@on-click(count += (')'->count() + 1))")]
+        public void LiveDirectivesKeepTheirAuthoredSpelling(string action)
+        {
+            string formatted = Fmt($"<live id='board'>\n<span hidden {action} on-action='count += 1'></span>\n</live>", "page.html");
+            Assert.Contains(action, formatted);
+            Assert.Contains("on-action='count += 1'", formatted);
+            Assert.Equal(formatted, Fmt(formatted, "page.html"));
+        }
+
         [Fact]
         public void InlineElementsStayTogetherInPages()
         {

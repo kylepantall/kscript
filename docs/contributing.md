@@ -62,6 +62,14 @@ npm run test:vscode -- ../../KScriptApp/bin/Release/net8.0/KScript.dll
 
 `smoke` starts the server and sends JSON-RPC requests. `test:vscode` runs the extension in VS Code. On headless Linux, prefix the latter command with `xvfb-run -a`.
 
+### Editor regression tests
+
+Changes to user-facing language syntax, component directives, fields and package APIs require editor regression tests alongside the runtime tests. Test completion on an unfinished example at the caret where a developer would type. Assert the suggestions that belong there, the edit made by accepting one, and a nearby position where those suggestions must be absent. Cover each supported source form, including fenced component HTML when applicable.
+
+For fields with a declared or inferred type, check that incompatible values stay out of the list. For enum fields, assert the exact allowed choices. When a change affects trigger characters, embedded languages, snippets or highlighting, exercise it through the VS Code extension too.
+
+### CI jobs
+
 Every push to `master` and every pull request runs [the CI workflow](../.github/workflows/ci.yml), which restores, builds and tests the solution in Release mode, runs `samples/scripts/oldest.kscript`, checks the sample scripts with `kscript check`, checks their formatting with `kscript fmt --check` and runs their KScript tests with `kscript test`, on three platforms:
 
 - **Linux** runs on a self-hosted runner (`home-ci`). Pull requests from forks always use a GitHub-hosted `ubuntu-latest` runner instead, so untrusted code never runs on the self-hosted machine. The solution is built once, in the `Build and test (linux)` job, and the other Linux jobs (the project templates, the VS Code extension and the database servers) download that build instead of compiling their own.

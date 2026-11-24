@@ -55,6 +55,40 @@ namespace KScript.Language.Tests
 
         private static string Show(DocumentAnalysis a, string variable) => a.Symbols.Last(s => s.Name == variable).Shape.Display();
 
+        [Theory]
+        [InlineData("stargazers_count: ‸", "$count", "$title")]
+        [InlineData("owner: { login: ‸ }", "$title", "$count")]
+        public void A_sampled_fields_inferred_type_filters_constructor_values(string fields, string expected, string wrong)
+        {
+            List<string> labels = Labels("<type name=\"Repo\" path=\"repo.json\" /><let name=\"count\" value=\"1\" />"
+                + $"<let name=\"title\" value=\"'one'\" /><let name=\"made\" value=\"Repo({fields})\" />");
+            Assert.Contains(expected, labels);
+            Assert.DoesNotContain(wrong, labels);
+            Assert.DoesNotContain("Repo", labels);
+        }
+
+        [Fact]
+        public void Xml_field_defaults_offer_enum_members_within_the_attribute_quotes()
+        {
+            (string text, int offset) = WithCaret(Script("<enum name=\"Mode\" values=\"quiet, loud\" />"
+                + "<type name=\"Board\"><field name=\"mode\" type=\"Mode\" default=\"qu‸\" /></type>"));
+            var items = Service.GetCompletions(Service.Analyze(text, DocPath), offset);
+            Assert.Equal(new[] { "quiet", "loud" }, items.Select(item => item.Label));
+            Assert.All(items, item => Assert.Equal("qu", text.Substring(item.ReplaceSpan.Start, item.ReplaceSpan.Length)));
+        }
+
+        [Theory]
+        [InlineData("Repo(stargazers_count: 'many')", "'many'")]
+        [InlineData("Repo(visibility: 'maybe')", "'maybe'")]
+        public void Invalid_constructor_literals_report_the_field_error_at_the_value(string call, string value)
+        {
+            DocumentAnalysis analysis = Open("<enum name=\"Visibility\" values=\"public, private\" />"
+                + "<type name=\"Repo\" path=\"repo.json\" fields=\"visibility: Visibility\" />"
+                + $"<let name=\"result\" value=\"{call}\" />");
+            Diagnostic error = Assert.Single(analysis.Diagnostics, e => e.Code == DiagnosticCodes.InvalidTypedValue);
+            Assert.Equal(value, analysis.Source.Text.Substring(error.Span.Start, error.Span.Length));
+        }
+
         [Fact]
         public void TypesAreConstantsWhoseRecordsHaveFields()
         {

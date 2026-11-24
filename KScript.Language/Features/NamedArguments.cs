@@ -441,33 +441,34 @@ namespace KScript.Language.Features
         }
 
         /// <summary>Promote compatible variables, retaining the existing proximity order within each group.</summary>
-        private List<CompletionItem> RankVariables(DocumentAnalysis analysis, int offset, List<CompletionItem> variables, string type)
+        private List<CompletionItem> RankVariables(DocumentAnalysis analysis, int offset, List<CompletionItem> variables, string type, bool matchingOnly = false)
         {
             if (type == null || new TypeInference(Catalog, analysis).TypeNamed(type, offset) is not TypeShape expected || expected.Type == KType.Any)
                 return variables;
-            bool Matches(TypeShape want, TypeShape actual) => actual != null && want.Type == actual.Type
-                && (want.Name == null || want.Name == actual.Name)
-                && (want.Element == null || Matches(want.Element, actual.Element));
-
             Scope scope = analysis.ScopeAt(offset);
-            string name = TypeRef.Parse(type)?.Name;
+            TypeRef target = TypeRef.Parse(type);
+            string name = target?.Name;
             bool isEnum = name != null && scope.Lookup(name, offset)?.EnumValues != null;
-            // Enum values have the ordinary string shape. Only an explicit enum annotation proves membership.
-            bool HasEnumType(Symbol s)
-            {
-                string declared = s.Kind == SymbolKind.Parameter && s.DeclaringElement?.Name == "fn"
-                    ? analysis.Symbols.FirstOrDefault(f => f.Kind == SymbolKind.Function && f.DeclaringElement == s.DeclaringElement)?.Parameters.FirstOrDefault(p => p.Name == s.Name)?.Type
-                    : s.DeclaringElement?.GetAttributeValue("type");
-                return TypeRef.Parse(declared)?.Name == name;
-            }
             var matching = scope.VisibleAt(offset)
-                .Where(s => !s.IsTypeDeclaration && s.Kind is not (SymbolKind.Function or SymbolKind.Import) && !s.HoldsSeveralTypes && Matches(expected, s.Shape))
-                .Where(s => !isEnum || HasEnumType(s))
+                .Where(s => !s.IsTypeDeclaration && s.Kind is not (SymbolKind.Function or SymbolKind.Import) && !s.HoldsSeveralTypes
+                    && MatchesValueShape(expected, s.Shape))
+                .Where(s => !isEnum || TypeRef.Parse(SymbolValueType(analysis, s))?.Name == name)
+                .Where(s => !matchingOnly || target?.Optional == true || TypeRef.Parse(SymbolValueType(analysis, s))?.Optional != true)
                 .Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+            if (matchingOnly) return variables.Where(i => matching.Contains(i.FilterText ?? i.Label)).ToList();
             if (matching.Count == 0) return variables;
             return variables.Select(i => matching.Contains(i.Label) ? WithSort(i, "!" + i.SortText) : i)
                 .OrderByDescending(i => i.SortText.StartsWith('!')).ToList();
         }
+
+        private static bool MatchesValueShape(TypeShape expected, TypeShape actual) => actual != null
+            && expected.Type == actual.Type && (expected.Name == null || expected.Name == actual.Name)
+            && (expected.Element == null || MatchesValueShape(expected.Element, actual.Element));
+
+        private static string SymbolValueType(DocumentAnalysis analysis, Symbol symbol) =>
+            symbol.Kind == SymbolKind.Parameter && symbol.DeclaringElement?.Name == "fn"
+                ? analysis.Symbols.FirstOrDefault(f => f.Kind == SymbolKind.Function && f.DeclaringElement == symbol.DeclaringElement)?.Parameters.FirstOrDefault(p => p.Name == symbol.Name)?.Type
+                : symbol.DeclaringElement?.GetAttributeValue("type");
 
         /// <summary>At the start of a list item, ask the bound parameter's element type for its available values.</summary>
         private List<CompletionItem> ListItemCompletions(DocumentAnalysis analysis, ExpressionRegion region, int wordStart, TextSpan replace)

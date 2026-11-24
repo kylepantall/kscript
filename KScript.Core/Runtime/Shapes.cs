@@ -564,6 +564,9 @@ namespace KScript.Runtime
 
         public RecordType Type { get; }
 
+        /// <summary>Fields exposed by reference in method scopes for a rendered component instance.</summary>
+        internal IReadOnlySet<string> BoundFields { get; set; }
+
         /// <summary>A copy of the stored data. Maps, lists, and records retain their shapes without sharing mutable containers.</summary>
         public Record Copy()
         {
@@ -577,7 +580,7 @@ namespace KScript.Runtime
                 if (value is Dictionary<string, object> map)
                 {
                     Dictionary<string, object> result = value is Record record
-                        ? new Record(record.Type) : new Dictionary<string, object>(map.Comparer);
+                        ? new Record(record.Type) { BoundFields = record.BoundFields } : new Dictionary<string, object>(map.Comparer);
                     copies[value] = result;
                     foreach (var entry in map) result[entry.Key] = Clone(entry.Value);
                     return result;
@@ -1566,7 +1569,8 @@ namespace KScript.Runtime
             return mapper.Problems.Count == 0 ? converted : item;
         }
 
-        private object MapRecord(object value, RecordType type, string path, int depth)
+        internal Record MapRecord(object value, RecordType type, string path, int depth,
+            Func<FieldDefinition, object> missingField = null)
         {
             if (value is Record existing && existing.Type.IsA(type)) return existing;
             if (type.ReadsText && (value is string || value is ISemanticText))
@@ -1604,6 +1608,8 @@ namespace KScript.Runtime
                     Scope s = owner.Closure.Child();
                     raw = f.DefaultNode != null ? interpreter.Evaluate(f.DefaultNode, s, new EvalContext(owner.Module, null)) : interpreter.EvaluateText(f.DefaultText, s, owner.Module);
                 }
+                else if (!found && !f.Optional && missingField != null)
+                    raw = missingField(f);
                 record[f.Name] = ConvertField(f, raw, found, f.Type.WithOptional(f.Optional), fieldPath);
             }
             Problems.AddRange(mapper.Problems);

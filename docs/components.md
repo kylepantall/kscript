@@ -4,12 +4,21 @@ A component is a reusable part of a KScript website. Give it typed inputs and re
 
 ## Build your first component
 
-Create `_components/click-counter.html` inside your site folder.
+Create `_components/click-counter.kscript` inside your site folder.
 
-```html
-<state name="count" value="0" />
-<button type="button" on-click="count += 1">Count is {$count}</button>
-```
+````kscript
+import KScript.Web
+
+type ClickCounter extends Component {
+  count: int = 0
+
+  fn render(): Component {
+    return ```html
+    <button type="button" @on-click(count += 1)>Count is {$count}</button>
+    ```
+  }
+}
+````
 
 Create `index.html` in the same site folder.
 
@@ -21,7 +30,7 @@ Create `index.html` in the same site folder.
 
 Run `kscript serve` from the site folder and open the address it prints. Click the first button. It reads **Count is 1**, and the second still reads **Count is 0**.
 
-KScript gives each counter its own live root because the template declares state and a click handler. Put `<state>` at the top level of the template. The automatic root is a `div`.
+The click handler makes each counter live. Each instance gets its own root and keeps its own `count` between clicks. Passing `<click-counter count="{5}" />` starts an instance at five.
 
 An explicit `<live>` block lets you choose the root element with `as`, defer rendering, or make only a portion of a component live. Use explicit blocks for interactive markup directly in a page. Plain display components render without loading the live runtime.
 
@@ -49,7 +58,7 @@ Add `<hello-card name="Sam" />` to `index.html` to render **Hello, Sam!**. Use k
 | --- | --- |
 | Discovery | KScript resolves `<item-card />` to a component such as `_components/item-card.kscript` or `_components/item-card.html`. |
 | Class contract | A script component extends `Component` from `KScript.Web` and defines `fn render(): Component`. |
-| Inputs | Declare fields such as `title: string` on the type. Defaults make a field optional. The tag passes attributes into the fields. |
+| Inputs | The caller can initialize stored fields using attributes. A field initializer supplies a default. Simple field types also have built-in initial values. |
 | Render-time values | HTML can read a field as `$title` or `$.title`. Computed fields and component methods can prepare display values. |
 | Children | Put `<slot />` in the template to render the caller's child markup. |
 | Template components | HTML and Markdown components can declare `<prop name="title" required />`. A companion script can expose `load(props: map)` and other functions. |
@@ -66,6 +75,33 @@ The page may render more than once during an action. Keep render methods, comput
 HTML escapes ordinary `{ expression }` output. Signed values are still visible to the browser. Read private data from the server when you need it. Authorize writes and validate input in the action even when a control is normally hidden or disabled.
 
 ## State and binding
+
+In a class component, declare each field once. This editor starts with an empty title, an unchecked box and an empty list. Its color defaults to yellow.
+
+````kscript
+import KScript.Web
+
+type NoteEditor extends Component {
+  title: string
+  done: bool
+  descriptions: string[]
+  color: color = 'yellow'
+
+  fn render(): Component {
+    return ```html
+    <label>Title <input @bind('title') @bind-on('blur')></label>
+    <label><input type="checkbox" @bind('done')> Done</label>
+    <button type="button" @on-click(title = ''; done = false)>Clear</button>
+    ```
+  }
+}
+````
+
+Mount it with `<note-editor />` or give it an initial title with `<note-editor title="First draft" />`. Numbers start at zero, strings at empty text, booleans at false and collections at an empty list or map. Nullable fields start at `null`. Give domain types such as `color`, enums and records a valid initializer or pass their value from the caller. A named enum such as `enum NoteColor { red, blue }` limits the editor's choices to those members.
+
+KScript restores fields the instance changed on later actions. Fields the component only reads can pick up fresh values from the caller on each render. A browser can submit edits only for controls rendered with a matching binding. Use the current server session to authorize writes.
+
+Put KScript behavior in directives on the opening HTML tag. For example, `@bind('title')` takes a field path, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and suggests the allowed values for options such as `@bind-on('blur')`. Existing HTML spellings such as `bind="title"` and `on-click="count += 1"` work too.
 
 Use `<state name="…" value="…" />` at the top level of a component template or directly inside a `<live>` block. Read it with `$name` and assign it with `name = …`. A normal state value survives actions on that rendered block.
 
@@ -229,7 +265,13 @@ To mount a display component so a JavaScript lifecycle hook can observe it, give
 
 Register a browser-only action using `KScriptLive.action('name', callback)` and invoke it from `live-client="name"`. The callback receives `component`, `element`, the browser `event`, and a `call(name, payload)` function for that component.
 
-To call a signed server action from JavaScript, give its rendered handler a name with `live-action="save" on-action="@save($event.data)"`. Call `KScriptLive.call(component, 'save', payload)` using the component element or its ID. The server checks that the action still belongs to the rendered component before it runs.
+Give a server action a name in the component's HTML. The `on-action` handler receives the payload as `$event.data`.
+
+```html
+<span hidden @live-action('save') @on-action(@save($event.data))></span>
+```
+
+Call `KScriptLive.call(component, 'save', payload)` with the component element or its live ID. The server checks that the action belongs to the rendered component before it runs. The HTML attribute `live-action="save"` exposes the same action.
 
 ## Test a component
 

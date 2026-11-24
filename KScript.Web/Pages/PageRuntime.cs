@@ -133,30 +133,49 @@ namespace KScript.Pages
         public object Call(ICallable function, object argument, Scope scope, Module module) =>
             Run(module, () => Interpreter.Call(function, new[] { argument }, scope: scope, module: module));
 
-        private readonly Dictionary<string, string> components = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (RecordType Type, IReadOnlySet<string> State)> components = new(StringComparer.Ordinal);
 
-        internal ComponentTemplate RenderComponent(PageContext ctx, string path, string tag, Dictionary<string, object> props)
+        internal ComponentTemplate RenderComponent(PageContext ctx, string path, string tag, Dictionary<string, object> props,
+            out IReadOnlySet<string> liveFields)
         {
             string full = ctx.ResolveSitePath(path, "component");
             Module page = ModuleFor(path, full);
-            return (ComponentTemplate)Run(page, () =>
+            var rendered = (ComponentTemplate)Run(page, () =>
             {
-                if (!components.TryGetValue(full, out string name))
+                if (!components.TryGetValue(full, out var definition))
                 {
                     Module script = Interpreter.LoadedModules.FirstOrDefault(m => m.Path == full) ?? Interpreter.Load(full);
                     var type = ComponentScript.FindType(script.Document, tag)
                         ?? throw new PageException($"{path} needs a type matching <{tag}> that extends Component.");
-                    name = type.GetAttributeValue("name");
+                    string name = type.GetAttributeValue("name");
                     Interpreter.ImportScript(page, full, page.Globals, names: name);
                     foreach (string package in PageElementNames.DefaultPackages)
                         Interpreter.ImportPackage(script, package);
-                    components[full] = name;
+                    if (!page.Globals.TryGet(name, out object exported) || exported is not RecordType recordType)
+                        throw new PageException($"{path} must export the component type {name}.");
+                    var fields = recordType.Fields.Where(f => !f.Computed).Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
+                    components[full] = definition = (recordType, fields);
                 }
+                // The mapper resolves 'from' paths and declared defaults before requesting a type's initial value.
+                var mapper = new ShapeMapper(Interpreter, definition.Type.Closure, definition.Type.Module);
+                Record record = mapper.MapRecord(props, definition.Type, "$", 0, field => InitialState(definition.Type, field));
+                mapper.ThrowIfAny(definition.Type.Name, TypeRef.Of(definition.Type));
+                record.BoundFields = definition.State;
                 var scope = page.Globals.Child();
-                scope.Declare("component_props", props);
-                return Interpreter.EvaluateText(Text(page, 0, $"{name}($component_props)->render()"), scope, page)
-                    as ComponentTemplate ?? throw new PageException($"{name}->render() must return a Component.");
+                scope.Declare("component", record);
+                return Interpreter.EvaluateText(Text(page, 0, "$component->render()"), scope, page)
+                    as ComponentTemplate ?? throw new PageException($"{definition.Type.Name}->render() must return a Component.");
             });
+            liveFields = components[full].State;
+            return rendered;
+        }
+
+        private static object InitialState(RecordType owner, FieldDefinition field)
+        {
+            var create = TemplateContract.FieldInitializer(field.Type)
+                ?? throw new PageException($"Component field {owner.Name}.{field.Name} needs an initial value for {field.Type}. "
+                    + "Supply it as a prop, give it a default or make the field optional.");
+            return create();
         }
 
         public object Evaluate(string expression, Scope scope, Module module) =>

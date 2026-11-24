@@ -18,11 +18,12 @@ namespace KScript.Language.Analysis
             {
                 var type = ComponentScript.FindType(document, ComponentScript.Tag(path));
                 if (type == null) yield break;
-                foreach (var field in type.ChildElements.Where(field => field.Name == "field" && field.GetAttribute("value") == null))
+                foreach (var field in type.ChildElements.Where(ComponentScript.IsStoredField))
                 {
                     string name = field.GetAttributeValue("name")?.Trim();
                     if (string.IsNullOrEmpty(name)) continue;
-                    bool optional = name.EndsWith('?') || field.GetAttribute("optional") != null || field.GetAttribute("default") != null;
+                    bool optional = name.EndsWith('?') || field.GetAttribute("optional") != null || field.GetAttribute("default") != null ||
+                        TemplateContract.HasImplicitFieldDefault(KScript.Runtime.TypeRef.Parse(field.GetAttributeValue("type")));
                     yield return (name.TrimEnd('?').Replace('_', '-'), !optional);
                 }
                 yield break;
