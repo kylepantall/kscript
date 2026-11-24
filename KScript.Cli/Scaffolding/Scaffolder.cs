@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using KScript.Projects;
+using KScript.Syntax.Markup;
+using KScript.Syntax.Text;
 
 namespace KScript.Scaffolding
 {
@@ -42,6 +45,7 @@ namespace KScript.Scaffolding
         public bool DryRun { get; set; }
         /// <summary>Only render the template (for templates that add to another file, such as route): nothing is written.</summary>
         internal bool Rendering { get; set; }
+        internal MakeResult PlannedModel { get; set; }
         /// <summary>Where to write the file, relative to the project folder, instead of the template's <c>to:</c>.</summary>
         public string To { get; set; }
     }
@@ -59,7 +63,7 @@ namespace KScript.Scaffolding
 
     /// <summary>
     /// <c>kscript make &lt;type&gt; &lt;Name&gt;</c>: creates files from templates. Each template is a file named after its type,
-    /// e.g. _templates/component.html, with an optional header saying where the file goes:
+    /// e.g. _templates/component.kscript, with an optional header saying where the file goes:
     /// <code>
     /// --- make
     /// description: A reusable piece of a page
@@ -134,7 +138,8 @@ namespace KScript.Scaffolding
             if (rawName.Split('/').Any(s => s == ".." || s == "." || s.Length == 0) || Path.IsPathRooted(rawName) || rawName.Contains(':'))
                 throw new StubException($"'{request.Name}' is not a valid name. Use letters, digits, - and _, with / for folders (e.g. blog/first-post).");
 
-            var values = Values(template, rawName, request.Options, KScript.Projects.ProjectConfig.FindAndLoad(root));
+            var projectConfig = ProjectConfig.FindAndLoad(root);
+            var values = Values(template, rawName, request.Options, projectConfig);
             var (header, body) = SplitHeader(template.Source, template.FileName);
             if (header.ContainsKey("adds-to") && !request.Rendering)
                 throw new StubException($"kscript make {template.Type} adds to a file rather than making one; run it as kscript make {template.Type} {Example(template.Type)}.");
@@ -143,18 +148,10 @@ namespace KScript.Scaffolding
             if (string.Equals(template.Type, "component", StringComparison.OrdinalIgnoreCase))
             {
                 CheckComponentName(values["kebab"], request.Name);
-                if (template.BuiltIn && StubTemplate.IsSet(values.GetValueOrDefault("model_update")))
+                if (MarkupParser.IsCodePath(template.FileName))
                 {
-                    static bool Identifier(string name) => !string.IsNullOrEmpty(name) && Syntax.Lexer.IsIdentStart(name[0]) && name.All(Syntax.Lexer.IsIdentChar);
-                    if (!Identifier(values["model_update"]) || values["model_update"] == "true")
-                        throw new StubException("--model-update needs a binding name, such as edit_profile.");
-                    string fields = values.GetValueOrDefault("fields");
-                    if (string.IsNullOrWhiteSpace(fields) || fields == "true" || fields.Split(',').Any(f => !Identifier(f.Trim())))
-                        throw new StubException("Use --fields to choose the model fields, e.g. --fields bio,website.");
-                    string delay = values.GetValueOrDefault("autosave");
-                    if (StubTemplate.IsSet(delay) && !string.Equals(delay, "true", StringComparison.OrdinalIgnoreCase) &&
-                        (!Runtime.Duration.TrySeconds(delay, out double seconds) || seconds < 0 || seconds * 1000 > int.MaxValue))
-                        throw new StubException("--autosave needs a delay such as 500ms, or use the flag by itself.");
+                    ScriptFormat.AddValues(values, ScriptFormat.KScript);
+                    PrepareComponent(root, projectConfig, request, values);
                 }
             }
             else if (values["kebab"].Length == 0)
@@ -198,6 +195,143 @@ namespace KScript.Scaffolding
             }
 
             return new MakeResult { RelativePath = to, FullPath = full, Content = content, Hint = hint, Template = template, Overwrote = exists };
+        }
+
+        /// <summary>Plans both files before writing a model and its component.</summary>
+        public static IReadOnlyList<MakeResult> MakeAll(MakeRequest request)
+        {
+            if (FindTemplate(request.Root, request.Type).Type != "model"
+                || !StubTemplate.IsSet(request.Options.GetValueOrDefault("component")))
+                return new[] { Make(request) };
+
+            var model = Make(new MakeRequest
+            {
+                Type = request.Type, Name = request.Name, Root = request.Root, To = request.To,
+                Options = request.Options, Force = request.Force, DryRun = true,
+            });
+            var component = Make(new MakeRequest
+            {
+                Type = "component", Name = request.Name, Root = request.Root, Force = request.Force, DryRun = true, PlannedModel = model,
+            });
+            if (string.Equals(model.FullPath, component.FullPath, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase))
+                throw new StubException("The model and component templates point to the same file. Set separate output paths.");
+            if (!request.DryRun)
+            {
+                var files = new[] { model, component };
+                var previous = files.Select(file => file.Overwrote ? File.ReadAllBytes(file.FullPath) : null).ToArray();
+                int written = 0;
+                try
+                {
+                    foreach (var file in files)
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(file.FullPath)!);
+                        using var stream = new FileStream(file.FullPath, file.Overwrote ? FileMode.Create : FileMode.CreateNew);
+                        written++;
+                        using var writer = new StreamWriter(stream);
+                        writer.Write(file.Content);
+                    }
+                }
+                catch
+                {
+                    for (int i = written - 1; i >= 0; i--)
+                    {
+                        if (previous[i] == null) File.Delete(files[i].FullPath);
+                        else File.WriteAllBytes(files[i].FullPath, previous[i]);
+                    }
+                    throw;
+                }
+            }
+            return new[] { model, component };
+        }
+
+        private static void PrepareComponent(string root, ProjectConfig project, MakeRequest request, Dictionary<string, string> values)
+        {
+            static bool Identifier(string name) => !string.IsNullOrEmpty(name) && Syntax.Lexer.IsIdentStart(name[0]) && name.All(Syntax.Lexer.IsIdentChar);
+            static bool Set(string value) => StubTemplate.IsSet(value);
+            static string[] Names(string value) => (value ?? "").Trim().TrimStart('[').TrimEnd(']')
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            string model = values.GetValueOrDefault("model");
+            string update = values.GetValueOrDefault("model_update");
+            string fields = values.GetValueOrDefault("fields");
+            string delay = values.GetValueOrDefault("autosave");
+            if (Set(model) && (!Identifier(model) || model == "true"))
+                throw new StubException("--model needs the name of an existing model, such as Note.");
+            if (Set(update) && (!Identifier(update) || update == "true"))
+                throw new StubException("--model-update needs a binding name, such as edit_note.");
+            if (Set(delay) && (!Set(update) || (!string.Equals(delay, "true", StringComparison.OrdinalIgnoreCase)
+                && (!Runtime.Duration.TrySeconds(delay, out double seconds) || seconds < 0 || seconds * 1000 > int.MaxValue))))
+                throw new StubException("Use --autosave with --model-update. Give a delay such as 500ms, or use the flag by itself.");
+
+            if (Set(update))
+            {
+                var binding = FindModelBinding(root, project, update);
+                if (binding != null)
+                {
+                    string boundModel = binding.GetAttributeValue("model")?.Trim();
+                    if (Set(model) && !string.Equals(model, boundModel, StringComparison.OrdinalIgnoreCase))
+                        throw new StubException($"ModelUpdate '{update}' uses {boundModel}. Use --model {boundModel} or omit --model.");
+                    model = boundModel;
+                    string boundFields = binding.GetAttributeValue("fields");
+                    if (!Set(fields)) fields = boundFields;
+                    else if (Names(fields).Except(Names(boundFields), StringComparer.Ordinal).FirstOrDefault() is string invalidField)
+                        throw new StubException($"ModelUpdate '{update}' does not allow editing '{invalidField}'. Choose one of {string.Join(", ", Names(boundFields))}.");
+                }
+                if (!Set(fields) || fields == "true" || Names(fields).Length == 0)
+                    throw new StubException($"Provide --fields title,body or declare the fields on the '{update}' ModelUpdate route.");
+            }
+            string[] selectedFields = Set(fields) ? Names(fields) : Array.Empty<string>();
+            if (fields == "true" || selectedFields.Any(field => !Identifier(field)) || (selectedFields.Length > 0 && !Set(model) && !Set(update)))
+                throw new StubException("Use --fields title,body with --model or --model-update.");
+            values["fields"] = string.Join(",", selectedFields.Distinct(StringComparer.Ordinal));
+            values["model_key"] = "id";
+            values["component_suffix"] = "";
+            values["record_input"] = Set(model) || Set(update) || request.PlannedModel != null ? "true" : "false";
+            var props = Names(values.GetValueOrDefault("props"));
+            if (props.Any(prop => prop == "true" || !Identifier(StubNames.Var(prop)))
+                || props.Select(StubNames.Var).Distinct(StringComparer.Ordinal).Count() != props.Length
+                || (Set(values["record_input"]) && props.Any(prop => StubNames.Var(prop) == "record")))
+                throw new StubException("Use distinct tag attributes with --props, e.g. title,sub-title. A model-bound component already has record.");
+            values["props"] = string.Join(",", props);
+
+            if (!Set(model) && request.PlannedModel == null) return;
+
+            string modelsDir = Path.Combine(root, values["paths.models"]);
+            var planned = request.PlannedModel;
+            IEnumerable<string> candidates = project?.ModelFiles() ?? Enumerable.Empty<string>();
+            if (Directory.Exists(modelsDir) && (project == null || project.Directory != root))
+                candidates = candidates.Concat(Directory.EnumerateFiles(modelsDir, "*", SearchOption.AllDirectories).Where(ScriptFiles.IsScript));
+            string file = planned?.FullPath ?? ProjectConfig.ModelFileFor(candidates, model);
+            if (file == null)
+                throw new StubException($"Model '{model}' was not found. Create it with kscript make model {model} --component.");
+            string source = planned?.Content ?? File.ReadAllText(file);
+            var declaration = ReadScript(source, file).DescendantElements().FirstOrDefault(e => (e.Name is "model" or "Model" or "KScript.Model")
+                && (planned != null || string.Equals(e.GetAttributeValue("name")?.Trim(), model, StringComparison.OrdinalIgnoreCase)));
+            if (declaration == null)
+                throw new StubException($"No model named '{model ?? values["pascal"]}' is declared in {file}.");
+            string modelName = declaration.GetAttributeValue("name").Trim();
+            values["model_type"] = modelName;
+            if (values["pascal"] == modelName) values["component_suffix"] = ComponentScript.Contract;
+            values["model_key"] = declaration.GetAttributeValue("key")?.Trim() ?? "id";
+            string componentDir = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(root,
+                request.To ?? Path.Combine(values["paths.components"], values["kebab"] + ".kscript"))))!;
+            values["model_path"] = Path.GetRelativePath(componentDir, file).Replace('\\', '/').Replace("\"", "\\\"");
+        }
+
+        private static MarkupDocument ReadScript(string source, string path) =>
+            MarkupParser.Parse(new SourceText(source), DocumentKind.Script, path);
+
+        private static MarkupElement FindModelBinding(string root, ProjectConfig project, string binding)
+        {
+            var routes = project?.Http.Routes?.Select(r => Path.Combine(project.Directory, r.File))
+                ?? HttpSettings.DefaultRouteNames.SelectMany(name => ScriptFiles.Extensions.Select(ext => Path.Combine(root, name + ext)));
+            foreach (string file in routes.Where(File.Exists))
+            {
+                var match = ReadScript(File.ReadAllText(file), file).DescendantElements()
+                    .FirstOrDefault(e => (e.Name is "ModelUpdate" or "KScript.ModelUpdate") && e.GetAttributeValue("name")?.Trim() == binding);
+                if (match != null) return match;
+            }
+            return null;
         }
 
         /// <summary>

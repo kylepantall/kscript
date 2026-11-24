@@ -10,7 +10,7 @@ Open http://localhost:8080/register to make an account. You are signed in straig
 
 To try passkeys, open `/account` at `http://localhost:8080` after signing in. Choose **Add a passkey** and follow your device's prompt. Sign out, then choose **Sign in with a passkey** at `/login`. Direct sign-in returns to the home page. If you opened a protected page such as `/profile`, either sign-in method returns you there. To revoke a passkey, choose **Remove passkey** beside its registration date on the account page. For deployment, set `http.auth.passkey_origin` in `kscript.json` to the site's public HTTPS origin.
 
-To try a model-bound component, run `kscript db migrate` from this folder and open `/profile` while signed in. Enter a bio and choose **Save profile**, or turn on **Save as I type** to save after a half-second pause. **Show saved bio** reads the persisted value and keeps your current draft in the editor. `_components/profile-editor.html` uses the `edit_profile` binding in `routes/web.kscript`. It permits the account to update its own bio. Profiles live in `_data/profile.sqlite`.
+To try a model-bound component, run `kscript db migrate` from this folder and open `/profile` while signed in. Enter a bio and choose **Save profile**, or turn on **Save as I type** to save after a half-second pause. **Show saved bio** reads the persisted value and keeps your current draft in the editor. `_components/profile-editor.kscript` receives a typed `record` prop, reads it as `$.record` inside `render()`, and uses the `edit_profile` binding in `routes/web.kscript`. It permits the account to update its own bio. Profiles live in `_data/profile.sqlite`.
 
 With the API:
 

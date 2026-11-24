@@ -204,7 +204,7 @@ namespace KScript.Runtime
             {
                 try
                 {
-                    return InvokeWithFunctionCatches(call, scope);
+                    return CheckReturn(InvokeWithFunctionCatches(call, scope));
                 }
                 catch (KScriptException error) when (TypeCatches is { Count: > 0 })
                 {
@@ -216,7 +216,16 @@ namespace KScript.Runtime
                     throw;
                 }
             }
-            catch (ReturnSignal r) { return r.Value; }
+            catch (ReturnSignal r) { return CheckReturn(r.Value); }
+        }
+
+        private object CheckReturn(object value)
+        {
+            string type = Element.GetAttributeValue("returns")?.Trim();
+            if (type == null) return value;
+            if (type == ComponentScript.Contract)
+                return value is ComponentTemplate ? value : throw new KScriptException($"{Name} must return a fenced HTML Component.", "Type");
+            return Shapes.Convert(Module.Interpreter, value, type, $"The result of {Name}()", Closure, Module);
         }
 
         private object InvokeWithFunctionCatches(CallContext call, Scope scope)
@@ -289,7 +298,11 @@ namespace KScript.Runtime
 
             if (ValueExpression != null)
             {
-                return interpreter.Evaluate(ValueExpression, scope, ValueContext);
+                var origin = Element.GetAttribute("value").Value;
+                var block = ComponentScript.HtmlBlock(Element, origin);
+                return block is { Error: null }
+                    ? new ComponentTemplate(block, scope, Module, origin)
+                    : interpreter.Evaluate(ValueExpression, scope, ValueContext);
             }
 
             interpreter.ExecuteNodes(body, scope, Module);

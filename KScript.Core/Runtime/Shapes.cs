@@ -364,6 +364,8 @@ namespace KScript.Runtime
         internal DecodedText Parse { get; set; }
 
         /// <summary>The type's own methods (<c>fn</c> inside the type), by name, with its bases' after its own.</summary>
+        internal Dictionary<string, MethodSignature> Signatures { get; } = new(StringComparer.Ordinal);
+
         internal Dictionary<string, MarkupElement> OwnMethods { get; } = new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
 
         /// <summary>Inherited record methods evaluate their bodies, defaults and catches in the defining module.</summary>
@@ -803,7 +805,12 @@ namespace KScript.Runtime
             if (Values.IsDeclarable(name))
                 throw run.Error($"'{name}' is a built-in type, so a <type> can't use it as its name.", "name", "Syntax");
             List<string> with = TypeNames(run.Raw("with"));
-            if (with.Count == 1 && IsRefinable(with[0], run.Scope)) return DeclareRefined(run, name, with[0]);
+            if (with.Count == 1 && IsRefinable(with[0], run.Scope))
+            {
+                if (run.Has("extends") || run.ChildElements.Any(e => e.GetAttribute("signature") != null))
+                    throw run.Error("Method signatures and extends require a record type.", "extends", "Type");
+                return DeclareRefined(run, name, with[0]);
+            }
             foreach (string b in with)
             {
                 string baseName = TypeRef.Parse(b).Name;
@@ -855,7 +862,20 @@ namespace KScript.Runtime
             // A field two bases disagree on is fine once this type declares it itself.
             string conflict = conflicts.Keys.FirstOrDefault(f => !seen.Contains(f));
             if (conflict != null) throw run.Error(conflicts[conflict], "with", "Syntax");
-            if (type.Fields.Count == 0 && type.OwnMethods.Count == 0)
+            if (run.Raw("extends")?.Trim() is string contract)
+            {
+                IEnumerable<MethodSignature> signatures = contract == ComponentScript.Contract
+                    ? new[] { MethodSignature.Render }
+                    : run.Scope.TryGet(contract, out object target) && target is RecordType parent && parent.Signatures.Count > 0
+                        ? parent.Signatures.Values
+                        : throw run.Error($"'{contract}' does not declare method signatures. Declare it before {name} or import its file.", "extends", "Type");
+                foreach (var signature in signatures)
+                {
+                    if (signature.Problem(type.OwnMethods.GetValueOrDefault(signature.Name)) is string problem)
+                        throw run.Error($"{name} must {problem} to extend {contract}.", "extends", "Type");
+                }
+            }
+            if (type.Fields.Count == 0 && type.OwnMethods.Count == 0 && type.Signatures.Count == 0 && !run.Has("extends"))
                 throw run.Error(KScript.Syntax.Markup.CodeArguments.TypeNeedsFields(name), null, "Syntax");
             return type;
         }
@@ -890,8 +910,16 @@ namespace KScript.Runtime
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
                     if (string.IsNullOrEmpty(method)) throw run.Error($"A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
                     if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
-                    type.OwnMethods[method] = e;
-                    seen.Add("fn " + method);
+                    if (!seen.Add("fn " + method))
+                        throw run.Error($"{name} declares the method '{method}' twice.", null, "Syntax");
+                    if (e.GetAttribute("signature") != null)
+                        type.Signatures.Add(method, MethodSignature.From(e));
+                    else
+                    {
+                        if (e.GetAttribute("optional") != null)
+                            throw run.Error($"Only a method signature can be optional ({method}).", null, "Syntax");
+                        type.OwnMethods[method] = e;
+                    }
                     continue;
                 }
                 if (e.Name != "field")

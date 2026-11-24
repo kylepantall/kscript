@@ -21,7 +21,7 @@ namespace KScript.Language.Analysis
         private bool ChecksImports => Kind == DocumentKind.Script;
 
         /// <summary>True in a .kscript file, so messages and fixes are written in that format.</summary>
-        private bool IsCode => result.Markup.Syntax == SourceSyntax.Code;
+        private bool IsCode => !inComponentHtml && result.Markup.Syntax == SourceSyntax.Code;
 
         /// <summary>How the file declares a function, in its own format.</summary>
         private string FnHint(string name) => IsCode ? $"fn {name}() {{ }}" : $"<fn name=\"{name}\">";

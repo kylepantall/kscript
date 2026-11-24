@@ -151,7 +151,12 @@ namespace KScript.Language.Analysis
                     FillRelations(e, shape);
                 }
             }
-            foreach (MarkupElement fn in e.ChildElements.Where(c => IsKScriptElementName(c, "fn")))
+            foreach (MarkupElement signature in e.ChildElements.Where(c => c.Name == "fn" && c.GetAttribute("signature") != null))
+            {
+                var method = KScript.Runtime.MethodSignature.From(signature);
+                if (!string.IsNullOrEmpty(method.Name)) shape.Signatures.TryAdd(method.Name, method);
+            }
+            foreach (MarkupElement fn in e.ChildElements.Where(c => IsKScriptElementName(c, "fn") && c.GetAttribute("signature") == null))
             {
                 MarkupAttribute nameAttr = fn.GetAttribute("name");
                 string fnName = nameAttr?.ValueText?.Trim();
@@ -478,7 +483,7 @@ namespace KScript.Language.Analysis
                     Report(TrimmedSpan(nameAttr.Value), DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The field '{name}' is listed twice.");
                 }
             }
-            bool hasMembers = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null
+            bool hasMembers = seen.Count > 0 || e.GetAttribute("path") != null || e.GetAttribute("with") != null || e.GetAttribute("extends") != null
                 || (IsKScriptElementName(e, "type") && e.ChildElements.Any(c => IsKScriptElementName(c, "fn")));
             if (!hasMembers)
             {
@@ -491,6 +496,7 @@ namespace KScript.Language.Analysis
             }
             CheckWithNames(e);
             CheckInheritedMembers(e);
+            CheckMethodContract(e, instance);
             // Rules and methods see the value: $value in a refinement type, the fields (and $this) in a record type.
             Scope typeScope = new Scope(inner, e.Span);
             if (instance != null)
@@ -525,6 +531,40 @@ namespace KScript.Language.Analysis
                     .Select(r => Infer(r.Parse.Root, r)).ToList();
                 if (fallbacks.Count > 0)
                     foreach (var method in e.ChildElements.Where(c => c.Name == "fn")) RecordReturnShape(method, fallbacks);
+            }
+        }
+
+        private void CheckMethodContract(MarkupElement type, TypeShape shape)
+        {
+            if (type.GetAttribute("extends") is not { Value: not null } attr || shape == null) return;
+            string contract = attr.ValueText.Trim();
+            TextSpan span = TrimmedSpan(attr.Value);
+            if (shape.RefinementBase != null)
+            {
+                Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "Method signatures and extends require a record type.");
+                return;
+            }
+            IEnumerable<KScript.Runtime.MethodSignature> signatures;
+            if (contract == ComponentScript.Contract)
+                signatures = new[] { KScript.Runtime.MethodSignature.Render };
+            else if (result.RootScope.Lookup(contract, type.Span.Start) is Symbol symbol && symbol.Shape.Instance?.Signatures is { Count: > 0 } declared)
+            {
+                result.References.Add(new SymbolReference(symbol, span, false, false));
+                if (symbol.SourcePath == null && symbol.DeclarationSpan.Start > type.Span.Start)
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Declare {contract} before {shape.Name}.");
+                signatures = declared.Values;
+            }
+            else
+            {
+                Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"'{contract}' does not declare method signatures.");
+                return;
+            }
+            foreach (var signature in signatures)
+            {
+                shape.Methods.TryGetValue(signature.Name, out Symbol method);
+                if (signature.Problem(method?.DeclaringElement) is string problem)
+                    Report(method?.DeclaringElement?.NameSpan ?? span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"{shape.Name} must {problem} to extend {contract}.");
             }
         }
 

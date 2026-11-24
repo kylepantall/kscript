@@ -246,7 +246,8 @@ namespace KScript.Syntax
             {
                 return false;
             }
-            if (i + 1 >= text.Length || !Lexer.IsIdentStart(text[i + 1]))
+            int nameStart = i + (c == '$' && i + 1 < text.Length && text[i + 1] == '.' ? 2 : 1);
+            if (nameStart >= text.Length || !Lexer.IsIdentStart(text[nameStart]))
             {
                 return false;
             }

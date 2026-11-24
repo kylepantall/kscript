@@ -76,6 +76,8 @@ namespace KScript.Language.Analysis
         internal IReadOnlyList<string> ValueChoices { get; init; }
 
         /// <summary>For records of a &lt;type&gt;: the methods its &lt;fn&gt; children declare (<c>$size->width_in(cm)</c>).</summary>
+        internal Dictionary<string, KScript.Runtime.MethodSignature> Signatures { get; } = new(StringComparer.Ordinal);
+
         public IDictionary<string, Symbol> Methods { get; } = new Dictionary<string, Symbol>(StringComparer.Ordinal);
 
         /// <summary>A KScript.Data model's scopes (<c>fn admins(query) => ...</c>), called on the model and its queries: <c>User->admins()</c>.</summary>

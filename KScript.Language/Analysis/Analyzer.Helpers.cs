@@ -209,14 +209,23 @@ namespace KScript.Language.Analysis
                 return symbol;
             }
 
-            if (result.IsPartial && !isWrite)
+            if (result.IsPartial && result.Kind != DocumentKind.Script && !isWrite)
             {
                 // Layouts and components get their variables from the page that uses them: these are its props.
                 if (!result.Inputs.ContainsKey(name))
                 {
                     result.Inputs[name] = span;
                 }
-                return null;
+                if (!IsComponentPage) return null;
+
+                var input = new Symbol
+                {
+                    Name = name, Kind = SymbolKind.Parameter, Shape = TypeShape.Unknown,
+                    Description = $"Passed to this component as the {name.Replace('_', '-')} attribute.",
+                };
+                result.RootScope.Declare(input, 0);
+                result.References.Add(new SymbolReference(input, span, false, false));
+                return input;
             }
 
             string package = catalog.PackageOfVariable(name);

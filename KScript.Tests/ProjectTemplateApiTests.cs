@@ -212,7 +212,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         string root = Path.Combine(parent.Root, "Notes App");
         Assert.Equal(new[]
         {
-            ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.html", "_layout.html",
+            ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.kscript", "_layout.html",
             "config/config.kscript", "controllers/notes.kscript", "index.html", "kscript.json", "lib/cache.kscript",
             "lib/notes-client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
             "tests/notes-client.test.kscript",

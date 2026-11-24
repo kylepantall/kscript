@@ -1,0 +1,13 @@
+import KScript.Web
+
+type SiteNav extends Component {
+  fn render(): Component {
+    return ```html
+    <nav class="site-nav">
+      <a href="/">Home</a>
+      <a href="/notes">Notes</a>
+      <a href="/_api">API</a>
+    </nav>
+    ```
+  }
+}

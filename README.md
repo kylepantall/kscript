@@ -98,7 +98,9 @@ echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
 </live>
 ```
 
-That's a working to-do list. The state travels with the page and is signed so the browser can't change it, so the server keeps nothing between requests. `kscript serve` adds its own small runtime to the page. Layouts, components, Markdown pages with front matter, dynamic routes like `people/[id].html` and JSON endpoints are all built in. Values are HTML-escaped by default.
+That's a working to-do list. The state travels with the page and is signed so the browser can't change it, so the server keeps nothing between requests. `kscript serve` adds its own small runtime to the page. Layouts, component classes, Markdown pages with front matter, dynamic routes like `people/[id].html` and JSON endpoints are all built in. Values are HTML-escaped by default.
+
+Use `kscript make component NoteCard --model Note --fields title` to give an existing model a component, or `kscript make model Note --component` to create both files. The page passes a row with `<note-card record="{$note}" />`. The class declares `record: Note` and reads it as `$.record` inside its parameterless `render()`. Add `--live` to generate an interactive block.
 
 ```sh
 kscript serve "Example Sites/team"    # then open http://localhost:8080/demo

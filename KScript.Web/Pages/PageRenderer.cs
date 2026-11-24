@@ -92,7 +92,20 @@ namespace KScript.Pages
         }
 
         /// <summary>For paths the renderer builds itself (such as _components/name.html), which stay in the site.</summary>
-        internal bool SiteFileExists(string path) => File.Exists(Path.Combine(SiteRoot, path));
+        internal bool SiteFileExists(string path) => File.Exists(ResolveSitePath(path));
+
+        private string componentsFolder;
+        internal string ComponentsFolder => componentsFolder ??=
+            Projects.ProjectConfig.FindAndLoad(SiteRoot)?.PathFor("components") ?? "_components";
+
+        private readonly Dictionary<string, string> componentFiles = new(StringComparer.OrdinalIgnoreCase);
+        internal string ComponentFile(string tag)
+        {
+            if (!componentFiles.TryGetValue(tag, out string file))
+                componentFiles[tag] = file = KScript.Syntax.Markup.ComponentScript.FindFile(ComponentsFolder, tag,
+                    SiteFileExists, path => ReadSiteFile(path, "component script"));
+            return file;
+        }
     }
 
     /// <summary>
@@ -567,12 +580,8 @@ namespace KScript.Pages
 
         private static bool TryComponent(PageElement el, Scope scope, StringBuilder sb, RenderState state)
         {
-            string path = $"_components/{el.Name}.html";
-            if (!state.Ctx.SiteFileExists(path))
-            {
-                path = $"_components/{el.Name}.md";
-                if (!state.Ctx.SiteFileExists(path)) return false;
-            }
+            string path = state.Ctx.ComponentFile(el.Name);
+            if (path == null) return false;
 
             var body = new StringBuilder();
             RenderNodes(el.Children, scope.Child(), body, state);
@@ -598,10 +607,34 @@ namespace KScript.Pages
                 componentScope.Declare(name, value);
             }
 
-            string companion = TemplateContract.CompanionPath(path);
-            if (companion != null && !state.Ctx.SiteFileExists(companion)) companion = null;
-            AppendIndented(sb, RenderFileInScope(state.Ctx, path, componentScope, body.ToString(), inputs,
-                companion == null ? null : state.Ctx.ResolveSitePath(companion, "component script"), loaded), state);
+            if (global::KScript.Syntax.Markup.ScriptFiles.IsScript(path))
+            {
+                if (loaded != null) throw new PageException("onLoad is available on components with companion load functions.");
+                state.Ctx.IncludeDepth++;
+                try
+                {
+                    if (state.Ctx.IncludeDepth > 32)
+                        throw new PageException($"Components are nested more than 32 deep (at {path}). Does one include itself?");
+                    var component = state.Ctx.Runtime.RenderComponent(state.Ctx, path, el.Name, inputs);
+                    var componentState = NewState(state.Ctx, path, body.ToString(), false);
+                    componentState.Module = component.Module;
+                    var templateScope = component.Scope.Child();
+                    if (!templateScope.TryGet("request", out object request) || request == null)
+                        templateScope.Declare("request", state.Ctx.Request);
+                    AppendIndented(sb, RenderSource(component.Html, component.FirstLine, componentState, templateScope), state);
+                }
+                finally
+                {
+                    state.Ctx.IncludeDepth--;
+                }
+            }
+            else
+            {
+                string companion = TemplateContract.CompanionPath(path);
+                if (companion != null && !state.Ctx.SiteFileExists(companion)) companion = null;
+                AppendIndented(sb, RenderFileInScope(state.Ctx, path, componentScope, body.ToString(), inputs,
+                    companion == null ? null : state.Ctx.ResolveSitePath(companion, "component script"), loaded), state);
+            }
             return true;
         }
 

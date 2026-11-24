@@ -57,6 +57,8 @@ namespace KScript.Language.Analysis
 
         public DocumentKind Kind { get; }
         public MarkupDocument Markup { get; }
+        internal List<(TextSpan Span, MarkupDocument Markup)> ComponentMarkup { get; } = new();
+        internal MarkupDocument MarkupAt(int offset) => ComponentMarkup.FirstOrDefault(m => m.Span.Contains(offset)).Markup ?? Markup;
         public List<Diagnostic> Diagnostics { get; } = new List<Diagnostic>();
 
         /// <summary>
@@ -174,10 +176,13 @@ namespace KScript.Language.Analysis
         public SymbolReference ReferenceAt(int offset)
         {
             // The editable name excludes its sigil. Clicking the sigil should still navigate to that name.
-            if (offset >= 0 && offset < Source.Length && Source.Text[offset] == '$'
-                && References.FirstOrDefault(r => r.Span.Start == offset + 1) is SymbolReference variable)
+            if (offset >= 0 && offset < Source.Length)
             {
-                return variable;
+                string text = Source.Text;
+                int nameStart = text[offset] == '$' ? offset + 1 : offset;
+                if (nameStart < text.Length && text[nameStart] == '.' && nameStart > 0 && text[nameStart - 1] == '$') nameStart++;
+                if (nameStart != offset && References.FirstOrDefault(r => r.Span.Start == nameStart) is SymbolReference variable)
+                    return variable;
             }
             return References.Where(r => r.Span.Contains(offset)).OrderBy(r => r.Span.Length).FirstOrDefault();
         }

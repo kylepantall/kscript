@@ -23,7 +23,7 @@ namespace KScript.Web
             p.Requires("KScript.Markdown");
 
             Page(p, new ElementInfo("live", "A reactive block: its on-* handlers run on the server and only this block is redrawn. No page JavaScript needed.", ContentKind.Markup,
-                new A("id", K.Text, "A name for the block, unique on the page.", required: true))
+                new A("id", K.Text, "A name for the block, unique on the page. Omit it to assign one in render order."))
             {
                 Context = ElementContext.Page,
                 Example = "<live id=\"counter\">\n  <state name=\"count\" value=\"0\" />\n  <button on-click=\"count += 1\">{$count}</button>\n</live>",

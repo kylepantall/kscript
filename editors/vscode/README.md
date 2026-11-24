@@ -47,6 +47,8 @@ You can also install this extension from the command line with `kscript ide inst
 | `kscript.codeLens.enabled` | `true` | Show **Run** above a script, **Run test** above each test and how many times each function is used. |
 | `kscript.trace.server` | `off` | Log the messages between VS Code and the language server (`messages` or `verbose`). |
 
+In component HTML fences, completion, hover, and diagnostics use the fields declared on the component class. Use `$record.title` or `$.record.title`, and type `$.` to list the values in scope.
+
 ## Project settings
 
 A `kscript.json` at the top of a project (created by `kscript make project`) sets the lint rules the editor uses: `lint.rules` changes or turns off a diagnostic by code (`"KS3003": "off"`), and `lint.exclude` silences files and folders such as `_templates`. The extension validates `kscript.json` and completes its settings. See [Project settings](https://github.com/kylepantall/kscript/blob/master/docs/projects.md#project-settings-kscriptjson) for every setting.

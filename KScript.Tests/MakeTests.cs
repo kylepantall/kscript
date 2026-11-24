@@ -42,6 +42,7 @@ public class StubTemplateTests
     public void SingleBracesAreLeftForKScript()
     {
         Assert.Equal("<p>{$sub_title}</p>", Render("<p>{${{ item | var }}}</p>", ("item", "sub-title")));
+        Assert.Equal("<p>{$.sub_title}</p>", Render("<p>{$.{{ item | var }}}</p>", ("item", "sub-title")));
         Assert.Equal("{ $a ? 'x' : 'y' }", Render("{ $a ? 'x' : 'y' }"));
     }
 
@@ -104,13 +105,13 @@ public class ScaffolderTests
         Assert.Contains("--fields", missing.Err);
         var made = Make(site.Root, "component", "ProfileEditor", "--model-update", "edit_profile", "--fields", "bio,website", "--autosave");
         Assert.True(made.Code == 0, made.Err);
-        string source = Read(site, "_components/profile-editor.html");
-        Assert.Contains("model-update=\"edit_profile\" key=\"{$record.id}\" autosave", source);
-        Assert.Contains("name=\"bio\" value=\"{$record.bio}\"", source);
-        Assert.Contains("name=\"website\" value=\"{$record.website}\"", source);
+        string source = Read(site, "_components/profile-editor.kscript");
+        Assert.Contains("model-update=\"edit_profile\" key=\"{$.record.id}\" autosave", source);
+        Assert.Contains("name=\"bio\" value=\"{$.record.bio}\"", source);
+        Assert.Contains("name=\"website\" value=\"{$.record.website}\"", source);
         Assert.Contains("record=\"{$record}\"", made.Out);
         Assert.Equal(0, Make(site.Root, "component", "ProfileEditor", "--model-update", "edit_profile", "--fields", "bio", "--autosave", "750ms", "--force").Code);
-        Assert.Contains("autosave=\"750ms\"", Read(site, "_components/profile-editor.html"));
+        Assert.Contains("autosave=\"750ms\"", Read(site, "_components/profile-editor.kscript"));
         var live = Make(site.Root, "component", "OrderDetails", "--live");
         Assert.Equal(0, live.Code);
         site.Write("index.html", "<order-details>Order contents</order-details>");
@@ -127,9 +128,12 @@ public class ScaffolderTests
 
         Assert.Equal(0, code);
         Assert.Equal("", err);
-        Assert.Contains("Created _components/hero.html", output);
+        Assert.Contains("Created _components/hero.kscript", output);
         Assert.Contains("<hero title=\"…\" sub-title=\"…\" />", output);
-        Assert.Equal("<section class=\"hero\">\n  <p>{$title}</p>\n  <p>{$sub_title}</p>\n  <!-- TODO: Add what the component shows. <slot /> is where the content between its tags goes. -->\n  <slot />\n</section>\n", Read(site, "_components/hero.html"));
+        string source = Read(site, "_components/hero.kscript");
+        Assert.Contains("type Hero extends Component", source);
+        Assert.Contains("fn render(): Component", source);
+        Assert.Contains("<p>{$.sub_title}</p>", source);
 
         // A one-word component works as <hero>, not only hyphenated names.
         site.Write("index.html", "<hero title=\"Hello\" sub-title=\"World\"><b>inner</b></hero>");
@@ -140,11 +144,49 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void ModelAndComponentCanBeGeneratedTogetherAndRendered()
+    {
+        using var site = new TempSite();
+        var args = new[] { "model", "Note", "--fields", "title: string, body: string", "--component" };
+        var preview = Make(site.Root, args.Append("--dry-run").ToArray());
+        Assert.True(preview.Code == 0, preview.Err);
+        Assert.Contains("models/note.kscript", preview.Out);
+        Assert.Contains("_components/note.kscript", preview.Out);
+        Assert.False(File.Exists(Path.Combine(site.Root, "models/note.kscript")));
+
+        var made = Make(site.Root, args);
+        Assert.True(made.Code == 0, made.Err);
+        Assert.Contains("record: Note", Read(site, "_components/note.kscript"));
+
+        var card = Make(site.Root, "component", "NoteCard", "--model", "Note", "--fields", "title");
+        Assert.True(card.Code == 0, card.Err);
+        site.Write("index.html", """
+            <import path="models/note.kscript" />
+            <let name="note" value="Note({ id: 12, title: 'A & B', body: 'Private draft' })" />
+            <note record="{$note}" />
+            <note-card record="{$note}" />
+            """);
+        string html = site.Render("index.html").Body;
+        Assert.Contains("Note 12", html);
+        Assert.Contains("A &amp; B", html);
+        Assert.DoesNotContain("Private draft", html);
+    }
+
+    [Fact]
+    public void ACompanionConflictLeavesTheModelUnwritten()
+    {
+        using var site = new TempSite(("_components/note.kscript", "mine"));
+        Assert.Equal(2, Make(site.Root, "model", "Note", "--component").Code);
+        Assert.Equal("mine", Read(site, "_components/note.kscript"));
+        Assert.False(File.Exists(Path.Combine(site.Root, "models/note.kscript")));
+    }
+
+    [Fact]
     public void ComponentWithoutPropsShowsItsTitle()
     {
         using var site = new TempSite();
         Assert.Equal(0, Make(site.Root, "component", "PricingTable").Code);
-        Assert.Contains("<h2>Pricing Table</h2>", Read(site, "_components/pricing-table.html"));
+        Assert.Contains("<h2>Pricing Table</h2>", Read(site, "_components/pricing-table.kscript"));
     }
 
     [Theory]
@@ -305,15 +347,15 @@ public class ScaffolderTests
     [Fact]
     public void ExistingFilesNeedForce()
     {
-        using var site = new TempSite(("_components/hero.html", "mine"));
+        using var site = new TempSite(("_components/hero.kscript", "mine"));
         var (code, _, err) = Make(site.Root, "component", "Hero");
         Assert.Equal(2, code);
         Assert.Contains("already exists", err);
-        Assert.Equal("mine", Read(site, "_components/hero.html"));
+        Assert.Equal("mine", Read(site, "_components/hero.kscript"));
 
         var forced = Make(site.Root, "component", "Hero", "--force");
         Assert.Equal(0, forced.Code);
-        Assert.Contains("Replaced _components/hero.html", forced.Out);
+        Assert.Contains("Replaced _components/hero.kscript", forced.Out);
     }
 
     [Fact]
@@ -410,7 +452,7 @@ public class ScaffolderTests
         using var site = new TempSite();
         var (code, output, _) = Make(site.Root, "templates");
         Assert.Equal(0, code);
-        foreach (var f in new[] { "component.html", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript", "document.kscript" })
+        foreach (var f in new[] { "component.kscript", "page.html", "markdown.md", "layout.html", "script.kscript", "test.kscript", "document.kscript" })
         {
             Assert.Contains($"Created _templates/{f}", output);
             Assert.True(File.Exists(Path.Combine(site.Root, "_templates", f)));
@@ -418,7 +460,7 @@ public class ScaffolderTests
 
         // Published templates produce the same files as the built-ins, and are not overwritten again without --force.
         Assert.Equal(0, Make(site.Root, "component", "Hero", "--props", "title").Code);
-        Assert.Contains("<p>{$title}</p>", Read(site, "_components/hero.html"));
+        Assert.Contains("<p>{$.title}</p>", Read(site, "_components/hero.kscript"));
         site.Write("_templates/page.html", "custom");
         Assert.Contains("Nothing to copy", Make(site.Root, "templates", "page").Out);
         Assert.Equal("custom", Read(site, "_templates/page.html"));

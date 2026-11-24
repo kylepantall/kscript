@@ -76,11 +76,7 @@ namespace KScript.Language.Analysis
             return shape;
         }
 
-        private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
-        {
-            TextSpan span = region.Source.ToSource(v.Span);
-            return TextSpan.FromBounds(Math.Min(span.Start + 1, span.End), span.End);
-        }
+        private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region) => region.Source.ToSource(v.NameSpan);
 
         /// <summary>The shape of an expression's value, as far as it can be told from the source.</summary>
         public TypeShape Infer(ExprNode node, ExpressionRegion region)

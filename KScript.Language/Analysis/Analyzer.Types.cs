@@ -170,6 +170,7 @@ namespace KScript.Language.Analysis
                 return;
             }
 
+            string declared = fn.GetAttributeValue("returns")?.Trim();
             List<TypeShape> shapes = typeFallbacks?.ToList() ?? new List<TypeShape>();
             foreach (ExpressionRegion region in result.Regions)
             {
@@ -181,11 +182,16 @@ namespace KScript.Language.Analysis
                     || (region.Element.Name == "return" && region.Element.Ancestors().FirstOrDefault(a => IsKScriptElementName(a, "fn")) == fn);
                 if (own)
                 {
-                    shapes.Add(Infer(region.Parse.Root, region));
+                    TypeShape shape = Infer(region.Parse.Root, region);
+                    if (declared == ComponentScript.Contract && shape.Type != KType.Any && shape.Type != ComponentScript.Contract)
+                        Report(region.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                            "Returning a Component requires a fenced HTML block or a function that returns one.");
+                    shapes.Add(shape);
                 }
             }
 
-            TypeShape returned = Unify(shapes);
+            TypeShape returned = declared == ComponentScript.Contract ? new TypeShape(ComponentScript.Contract)
+                : (declared != null ? TypeNamed(declared, fn.Span.Start) : null) ?? Unify(shapes);
             // A recursive function's own call gives nothing; keep what the last pass found rather than forgetting it.
             if (typeFallbacks != null || returned.Type != KType.Any || symbol.ReturnShape.Type == KType.Any)
             {

@@ -13,7 +13,20 @@ namespace KScript.Language.Analysis
         {
             string text = path == null ? null : files.ReadText(path);
             if (text == null) yield break;
-            var document = MarkupParser.Parse(text, MarkupParser.KindFromPath(path));
+            var document = MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(path), path);
+            if (ScriptFiles.IsScript(path))
+            {
+                var type = ComponentScript.FindType(document, ComponentScript.Tag(path));
+                if (type == null) yield break;
+                foreach (var field in type.ChildElements.Where(field => field.Name == "field" && field.GetAttribute("value") == null))
+                {
+                    string name = field.GetAttributeValue("name")?.Trim();
+                    if (string.IsNullOrEmpty(name)) continue;
+                    bool optional = name.EndsWith('?') || field.GetAttribute("optional") != null || field.GetAttribute("default") != null;
+                    yield return (name.TrimEnd('?').Replace('_', '-'), !optional);
+                }
+                yield break;
+            }
             foreach (MarkupElement declaration in Declarations(document))
             {
                 string name = declaration.GetAttributeValue("name");
@@ -34,10 +47,7 @@ namespace KScript.Language.Analysis
 
         internal static string ComponentFile(IFileSystem files, string directory, string tag)
         {
-            string path = Path.Combine(directory, tag.ToLowerInvariant() + ".html");
-            if (files.FileExists(path)) return path;
-            path = Path.ChangeExtension(path, ".md");
-            return files.FileExists(path) ? path : null;
+            return ComponentScript.FindFile(directory, tag, files.FileExists, files.ReadText);
         }
 
         internal static string CompanionFile(IFileSystem files, string template)

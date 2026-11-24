@@ -80,6 +80,29 @@ public sealed class ModelFormTests : DataFixture
     }
 
     [Fact]
+    public void GeneratedModelComponentUsesTheNamedBindingFieldsAndSaves()
+    {
+        var output = new StringWriter();
+        var errors = new StringWriter();
+        Assert.True(KScript.Scaffolding.MakeCommand.Run(new[] {
+            "component", "NoteEditor", "--model", "Note", "--model-update", "edit_note", "--autosave", "--dir", Project,
+        }, output, errors) == 0, errors.ToString());
+        FileOf("views/edit.html", """
+            <import path="../models/note.kscript" />
+            <note-editor record="{Note({ id: 1, user_id: 'alice', title: 'Original', score: 1 })}" />
+            """);
+        var browser = new Browser(app);
+        Assert.Equal(200, browser.Get("/login-test/alice").Status);
+        PageResult page = browser.Get(View);
+        Assert.True(page.Status == 200, page.Body);
+        Assert.Contains("name=\"title\" value=\"Original\"", page.Body);
+        Assert.Contains("name=\"score\" value=\"1\"", page.Body);
+        Assert.Contains("data-ks-autosave=\"500\"", page.Body);
+        Assert.Equal(303, browser.Submit(View, Action, ("_key", "1"), ("title", "Changed")).Status);
+        Assert.Equal("Changed", notes.Find("1")["title"]);
+    }
+
+    [Fact]
     public void EverySubmissionChecksSessionCsrfOwnershipAndModelRules()
     {
         var browser = new Browser(app);

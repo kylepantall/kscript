@@ -33,6 +33,12 @@ namespace KScript.Scaffolding
             foreach (StubOption option in type.Options)
             {
                 string key = option.Name.TrimStart('-');
+                if (type.Type == "component")
+                {
+                    if ((key == "fields" && !options.ContainsKey("model") && !options.ContainsKey("model-update"))
+                        || (key == "autosave" && !options.ContainsKey("model-update"))
+                        || (key == "live" && options.ContainsKey("model-update"))) continue;
+                }
                 string question = option.Description ?? key;
                 if (IsFlag(type, key))
                 {

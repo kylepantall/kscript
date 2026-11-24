@@ -35,7 +35,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 | `<while test>` | Loop while true (stopped after 100,000 runs). |
 | `<match value>` with `<case is="1, 2">`, `<case when="$it gt 9">`, `<default>` | Pick one branch. |
 | `<layout path="_layout.html" title="…">` and `<slot />` | Wrap the page in a layout; extra attributes become variables. |
-| `<my-card user="{$u}">`, `<hero>` | A component: `_components/my-card.html`, with `<slot />` for its children. Any element that isn't an HTML or KScript element can be a component. Components only see their own attributes. |
+| `<my-card user="{$u}">`, `<hero>` | A component from `_components/my-card.kscript`, with `<slot />` for its children. The tag matches the component filename. |
 | `<include path="_part.html">` | Insert another template here. |
 | `<markdown>` | Render Markdown, with `{ }` values escaped. |
 | `<respond status json redirect type header-x>` | Send a different response, e.g. JSON, a 404, or a redirect (`<respond redirect="/thanks" />`). |
@@ -52,6 +52,37 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 
 ## Model forms
 
+Create a component for an existing model, or create the two files together.
+
+```sh
+kscript make component NoteCard --model Note --fields title,body
+kscript make model Note --fields "title: string, body: string" --component
+```
+
+The first command writes `_components/note-card.kscript`. A page renders it with `<note-card record="{$note}" />`, where `$note` is a model row.
+
+````kscript
+import KScript.Web
+import "../models/note.kscript"
+
+type NoteCard extends Component {
+  record: Note
+  heading: string => $.record.title
+
+  fn render(): Component {
+    return ```html
+    <article>
+      <h2>{$.heading}</h2>
+      <p>{$.record.body}</p>
+      <slot />
+    </article>
+    ```
+  }
+}
+````
+
+The tag passes attributes into fields, which `render()` reads as `$record` or `$.record`. Computed fields such as `$.heading`, local constants, and methods called with `$this->method()` are available to the HTML. The editor completes props on the tag and model fields inside the fence. `Component` requires `fn render(): Component`. Existing HTML and Markdown components also work, and the editor recognises `$record` as an input when a legacy template uses it.
+
 A component can save edits directly to a [KScript.Data model](data.md). Declare the writable fields and the ownership rule once in the web routes. For example, a `Profile` model in `models/profile.kscript` holds a `user_id` and a `bio`. Its `bio` field can declare a length limit such as `string(max: 500)`.
 
 ```kscript
@@ -65,30 +96,12 @@ Routes {
 Generate the reusable editor after declaring the binding.
 
 ```sh
-kscript make component ProfileEditor --model-update edit_profile --fields bio
+kscript make component ProfileEditor --model-update edit_profile
 ```
 
 Pass the owned row as `<profile-editor record="{$profile}" />`. The generated form has a Save button. Add `--autosave` to the command to save after typing pauses. For a component with its own interactive state, start with `kscript make component OrderDetails --live`.
 
-A protected GET controller loads the signed-in user's row and passes it to the page. Render `<profile-editor profile="{$data.profile}" />` to reuse the component below from `_components/profile-editor.html`. Its stable live ID identifies the record when the user requests a redraw.
-
-```html
-<live id="profile-{$profile.id}">
-  <state name="automatic" value="false" />
-  <state name="preview" value="false" />
-  <label><input type="checkbox" bind="automatic"> Save as I type</label>
-
-  <form model-update="edit_profile" key="{$profile.id}" autosave="{$automatic}">
-    <label>Bio <input name="bio" value="{$profile.bio}"></label>
-    <button>Save profile</button>
-  </form>
-
-  <button type="button" on-click="preview = not $preview">
-    {$preview ? 'Hide saved bio' : 'Show saved bio'}
-  </button>
-  <if test="$preview"><p>Saved bio: {$profile.bio}</p></if>
-</live>
-```
+A protected GET controller loads the signed-in user's row and passes it to the page. Render `<profile-editor record="{$data.profile}" />` to use the [profile component](../samples/auth-app/_components/profile-editor.kscript). Its stable live ID identifies the record during a redraw. The scaffold generates a `<live>` wrapper for `--live` and `--model-update`.
 
 **Save on click.** Omit `autosave` for a manual editor. Typing leaves the database untouched until the user chooses Save. In a live block, Save updates the model in place and a status message confirms the write. A standalone form uses a native POST and redirects back to the page. Native submission also works with JavaScript disabled.
 

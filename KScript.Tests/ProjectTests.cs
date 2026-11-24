@@ -264,7 +264,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.html", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.kscript" })
+        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.kscript", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.kscript" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);
@@ -724,8 +724,8 @@ public class MakeProjectTests : IDisposable
             var o = new StringWriter { NewLine = "\n" };
             var e = new StringWriter { NewLine = "\n" };
             Assert.Equal(0, MakeCommand.Run(new[] { "component", "Hero" }, o, e));
-            Assert.True(File.Exists(Path.Combine(root, "_components", "hero.html")), o.ToString() + e);
-            Assert.Contains("Created ../_components/hero.html", o.ToString());
+            Assert.True(File.Exists(Path.Combine(root, "_components", "hero.kscript")), o.ToString() + e);
+            Assert.Contains("Created ../_components/hero.kscript", o.ToString());
         }
         finally
         {

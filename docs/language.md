@@ -224,6 +224,24 @@ echo "{ $repo.name } has { $repo.stars } stars, owned by { $repo.owner.login }"
 
 `stars: int from stargazers_count` reads the field from a key with another name, and `owner: User` is another type, so the nested data is checked and turned into a `User` record too. `Repo(data)` maps a map, a list of maps or JSON text.
 
+Use `$.name` to look up a value in the current scope. It resolves the same name as `$name`, including a function parameter, local variable or component field.
+
+### Method signatures
+
+A type can declare a method signature with `;` after the header, and another type can implement it with `extends`. A `?` after a signature's method name makes that method optional. The checker reports any missing required method or mismatch in its parameter names, parameter types, or return type.
+
+```kscript
+type Summary {
+  fn label(prefix: string): string;
+  fn details?(): string;
+}
+
+type NoteSummary extends Summary {
+  title: string
+  fn label(prefix: string): string => $prefix + $title
+}
+```
+
 ### Field lines
 
 A field line is `name[?][: type] [from path] [= default | => value]`. Each part is optional except the name:
