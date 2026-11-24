@@ -43,10 +43,11 @@ namespace KScript.Syntax.Markup
         private readonly Stack<MarkupElement> open = new Stack<MarkupElement>();
         private int pos;
 
-        private MarkupParser(SourceText source, DocumentKind kind)
+        private MarkupParser(SourceText source, DocumentKind kind, TextSpan? range = null)
         {
             this.source = source;
-            text = source.Text;
+            text = range is TextSpan span ? source.Text[..span.End] : source.Text;
+            pos = range?.Start ?? 0;
             this.kind = kind;
             document = new MarkupDocument { Source = source, Kind = kind };
         }
@@ -68,6 +69,42 @@ namespace KScript.Syntax.Markup
             MarkupParser parser = new MarkupParser(source, kind);
             parser.Run();
             return parser.document;
+        }
+
+        /// <summary>Parses embedded HTML with positions in the enclosing source.</summary>
+        public static MarkupDocument ParsePageFragment(SourceText source, DecodedText origin, TextSpan range)
+        {
+            var parser = new MarkupParser(new SourceText(origin.Value), DocumentKind.Page, range);
+            parser.Run();
+            var fragment = parser.document;
+            fragment.Source = source;
+            foreach (MarkupNode node in fragment.DescendantNodes())
+            {
+                node.Span = origin.ToSource(node.Span);
+                if (node is MarkupText textNode) textNode.Content = Remap(textNode.Content);
+                if (node is not MarkupElement element) continue;
+                element.NameSpan = origin.ToSource(element.NameSpan);
+                element.StartTagSpan = origin.ToSource(element.StartTagSpan);
+                element.ContentSpan = origin.ToSource(element.ContentSpan);
+                if (element.EndNameSpan is TextSpan end) element.EndNameSpan = origin.ToSource(end);
+                foreach (MarkupAttribute attr in element.Attributes)
+                {
+                    attr.Span = origin.ToSource(attr.Span);
+                    attr.NameSpan = origin.ToSource(attr.NameSpan);
+                    if (attr.Value != null) attr.Value = Remap(attr.Value);
+                }
+            }
+            for (int i = 0; i < fragment.Diagnostics.Count; i++)
+            {
+                var diagnostic = fragment.Diagnostics[i];
+                fragment.Diagnostics[i] = new Diagnostic(origin.ToSource(diagnostic.Span), diagnostic.Severity, diagnostic.Code,
+                    diagnostic.Message, diagnostic.Fixes.Select(fix => new QuickFix(fix.Title,
+                        fix.Changes.Select(edit => new TextChange(origin.ToSource(edit.Span), edit.NewText)).ToArray())).ToArray());
+            }
+            return fragment;
+
+            DecodedText Remap(DecodedText text) => new(text.Value, Enumerable.Range(0, text.Value.Length + 1)
+                .Select(i => origin.ToSource(text.ToSource(i))).ToArray());
         }
 
         /// <summary>Chooses the document kind from a file name or URI.</summary>

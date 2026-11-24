@@ -973,11 +973,7 @@ namespace KScript.Language.Analysis
         private static string Article(string type) =>
             NativeTypes.Get(type)?.WithArticle ?? (type.Length > 0 && "aeiou".Contains(char.ToLowerInvariant(type[0])) ? "an " + type : "a " + type);
 
-        private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region)
-        {
-            TextSpan span = region.Source.ToSource(v.Span);
-            return TextSpan.FromBounds(Math.Min(span.Start + 1, span.End), span.End);
-        }
+        private static TextSpan VariableNameSpan(VariableNode v, ExpressionRegion region) => region.Source.ToSource(v.NameSpan);
 
         #endregion
 

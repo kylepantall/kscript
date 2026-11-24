@@ -107,6 +107,32 @@ namespace KScript.Pages
         public object Call(ICallable function, object argument, Scope scope, Module module) =>
             Run(module, () => Interpreter.Call(function, new[] { argument }, scope: scope, module: module));
 
+        private readonly Dictionary<string, string> components = new(StringComparer.Ordinal);
+
+        internal ComponentTemplate RenderComponent(PageContext ctx, string path, string tag, Dictionary<string, object> props)
+        {
+            string full = ctx.ResolveSitePath(path, "component");
+            Module page = ModuleFor(path, full);
+            return (ComponentTemplate)Run(page, () =>
+            {
+                if (!components.TryGetValue(full, out string name))
+                {
+                    Module script = Interpreter.LoadedModules.FirstOrDefault(m => m.Path == full) ?? Interpreter.Load(full);
+                    var type = ComponentScript.FindType(script.Document, tag)
+                        ?? throw new PageException($"{path} needs a type matching <{tag}> that extends Component.");
+                    name = type.GetAttributeValue("name");
+                    Interpreter.ImportScript(page, full, page.Globals, names: name);
+                    foreach (string package in PageElementNames.DefaultPackages)
+                        Interpreter.ImportPackage(script, package);
+                    components[full] = name;
+                }
+                var scope = page.Globals.Child();
+                scope.Declare("component_props", props);
+                return Interpreter.EvaluateText(Text(page, 0, $"{name}($component_props)->render()"), scope, page)
+                    as ComponentTemplate ?? throw new PageException($"{name}->render() must return a Component.");
+            });
+        }
+
         public object Evaluate(string expression, Scope scope, Module module) =>
             Run(module, () => Interpreter.EvaluateText(Text(module, 0, expression), scope, module));
 

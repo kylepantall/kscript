@@ -20,7 +20,7 @@ What it makes:
 | File | What it is |
 | --- | --- |
 | `kscript.json` | Settings for `serve`, `check`, `test` and, with the desktop app, the `app` section `kscript compile` reads. |
-| `index.html`, `about.md`, `_layout.html`, `_components/site-nav.html`, `site.css` | The site: two pages, the layout they share and a navigation component. |
+| `index.html`, `about.md`, `_layout.html`, `_components/site-nav.kscript`, `site.css` | The site: two pages, the layout they share and a navigation component. |
 | `tasks.html` | A to-do list in a [`<live>`](web.md#reactive-pages-with-live-no-javascript) block, with no JavaScript. |
 | `lib/tasks.kscript` | The to-do rules (add, tick, remove, clear, count), shared by the page, the desktop app, the API and the tests. |
 | `desktop.kscript` | The same to-do list as a [desktop app](desktop.md): a `Window { }` block. |
@@ -369,7 +369,7 @@ kscript make controller people --resource             # controllers/people.kscri
 kscript make request NewPerson --fields "name: string, age?: int"   # requests/new-person.kscript, a typed body
 kscript make middleware secure-headers                # middleware/secure-headers.kscript
 kscript make view people/show --vars person           # views/people/show.html, for @view('people/show', person: $p)
-kscript make component Hero --props title,sub-title   # _components/hero.html, used as <hero title="…" sub-title="…" />
+kscript make component Hero --props title,sub-title   # _components/hero.kscript, used as <hero title="…" sub-title="…" />
 kscript make page about --title "About us"            # about.html, wrapped in _layout.html (created if missing)
 kscript make page "people/[id]"                       # people/[id].html, with $id read from the URL
 kscript make css theme --primary "#3355ff"            # styles/theme.ks.css, served as /styles/theme.css
@@ -450,13 +450,13 @@ Pages stay where they are, because a page's path is its URL. Desktop windows (`m
 }
 ```
 
-The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. List settings files in `config.files`. Paths are relative to the project folder or to `config.root` when set. Pages only find components in `_components/`.
+The names are `routes`, `controllers`, `middleware`, `requests`, `views`, `components`, `layouts`, `partials`, `styles`, `lib`, `types`, `models`, `errors`, `storage`, `jobs`, `windows`, `config`, `locales`, `logging`, `data`, `scripts` and `tests`. `paths.views` is also where `@view()` looks, unless `http.views` says otherwise. `kscript serve` finds `routes/web.kscript` and `routes/api.kscript` by itself; a route file anywhere else needs listing in `http.routes`. List settings files in `config.files`. Paths are relative to the project folder or to `config.root` when set. Pages look in `paths.components`, which defaults to `_components/`.
 
 Names can be written any way (`HeroBanner`, `hero-banner`, `hero_banner`) and files are named in kebab case. Options: `--dir <project>` (default: the project's site root inside a project, otherwise the current folder), `--force` to replace an existing file, `--dry-run` to print the file instead of writing it. Every other `--key value` (or `--key=value`, or a bare `--flag` for `true`) is passed to the template.
 
 Scripts and tests are written as `.kscript` files. `--syntax xml` writes `.ks.xml` instead, and `"make": { "syntax": "xml" }` in `kscript.json` makes that the project's default.
 
-<a id="your-own-templates"></a>**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.html`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
+<a id="your-own-templates"></a>**Your own templates.** Templates live in the project's `_templates/` folder, which `kscript serve` never serves. `kscript make templates` copies the built-in ones there to edit. A file there replaces the built-in template of the same name (`_templates/component.kscript`), and any other file adds a type: `_templates/card.html` gives `kscript make card Profile`.
 
 ```html
 --- make

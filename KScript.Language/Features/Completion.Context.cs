@@ -53,7 +53,7 @@ namespace KScript.Language.Features
 
         private List<CompletionItem> ContextCompletions(DocumentAnalysis analysis, Cursor cursor)
         {
-            if (analysis.Kind != DocumentKind.Script)
+            if (analysis.Kind != DocumentKind.Script || analysis.MarkupAt(cursor.Offset) != analysis.Markup)
             {
                 return null;
             }

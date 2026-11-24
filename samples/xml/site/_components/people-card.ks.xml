@@ -1,0 +1,9 @@
+<kscript>
+  <import package="KScript.Web" />
+  <type name="PeopleCard" extends="Component">
+    <field name="person" type="map" />
+    <fn name="render" returns="Component">
+      <return value="```html&#10;      &lt;div class=&quot;card&quot;&gt;&#10;        &lt;h2&gt;{$.person.name}&lt;/h2&gt;&#10;        &lt;p&gt;{$.person.age} years old&lt;/p&gt;&#10;        &lt;slot /&gt;&#10;      &lt;/div&gt;&#10;      ```" />
+    </fn>
+  </type>
+</kscript>

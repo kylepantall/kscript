@@ -101,6 +101,7 @@ namespace KScript.Runtime
                 new A("fields", K.Fields, "A short type's fields on one line, like fn params: `login: string, id: int, avatar_url?: string`. Bigger types list their fields one per line instead (<field> elements)."),
                 new A("path", K.Path, "A JSON file holding a sample of the data. Its keys become fields; <field> elements and `fields` replace the ones they name."),
                 new A("extra", K.Enum, "Keys in the data that the type doesn't list: drop them (the default), keep them, or make them an error.", false, "drop", "keep", "error"),
+                new A("extends", K.Text, "A type whose required method signatures this type implements."),
                 new A("with", K.TypeNames, "Other types this one is made from. Types with fields are joined: `with=\"User, Auditable\"` has all their fields and rules, and fits wherever they do. One built-in type, such as `with=\"int\"` or `with=\"handle\"`, makes a type with rules instead of fields: min, max, pattern, one_of, not, <validate> and <normalize>.", false, Values.DeclarableTypes.ToArray()),
                 new A("min", K.Text, "The smallest value allowed: a number for numbers, a date for dates, the length for text (a handle's name without its @), the count for lists. Needs with=\"...\" naming one built-in type."),
                 new A("max", K.Text, "The largest value allowed: a number for numbers, a date for dates, the length for text, the count for lists. Needs with=\"...\" naming one built-in type."),
@@ -301,6 +302,9 @@ namespace KScript.Runtime
                 new A("name", K.DeclareFunction, "The function's name.", true),
                 new A("params", K.Parameters, "Parameters, with optional types and defaults: `who, greeting = 'Hello'` or `count: int = 1`."),
                 new A("value", K.Expression, "For one-line functions: the result, instead of a body."),
+                new A("returns", K.Text, "The declared return type."),
+                new A("signature", K.Text, "Declares a method signature without an implementation."),
+                new A("optional", K.Text, "The method may be omitted by a type implementing this signature."),
                 new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
@@ -316,7 +320,14 @@ namespace KScript.Runtime
                 new A("value", K.Expression, "The result. Without it the function returns null."))
             {
                 MustBeInside = new[] { "fn" },
-            }, run => throw new ReturnSignal(run.Eval("value", null)));
+            }, run =>
+            {
+                var fn = run.Element.Ancestors().FirstOrDefault(e => e.Name == "fn");
+                var block = ComponentScript.HtmlBlock(fn, run.Element.GetAttribute("value")?.Value);
+                throw new ReturnSignal(block is { Error: null }
+                    ? new ComponentTemplate(block, run.Scope, run.Module, run.Element.GetAttribute("value").Value)
+                    : run.Eval("value", null));
+            });
 
             p.Element(new ElementInfo("call", "Calls a function for its effect, optionally keeping the result.", ContentKind.Empty,
                 new A("fn", K.FunctionReference, "The function (or command) to call: `@greet` (in XML, fn=\"greet\").", true),

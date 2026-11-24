@@ -942,6 +942,10 @@ namespace KScript.Syntax.Markup
             {
                 AddRawAttribute(e, "name", name);
             }
+            if (parent.Name == "type" && Peek(0) == '?')
+            {
+                AddRawAttribute(e, "optional", new TextSpan(pos++, 1));
+            }
             if (isOverride)
             {
                 AddAttribute(e, "override", DecodedText.Plain("yes", start), new TextSpan(start, 0));
@@ -969,6 +973,23 @@ namespace KScript.Syntax.Markup
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             SkipSpaces();
+            if (Peek(0) == ':')
+            {
+                pos++;
+                SkipSpaces();
+                TextSpan returns = ReadTypeSpan();
+                if (returns.Length == 0)
+                    Error(returns, DiagnosticCodes.MissingAttribute, "Write the return type after ':'.");
+                else
+                    AddRawAttribute(e, "returns", returns);
+                SkipSpaces();
+            }
+            if (parent.Name == "type" && Peek(0) == ';')
+            {
+                AddRawAttribute(e, "signature", new TextSpan(pos, 1));
+                Finish(e, start, pos + 1);
+                return;
+            }
             if (Lookahead("=>"))
             {
                 pos += 2;
@@ -1119,6 +1140,16 @@ namespace KScript.Syntax.Markup
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
             }
             SkipSpaces();
+            if (keyword == "type" && TryWord("extends"))
+            {
+                SkipSpaces();
+                TextSpan contract = ReadNameSpan(allowDash: false);
+                if (contract.Length == 0)
+                    Error(contract, DiagnosticCodes.MissingAttribute, "Write a type whose signature this type implements.");
+                else
+                    AddRawAttribute(e, "extends", contract);
+                SkipSpaces();
+            }
             if (Peek(0) == '{')
             {
                 bool wasModel = inModel;

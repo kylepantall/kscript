@@ -44,8 +44,8 @@ public sealed class MakeWizardTests : IDisposable
     public void Yes_no_options_are_asked_as_yes_no_questions()
     {
         using var site = new TempSite();
-        // Name, --fields skipped, --timestamps yes, --soft-deletes no.
-        Answer("Post\n\ny\nn\n");
+        // Name, --fields skipped, --timestamps yes, --soft-deletes no, --component no.
+        Answer("Post\n\ny\nn\nn\n");
         var (code, _, error) = Make(site.Root, "model");
         Assert.True(code == 0, error);
         string model = File.ReadAllText(Directory.GetFiles(site.Root, "post.*", SearchOption.AllDirectories).Single());

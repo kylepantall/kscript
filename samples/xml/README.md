@@ -14,7 +14,7 @@ Each script here has a `.kscript` twin with the same name in [`samples/scripts`]
 | `errors.ks.xml`, `errors/` | Declared error types, thrown and caught by type. |
 | `tests/` | Tests, run by `kscript test`. |
 | `counter.ks.xml` | A desktop app: a window with a number and two buttons. |
-| `site/` | A small site of pages, served by `kscript serve`. |
+| `site/` | A small site with an XML component class. Its `render()` reads tag props with `$.person`. Serve it with `kscript serve site`. |
 
 ```sh
 kscript oldest.ks.xml

@@ -340,7 +340,7 @@
       ]
     },
     "variable": {
-      "match": "\\$[A-Za-z_]\\w*",
+      "match": "\\$(?:\\.)?[A-Za-z_]\\w*",
       "name": "variable.other.kscript"
     },
     "command": {
@@ -803,7 +803,7 @@
       }
     },
     "textVariable": {
-      "match": "(?<![\\w.])\\$[A-Za-z_]\\w*(?:(?:\\??\\.)[A-Za-z_]\\w*)*",
+      "match": "(?<![\\w.])\\$(?:\\.)?[A-Za-z_]\\w*(?:(?:\\??\\.)[A-Za-z_]\\w*)*",
       "captures": {
         "0": {
           "patterns": [

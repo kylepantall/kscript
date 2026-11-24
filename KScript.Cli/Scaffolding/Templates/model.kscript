@@ -1,12 +1,14 @@
 --- make
 description: A model in models/: a type whose records are kept in a database table, with a query builder (User->where(...))
 category: Scripts and data
-usage: <Name> [--fields "name: string, email: email"] [--timestamps] [--soft-deletes]
+usage: <Name> [--fields "name: string, email: email"] [--timestamps] [--soft-deletes] [--component]
 --fields: The fields, comma separated, as name: type, with ? for optional and = for a default. Default: name: string
 --timestamps: Add created_at and updated_at, set when records are saved
 --soft-deletes: Mark records deleted instead of removing them, so they can be restored
+--component: Also create a component that takes a row of this model as record
 example: kscript make model User --fields "name: string, email: email, password: password" --timestamps
 example: kscript make model BlogPost --fields "title: string, body: string, published: bool = false" --soft-deletes
+example: kscript make model Note --fields "title: string, body: string" --component
 to: {{ paths.models }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.models }}/{{ dir }}{{ kebab }}{{ ext }}", make its table with $db->create_table({{ pascal }}), then query it: {{ pascal }}->where(...)->get()
 ---

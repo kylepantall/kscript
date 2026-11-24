@@ -20,6 +20,23 @@ namespace KScript.Language.Tests
 
         private static readonly string Site = Path.Combine(Path.GetTempPath(), "kscript-intellisense");
 
+        private const string ScriptComponent = """
+            import KScript.Web
+            import "../models/note.kscript"
+
+            type NoteCard extends Component {
+              record: Note
+              caption?: string
+              label => $record.title
+              fn caption_text(): string => $caption ?? 'Note'
+              fn render(): Component {
+                return ```html
+                <section><h2>{$label}</h2><p>{$this->caption_text()}</p><p>{$record.title}</p><slot /></section>
+                ```
+              }
+            }
+            """;
+
         private static readonly LanguageService Service = new LanguageService(files: new FakeFiles(new Dictionary<string, string>
         {
             [Path.Combine(Site, "_layout.html")] = "<html><slot /></html>",
@@ -27,6 +44,8 @@ namespace KScript.Language.Tests
             [Path.Combine(Site, "_components", "note.html")] = "<prop name=\"title\" required /><p>{@heading($data.title)}</p>",
             [Path.Combine(Site, "_components", "note.kscript")] = "fn heading(title: string) => $title->upper()\nfn load(props: map) => $props\n",
             [Path.Combine(Site, "data", "people.json")] = "[{\"name\": \"Joan\", \"age\": 82, \"address\": {\"city\": \"Leeds\"}}, {\"name\": \"Ellie\", \"role\": null}]",
+            [Path.Combine(Site, "_components", "note-card.kscript")] = ScriptComponent,
+            [Path.Combine(Site, "models", "note.kscript")] = "import KScript.Data\nmodel Note { title: string; body: string }",
             [Path.Combine(Site, "_components", "person-card.html")] = "<div class=\"card\"><h2>{$person.name}</h2><p>{$caption ?? ''}</p><slot /></div>",
         }));
 
@@ -139,6 +158,46 @@ namespace KScript.Language.Tests
             Assert.Contains("read_json", local);
             Assert.DoesNotContain("api", local);
             Assert.Contains("api", Labels("<import package=\"KScript.Net\" /><p>{@‸}</p>"));
+        }
+
+        [Fact]
+        public void ScopedSigilCompletesAndKeepsTheVariableNameSpan()
+        {
+            Assert.Contains("title", Labels("title = 'Draft'\necho $.‸", "title.kscript"));
+            Assert.Contains("title", Labels("<let name=\"title\" value=\"'Draft'\" /><p>{$.‸}</p>"));
+            Assert.Contains("title", Labels("<let name=\"title\" value=\"'Draft'\" /><p>{$‸}</p>"));
+        }
+
+        [Fact]
+        public void ClassComponentCompletesPropsOnItsTagAndFieldsInsideTheFence()
+        {
+            Assert.Equal(new[] { "record", "caption" }, Labels("<note-card ‸ />"));
+            var analysis = Service.Analyze(ScriptComponent, Path.Combine(Site, "_components", "note-card.kscript"));
+            Assert.Empty(analysis.Errors);
+            var fields = Labels(ScriptComponent.Replace("{$record.title}", "{$record.‸}"), "_components/note-card.kscript");
+            Assert.Contains("title", fields);
+            Assert.Contains("body", fields);
+            Assert.Contains("id", fields);
+            Assert.Contains("record", Labels(ScriptComponent.Replace("{$record.title}", "{$.‸}"), "_components/note-card.kscript"));
+            Assert.Contains("body", Labels(ScriptComponent.Replace("{$record.title}", "{$.record.‸}"), "_components/note-card.kscript"));
+            var scoped = Service.Analyze(ScriptComponent.Replace("{$record.title}", "{$.record.title}"),
+                Path.Combine(Site, "_components", "note-card.kscript"));
+            int sigil = scoped.Source.Text.IndexOf("$.record", StringComparison.Ordinal);
+            Assert.Equal("record", scoped.ReferenceAt(sigil)?.Symbol.Name);
+            Assert.Equal("record", scoped.ReferenceAt(sigil + 1)?.Symbol.Name);
+            var broken = Service.Analyze(ScriptComponent.Replace("{$record.title}", "{$record.titel}"),
+                Path.Combine(Site, "_components", "note-card.kscript"));
+            Assert.Contains(broken.Diagnostics, diagnostic => diagnostic.Message.Contains("titel"));
+        }
+
+        [Fact]
+        public void LegacyRecordInputHasAReferenceAndCompletesInsideTheComponent()
+        {
+            const string text = "<p>{$record.id}</p>";
+            var analysis = Service.Analyze(text, Path.Combine(Site, "_components", "legacy.html"));
+            Assert.Contains("record", analysis.Inputs.Keys);
+            Assert.Equal("record", analysis.ReferenceAt(text.IndexOf("$record", StringComparison.Ordinal))?.Symbol.Name);
+            Assert.Contains("record", Labels("<p>{$record.id} {$rec‸}</p>", "_components/legacy.html"));
         }
 
         [Fact]

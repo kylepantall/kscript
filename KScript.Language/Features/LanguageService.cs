@@ -51,9 +51,10 @@ namespace KScript.Language.Features
         internal static Cursor Locate(DocumentAnalysis analysis, int offset)
         {
             Cursor c = new Cursor { Offset = offset };
-            bool code = analysis.Markup.Syntax == SourceSyntax.Code;
+            var markup = analysis.MarkupAt(offset);
+            bool code = markup.Syntax == SourceSyntax.Code;
 
-            foreach (MarkupElement e in analysis.Markup.DescendantElements())
+            foreach (MarkupElement e in markup.DescendantElements())
             {
                 // A .kscript statement has no closing '>': a value that ends the line (a: |) is still inside it.
                 bool inStart = offset > e.StartTagSpan.Start && (offset < e.StartTagSpan.End || (offset == e.StartTagSpan.End

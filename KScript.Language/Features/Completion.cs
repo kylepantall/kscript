@@ -159,12 +159,12 @@ namespace KScript.Language.Features
             // In text: a '<' just typed (the parser sees it as text until a name follows), or '</'.
             if (offset > 0 && text[offset - 1] == '<')
             {
-                MarkupElement parent = analysis.Markup.FindElementAt(offset);
+                MarkupElement parent = analysis.MarkupAt(offset).FindElementAt(offset);
                 return ElementCompletions(analysis, parent, new TextSpan(offset, 0), previous: PreviousElementBefore(text, parent, offset - 1), snippets: true);
             }
             if (offset > 1 && text[offset - 1] == '/' && text[offset - 2] == '<')
             {
-                MarkupElement open = analysis.Markup.FindElementAt(offset - 2);
+                MarkupElement open = analysis.MarkupAt(offset - 2).FindElementAt(offset - 2);
                 return open == null ? new List<CompletionItem>() : new List<CompletionItem>
                 {
                     new CompletionItem { Label = open.Name, Kind = CompletionKind.Element, InsertText = open.Name + ">", ReplaceSpan = new TextSpan(offset, 0) },
@@ -235,12 +235,13 @@ namespace KScript.Language.Features
         private List<CompletionItem> ElementCompletions(DocumentAnalysis analysis, MarkupElement parent, TextSpan replace, MarkupElement previous, bool snippets, string openBracket = "")
         {
             List<CompletionItem> items = new List<CompletionItem>();
-            ElementContext context = analysis.Kind == DocumentKind.Script ? ElementContext.Script : ElementContext.Page;
+            ElementContext context = analysis.Kind == DocumentKind.Script && analysis.MarkupAt(replace.Start) == analysis.Markup
+                ? ElementContext.Script : ElementContext.Page;
 
             foreach (ElementInfo e in Catalog.Elements)
             {
                 // Only what this file can use: built-ins and the packages it imports.
-                if (!e.Context.HasFlag(context) || e.Planned || (context == ElementContext.Page && e.HtmlWins) || NeedsImport(analysis, e.Package))
+                if (!e.Context.HasFlag(context) || e.Planned || (context == ElementContext.Page && e.HtmlWins) || (context == ElementContext.Script && NeedsImport(analysis, e.Package)))
                 {
                     continue;
                 }
@@ -267,13 +268,12 @@ namespace KScript.Language.Features
 
             if (context == ElementContext.Page && analysis.Path != null)
             {
-                string dir = FindComponentsFolder(analysis.Path);
+                string dir = ComponentFiles.Folder(analysis.Path, Files);
                 if (dir != null)
                 {
-                    foreach (string file in Files.ListFiles(dir, "*.html").Concat(Files.ListFiles(dir, "*.md"))
-                        .DistinctBy(f => Path.GetFileNameWithoutExtension(f), StringComparer.OrdinalIgnoreCase))
+                    foreach (string file in ComponentFiles.List(dir, Files))
                     {
-                        string name = Path.GetFileNameWithoutExtension(file);
+                        string name = ComponentScript.Tag(file);
                         List<string> props = ComponentProps(file);
                         int n = 1;
                         var declared = TemplateContracts.Read(Files, file).ToList();
@@ -283,7 +283,7 @@ namespace KScript.Language.Features
                         {
                             Label = name,
                             Kind = CompletionKind.Element,
-                            Detail = "Component (_components/" + Path.GetFileName(file) + ")",
+                            Detail = "Component (" + Path.GetFileName(file) + ")",
                             Documentation = props.Count > 0 ? "Props: " + string.Join(", ", props) : null,
                             InsertText = snippets ? (propSnippet.Length > 0 ? name + propSnippet + " />" : name + " $1/>") : null,
                             IsSnippet = snippets,
@@ -370,19 +370,6 @@ namespace KScript.Language.Features
             return close < 0 || close >= offset;
         }
 
-        private string FindComponentsFolder(string path)
-        {
-            for (string dir = Path.GetDirectoryName(Path.GetFullPath(path)); dir != null; dir = Path.GetDirectoryName(dir))
-            {
-                string candidate = Path.Combine(dir, "_components");
-                if (Files.DirectoryExists(candidate))
-                {
-                    return candidate;
-                }
-            }
-            return null;
-        }
-
         /// <summary>The component file for a tag such as &lt;person-card&gt;, found in the nearest _components folder.</summary>
         internal string ComponentFile(string documentPath, string tag)
         {
@@ -390,7 +377,7 @@ namespace KScript.Language.Features
             {
                 return null;
             }
-            string dir = FindComponentsFolder(documentPath);
+            string dir = ComponentFiles.Folder(documentPath, Files);
             if (dir == null)
             {
                 return null;
@@ -406,8 +393,9 @@ namespace KScript.Language.Features
             {
                 return new List<string>();
             }
-            return TemplateContracts.Read(Files, componentFile).Select(p => p.Name)
-                .Concat(Analyze(text, componentFile).Inputs.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var declared = TemplateContracts.Read(Files, componentFile).Select(p => p.Name);
+            return ScriptFiles.IsScript(componentFile) ? declared.ToList()
+                : declared.Concat(Analyze(text, componentFile).Inputs.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         internal static string ElementSnippet(ElementInfo e)
@@ -465,13 +453,13 @@ namespace KScript.Language.Features
                         {
                             Label = name, Kind = CompletionKind.Attribute,
                             Detail = required ? "Required template prop" : "Template prop",
-                            Documentation = $"Available in {Path.GetFileName(file)} as ${KScript.Pages.TemplateContract.VariableName(name)}.",
+                            Documentation = $"Available in {Path.GetFileName(file)} as ${KScript.Pages.TemplateContract.VariableName(name)} or $.{KScript.Pages.TemplateContract.VariableName(name)}.",
                             InsertText = name + "=\"$1\"", IsSnippet = true,
                             ReplaceSpan = TextSpan.FromBounds(start, offset), SortText = (required ? "0" : "1") + name,
                         });
                     }
 
-                    if (!wrapper && !e.Attributes.Any(a => global::KScript.Pages.TemplateContract.IsLoadCallback(a.Name) && a.NameSpan.Start != start))
+                    if (!wrapper && !ScriptFiles.IsScript(file) && !e.Attributes.Any(a => global::KScript.Pages.TemplateContract.IsLoadCallback(a.Name) && a.NameSpan.Start != start))
                         items.Add(new CompletionItem
                         {
                             Label = "onLoad", Kind = CompletionKind.Attribute, Detail = "Component lifecycle callback",
@@ -490,7 +478,7 @@ namespace KScript.Language.Features
                 return Files.FileExists(full) ? full : null;
             }
 
-            bool code = analysis.Markup.Syntax == SourceSyntax.Code;
+            bool code = analysis.MarkupAt(offset).Syntax == SourceSyntax.Code;
             foreach (AttributeInfo a in code ? CodeStatementHelp.Options(info) : info.Attributes)
             {
                 if (e.Attributes.Any(x => x.Name == a.Name && !(x.NameSpan.Start == start)))
@@ -1153,13 +1141,19 @@ namespace KScript.Language.Features
         {
             string text = analysis.Source.Text;
             int wordStart = WordStart(text, offset);
-            if (analysis.Kind != DocumentKind.Script || wordStart == 0 || (wordStart < offset && !Lexer.IsIdentStart(text[wordStart])))
+            if (wordStart == 0 || (wordStart < offset && !Lexer.IsIdentStart(text[wordStart]))) return null;
+            bool scoped = wordStart >= 2 && text[wordStart - 2] == '$' && text[wordStart - 1] == '.';
+            int sigilOffset = wordStart - (scoped ? 2 : 1);
+            if (analysis.MarkupAt(offset).Kind != DocumentKind.Script)
             {
-                return null;
+                if (!scoped) return null; // Use page-aware suggestions for the ordinary sigils.
+                var region = analysis.RegionAt(sigilOffset);
+                int local = region?.Source.FromSource(sigilOffset) ?? -1;
+                if (region == null || !region.CodeSpans.Any(span => span.Start <= local && local <= span.End)) return null;
             }
-            char sigil = text[wordStart - 1];
+            char sigil = text[sigilOffset];
             // joan@example.com and a$b are text, not a command or a variable.
-            if ((sigil != '@' && sigil != '$') || (wordStart >= 2 && (Lexer.IsIdentChar(text[wordStart - 2]) || text[wordStart - 2] == '@' || text[wordStart - 2] == '$')))
+            if ((sigil != '@' && sigil != '$') || (sigilOffset > 0 && (Lexer.IsIdentChar(text[sigilOffset - 1]) || text[sigilOffset - 1] == '@' || text[sigilOffset - 1] == '$')))
             {
                 return null;
             }
@@ -1167,7 +1161,7 @@ namespace KScript.Language.Features
             if (sigil == '$')
             {
                 List<CompletionItem> variables = VariableCompletions(analysis, offset, replace, withSigil: false);
-                string expectedType = ExpectedTypeAt(analysis, wordStart - 1) ?? CallArgumentTypeAt(analysis, wordStart - 1);
+                string expectedType = ExpectedTypeAt(analysis, sigilOffset) ?? CallArgumentTypeAt(analysis, sigilOffset);
                 return RankVariables(analysis, offset, variables, expectedType);
             }
             if (ExpectedTypeAt(analysis, wordStart - 1) is string expected && SplitType(expected).Name == "handle")

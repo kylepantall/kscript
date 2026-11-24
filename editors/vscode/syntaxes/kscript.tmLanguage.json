@@ -168,7 +168,7 @@
         },
         {
           "name": "variable.other.kscript",
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+          "match": "\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*"
         },
         {
           "include": "source.kscript-code#member"
@@ -245,7 +245,7 @@
         },
         {
           "name": "variable.other.kscript",
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+          "match": "\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*"
         },
         {
           "include": "source.kscript-code#member"
@@ -327,7 +327,7 @@
         },
         {
           "name": "variable.other.kscript",
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+          "match": "\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*"
         },
         {
           "include": "source.kscript-code#member"
@@ -384,7 +384,7 @@
         },
         {
           "name": "variable.other.kscript",
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+          "match": "\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*"
         },
         {
           "include": "source.kscript-code#member"
@@ -428,7 +428,7 @@
     "bare-reference": {
       "patterns": [
         {
-          "match": "(\\$[A-Za-z_][A-Za-z0-9_]*)((?:\\.[A-Za-z_][A-Za-z0-9_]*)*)",
+          "match": "(\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*)((?:\\.[A-Za-z_][A-Za-z0-9_]*)*)",
           "captures": {
             "1": {
               "name": "variable.other.kscript"
@@ -493,7 +493,7 @@
         },
         {
           "name": "variable.other.kscript",
-          "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+          "match": "\\$(?:\\.)?[A-Za-z_][A-Za-z0-9_]*"
         },
         {
           "include": "source.kscript-code#member"

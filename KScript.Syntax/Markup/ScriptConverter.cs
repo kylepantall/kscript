@@ -701,14 +701,21 @@ namespace KScript.Syntax.Markup
                             WriteBlock("extend " + extended.Trim(), e, indent, chained);
                             return;
                         }
-                    case "fn" when Only("name", "params", "value", "description", "override") && Attr("name") != null
+                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional") && Attr("name") != null
                         && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override")))):
                         {
                             if (!chained)
                             {
                                 WriteDoc(e, indent);
                             }
-                            string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim() + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
+                            string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim()
+                                + (Attr("optional") != null ? "?" : "") + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
+                            if (Attr("returns") is string returns) header += ": " + returns.Trim();
+                            if (Attr("signature") != null)
+                            {
+                                Line(indent, header + ";");
+                                return;
+                            }
                             scopes.Push();
                             foreach (string p in ParameterNames(Attr("params")))
                             {
@@ -747,7 +754,7 @@ namespace KScript.Syntax.Markup
                             // fields="login: string, id: int" becomes one line per field, the way .kscript writes types.
                             List<string> fieldLines = FieldsAsLines(Attr("fields"));
                             // The options of every declaration go in its brackets: model User(timestamps, unique: [email]).
-                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with") && !RuleAttributes.Contains(a.Name)
+                            string options = string.Join(", ", e.Attributes.Where(a => a.Name is not ("name" or "description" or "with" or "extends") && !RuleAttributes.Contains(a.Name)
                                 && !(a.Name == "fields" && fieldLines != null)).Select(a => ModelOption(e, a) ?? FormatAttribute(e, a)));
                             sb.Append(pad).Append(e.Name).Append(' ').Append(typeName.Trim()).Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
                             if (Attr("with") is string with)
@@ -756,7 +763,8 @@ namespace KScript.Syntax.Markup
                                 string bases = with.Trim().TrimStart('[').TrimEnd(']');
                                 sb.Append(" with [").Append(string.Join(", ", bases.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0))).Append(']');
                             }
-                            if (!e.ChildElements.Any() && rules.Count == 0 && fieldLines == null)
+                            if (Attr("extends") is string contract) sb.Append(" extends ").Append(contract.Trim());
+                            if (!e.ChildElements.Any() && rules.Count == 0 && fieldLines == null && Attr("extends") == null)
                             {
                                 sb.Append('\n');
                                 return;

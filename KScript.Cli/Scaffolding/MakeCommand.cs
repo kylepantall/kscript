@@ -229,30 +229,33 @@ namespace KScript.Scaffolding
                     return 0;
                 }
 
-                var result = Scaffolder.Make(new MakeRequest { Type = type, Name = positional[1], Root = root, Options = options, Force = force, DryRun = dryRun });
-                // In a project, files are made from its site root; show them relative to where the command was run.
-                string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, result.FullPath).Replace('\\', '/');
+                var results = Scaffolder.MakeAll(new MakeRequest { Type = type, Name = positional[1], Root = root, Options = options, Force = force, DryRun = dryRun });
+                foreach (var result in results)
+                {
+                    // In a project, files are made from its site root; show them relative to where the command was run.
+                    string shown = !fromProject || root == "." ? result.RelativePath : Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, result.FullPath).Replace('\\', '/');
 
-                var file = new CliOutput(output);
-                if (dryRun)
-                {
-                    file.Info($"Would create {file.Style.Bold(shown)}{(result.Overwrote ? " (replacing it)" : "")}:");
-                    output.WriteLine();
-                    output.Write(result.Content);
-                    if (!result.Content.EndsWith('\n')) output.WriteLine();
+                    var file = new CliOutput(output);
+                    if (dryRun)
+                    {
+                        file.Info($"Would create {file.Style.Bold(shown)}{(result.Overwrote ? " (replacing it)" : "")}:");
+                        output.WriteLine();
+                        output.Write(result.Content);
+                        if (!result.Content.EndsWith('\n')) output.WriteLine();
+                    }
+                    else
+                    {
+                        file.Info($"{(result.Overwrote ? "Replaced" : "Created")} {file.Style.Bold(shown)}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
+                    }
+                    // A new page that uses the default _layout.html, in a folder without one, gets one too: otherwise the page
+                    // renders without <html>/<head>, kscript check warns, and editors don't see the folder as a site.
+                    var layout = Scaffolder.MakeDefaultLayoutIfMissing(root, result, options, dryRun);
+                    if (layout != null)
+                    {
+                        file.Info(dryRun ? $"Would also create {file.Style.Bold(layout.RelativePath)}, the layout pages use by default." : $"Created {file.Style.Bold(layout.RelativePath)}, the layout pages use by default");
+                    }
+                    if (!string.IsNullOrEmpty(result.Hint)) file.Comment("  " + result.Hint);
                 }
-                else
-                {
-                    file.Info($"{(result.Overwrote ? "Replaced" : "Created")} {file.Style.Bold(shown)}{(result.Template.BuiltIn ? "" : $" (from {Scaffolder.TemplatesFolder}/{Path.GetFileName(result.Template.FilePath)})")}");
-                }
-                // A new page that uses the default _layout.html, in a folder without one, gets one too: otherwise the page
-                // renders without <html>/<head>, kscript check warns, and editors don't see the folder as a site.
-                var layout = Scaffolder.MakeDefaultLayoutIfMissing(root, result, options, dryRun);
-                if (layout != null)
-                {
-                    file.Info(dryRun ? $"Would also create {file.Style.Bold(layout.RelativePath)}, the layout pages use by default." : $"Created {file.Style.Bold(layout.RelativePath)}, the layout pages use by default");
-                }
-                if (!string.IsNullOrEmpty(result.Hint)) file.Comment("  " + result.Hint);
                 return 0;
             }
             catch (KScript.Projects.ProjectConfigException ex)

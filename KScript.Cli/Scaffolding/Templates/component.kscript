@@ -1,0 +1,74 @@
+--- make
+description: A component type with a render method, used as an HTML tag
+category: Pages and styles
+usage: <Name> [--model Model] [--fields title,body] [--model-update binding [--autosave]] [--props title,image] [--live]
+--model: Bind to an existing model, e.g. --model Note, and pass a row as record
+--model-update: Use an existing ModelUpdate route to save edits
+--fields: Model fields to display or edit, comma separated. Defaults to the fields of a known ModelUpdate route
+--autosave: Save after typing pauses (500ms by default). Supply a delay, e.g. --autosave 750ms
+--props: Extra tag attributes, comma separated
+--live: Add an interactive live block
+example: kscript make component Hero --props title,subtitle
+example: kscript make component OrderDetails --live
+to: {{ paths.components }}/{{ kebab }}.kscript
+hint: Use it in a page: <{{ kebab }}{{#if record_input}} record="{$record}"{{/if}}{{#each props}} {{ item }}="…"{{/each}} />
+---
+import KScript.Web
+{{#if model_path}}
+import "{{ model_path }}"
+{{/if}}
+
+type {{ pascal }}{{ component_suffix }} extends Component {
+{{#if record_input}}
+  record: {{ model_type ?? any }}
+{{/if}}
+{{#each props}}
+  {{ item | var }}: any
+{{/each}}
+
+  fn render(): Component {
+    return ```html
+{{#if model_update}}
+    <live id="{{ kebab }}-{$.record.{{ model_key }}}">
+      <form model-update="{{ model_update }}" key="{$.record.{{ model_key }}}"{{#if autosave}} autosave{{#unless autosave is true}}="{{ autosave }}"{{/unless}}{{/if}}>
+{{#each fields}}
+        <p><label>{{ item | title }} <input name="{{ item }}" value="{$.record.{{ item }}}"></label></p>
+{{/each}}
+        <button type="submit">Save</button>
+      </form>
+    </live>
+{{else}}
+{{#if live}}
+    <live>
+      <state name="expanded" value="false" />
+      <button type="button" on-click="expanded = not $.expanded" aria-expanded="{$.expanded ? 'true' : 'false'}">{{ title }}</button>
+      <if test="$.expanded">
+{{else}}
+    <section class="{{ kebab }}">
+{{/if}}
+{{#if record_input}}
+{{#each fields}}
+{{#if live}}  {{/if}}      <p>{$.record.{{ item }}}</p>
+{{else}}
+{{#if live}}  {{/if}}      <h2>{{ title }} {$.record.{{ model_key }}}</h2>
+{{/each}}
+{{/if}}
+{{#each props}}
+{{#if live}}  {{/if}}      <p>{$.{{ item | var }}}</p>
+{{/each}}
+{{#unless record_input}}
+{{#unless props}}
+{{#if live}}  {{/if}}      <h2>{{ title }}</h2>
+{{/unless}}
+{{/unless}}
+{{#if live}}  {{/if}}      <slot />
+{{#if live}}
+      </if>
+    </live>
+{{else}}
+    </section>
+{{/if}}
+{{/if}}
+    ```
+  }
+}

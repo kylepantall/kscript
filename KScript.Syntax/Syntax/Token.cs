@@ -260,9 +260,10 @@ namespace KScript.Syntax
                 return new Token(TokenKind.String, block.Value, TextSpan.FromBounds(start, block.End), block.Error, block.Tag, block.Error != null ? block.ErrorSpan : null);
             }
 
-            if ((c == '$' || c == '@') && Position + 1 < end && IsIdentStart(text[Position + 1]))
+            int nameOffset = c == '$' && Position + 1 < end && text[Position + 1] == '.' ? 2 : 1;
+            if ((c == '$' || c == '@') && Position + nameOffset < end && IsIdentStart(text[Position + nameOffset]))
             {
-                Position++;
+                Position += nameOffset;
                 int nameStart = Position;
                 while (Position < end && IsIdentChar(text[Position]))
                 {

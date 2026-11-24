@@ -73,10 +73,11 @@ namespace KScript.Syntax
             Template == null ? Array.Empty<ExprNode>() : Template.Expressions.Select(s => s.Node).Where(n => n != null);
     }
 
-    /// <summary><c>$name</c>.</summary>
+    /// <summary>A scope lookup written as <c>$name</c> or <c>$.name</c>.</summary>
     public sealed class VariableNode : ExprNode
     {
         public string Name { get; internal set; }
+        public TextSpan NameSpan => TextSpan.FromBounds(Math.Max(Span.Start, Span.End - Name.Length), Span.End);
     }
 
     /// <summary>A bare identifier: a function name in <c>|&gt; slugify()</c>, an import alias, or <c>_</c>.</summary>

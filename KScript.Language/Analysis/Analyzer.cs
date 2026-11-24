@@ -31,7 +31,11 @@ namespace KScript.Language.Analysis
             CodeArguments.Normalise(result.Markup, this.catalog.GetElement);
         }
 
-        private DocumentKind Kind => result.Kind;
+        private bool inComponentHtml;
+        private DocumentKind Kind => inComponentHtml ? DocumentKind.Page : result.Kind;
+
+        private bool IsComponentPage => result.Kind != DocumentKind.Script && result.Path != null
+            && string.Equals(directory, ComponentFiles.Folder(result.Path, files), StringComparison.Ordinal);
 
         /// <summary>Analyzes a document. The kind is chosen from the path's extension unless given.</summary>
         public static DocumentAnalysis Analyze(string text, string path = null, IFileSystem files = null, LanguageCatalog catalog = null, DocumentKind? kind = null, Rules.DocumentRules rules = null)
@@ -981,7 +985,10 @@ namespace KScript.Language.Analysis
             {
                 if (component != null && global::KScript.Pages.TemplateContract.IsLoadCallback(attr.Name))
                 {
-                    CheckLoadCallback(e, attr, scope);
+                    if (ScriptFiles.IsScript(component))
+                        Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "onLoad is available on components with companion load functions.");
+                    else
+                        CheckLoadCallback(e, attr, scope);
                     continue;
                 }
                 if (attr.Value == null)
@@ -1061,7 +1068,7 @@ namespace KScript.Language.Analysis
 
         private string CheckComponent(MarkupElement e, bool required)
         {
-            string componentDir = FindUpwards("_components");
+            string componentDir = ComponentFiles.Folder(result.Path, files);
             if (componentDir == null)
             {
                 return null;
@@ -1078,24 +1085,11 @@ namespace KScript.Language.Analysis
                 return null;
             }
 
-            IEnumerable<string> known = files.ListFiles(componentDir, "*.html").Select(f => System.IO.Path.GetFileNameWithoutExtension(f));
+            IEnumerable<string> known = ComponentFiles.List(componentDir, files).Select(ComponentScript.Tag);
             string suggestion = Suggestions.Closest(e.Name, known);
             Report(e.NameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownElement,
-                Wording.Of($"No component named <{e.Name}>: _components/{e.Name}.html doesn't exist.") + (suggestion != null ? Wording.Of($" Did you mean <{suggestion}>?") : null),
+                Wording.Of($"No component named <{e.Name}> in {System.IO.Path.GetFileName(componentDir)}.") + (suggestion != null ? Wording.Of($" Did you mean <{suggestion}>?") : null),
                 suggestion != null ? new[] { RenameElementFix(e, suggestion) } : null);
-            return null;
-        }
-
-        private string FindUpwards(string folderName)
-        {
-            for (string dir = directory; dir != null; dir = System.IO.Path.GetDirectoryName(dir))
-            {
-                string candidate = System.IO.Path.Combine(dir, folderName);
-                if (files.DirectoryExists(candidate))
-                {
-                    return candidate;
-                }
-            }
             return null;
         }
 
@@ -1249,6 +1243,15 @@ namespace KScript.Language.Analysis
         private void AnalyzeAttribute(MarkupElement e, MarkupAttribute attr, AttributeInfo a, Scope scope)
         {
             CheckArgumentForm(e, attr, a);
+            if (attr.Name == "value" && e.Name is "fn" or "return")
+            {
+                var fn = e.Name == "fn" ? e : e.Ancestors().FirstOrDefault(parent => parent.Name == "fn");
+                if (ComponentScript.HtmlBlock(fn, attr.Value) is { Error: null } block)
+                {
+                    AnalyzeComponentHtml(block, attr.Value, scope);
+                    return;
+                }
+            }
             switch (a.Kind)
             {
                 case AttributeKind.Expression:
@@ -1606,12 +1609,7 @@ namespace KScript.Language.Analysis
 
         private static TextSpan NameSpanOf(AssignmentNode assign, ExpressionRegion region)
         {
-            TextSpan local = assign.NameSpan;
-            if (assign.Target is VariableNode || (assign.NameSpan.Length > 0 && region.Source.Value[assign.NameSpan.Start] == '$'))
-            {
-                local = TextSpan.FromBounds(local.Start + 1, local.End);
-            }
-            return region.Source.ToSource(local);
+            return region.Source.ToSource(assign.Target is VariableNode variable ? variable.NameSpan : assign.NameSpan);
         }
 
         private void AnalyzeFor(MarkupElement e, Scope outer, Scope body)
@@ -1670,6 +1668,20 @@ namespace KScript.Language.Analysis
             body.Declare(position, e.ContentSpan.Start);
         }
 
+        private void AnalyzeComponentHtml(StringBlock block, DecodedText value, Scope outer)
+        {
+            TextSpan span = TextSpan.FromBounds(value.ToSource(block.ContentStart), value.ToSource(block.ContentEnd));
+            var fragment = MarkupParser.ParsePageFragment(source, value, TextSpan.FromBounds(block.ContentStart, block.ContentEnd));
+            result.ComponentMarkup.Add((span, fragment));
+            result.Diagnostics.AddRange(fragment.Diagnostics);
+            var scope = new Scope(outer, span);
+            if (outer.Lookup("request", span.Start) == null)
+                scope.Declare(BuiltIn("request", RequestContextFields()), span.Start);
+            inComponentHtml = true;
+            try { WalkChildren(fragment.Children, scope, markupMode: true); }
+            finally { inComponentHtml = false; }
+        }
+
         private void AnalyzeFn(MarkupElement e, Scope outer, bool markupMode)
         {
             ElementInfo info = catalog.GetElement("fn");
@@ -1711,6 +1723,10 @@ namespace KScript.Language.Analysis
             }
 
             CheckIdentifier(e.GetAttribute("name")?.Value);
+            if (e.GetAttribute("optional") is { Value: not null } optional && e.GetAttribute("signature") == null)
+                Report(optional.Value.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "Only a method signature can be optional.");
+            if (e.GetAttribute("returns") is { Value: not null } returns && returns.ValueText.Trim() != ComponentScript.Contract)
+                CheckTypeText(returns.ValueText.Trim(), TrimmedSpan(returns.Value), returns.Value.SourceSpan.Start, scope: body);
 
             bool hasBody = e.Children.Any(c => c is MarkupElement { Name: not "catch" } || (c is MarkupText t && !t.IsWhitespace));
             if (e.GetAttribute("value") != null && hasBody)

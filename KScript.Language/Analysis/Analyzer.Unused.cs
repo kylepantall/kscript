@@ -123,7 +123,9 @@ namespace KScript.Language.Analysis
             }
 
             List<Symbol> candidates = result.Symbols
-                .Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement?.Name == "fn" && s.DeclaringElement.Parent?.Name != "extend" && !Ignored(s) && s.Doc?.IsPublic != true && !IsRead(s))
+                .Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement?.Name == "fn" && s.DeclaringElement.Parent?.Name != "extend"
+                    && !(s.Name == "render" && s.DeclaringElement.Parent?.GetAttributeValue("extends") == ComponentScript.Contract)
+                    && !Ignored(s) && s.Doc?.IsPublic != true && !IsRead(s))
                 .ToList();
             if (candidates.Count == 0)
             {
@@ -295,7 +297,7 @@ namespace KScript.Language.Analysis
             foreach ((MarkupElement fn, List<Symbol> parameters) in functionParameters)
             {
                 // An unused function is reported once, not once more for each of its parameters.
-                if (unusedFunctions.Any(f => f.DeclaringElement == fn))
+                if (fn.GetAttribute("signature") != null || unusedFunctions.Any(f => f.DeclaringElement == fn))
                 {
                     continue;
                 }
@@ -426,7 +428,9 @@ namespace KScript.Language.Analysis
                 return;
             }
             Symbol alias = result.Symbols.FirstOrDefault(s => s.Kind == SymbolKind.Import && s.DeclaringElement == e);
-            if ((alias != null && uses[alias].Any()) || PackageUsed(package))
+            if ((alias != null && uses[alias].Any()) || PackageUsed(package)
+                || (package == "KScript.Web" && result.Markup.DescendantElements()
+                    .Any(type => type.Name == "type" && type.GetAttributeValue("extends") == ComponentScript.Contract)))
             {
                 return;
             }
