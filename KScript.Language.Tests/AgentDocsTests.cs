@@ -273,7 +273,9 @@ namespace KScript.Language.Tests
             Write("main.kscript", "fn one() => 1\n");
             string section = AgentDocs.AgentsSection(AgentDocs.Read(dir));
             Assert.StartsWith(AgentDocs.Begin, section);
-            Assert.Contains("Start with the [function and type index](.kscript/agents/index.md) and [package references](.kscript/agents/packages/).\n\n## Syntax", section);
+            Assert.Contains("Start with the [function and type index](.kscript/agents/index.md) and [package references](.kscript/agents/packages/).\n\nUse `search_docs`", section);
+            Assert.Contains("KScript extension provides these tools through KScript Docs", section);
+            Assert.Contains("Other MCP clients can use `kscript mcp`.\n\n## Syntax", section);
             Assert.EndsWith(AgentDocs.End + "\n", section);
             Assert.Contains("```kscript\nimport KScript.IO", section);
             Assert.Contains("kscript check --output json", section);
