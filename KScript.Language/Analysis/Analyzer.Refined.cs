@@ -24,7 +24,14 @@ namespace KScript.Language.Analysis
         private static bool IsTextRoot(string root) => root == "string" || (KScript.Metadata.NativeTypes.IsNative(root) && root != "port");
 
         /// <summary>The types named in with="..." (<c>with [User, Auditable]</c>), without brackets.</summary>
-        internal static List<string> WithNames(MarkupElement type) => Shapes.TypeNames(type.GetAttributeValue("with"));
+        internal static List<string> WithNames(MarkupElement type)
+        {
+            string text = type.GetAttributeValue("with");
+            if (type.Name is "model" or "KScript.model")
+                return KScript.Data.ModelComposition.TryReadBases(text, out var bases, out _)
+                    ? bases.Select(b => b.Name).ToList() : new List<string>();
+            return Shapes.TypeNames(text);
+        }
 
         private void CheckMoneyRates(string text, TextSpan span)
         {

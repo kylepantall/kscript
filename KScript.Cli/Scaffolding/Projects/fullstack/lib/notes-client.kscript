@@ -1,3 +1,6 @@
+--- make
+when: examples
+---
 // The pages' client for the app's own JSON API (routes/api{{ ext }}).
 // @api(/api/...) sends the request to this
 // app's routes in the same process, with the cookies of the person viewing the page{{#if auth}}, so it is signed in as them{{/if}}.

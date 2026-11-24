@@ -1097,12 +1097,17 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, keyword, start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             SkipSpaces();
-            if (TryWord("with"))
+            if (keyword == "model" && (TryWord("extends") || TryWord("with")))
+            {
+                (int from, int end) = ReadExpression(Stop.Header);
+                if (from == end)
+                    Error(new TextSpan(from, 0), DiagnosticCodes.MissingAttribute, "Name the models or mixins to extend.");
+                else
+                    AddRawAttribute(e, "with", TextSpan.FromBounds(from, end));
+            }
+            else if (TryWord("with"))
             {
                 // type Admin with [User, Auditable] { }: with="User, Auditable".
                 SkipSpaces();
@@ -1166,6 +1171,16 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        private void ParseDeclarationOptions(MarkupElement declaration)
+        {
+            int nameEnd = pos;
+            SkipSpaces();
+            if (Peek(0) == '(')
+                ParseAttributeList(declaration);
+            else
+                pos = nameEnd;
+        }
+
         /// <summary>
         /// <c>error NotFound(status: 404, message: "No {$kind} {$id}") extends Validation { kind: string; id: int }</c>:
         /// an &lt;error&gt;. The options, <c>extends</c> and the block of fields are all optional.
@@ -1175,10 +1190,7 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, "error", start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
@@ -1222,10 +1234,7 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, "job", start);
             SkipSpaces();
             AddRawAttribute(e, "name", ReadNameSpan(allowDash: false));
-            if (Peek(0) == '(')
-            {
-                ParseAttributeList(e);
-            }
+            ParseDeclarationOptions(e);
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
@@ -1372,7 +1381,7 @@ namespace KScript.Syntax.Markup
         /// A model's settings (KScript.Data), written as lines of its block (<c>table: people</c>, <c>unique: [email]</c>)
         /// or as options (<c>model User(timestamps: yes)</c>). In a model, a line starting with one is always a setting.
         /// </summary>
-        public static readonly string[] ModelSettings = { "table", "connection", "key", "timestamps", "soft_deletes", "unique", "index", "hidden", "guarded" };
+        public static readonly string[] ModelSettings = { "table", "connection", "key", "timestamps", "soft_deletes", "unique", "index", "hidden", "guarded", "mixin", "auto_create" };
 
         /// <summary>True while parsing the block of a model, whose settings are lines too.</summary>
         private bool inModel;
@@ -1418,7 +1427,10 @@ namespace KScript.Syntax.Markup
             pos = end;
             SkipSpaces();
             // fn(x) is also shaped like a parameterised type; the arrow makes it a normalize callback.
-            bool normalizer = word == "normalize" && text.AsSpan(p).StartsWith("fn(") && Lookahead("=>");
+            int args = p + 2;
+            while (args < text.Length && text[args] is ' ' or '\t') args++;
+            bool normalizer = word == "normalize" && text.AsSpan(p).StartsWith("fn") && args < text.Length
+                && text[args] == '(' && Lookahead("=>");
             bool field = !normalizer && (AtStatementEnd() || Peek(0) == '=' || TryWord("from"));
             pos = saved;
             return field ? null : word;
@@ -2531,18 +2543,14 @@ namespace KScript.Syntax.Markup
                 {
                     p += 2;
                 }
-                else if (text[p] == '(')
-                {
-                    int close = ClosingBracket(p);
-                    if (close < 0)
-                    {
-                        return -1;
-                    }
-                    p = close + 1;
-                }
                 else
                 {
-                    break;
+                    int open = p;
+                    while (open < text.Length && text[open] is ' ' or '\t') open++;
+                    if (open >= text.Length || text[open] != '(') break;
+                    int close = ClosingBracket(open);
+                    if (close < 0) return -1;
+                    p = close + 1;
                 }
             }
             return p < text.Length && text[p] == '?' ? p + 1 : p;

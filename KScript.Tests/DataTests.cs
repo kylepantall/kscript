@@ -90,6 +90,78 @@ public abstract class DataFixture : IDisposable
 public sealed class DataModelTests : DataFixture
 {
     [Fact]
+    public void ModelMixinsAndModelBasesShareFieldsAndOptionsWithoutSharingTables()
+    {
+        string[] lines = Lines("""
+            model UID(mixin, key: 'uid') {
+              uid: uuid = @uuid()
+            }
+            model Auditable(mixin, timestamps)
+            model SoftDeletable(mixin, soft_deletes)
+            model BaseNote(table: 'archived_notes') extends UID {
+              title: string
+            }
+            model Note(table: 'active_notes', auto_create) extends BaseNote, Auditable, SoftDeletable {
+              title: string(min: 1)
+              done: bool = false
+            }
+            model Task(auto_create) extends [BaseNote, Auditable(timestamps: false)] {
+              done: bool = false
+            }
+
+            echo $db->has_table('active_notes')
+            note = Note->create(title: 'Draft')
+            echo $db->has_table('active_notes')
+            echo $db->has_table('archived_notes')
+            echo $db->has_table('uids')
+            echo Note->find($note.uid).title
+            echo $note.created_at != null
+            $note->delete()
+            echo Note->count()
+            echo Note->with_trashed()->count()
+            Task->create(title: 'Next')
+            echo $db->describe_table(Task).columns->pluck('name')->contains('created_at') == false
+            """);
+        Assert.Equal(new[] { "false", "true", "false", "false", "Draft", "true", "0", "1", "true" }, lines);
+    }
+
+    [Fact]
+    public void AutomaticTableCreationCreatesOptedInForeignKeyTargetsFirst()
+    {
+        string[] lines = Lines("""
+            model Author(auto_create) { name: string }
+            model Note(auto_create) { author?: Author }
+            echo Note->count()
+            echo $db->has_table(Author)
+            echo $db->has_table(Note)
+            """);
+        Assert.Equal(new[] { "0", "true", "true" }, lines);
+    }
+
+    [Fact]
+    public void InheritedModelMembersUseTheirDefiningModule()
+    {
+        FileOf("base.kscript", """
+            import KScript.Data
+            fn base_label(title: string) => 'base ' + $title
+            model Base(mixin) {
+              title: string = @base_label('default')
+              fn label() => @base_label($title)
+            }
+            """);
+        Assert.Equal("base draft\nbase default\n", Run("""
+            import Base from "base.kscript"
+            model Note extends Base {
+              done: bool = false
+            }
+            note = Note(title: 'draft')
+            echo $note->label()
+            default_note = Note()
+            echo $default_note.title
+            """));
+    }
+
+    [Fact]
     public void StoredRefinementsKeepTheirMethodsWithoutNormalizingTwice()
     {
         string[] lines = Lines("""

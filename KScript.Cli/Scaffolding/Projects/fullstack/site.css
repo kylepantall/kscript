@@ -5,6 +5,7 @@ main { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
 code { background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 4px; }
 button { font: inherit; padding: 0.3rem 0.8rem; border: 1px solid #d1d5db; border-radius: 6px; background: white; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
+{{#if examples}}
 .add-note { display: flex; gap: 0.5rem; margin: 1rem 0; }
 .add-note input { flex: 1; font: inherit; padding: 0.3rem 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; }
 .notes { list-style: none; padding: 0; }
@@ -14,3 +15,4 @@ button:disabled { opacity: 0.5; cursor: default; }
 .note { color: #6b7280; }
 .notes li.empty { color: #9ca3af; }
 .problem { color: #b91c1c; }
+{{/if}}

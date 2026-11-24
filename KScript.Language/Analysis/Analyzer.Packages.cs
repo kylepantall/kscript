@@ -18,7 +18,9 @@ namespace KScript.Language.Analysis
         /// <summary>The packages a page names in its own &lt;import package&gt; elements.</summary>
         private readonly HashSet<string> pageImports = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        private bool ChecksImports => Kind == DocumentKind.Script;
+        private readonly HashSet<string> unqualifiedCommandPackages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private bool ChecksImports => result.Kind == DocumentKind.Script;
 
         /// <summary>True in a .kscript file, so messages and fixes are written in that format.</summary>
         private bool IsCode => !inComponentHtml && result.Markup.Syntax == SourceSyntax.Code;
@@ -26,17 +28,19 @@ namespace KScript.Language.Analysis
         /// <summary>How the file declares a function, in its own format.</summary>
         private string FnHint(string name) => IsCode ? $"fn {name}() {{ }}" : $"<fn name=\"{name}\">";
 
-        private void ImportPackage(string package)
+        private void ImportPackage(string package, bool aliased = false)
         {
             foreach (string p in catalog.WithRequired(package))
             {
                 importedPackages.Add(p);
+                if (!aliased || p != package) unqualifiedCommandPackages.Add(p);
             }
         }
 
         private void ResolvePackages(Scope root)
         {
             ImportPackage("KScript.Core");
+            result.UnqualifiedCommandPackages = unqualifiedCommandPackages;
             if (!ChecksImports)
             {
                 foreach (string package in global::KScript.Pages.PageElementNames.DefaultPackages) ImportPackage(package);
@@ -101,10 +105,10 @@ namespace KScript.Language.Analysis
                 // Known by name (KScript.UI, KScript.AI) but not in this build of the tools.
                 Report(span, DiagnosticSeverity.Warning, DiagnosticCodes.UnknownPackage, $"{package} isn't installed in this copy of kscript.");
             }
-            ImportPackage(package);
-
             MarkupAttribute asAttr = e.GetAttribute("as");
-            if (string.IsNullOrWhiteSpace(asAttr?.ValueText))
+            bool aliased = !string.IsNullOrWhiteSpace(asAttr?.ValueText);
+            ImportPackage(package, aliased);
+            if (!aliased)
             {
                 return;
             }
@@ -195,13 +199,14 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>Reports <paramref name="what"/> (such as "&lt;input&gt;") when its package isn't imported.</summary>
-        private void RequirePackage(string package, TextSpan span, string what)
+        private void RequirePackage(string package, TextSpan span, string what, bool command = false)
         {
             if (package != null)
             {
                 usedPackages.Add(package);
             }
-            if (!ChecksImports || package == null || importedPackages.Contains(package))
+            if (!ChecksImports || package == null || (command ? unqualifiedCommandPackages : importedPackages).Contains(package)
+                || inComponentHtml && global::KScript.Pages.PageElementNames.DefaultPackages.Any(p => catalog.WithRequired(p).Contains(package)))
             {
                 return;
             }
@@ -211,7 +216,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>How the file imports a package, in its own format.</summary>
-        private string ImportLine(string package) => IsCode ? $"import {package}" : $"<import package=\"{package}\" />";
+        private string ImportLine(string package) => result.Markup.Syntax == SourceSyntax.Code ? $"import {package}" : $"<import package=\"{package}\" />";
 
         private QuickFix[] AddImportFix(string package)
         {
@@ -220,7 +225,7 @@ namespace KScript.Language.Analysis
             {
                 return null;
             }
-            return new[] { new QuickFix(IsCode ? $"Add import {package}" : $"Add <import package=\"{package}\" />", change) };
+            return new[] { new QuickFix($"Add {ImportLine(package)}", change) };
         }
 
         /// <summary>The edit that imports a package, in the file's own format; null for an XML file with no usable root.</summary>

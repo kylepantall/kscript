@@ -1,7 +1,8 @@
 // Tests for the JSON API (routes/api{{ ext }}). @api(/api/...) sends a
 // request to this app's own routes, without a
-// server. the config script selects test storage, so these notes never reach the real {{#if db is none}}notes file{{else}}database{{/if}}.
+// server. The config script selects storage for the test environment.
 import KScript.Net
+{{#if examples}}
 {{#if auth}}
 import KScript.Auth
 
@@ -74,3 +75,9 @@ describe(name: "api") {
   }
 {{/if}}
 }
+{{else}}
+
+test(name: "GET /api/health says the API is up") {
+  expect(value: @api(/api/health)->json().ok, equals: true)
+}
+{{/if}}

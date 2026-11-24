@@ -1,4 +1,5 @@
 --- make
+when: examples
 unless: db is none
 ---
 // The notes API: each function answers one of the Resource routes in
@@ -16,7 +17,7 @@ import "../models/note{{ ext }}"
 import "../requests/note-input{{ ext }}"
 
 /// The notes this request may see{{#if auth}}: the signed-in user's{{/if}}.
-fn mine() => {{#if auth}}@notes()->where(user_id: @user().id){{else}}@notes()->query(){{/if}}
+fn mine() => {{#if auth}}Note->where(user_id: @user().id){{else}}Note->query(){{/if}}
 
 /// GET /api/notes: the newest first.
 fn index() {
@@ -29,7 +30,7 @@ fn index() {
 
 /// POST /api/notes
 fn store(json: NoteInput) {
-  note = @notes()->create({{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done)
+  note = Note->create({{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done)
 {{#if cache}}
   @forget_cached(@list_key())
 {{/if}}

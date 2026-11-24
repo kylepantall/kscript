@@ -1,3 +1,4 @@
+using KScript.Data;
 using KScript.Metadata;
 using KScript.Syntax;
 using KScript.Syntax.Markup;
@@ -41,9 +42,79 @@ namespace KScript.Language.Analysis
                 $"This argument needs {expected}, but its type is {shape.Display()}.");
         }
 
+        private static bool IsModelMixin(MarkupElement model) => IsYes(model.GetAttributeValue("mixin"));
+
+        private readonly Dictionary<MarkupElement, IReadOnlyDictionary<string, string>> effectiveModelOptions = new();
+
+        private IReadOnlyDictionary<string, string> ModelOptions(MarkupElement model)
+        {
+            if (effectiveModelOptions.TryGetValue(model, out var options)) return options;
+            // A cycle is diagnosed when checking the base list. Stop here to keep field completion usable.
+            effectiveModelOptions[model] = new Dictionary<string, string>();
+            ModelComposition.TryReadBases(model.GetAttributeValue("with"), out var parents, out _);
+            options = ModelComposition.Merge(parents.Select(parent =>
+            {
+                MarkupElement declaration = TypeElementNamed(parent.Name);
+                return (declaration != null && IsModelElement(declaration) ? ModelOptions(declaration) : null, parent);
+            }), model);
+            effectiveModelOptions[model] = options;
+            return options;
+        }
+
+        private void CheckModelBases(MarkupElement model, MarkupAttribute attribute)
+        {
+            if (!ModelComposition.TryReadBases(attribute.ValueText, out var bases, out string problem))
+            {
+                Report(TrimmedSpan(attribute.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, problem);
+                return;
+            }
+
+            bool ReachesModel(MarkupElement parent, HashSet<MarkupElement> seen) =>
+                parent == model || seen.Add(parent) && WithNames(parent)
+                    .Select(TypeElementNamed).Any(e => e != null && ReachesModel(e, seen));
+
+            foreach (var parent in bases)
+            {
+                string name = parent.Name;
+                MarkupElement declaration = TypeElementNamed(name);
+                if (declaration == null || RefinedRoot(declaration) != null || IsEnumName(name))
+                    Report(TrimmedSpan(attribute.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"'{name}' must name an imported or declared model, model mixin or record type.");
+                else if (ReachesModel(declaration, new HashSet<MarkupElement>()))
+                    Report(TrimmedSpan(attribute.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Extending '{name}' creates a cycle.");
+                else
+                {
+                    Symbol symbol = result.RootScope.Lookup(name, model.Span.Start);
+                    int index = attribute.ValueText.IndexOf(name, StringComparison.Ordinal);
+                    if (symbol != null && index >= 0)
+                        result.References.Add(new SymbolReference(symbol, attribute.Value.ToSource(new TextSpan(index, name.Length)), false, false));
+                }
+            }
+        }
+
         /// <summary>Each field named in a model option must exist when the model is declared.</summary>
         private void CheckModelOptions(MarkupElement model, ElementInfo element, string modelName)
         {
+            if (IsModelMixin(model))
+            {
+                foreach (MarkupAttribute attribute in model.Attributes.Where(a => a.Name is "table" or "connection" or "auto_create"))
+                    Report(attribute.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"A model mixin cannot set {attribute.Name}.");
+                return;
+            }
+            if (model.GetAttribute("with") is MarkupAttribute inherited)
+            {
+                foreach (var option in ModelOptions(model).Where(o => model.GetAttribute(o.Key) == null))
+                {
+                    ModelFieldKind kind = element.GetAttribute(option.Key)?.ModelFields ?? ModelFieldKind.None;
+                    string[] known = result.ModelOptionFields(model, option.Key).Select(f => f.Name).ToArray();
+                    if (kind == ModelFieldKind.Single)
+                        CheckColumnName(modelName, option.Value.Trim(), TrimmedSpan(inherited.Value), "field", known, DiagnosticSeverity.Error);
+                    else if (kind is ModelFieldKind.Groups or ModelFieldKind.List)
+                        foreach ((string name, _) in NameList.Split(option.Value))
+                            CheckColumnName(modelName, name, TrimmedSpan(inherited.Value), "field", known, DiagnosticSeverity.Error);
+                }
+            }
             foreach (MarkupAttribute option in model.Attributes)
             {
                 ModelFieldKind kind = element.GetAttribute(option.Name)?.ModelFields ?? ModelFieldKind.None;

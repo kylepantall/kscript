@@ -74,17 +74,19 @@ kscript test       # 12 tests, against a database in memory
 
 ### A web app with its API: --template fullstack
 
-`kscript make project notes --template fullstack` makes a website whose pages get their data from the app's own JSON API. `notes.html` is a [live](web.md#reactive-pages-with-live-no-javascript) page that lists, adds, ticks and deletes notes through `lib/notes-client.kscript`, which calls `@api(/api/notes)`. Pages and other clients (a phone app, a script) share one set of rules: `routes/api.kscript`, `controllers/notes.kscript` and `models/note.kscript`, as in the api template. The tests check the API and the client.
+`kscript make project my-site --template fullstack` makes a site with a home page, layout, API health endpoint and a test for that endpoint. Choose the database, sign-in, caching and Docker options for your project.
+
+Pass `--examples` or select **Include the Notes example?** in the wizard to add a [live](web.md#reactive-pages-with-live-no-javascript) Notes page, a CRUD API and their tests. The page calls the API through `lib/notes-client.kscript` with `@api(/api/notes)`.
 
 ### Database, sign-in, cache and Docker
 
-The api and fullstack templates take the same options:
+The api and fullstack templates share these options:
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database the notes are kept in, set up in `config/config.kscript`. `none` keeps them in a JSON file instead (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
+| `--db sqlite\|postgres\|mysql\|none` | `sqlite` | The database configured in `config/config.kscript`. With `none`, the Notes example uses a JSON file (`notes.file` in the config). With `postgres` or `mysql` the app connects to that server (`DATABASE_URL` overrides the url, and `--docker` adds it to the compose file), while `kscript test` still uses SQLite in memory. |
 | `--auth`, `--no-auth` | on (api), off (fullstack) | Sign-in. In the api template: `POST /api/register`, `/api/tokens`, `GET /api/me`, and notes that belong to who is signed in. In the fullstack template it also runs [`kscript make auth`](auth.md) for the sign-in pages; the pages call the API as whoever is viewing them. |
-| `--cache`, `--no-cache` | on | Caches the notes list and answers repeat requests with `304 Not Modified` (the `etag` middleware). |
+| `--cache`, `--no-cache` | on | Adds cache configuration and helpers. The Notes example uses them to cache the list and answer repeat requests with `304 Not Modified`. |
 | `--docker` | off | Adds a `Dockerfile`, `.dockerignore` and `compose.yaml`, with a Postgres or MySQL service for those databases, and `make up` / `make down`. |
 | `--port` | `8080` | The port `kscript serve` uses. |
 
@@ -112,7 +114,7 @@ The app runs as an unprivileged user with a read-only application directory. Com
 
 ### Running the development site in Docker
 
-Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Edit pages, styles, or route files locally, then refresh the browser to see the changes without rebuilding. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply.
+Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Edit pages, styles, or route files locally, then refresh the browser to see the changes without rebuilding. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.
 
 Add this to `kscript.json` to use Docker whenever you run `kscript serve`.
 

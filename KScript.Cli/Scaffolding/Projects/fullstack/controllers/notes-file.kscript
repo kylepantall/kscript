@@ -1,5 +1,6 @@
 --- make
-when: db is none
+when: examples
+unless: db in sqlite, postgres, mysql
 to: controllers/notes.kscript
 ---
 // The notes API: each function answers one of the Resource routes in

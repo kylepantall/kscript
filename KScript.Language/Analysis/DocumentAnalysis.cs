@@ -159,6 +159,9 @@ namespace KScript.Language.Analysis
         /// <summary>The packages a script imports (always KScript.Core). Empty for pages.</summary>
         public IReadOnlyList<string> ImportedPackages { get; internal set; } = new[] { "KScript.Core" };
 
+        /// <summary>Packages whose commands this document can call without an alias.</summary>
+        internal IReadOnlyCollection<string> UnqualifiedCommandPackages { get; set; } = new[] { "KScript.Core" };
+
         /// <summary>True for layouts and components, whose variables are supplied by the page that uses them.</summary>
         public bool IsPartial { get; internal set; }
 

@@ -942,6 +942,10 @@ namespace KScript.Runtime
             if (Retired.Commands.TryGetValue(name, out var retired))
                 throw Fail(node, ctx, $"@{name}() was removed in KScript 2. {Wording.Prose(retired.Replacement)}", "Retired");
 
+            string importedAs = module?.Aliases.FirstOrDefault(pair => pair.Value.Package?.Commands.ContainsKey(name) == true).Key;
+            if (importedAs != null)
+                throw Fail(node, ctx, $"Call @{importedAs}.{name}() through its package alias, or add {ImportHint(module, module.Aliases[importedAs].Package.Name)}.", "Import");
+
             KScriptPackage owner = Packages.FindCommand(name, module?.Packages).FirstOrDefault();
             if (owner != null)
                 throw Fail(node, ctx, $"@{name}() is part of {owner.Name}. Add {ImportHint(module, owner.Name)} at the top of the script.", "Import");

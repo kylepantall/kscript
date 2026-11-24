@@ -203,11 +203,38 @@ public sealed class ProjectTemplateApiTests : IDisposable
 
     // ---- the fullstack template -----------------------------------------------------------------------------------
 
+    [Theory]
+    [InlineData("kscript", "sqlite", "--no-cache")]
+    [InlineData("xml", "none", "--cache")]
+    public void FullstackStartsWithoutExampleFilesAndKeepsItsOwnApi(string syntax, string database, string cacheOption)
+    {
+        using var parent = new TempSite();
+        var (code, _, err) = Make(parent.Root, "site", "--template", "fullstack", "--syntax", syntax, "--db", database, cacheOption);
+        Assert.True(code == 0, err);
+
+        string root = Path.Combine(parent.Root, "site");
+        string extension = syntax == "xml" ? ".ks.xml" : ".kscript";
+        Assert.Contains("routes/api" + extension, Files(root));
+        Assert.DoesNotContain(Files(root), file => file.Contains("note", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain("/notes", File.ReadAllText(Path.Combine(root, "index.html")));
+        Assert.DoesNotContain("/notes", File.ReadAllText(Path.Combine(root, "_components", "site-nav" + extension)));
+        Assert.Equal(cacheOption == "--cache", File.Exists(Path.Combine(root, "lib", "cache" + extension)));
+
+        var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
+        var app = new HttpApp(root, config);
+        Assert.Equal(200, Get(app, "/api/health").Status);
+        Assert.Equal(404, Get(app, "/api/notes").Status);
+
+        var (tested, report) = Test(root);
+        Assert.True(tested == 0, report);
+        Assert.Matches(@"Tests:\s+1 passed, 1 total", report);
+    }
+
     [Fact]
     public void TheFullstackTemplatesPagesCallTheApi()
     {
         using var parent = new TempSite();
-        var (code, output, err) = Make(parent.Root, "Notes App", "--template", "fullstack");
+        var (code, output, err) = Make(parent.Root, "Notes App", "--template", "fullstack", "--examples");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "Notes App");
         Assert.Equal(new[]
@@ -256,7 +283,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void FullstackWithAuthAddsTheSignInPages()
     {
         using var parent = new TempSite();
-        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--auth", "--syntax", "xml");
+        var (code, output, err) = Make(parent.Root, "app", "--template", "fullstack", "--examples", "--auth", "--syntax", "xml");
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "app");
         foreach (string f in new[] { "routes/web.ks.xml", "controllers/accounts.ks.xml", "views/auth/login.html", "views/auth/register.html" })
@@ -333,6 +360,23 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.False(File.Exists(Path.Combine(root, "controllers", "accounts.kscript")), "no auth");
         Assert.True(File.Exists(Path.Combine(root, "lib", "cache.kscript")), "cache by default");
         Assert.True(File.Exists(Path.Combine(root, "compose.yaml")), "docker");
+    }
+
+    [Fact]
+    public void TheFullstackWizardAsksAboutCachingSeparatelyFromTheExample()
+    {
+        using var parent = new TempSite();
+        // Fullstack, kscript, no example, SQLite, no sign-in, include caching, no Docker, default port.
+        Answer("fullstack\n\nn\n\nn\ny\nn\n\n");
+        var (code, output, err) = Make(parent.Root, "site");
+        Assert.True(code == 0, err);
+        Assert.Contains("Include the Notes example?", output);
+        Assert.Contains("Include caching?", output);
+
+        string root = Path.Combine(parent.Root, "site");
+        Assert.True(File.Exists(Path.Combine(root, "lib", "cache.kscript")));
+        Assert.False(File.Exists(Path.Combine(root, "notes.html")));
+        Assert.False(Directory.Exists(Path.Combine(root, "models")));
     }
 
     [Fact]

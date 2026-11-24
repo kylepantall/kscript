@@ -1,5 +1,6 @@
 --- make
-when: auth
+when: examples
+unless: auth is false
 to: notes.html
 ---
 <import path="lib/notes-client{{ ext }}" />

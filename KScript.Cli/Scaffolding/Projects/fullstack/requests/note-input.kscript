@@ -1,4 +1,5 @@
 --- make
+when: examples
 ---
 /// What POST and PUT /api/notes take. The type checks the JSON before the function runs, and answers 422 if it doesn't fit.
 type NoteInput {

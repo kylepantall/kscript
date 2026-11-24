@@ -109,6 +109,7 @@ namespace KScript.Runtime
         public Dictionary<string, object> Exports { get; } = new Dictionary<string, object>(StringComparer.Ordinal);
 
         internal readonly List<KScriptPackage> packages = new List<KScriptPackage>();
+        internal readonly HashSet<KScriptPackage> UnqualifiedCommandPackages = new HashSet<KScriptPackage>();
         internal readonly Dictionary<string, ElementDefinition> Elements = new Dictionary<string, ElementDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, CommandDefinition> Commands = new Dictionary<string, CommandDefinition>(StringComparer.Ordinal);
         internal readonly Dictionary<string, MethodDefinition> Methods = new Dictionary<string, MethodDefinition>(StringComparer.Ordinal);

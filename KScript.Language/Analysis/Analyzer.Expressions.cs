@@ -117,7 +117,7 @@ namespace KScript.Language.Analysis
                 }
 
                 case CallNode call:
-                    AnalyzeCall(call, region, scope, piped: false, left: null);
+                    AnalyzeCall(call, region, scope);
                     FlushBare(call.Arguments, region, scope);
                     return;
 
@@ -451,13 +451,13 @@ namespace KScript.Language.Analysis
             && region.Element?.Parent is { } parent && IsKScriptElementName(region.Element, "normalize")
             && result.DeclaredTypes.TryGetValue(parent, out TypeShape refined) ? refined.RefinementBase : null;
 
-        private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped, TypeShape pipedShape = null)
+        private void AnalyzeCommand(CommandCallNode c, ExpressionRegion region, Scope scope, int piped, ExprNode pipedValue = null)
         {
             AnalyzeArguments(c.Arguments, region, scope);
             TextSpan full = region.Source.ToSource(c.NameSpan);
             TextSpan nameSpan = TextSpan.FromBounds(full.Start + 1, full.End);
             TypeShape normalizerInput = c.ArgumentList == null ? NormalizerInput(c, region) : null;
-            int count = normalizerInput != null ? 1 : c.ArgumentList == null ? -1 : c.Arguments.Count + piped;
+            int count = normalizerInput != null ? 1 : c.ArgumentList == null && piped == 0 ? -1 : c.Arguments.Count + piped;
 
             Symbol fn = scope.Lookup(c.Name, nameSpan.Start, includeMethods: true);
             if (fn != null && fn.Kind == SymbolKind.Function)
@@ -471,7 +471,7 @@ namespace KScript.Language.Analysis
                 }
                 if (count >= 0)
                 {
-                    NoteCallArguments(fn, c.Arguments, normalizerInput ?? (piped > 0 ? pipedShape ?? TypeShape.Unknown : null), region);
+                    NoteCallArguments(fn, c.Arguments, normalizerInput ?? (pipedValue != null ? Infer(pipedValue, region) : null), region);
                 }
                 return;
             }
@@ -479,37 +479,15 @@ namespace KScript.Language.Analysis
             int dot = c.Name.IndexOf('.');
             if (dot > 0)
             {
-                AnalyzeAliasCommand(c, dot, nameSpan, scope, region, normalizerInput);
+                AnalyzeAliasCommand(c, dot, nameSpan, scope, region, normalizerInput, count, piped, pipedValue);
                 return;
             }
 
             CallableInfo command = catalog.GetCommand(c.Name);
             if (command != null)
             {
-                if (command.Planned)
-                {
-                    Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature, $"@{command.Name}() is planned but not built yet, so it can't run.");
-                }
-                RequirePackage(command.Package, full, $"@{command.Name}()");
-                ReportDeprecatedCall(command, $"@{command.Name}", nameSpan, count >= 0 ? c.Arguments : null, piped, region);
-                if (command.KeepsBareWords)
-                {
-                    KeepBareWords(c.Arguments);
-                }
-                if (command.Package == "KScript.Data" && command.Name == "sql")
-                {
-                    CheckSqlTextIsNotFilledIn(c.Arguments, region);
-                    ReferenceSqlValues(c.Arguments, region, scope);
-                }
-                if (count >= 0 && CheckNamedArguments($"@{command.Name}()", c.Arguments, piped, SlotsOf(new[] { command }), region, full))
-                {
-                    return;
-                }
-                if (count >= 0 && command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
-                {
-                    Report(full, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
-                        $"@{command.Name} doesn't take {count} argument{(count == 1 ? string.Empty : "s")}{(piped > 0 ? " (including the piped value)" : string.Empty)}. Use {string.Join(" or ", command.Labels)}.");
-                }
+                RequirePackage(command.Package, full, $"@{command.Name}()", command: true);
+                AnalyzeBuiltInCommand(command, c.Name, c.Arguments, count, piped, pipedValue, region, scope, nameSpan, full);
                 return;
             }
 
@@ -533,8 +511,33 @@ namespace KScript.Language.Analysis
                 suggestion != null ? new[] { new QuickFix($"Change to @{suggestion}", new TextChange(nameSpan, suggestion)) } : null);
         }
 
+        private void AnalyzeBuiltInCommand(CallableInfo command, string writtenName, IReadOnlyList<ArgumentNode> arguments,
+            int count, int piped, ExprNode pipedValue, ExpressionRegion region, Scope scope, TextSpan nameSpan, TextSpan callSpan)
+        {
+            if (command.Planned)
+                Report(nameSpan, DiagnosticSeverity.Error, DiagnosticCodes.PlannedFeature, $"@{writtenName}() is planned but not built yet, so it can't run.");
+            ReportDeprecatedCall(command, $"@{writtenName}", nameSpan, count >= 0 ? arguments : null, piped, region);
+            if (command.KeepsBareWords) KeepBareWords(arguments);
+            if (command.Package == "KScript.Data" && command.Name == "sql")
+            {
+                CheckSqlTextIsNotFilledIn(arguments, region);
+                ReferenceSqlValues(arguments, region, scope);
+            }
+            if (count < 0) return;
+            if (pipedValue != null && command is { Package: "KScript.Http", Name: "route" })
+                CheckRouteName(pipedValue, region);
+
+            if (CheckNamedArguments($"@{writtenName}()", arguments, piped, SlotsOf(new[] { command }), region, callSpan))
+                return;
+
+            if (command.Signatures.Count > 0 && !command.Signatures.Any(s => count >= s.MinArgs && count <= s.MaxArgs))
+                Report(callSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                    $"@{writtenName} doesn't take {count} argument{(count == 1 ? string.Empty : "s")}{(piped > 0 ? " (including the piped value)" : string.Empty)}. Use {string.Join(" or ", command.Labels)}.");
+        }
+
         /// <summary><c>@math.sqrt(2)</c> or <c>@str.slugify($t)</c>: a command of a package or a function of a script imported with as="...".</summary>
-        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope, ExpressionRegion region, TypeShape normalizerInput)
+        private void AnalyzeAliasCommand(CommandCallNode c, int dot, TextSpan nameSpan, Scope scope, ExpressionRegion region, TypeShape normalizerInput,
+            int count, int piped, ExprNode pipedValue)
         {
             string aliasName = c.Name.Substring(0, dot), member = c.Name.Substring(dot + 1);
             TextSpan aliasSpan = new TextSpan(nameSpan.Start, dot);
@@ -551,17 +554,22 @@ namespace KScript.Language.Analysis
                 return;
             }
             result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+            TextSpan callSpan = TextSpan.FromBounds(nameSpan.Start - 1, nameSpan.End);
+            if (import.Package != null && catalog.GetCommand(member) is CallableInfo command && command.Package == import.Package)
+            {
+                usedPackages.Add(import.Package);
+                AnalyzeBuiltInCommand(command, c.Name, c.Arguments, count, piped, pipedValue, region, scope, memberSpan, callSpan);
+                return;
+            }
             if (ReferenceMember(import, member, memberSpan) is Symbol fn && fn.Kind == SymbolKind.Function)
             {
                 ReportIfDeprecated(fn, memberSpan);
-                int count = normalizerInput != null ? 1 : c.ArgumentList == null ? -1 : c.Arguments.Count;
                 if (count >= 0)
                 {
-                    NoteCallArguments(fn, c.Arguments, normalizerInput, region);
-                    TextSpan full = TextSpan.FromBounds(nameSpan.Start - 1, nameSpan.End);
-                    if (!CheckNamedArguments($"@{import.Name}.{fn.Name}()", c.Arguments, 0, SlotsOf(fn, scope), region, full))
+                    NoteCallArguments(fn, c.Arguments, normalizerInput ?? (pipedValue != null ? Infer(pipedValue, region) : null), region);
+                    if (!CheckNamedArguments($"@{import.Name}.{fn.Name}()", c.Arguments, piped, SlotsOf(fn, scope), region, callSpan))
                     {
-                        CheckFunctionArgumentCount(fn, count, full);
+                        CheckFunctionArgumentCount(fn, count, callSpan);
                     }
                 }
                 return;
@@ -573,8 +581,10 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private void AnalyzeCall(CallNode call, ExpressionRegion region, Scope scope, bool piped, TypeShape left)
+        private void AnalyzeCall(CallNode call, ExpressionRegion region, Scope scope, ExprNode pipedValue = null)
         {
+            bool piped = pipedValue != null;
+            TypeShape left = piped ? Infer(pipedValue, region) : null;
             AnalyzeArguments(call.Arguments, region, scope,
                 piped && left != null && call.Callee is IdentifierNode method ? LambdaParameterShapes(method.Name, left) : null);
 
@@ -640,6 +650,14 @@ namespace KScript.Language.Analysis
                     if (import?.Kind == SymbolKind.Import)
                     {
                         result.References.Add(new SymbolReference(import, aliasSpan, false, false));
+                        if (import.Package != null && catalog.GetCommand(member.Name) is CallableInfo command && command.Package == import.Package)
+                        {
+                            usedPackages.Add(import.Package);
+                            int pipedIn = piped ? 1 : 0;
+                            AnalyzeBuiltInCommand(command, alias.Name + "." + member.Name, call.Arguments, call.Arguments.Count + pipedIn,
+                                pipedIn, pipedValue, region, scope, region.Source.ToSource(member.NameSpan), region.Source.ToSource(call.Span));
+                            return;
+                        }
                         if (ReferenceMember(import, member.Name, region.Source.ToSource(member.NameSpan)) is Symbol fn && fn.Kind == SymbolKind.Function)
                         {
                             ReportIfDeprecated(fn, region.Source.ToSource(member.NameSpan));
@@ -675,12 +693,12 @@ namespace KScript.Language.Analysis
             switch (pipe.Right)
             {
                 case CallNode call:
-                    AnalyzeCall(call, region, scope, piped: true, left: Infer(pipe.Left, region));
+                    AnalyzeCall(call, region, scope, pipedValue: pipe.Left);
                     FlushBare(call.Arguments, region, scope);
                     return;
 
                 case CommandCallNode command:
-                    AnalyzeCommand(command, region, scope, piped: 1, pipedShape: Infer(pipe.Left, region));
+                    AnalyzeCommand(command, region, scope, piped: 1, pipedValue: pipe.Left);
                     FlushBare(command.Arguments, region, scope);
                     return;
 

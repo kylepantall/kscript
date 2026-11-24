@@ -43,6 +43,60 @@ public sealed class DockerServeTests
     }
 
     [Fact]
+    public void NestedVolumesHaveMountpointsBeforeTheSourceIsMountedReadOnly()
+    {
+        using var site = new TempSite(("app/state/keep.txt", "user data"));
+        const string composeConfig = """
+            {
+              "services": {
+                "app": {
+                  "volumes": [
+                    { "type": "volume", "target": "/app/data" },
+                    { "type": "volume", "target": "/app/data/deeper" },
+                    { "type": "volume", "target": "/app/app/state" },
+                    { "type": "volume", "target": "/app/other/cache" },
+                    { "type": "volume", "target": "/application/not-nested" },
+                    { "type": "volume", "target": "/var/lib/app-data" }
+                  ]
+                },
+                "db": { "volumes": [ { "type": "volume", "target": "/app/db-data" } ] }
+              }
+            }
+            """;
+
+        DockerServe.PrepareVolumeDirectories(site.Root, "/app/", "app", composeConfig);
+        DockerServe.PrepareVolumeDirectories(site.Root, "/app", "app", composeConfig);
+        Assert.True(Directory.Exists(Path.Combine(site.Root, "data")));
+        Assert.True(Directory.Exists(Path.Combine(site.Root, "other", "cache")));
+        Assert.Equal("user data", File.ReadAllText(Path.Combine(site.Root, "app", "state", "keep.txt")));
+        Assert.False(Directory.Exists(Path.Combine(site.Root, "data", "deeper")));
+        Assert.False(Directory.Exists(Path.Combine(site.Root, "db-data")));
+        Assert.False(Directory.Exists(Path.Combine(site.Root, "not-nested")));
+        Assert.False(Directory.Exists(Path.Combine(site.Root, "app-data")));
+    }
+
+    [Fact]
+    public void VolumeMountpointReportsAFileCollisionWithoutReplacingIt()
+    {
+        using var site = new TempSite(("data", "user data"));
+        const string composeConfig = """{"services":{"app":{"volumes":[{"type":"volume","target":"/app/data"}]}}}""";
+        var error = Assert.Throws<ProjectConfigException>(() =>
+            DockerServe.PrepareVolumeDirectories(site.Root, "/app", "app", composeConfig));
+        Assert.Contains("/app/data", error.Message);
+        Assert.Equal("user data", File.ReadAllText(Path.Combine(site.Root, "data")));
+    }
+
+    [Fact]
+    public void VolumeMountpointCannotUseAParentDirectory()
+    {
+        using var site = new TempSite();
+        const string composeConfig = """{"services":{"app":{"volumes":[{"type":"volume","target":"/app/data/../other"}]}}}""";
+        Assert.Throws<ProjectConfigException>(() =>
+            DockerServe.PrepareVolumeDirectories(site.Root, "/app", "app", composeConfig));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(site.Root));
+    }
+
+    [Fact]
     public void ServeUsesConfiguredDockerWithoutStartingALocalServer()
     {
         using var site = new TempSite(("kscript.json", """{"serve":{"docker":true}}"""));

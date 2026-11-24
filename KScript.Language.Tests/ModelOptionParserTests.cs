@@ -37,6 +37,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
+        [InlineData("model Note (timestamps, index: [user_id], hidden: [user_id]) { user_id: string }", "hidden", "[user_id]")]
         [InlineData("model Note(unique: [[key, owner], [title, code]], hidden: [title, key]) { title: string }", "unique", "[[key, owner], [title, code]]")]
         [InlineData("model Note(index: [first,\n /* key: value, ) */ second]) { first: string }", "index", "[first,\n /* key: value, ) */ second]")]
         [InlineData("Widget(items: [@make(key: 'x'), { key: 3 }], enabled)", "items", "[@make(key: 'x'), { key: 3 }]")]

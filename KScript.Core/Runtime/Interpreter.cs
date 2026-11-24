@@ -98,25 +98,24 @@ namespace KScript.Runtime
             {
                 module.Aliases[alias] = new ImportNamespace(alias, package);
             }
-            if (module.packages.Contains(package))
+            if (!module.packages.Contains(package))
             {
-                return;
+                module.packages.Add(package);
+                foreach (string required in package.Requires)
+                {
+                    KScriptPackage dependency = Packages.Get(required) ?? throw new KScriptException($"{package.Name} needs {required}, which isn't installed.", "Import");
+                    AddPackage(module, dependency, null);
+                }
+                foreach (var e in package.Elements) module.Elements[e.Key] = e.Value;
+                foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
+                foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
+                foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
+                foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
             }
-            module.packages.Add(package);
-            foreach (string required in package.Requires)
-            {
-                KScriptPackage dependency = Packages.Get(required) ?? throw new KScriptException($"{package.Name} needs {required}, which isn't installed.", "Import");
-                AddPackage(module, dependency, null);
-            }
-            foreach (var e in package.Elements) module.Elements[e.Key] = e.Value;
-            if (alias == null || package == Packages.Core)
+            if ((alias == null || package == Packages.Core) && module.UnqualifiedCommandPackages.Add(package))
             {
                 foreach (var c in package.Commands) module.Commands[c.Key] = c.Value;
             }
-            foreach (MethodDefinition m in package.Methods) module.Methods[m.Receiver + ":" + m.Name] = m;
-            foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
-            foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
-            foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
         }
 
         private void ResolveImports(Module module)

@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 
 using KScript.Output;
@@ -17,13 +19,7 @@ internal static class DockerServe
 
     internal static ProcessStartInfo CreateStartInfo(string root, DockerServeSettings settings, string containerName, string environment)
     {
-        string file = settings.ComposeFile == null
-            ? ComposeFiles.Select(name => Path.Combine(root, name)).FirstOrDefault(File.Exists)
-            : Path.GetFullPath(settings.ComposeFile, root);
-        if (file == null || !File.Exists(file))
-            throw new ProjectConfigException(file == null
-                ? "Docker needs a Compose file in the project. Run kscript make docker to add one."
-                : $"Docker Compose file not found: {file}.");
+        string file = FindComposeFile(root, settings);
         if (string.IsNullOrWhiteSpace(settings.Service) || settings.Service.StartsWith("-", StringComparison.Ordinal))
             throw new ProjectConfigException("serve.docker.service needs a Compose service name, such as app.");
         if (settings.Mount is string mount && (mount.Length < 2 || mount[0] != '/' || mount.Contains(':')))
@@ -48,6 +44,108 @@ internal static class DockerServe
         return start;
     }
 
+    private static string FindComposeFile(string root, DockerServeSettings settings)
+    {
+        string file = settings.ComposeFile == null
+            ? ComposeFiles.Select(name => Path.Combine(root, name)).FirstOrDefault(File.Exists)
+            : Path.GetFullPath(settings.ComposeFile, root);
+        if (file == null || !File.Exists(file))
+            throw new ProjectConfigException(file == null
+                ? "Docker needs a Compose file in the project. Run kscript make docker to add one."
+                : $"Docker Compose file not found: {file}.");
+        return file;
+    }
+
+    private static int PrepareVolumeMounts(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop)
+    {
+        // Read the same Compose model that run will use. This resolves long and short volume syntax,
+        // variables, includes and extensions without having to parse Compose's YAML ourselves.
+        var config = new ProcessStartInfo("docker")
+        {
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            ArgumentList = { "compose", "--file", FindComposeFile(root, settings), "--profile", "*", "config", "--format", "json", settings.Service },
+        };
+        using var process = Process.Start(config);
+        var output = process.StandardOutput.ReadToEndAsync(stop);
+        var errors = process.StandardError.ReadToEndAsync(stop);
+        try
+        {
+            process.WaitForExitAsync(stop).GetAwaiter().GetResult();
+            if (process.ExitCode != 0)
+            {
+                error.Write(errors.GetAwaiter().GetResult());
+                return process.ExitCode;
+            }
+            PrepareVolumeDirectories(root, settings.Mount, settings.Service, output.GetAwaiter().GetResult());
+            return 0;
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            try { process.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { /* Compose already exited. */ }
+            throw;
+        }
+    }
+
+    internal static void PrepareVolumeDirectories(string root, string mount, string service, string composeConfig)
+    {
+        try
+        {
+            using JsonDocument config = JsonDocument.Parse(composeConfig);
+            if (!config.RootElement.TryGetProperty("services", out JsonElement services)
+                || !services.TryGetProperty(service, out JsonElement app)
+                || !app.TryGetProperty("volumes", out JsonElement volumes))
+                return;
+
+            string prefix = mount.TrimEnd('/') + "/";
+            var mounts = volumes.EnumerateArray()
+                .Select(volume => (Type: volume.GetProperty("type").GetString(), Target: (volume.GetProperty("target").GetString() ?? "").TrimEnd('/')))
+                .ToList();
+            foreach (var volume in mounts)
+            {
+                if (volume.Type != "volume" || !volume.Target.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+                // Once another Compose mount hides a path, its volume's nested mountpoint is no longer in the source tree.
+                if (mounts.Any(parent => parent.Target.StartsWith(prefix, StringComparison.Ordinal)
+                    && volume.Target.StartsWith(parent.Target + "/", StringComparison.Ordinal)))
+                    continue;
+                EnsureVolumeDirectory(root, volume.Target, volume.Target.Substring(prefix.Length));
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new ProjectConfigException("Docker Compose returned an invalid volume configuration.");
+        }
+    }
+
+    private static void EnsureVolumeDirectory(string root, string target, string relative)
+    {
+        string[] segments = relative.Split('/');
+        char[] invalid = Path.GetInvalidFileNameChars();
+        if (segments.Any(segment => segment is "" or "." or ".." || segment.IndexOfAny(invalid) >= 0))
+            throw new ProjectConfigException($"Docker Compose volume target '{target}' is not a valid subdirectory of the project.");
+
+        string path = root;
+        foreach (string segment in segments)
+        {
+            path = Path.Combine(path, segment);
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(path);
+                if (!attributes.HasFlag(FileAttributes.Directory) || attributes.HasFlag(FileAttributes.ReparsePoint))
+                    throw new ProjectConfigException($"Docker Compose volume target '{target}' needs a directory at {path}.");
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // Docker cannot create this mountpoint after it makes the parent source bind read-only.
+                Directory.CreateDirectory(path);
+            }
+        }
+    }
+
     internal static int Run(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop)
     {
         if (stop.IsCancellationRequested) return 0;
@@ -55,6 +153,11 @@ internal static class DockerServe
         try
         {
             var start = CreateStartInfo(root, settings, name, Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
+            if (settings.Mount != null)
+            {
+                int prepared = PrepareVolumeMounts(root, settings, error, stop);
+                if (prepared != 0) return prepared;
+            }
             using var process = Process.Start(start);
             try
             {
@@ -69,7 +172,11 @@ internal static class DockerServe
                 return 0;
             }
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or ProjectConfigException)
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            return 0;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or ProjectConfigException)
         {
             error.WriteLine(ex.Message);
             return ExitCodes.Usage;

@@ -1,26 +1,27 @@
-// The JSON API, served by kscript serve under /api (see docs/http.md). The
-// pages call it with @api(/api/notes), and so can any other client. kscript
-// routes lists the routes, and /_api shows their docs.
+// The JSON API, served by kscript serve under /api. See its routes at /_api.
 import KScript.Http
+{{#if examples}}
 {{#if auth}}
 import KScript.Auth
 {{/if}}
 import "../controllers/notes{{ ext }}" as notes
+{{/if}}
 
 Routes(middleware: cors) {
   /// Says the API is up.
   Get(path: /health) {
     return { ok: true, app: $config.app.name }
   }
+{{#if examples}}
 {{#if auth}}
 
-  // Signed in with the session cookie (the pages) or Authorization: Bearer
-  // <token> (other clients).
+  // Authenticate with a session cookie or an API token.
   Group(middleware: auth) {
     Resource(path: /notes, to: notes{{#if cache}}, middleware: etag{{/if}})
   }
 {{else}}
 
   Resource(path: /notes, to: notes{{#if cache}}, middleware: etag{{/if}})
+{{/if}}
 {{/if}}
 }

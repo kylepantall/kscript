@@ -147,21 +147,8 @@ namespace KScript.Language.Features
         internal List<(string Method, string Path, string Handler)> ProjectRoutes(string root)
         {
             var routes = new List<(string, string, string)>();
-            if (root == null || !Files.FileExists(Path.Combine(root, ProjectConfig.FileName)))
+            foreach (var (file, doc) in ProjectRouteDocuments(root))
             {
-                return routes;
-            }
-            ProjectConfig project = ProjectConfig.Parse(Files.ReadText(Path.Combine(root, ProjectConfig.FileName)) ?? "{}", Path.Combine(root, ProjectConfig.FileName),
-                Files.FileExists, Files.ReadText);
-            foreach (HttpApp.RouteFileInfo file in new HttpApp(project.SiteRoot, project).Files)
-            {
-                string text = Files.ReadText(file.Path);
-                if (text == null)
-                {
-                    continue;
-                }
-                MarkupDocument doc = MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(file.Path), file.Path);
-                CodeArguments.Normalise(doc, Catalog.GetElement);
                 foreach (MarkupElement e in doc.DescendantElements())
                 {
                     string method = e.Name switch
@@ -185,6 +172,28 @@ namespace KScript.Language.Features
                 }
             }
             return routes;
+        }
+
+        /// <summary>Reads route declarations without executing project code.</summary>
+        private IEnumerable<(HttpApp.RouteFileInfo File, MarkupDocument Document)> ProjectRouteDocuments(string root)
+        {
+            if (root == null || !Files.FileExists(Path.Combine(root, ProjectConfig.FileName)))
+            {
+                yield break;
+            }
+            ProjectConfig project = ProjectConfig.Parse(Files.ReadText(Path.Combine(root, ProjectConfig.FileName)) ?? "{}", Path.Combine(root, ProjectConfig.FileName),
+                Files.FileExists, Files.ReadText);
+            foreach (HttpApp.RouteFileInfo file in new HttpApp(project.SiteRoot, project).Files)
+            {
+                string text = Files.ReadText(file.Path);
+                if (text == null)
+                {
+                    continue;
+                }
+                MarkupDocument doc = MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(file.Path), file.Path);
+                CodeArguments.Normalise(doc, Catalog.GetElement);
+                yield return (file, doc);
+            }
         }
     }
 }

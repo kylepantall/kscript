@@ -1,7 +1,7 @@
 // kscript make project --template fullstack reads this file to learn about the template. It is not copied into new projects.
 // Every other file in this folder is copied, with {{ }} placeholders filled in (see docs/projects.md).
 {
-  "description": "A web app with its own JSON API: pages that call /api through @api, routes, controllers, a Note model in a database, caching and tests",
+  "description": "A website with its own JSON API, a health endpoint and optional Notes example",
   "options": {
     "syntax": {
       "question": "Which syntax for scripts?",
@@ -9,21 +9,26 @@
       "choices": ["kscript", "xml"],
       "description": "kscript writes scripts, tests and routes as .kscript files; xml writes them as .ks.xml. Pages stay HTML."
     },
+    "examples": {
+      "question": "Include the Notes example?",
+      "default": false,
+      "description": "Add a live Notes page, CRUD API and tests."
+    },
     "db": {
       "question": "Which database?",
       "default": "sqlite",
       "choices": ["sqlite", "postgres", "mysql", "none"],
-      "description": "The database the notes are kept in (KScript.Data). none keeps them in a JSON file instead."
+      "description": "Configure KScript.Data for a database. The Notes example uses a JSON file when set to none."
     },
     "auth": {
       "question": "Add sign-in (KScript.Auth)?",
       "default": false,
-      "description": "Sign-in pages (kscript make auth): notes belong to who is signed in, and the API needs a session or an API token."
+      "description": "Add sign-in pages and account routes. The Notes example requires a session or an API token."
     },
     "cache": {
-      "question": "Cache the notes list (KScript.Cache)?",
+      "question": "Include caching?",
       "default": true,
-      "description": "Cache the notes list (KScript.Cache) and answer repeat API requests with 304 Not Modified."
+      "description": "Add KScript.Cache configuration and cache helpers."
     },
     "docker": {
       "question": "Add Docker (a Dockerfile and compose.yaml)?",
@@ -40,7 +45,7 @@
   "make": ["{{#if auth}}auth{{/if}}"],
   // Printed after the project is made. Lines that come out empty are left out.
   "notes": [
-    "{{#if db in postgres, mysql}}the app keeps its data in {{ db }}, using the connection settings in config/config{{ ext }} (DATABASE_URL can override them){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"
+    "{{#if db in postgres, mysql}}the app connects to {{ db }} using the settings in config/config{{ ext }} (DATABASE_URL can override them){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"
   ],
   // Printed after the project is made, under "Next:". Lines that come out empty are left out.
   "next": [

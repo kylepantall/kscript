@@ -43,7 +43,7 @@ fn profile() => @user()
 fn close_account() {
   user = @user()
 {{#unless db is none}}
-  @notes()->where(user_id: $user.id)->delete()
+  Note->where(user_id: $user.id)->delete()
 {{/unless}}
   @users()->delete($user.id)
   return null

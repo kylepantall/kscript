@@ -603,6 +603,40 @@ namespace KScript.Language.Formatting
         {
             Scan s = Read(text);
             Edits edits = new Edits();
+            foreach (MarkupElement declaration in CodeParser.Parse(text).DescendantElements())
+            {
+                if (declaration.Name is "model" or "type" or "error" or "job" or "fn"
+                    && declaration.GetAttribute("name") is MarkupAttribute name)
+                {
+                    int nameEnd = declaration.GetAttribute("optional")?.Span.End ?? name.Span.End;
+                    JoinOptions(nameEnd, declaration.StartTagSpan.End);
+                }
+
+                MarkupAttribute annotation = declaration.Name switch
+                {
+                    "field" or "let" or "set" => declaration.GetAttribute("type"),
+                    "fn" => declaration.GetAttribute("returns"),
+                    _ => null,
+                };
+                if (annotation?.Value is not DecodedText value) continue;
+                TextSpan span = value.SourceSpan;
+                for (int end = span.Start; end < span.End; end++)
+                {
+                    if (!Lexer.IsIdentChar(text[end]) && text[end] != ']') continue;
+                    int open = JoinOptions(end + 1, span.End);
+                    if (open >= 0 && s.Match[open] > open) end = s.Match[open];
+                }
+            }
+
+            int JoinOptions(int nameEnd, int limit)
+            {
+                int open = nameEnd;
+                while (Peek(text, open) is ' ' or '\t') open++;
+                if (open >= limit || text[open] != '(' || !Editable(s, open)) return -1;
+                if (open > nameEnd) edits.Replace(nameEnd, open - nameEnd, string.Empty);
+                return open;
+            }
+
             int statementStart = 0;
             bool assignedInStatement = false;
             for (int i = 0; i < text.Length; i++)

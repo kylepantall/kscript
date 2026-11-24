@@ -115,7 +115,7 @@ namespace KScript.Data
 
             // The other model's fields that are one record of this model: the other side of a has-one or has-many.
             List<FieldDefinition> backs = target.Type.Fields
-                .Where(g => !g.Computed && g.Type.ListDepth == 0 && !(target == owner && g.Name == field.Name) && target.ModelOf(g.Type) == owner)
+                .Where(g => !g.Computed && g.Type.ListDepth == 0 && !(target == owner && g.Name == field.Name) && target.ModelOf(g) == owner)
                 .ToList();
 
             if (through != null)

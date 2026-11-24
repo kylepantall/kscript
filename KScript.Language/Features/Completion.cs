@@ -92,6 +92,15 @@ namespace KScript.Language.Features
             {
                 return dateFormat;
             }
+            if (cursor.InCode && cursor.Region != null
+                && RouteNameCompletions(analysis, cursor.Region, cursor.LocalIndex) is List<CompletionItem> routeNames)
+            {
+                return routeNames;
+            }
+            if (cursor.InCode && cursor.Region != null && InQuotedText(cursor.Region, cursor.LocalIndex))
+            {
+                return ExpectedValueCompletions(analysis, offset) ?? new List<CompletionItem>();
+            }
             if (AliasMemberCompletions(analysis, offset) is List<CompletionItem> members)
             {
                 return members;
@@ -856,7 +865,7 @@ namespace KScript.Language.Features
             }
             if (before == '@')
             {
-                return CommandCompletions(analysis, replace, withSigil: false);
+                return CommandCompletions(analysis, replace, withSigil: false, suggestRouteImport: true);
             }
             if (before == '>' && wordStart >= 2 && text[wordStart - 2] == '-')
             {
@@ -916,14 +925,15 @@ namespace KScript.Language.Features
             return items;
         }
 
-        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil, bool preferModels = false)
+        private List<CompletionItem> VariableCompletions(DocumentAnalysis analysis, int offset, TextSpan replace, bool withSigil, bool preferModels = false, bool textOnly = false)
         {
             Scope scope = analysis.ScopeAt(offset);
             // The script's own variables come first, the one declared nearest above the cursor at the top; the
             // variables KScript provides ($args, $env...) follow by name.
             List<Symbol> visible = scope.VisibleAt(offset)
                 .Where(s => s.Kind != SymbolKind.Function && s.Kind != SymbolKind.Import
-                    && (!s.IsTypeDeclaration || (withSigil && scope.Lookup(s.Name, offset) == s))).ToList();
+                    && (!s.IsTypeDeclaration || (withSigil && scope.Lookup(s.Name, offset) == s))
+                    && (!textOnly || (!s.IsTypeDeclaration && s.Shape.Type == KType.String))).ToList();
             if (preferModels)
             {
                 visible.AddRange(scope.VisibleAt(offset)
@@ -951,7 +961,7 @@ namespace KScript.Language.Features
             }).ToList();
         }
 
-        private List<CompletionItem> CommandCompletions(DocumentAnalysis analysis, TextSpan replace, bool withSigil)
+        private List<CompletionItem> CommandCompletions(DocumentAnalysis analysis, TextSpan replace, bool withSigil, bool suggestRouteImport = false)
         {
             string sigil = withSigil ? "@" : string.Empty;
             List<CompletionItem> items = analysis.VisibleFunctions(replace.Start)
@@ -968,19 +978,36 @@ namespace KScript.Language.Features
                     SortText = "1" + s.Name,
                 }).ToList();
 
-            items.AddRange(Catalog.Commands.Where(c => !c.Planned && (c.Package == null || analysis.ImportedPackages.Contains(c.Package))).Select(c => new CompletionItem
+            var packages = new HashSet<string>(analysis.UnqualifiedCommandPackages, StringComparer.OrdinalIgnoreCase);
+            if (analysis.Kind == DocumentKind.Script && analysis.MarkupAt(replace.Start).Kind == DocumentKind.Page)
+                packages.UnionWith(global::KScript.Pages.PageElementNames.DefaultPackages.SelectMany(Catalog.WithRequired));
+            foreach (CallableInfo command in Catalog.Commands.Where(c => !c.Planned))
             {
-                Label = sigil + c.Name,
-                Kind = CompletionKind.Command,
-                Detail = c.Labels.FirstOrDefault(),
-                Documentation = CallableMarkdown(c),
-                Deprecated = c.Deprecated != null,
-                InsertText = sigil + c.Name + (c.MaxArgs == 0 ? "()" : "($1)"),
-                IsSnippet = true,
-                ReplaceSpan = replace,
-                FilterText = c.Name,
-                SortText = (c.Deprecated != null ? "9" : "2") + c.Name,
-            }));
+                TextChange import = null;
+                if (command.Package != null && !packages.Contains(command.Package))
+                {
+                    if (!suggestRouteImport || analysis.Kind != DocumentKind.Script
+                        || command is not { Package: "KScript.Http", Name: "route" }
+                        || items.Any(i => i.FilterText == command.Name))
+                        continue;
+                    import = Analyzer.ImportChange(analysis, command.Package);
+                    if (import == null || replace.Contains(import.Span.Start)) continue;
+                }
+                items.Add(new CompletionItem
+                {
+                    Label = sigil + command.Name,
+                    Kind = CompletionKind.Command,
+                    Detail = command.Labels.FirstOrDefault() + (import != null ? $" (import {command.Package})" : ""),
+                    Documentation = CallableMarkdown(command),
+                    Deprecated = command.Deprecated != null,
+                    InsertText = sigil + command.Name + (command.MaxArgs == 0 ? "()" : "($1)"),
+                    IsSnippet = true,
+                    ReplaceSpan = replace,
+                    FilterText = command.Name,
+                    SortText = (command.Deprecated != null ? "9" : import != null ? "4" : "2") + command.Name,
+                    AdditionalEdits = import != null ? new[] { import } : null,
+                });
+            }
             return items;
         }
 
@@ -1168,7 +1195,7 @@ namespace KScript.Language.Features
             {
                 return null;
             }
-            List<CompletionItem> commands = CommandCompletions(analysis, replace, withSigil: false);
+            List<CompletionItem> commands = CommandCompletions(analysis, replace, withSigil: false, suggestRouteImport: true);
             if (ExpectedTypeAt(analysis, wordStart - 1) is string type)
             {
                 string want = SplitType(type).Name;
