@@ -270,19 +270,22 @@ namespace KScript.Language.Features
                 string dir = FindComponentsFolder(analysis.Path);
                 if (dir != null)
                 {
-                    foreach (string file in Files.ListFiles(dir, "*.html"))
+                    foreach (string file in Files.ListFiles(dir, "*.html").Concat(Files.ListFiles(dir, "*.md"))
+                        .DistinctBy(f => Path.GetFileNameWithoutExtension(f), StringComparer.OrdinalIgnoreCase))
                     {
                         string name = Path.GetFileNameWithoutExtension(file);
                         List<string> props = ComponentProps(file);
                         int n = 1;
-                        string propSnippet = string.Concat(props.Select(p => $" {p}=\"${n++}\""));
+                        var declared = TemplateContracts.Read(Files, file).ToList();
+                        IEnumerable<string> snippetProps = declared.Count == 0 ? props : declared.Where(p => p.Required).Select(p => p.Name);
+                        string propSnippet = string.Concat(snippetProps.Select(p => $" {p}=\"${n++}\""));
                         items.Add(new CompletionItem
                         {
                             Label = name,
                             Kind = CompletionKind.Element,
-                            Detail = "Component (_components/" + name + ".html)",
+                            Detail = "Component (_components/" + Path.GetFileName(file) + ")",
                             Documentation = props.Count > 0 ? "Props: " + string.Join(", ", props) : null,
-                            InsertText = snippets ? (props.Count > 0 ? name + propSnippet + " />" : name + " $1/>") : null,
+                            InsertText = snippets ? (propSnippet.Length > 0 ? name + propSnippet + " />" : name + " $1/>") : null,
                             IsSnippet = snippets,
                             ReplaceSpan = replace,
                             SortText = "0" + name,
@@ -392,8 +395,7 @@ namespace KScript.Language.Features
             {
                 return null;
             }
-            string file = Path.Combine(dir, tag.ToLowerInvariant() + ".html");
-            return Files.FileExists(file) ? file : null;
+            return global::KScript.Pages.PageElementNames.CanBeComponent(tag) ? TemplateContracts.ComponentFile(Files, dir, tag) : null;
         }
 
         /// <summary>A component's props, in the order the component first uses them. $slot and the like are left out.</summary>
@@ -404,7 +406,8 @@ namespace KScript.Language.Features
             {
                 return new List<string>();
             }
-            return Analyze(text, componentFile).Inputs.Keys.ToList();
+            return TemplateContracts.Read(Files, componentFile).Select(p => p.Name)
+                .Concat(Analyze(text, componentFile).Inputs.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         internal static string ElementSnippet(ElementInfo e)
@@ -444,32 +447,47 @@ namespace KScript.Language.Features
                 start--;
             }
 
-            if (info == null)
+            if (analysis.Kind != DocumentKind.Script)
             {
-                // A component's props: the variables its file uses without declaring.
-                string file = ComponentFile(analysis.Path, e.Name);
+                bool wrapper = e.Name is "layout" or "include";
+                string file = wrapper ? LayoutFile(e.GetAttributeValue("path")) : ComponentFile(analysis.Path, e.Name);
                 if (file != null)
                 {
-                    foreach (string prop in ComponentProps(file))
+                    var declared = TemplateContracts.Read(Files, file).DistinctBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
+                    IEnumerable<string> inferredProps = wrapper ? Array.Empty<string>() : ComponentProps(file);
+                    foreach (string inferred in inferredProps)
+                        if (!declared.Any(p => p.Name.Equals(inferred, StringComparison.OrdinalIgnoreCase))) declared.Add((inferred, false));
+
+                    foreach ((string name, bool required) in declared)
                     {
-                        if (e.Attributes.Any(x => x.Name == prop && x.NameSpan.Start != start))
-                        {
-                            continue;
-                        }
+                        if (e.Attributes.Any(a => a.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && a.NameSpan.Start != start)) continue;
                         items.Add(new CompletionItem
                         {
-                            Label = prop,
-                            Kind = CompletionKind.Attribute,
-                            Detail = "prop of <" + e.Name + ">",
-                            Documentation = $"Available in _components/{e.Name}.html as ${prop}. Pass a value with {{ }}, e.g. {prop}=\"{{$value}}\".",
-                            InsertText = prop + "=\"$1\"",
-                            IsSnippet = true,
-                            ReplaceSpan = TextSpan.FromBounds(start, offset),
-                            SortText = "0" + prop,
+                            Label = name, Kind = CompletionKind.Attribute,
+                            Detail = required ? "Required template prop" : "Template prop",
+                            Documentation = $"Available in {Path.GetFileName(file)} as ${KScript.Pages.TemplateContract.VariableName(name)}.",
+                            InsertText = name + "=\"$1\"", IsSnippet = true,
+                            ReplaceSpan = TextSpan.FromBounds(start, offset), SortText = (required ? "0" : "1") + name,
                         });
                     }
+
+                    if (!wrapper && !e.Attributes.Any(a => global::KScript.Pages.TemplateContract.IsLoadCallback(a.Name) && a.NameSpan.Start != start))
+                        items.Add(new CompletionItem
+                        {
+                            Label = "onLoad", Kind = CompletionKind.Attribute, Detail = "Component lifecycle callback",
+                            Documentation = "Runs on the server with the result of the component's load function.",
+                            InsertText = "onLoad={fn(data) => $1}", IsSnippet = true,
+                            ReplaceSpan = TextSpan.FromBounds(start, offset), SortText = "1onLoad",
+                        });
                 }
-                return items;
+            }
+            if (info == null) return items;
+
+            string LayoutFile(string relative)
+            {
+                if (analysis.Path == null || string.IsNullOrWhiteSpace(relative) || relative.IndexOfAny(new[] { '{', '\0' }) >= 0) return null;
+                string full = Path.GetFullPath(Path.Combine(TemplateContracts.SiteRoot(Files, Path.GetDirectoryName(Path.GetFullPath(analysis.Path))), relative.Trim().TrimStart('/', '\\')));
+                return Files.FileExists(full) ? full : null;
             }
 
             bool code = analysis.Markup.Syntax == SourceSyntax.Code;
@@ -566,7 +584,8 @@ namespace KScript.Language.Features
                     return ParameterValueCompletions(analysis, before, cursor.Offset, replace);
 
                 case AttributeKind.Path:
-                    return PathCompletions(analysis, value, cursor.Offset, scriptsOnly: cursor.TagElement.Name == "import");
+                    return PathCompletions(analysis, value, cursor.Offset, scriptsOnly: cursor.TagElement.Name == "import",
+                        relativeToSite: analysis.Kind != DocumentKind.Script && cursor.TagElement.Name is "layout" or "include");
 
                 case AttributeKind.Expression:
                 case AttributeKind.ExpressionList:
@@ -633,7 +652,7 @@ namespace KScript.Language.Features
         /// <c>/</c> is typed, every script in the project (the folder of the nearest kscript.json, or this file's
         /// folder). An import only offers scripts; other path attributes also offer .html and .md pages.
         /// </summary>
-        private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset, bool scriptsOnly)
+        private List<CompletionItem> PathCompletions(DocumentAnalysis analysis, DecodedText value, int offset, bool scriptsOnly, bool relativeToSite = false)
         {
             List<CompletionItem> items = new List<CompletionItem>();
             if (analysis.Path == null)
@@ -643,11 +662,12 @@ namespace KScript.Language.Features
 
             string self = Path.GetFullPath(analysis.Path);
             string dir = Path.GetDirectoryName(self);
+            if (relativeToSite) dir = TemplateContracts.SiteRoot(Files, dir);
             int index = value.FromSource(offset);
             string typed = index >= 0 ? value.Value.Substring(0, index) : string.Empty;
             int slash = typed.LastIndexOf('/');
             string sub = slash >= 0 ? typed.Substring(0, slash) : string.Empty;
-            string folder = Path.GetFullPath(Path.Combine(dir, sub));
+            string folder = Path.GetFullPath(Path.Combine(dir, relativeToSite ? sub.TrimStart('/', '\\') : sub));
             TextSpan replace = TextSpan.FromBounds(value.ToSource(slash + 1), offset);
             string[] extensions = scriptsOnly ? ScriptExtensions : ScriptExtensions.Concat(PageExtensions).ToArray();
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -960,7 +980,7 @@ namespace KScript.Language.Features
                     SortText = "1" + s.Name,
                 }).ToList();
 
-            items.AddRange(Catalog.Commands.Where(c => !c.Planned && !NeedsImport(analysis, c.Package)).Select(c => new CompletionItem
+            items.AddRange(Catalog.Commands.Where(c => !c.Planned && (c.Package == null || analysis.ImportedPackages.Contains(c.Package))).Select(c => new CompletionItem
             {
                 Label = sigil + c.Name,
                 Kind = CompletionKind.Command,

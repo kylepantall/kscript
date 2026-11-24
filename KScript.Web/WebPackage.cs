@@ -48,6 +48,13 @@ namespace KScript.Web
                 AllowsExtraAttributes = true,
                 Context = ElementContext.Page,
             });
+            Page(p, new ElementInfo("prop", "Declares a value a layout or component receives from its caller.", ContentKind.Empty,
+                new A("name", K.Text, "The input name, available as a variable in the template.", required: true),
+                new A("required", K.Bool, "Require the caller to supply a non-null value."))
+            {
+                Context = ElementContext.Page,
+                Example = "<prop name=\"title\" required />",
+            });
             Page(p, new ElementInfo("slot", "In a layout or component: where the page's (or caller's) content goes.", ContentKind.Empty,
                 new A("name", K.Text, "A named slot."))
             {

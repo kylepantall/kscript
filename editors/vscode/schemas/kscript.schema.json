@@ -8,6 +8,16 @@
   "if": { "required": ["library"], "properties": { "library": { "type": "object" } } },
   "then": { "required": ["name"] },
   "definitions": {
+    "typeRules": {
+      "type": "object",
+      "properties": {
+        "min": { "type": ["number", "string"], "description": "Minimum value or length, depending on the type." },
+        "max": { "type": ["number", "string"], "description": "Maximum value or length, depending on the type." },
+        "pattern": { "type": "string", "description": "A regular expression the value must match." },
+        "one_of": { "type": ["array", "string"], "description": "Accepted values, as an array or comma-separated text." },
+        "not": { "type": ["array", "string"], "description": "Excluded values, as an array or comma-separated text." }
+      }
+    },
     "standardReference": {
       "type": "string",
       "anyOf": [{ "enum": ["kscript:recommended", "kscript:strict"] }, { "pattern": "^(?!kscript:)" }],
@@ -81,6 +91,22 @@
         "enum": ["KScript.Core", "KScript.Terminal", "KScript.Math", "KScript.IO", "KScript.Net", "KScript.Markdown", "KScript.Web", "KScript.Style", "KScript.Storage", "KScript.Document", "KScript.Data", "KScript.Cache", "KScript.Queue", "KScript.Http", "KScript.Auth", "KScript.Test", "KScript.UI", "KScript.AI"]
       },
       "uniqueItems": true
+    },
+    "types": {
+      "type": "object",
+      "description": "Default validation rules for built-in types. Arguments at a type's use site can override these defaults.",
+      "properties": {
+        "password": { "$ref": "#/definitions/typeRules" },
+        "string": { "$ref": "#/definitions/typeRules" },
+        "uuid": {
+          "allOf": [
+            { "$ref": "#/definitions/typeRules" },
+            { "properties": { "v": { "anyOf": [{ "type": "integer", "minimum": 1, "maximum": 8 }, { "type": "string", "pattern": "^(?:[1-8]|any)$" }], "description": "The UUID version, or any." } } }
+          ]
+        }
+      },
+      "additionalProperties": { "$ref": "#/definitions/typeRules" },
+      "examples": [{ "password": { "min": 10 }, "uuid": { "v": 4 } }]
     },
     "extensions": {
       "type": "array",

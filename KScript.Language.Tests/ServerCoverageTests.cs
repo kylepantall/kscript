@@ -195,6 +195,34 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void ManifestOptionsReportNativeRulesAndPinnedLibraryRequirements()
+        {
+            var files = new Memory();
+            string config = Path.Combine(Root, "kscript.json");
+            const string commit = "0123456789abcdef0123456789abcdef01234567";
+            files.Files[config] = $$"""
+                {
+                  "paths": { "lib": "packages" },
+                  "libraries": {
+                    "client": { "source": "https://github.com/example/client", "commit": "{{commit}}" },
+                    "stale": { "source": "https://github.com/example/stale", "commit": "{{commit}}" }
+                  }
+                }
+                """;
+            files.Files[Path.Combine(Root, "packages", "client", ".kscript-lib.json")] = $$"""
+                { "source": "https://github.com/example/client", "commit": "{{commit}}", "packages": ["Core", "Net"] }
+                """;
+            files.Files[Path.Combine(Root, "packages", "stale", ".kscript-lib.json")] = """{ "commit": "different", "packages": ["KScript.Math"] }""";
+            var (_, output) = Converse(files, Init(), Req(2, "kscript/manifestOptions", Doc(Workspace.PathToUri(config))));
+            JsonNode options = Reply(output, 2)["result"];
+            Assert.Equal("client", Assert.Single(options["requiredPackages"]["KScript.Net"].AsArray()).GetValue<string>());
+            Assert.Null(options["requiredPackages"]["KScript.Math"]);
+            Assert.Null(options["requiredPackages"]["KScript.Core"]);
+            Assert.Contains(options["types"]["password"].AsArray(), n => n.GetValue<string>() == "min");
+            Assert.Contains(options["types"]["uuid"].AsArray(), n => n.GetValue<string>() == "v");
+        }
+
+        [Fact]
         public void TheTestListReadsTestFilesThatAreNotOpen()
         {
             Memory files = new Memory();

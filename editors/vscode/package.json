@@ -560,6 +560,7 @@
     "test:vscode": "npm run bundle && node test/integration/run.js"
   },
   "dependencies": {
+    "jsonc-parser": "^3.3.1",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {

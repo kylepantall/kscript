@@ -137,6 +137,10 @@ test('kscript.json and standard files are validated with the bundled schemas', (
   for (const v of pkg.contributes.jsonValidation) {
     const schema = JSON.parse(fs.readFileSync(path.join(root, v.url), 'utf8'));
     assert.ok(schema.properties.lint && schema.properties.format, v.url);
+    if (v.url === './schemas/kscript.schema.json') {
+      assert.strictEqual(schema.properties.types.properties.password.$ref, '#/definitions/typeRules');
+      assert.ok(schema.definitions.typeRules.properties.min);
+    }
     assert.ok(ignore.includes('!' + path.posix.dirname(v.url.replace(/^\.\//, '')) + '/**'), `${v.url} is packaged`);
   }
   const jsonc = pkg.contributes.languages.find((l) => l.id === 'jsonc');

@@ -39,6 +39,7 @@ namespace KScript.Language.Analysis
             ImportPackage("KScript.Core");
             if (!ChecksImports)
             {
+                foreach (string package in global::KScript.Pages.PageElementNames.DefaultPackages) ImportPackage(package);
                 // A page's <import package="KScript.Auth" /> gives it the package's variables ($session), and its
                 // commands and methods are known without one.
                 foreach (MarkupElement e in result.Markup.DescendantElements())

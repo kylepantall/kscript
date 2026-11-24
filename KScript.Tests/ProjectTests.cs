@@ -164,7 +164,7 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test", Keys(props));
+        Assert.Equal("$schema,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test,types", Keys(props));
         var libraryForms = props.GetProperty("library").GetProperty("oneOf").EnumerateArray()
             .ToDictionary(form => form.GetProperty("type").GetString()!);
         Assert.Equal("entry,version", Keys(libraryForms["object"].GetProperty("properties")));

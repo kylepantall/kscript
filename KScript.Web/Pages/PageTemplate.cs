@@ -74,7 +74,7 @@ namespace KScript.Pages
         public static readonly HashSet<string> ControlElements = new HashSet<string>(StringComparer.Ordinal)
         {
             "let", "set", "do", "if", "elif", "else", "for", "while", "match", "case", "default",
-            "layout", "slot", "markdown", "respond", "redirect", "include", "live", "state",
+            "layout", "prop", "slot", "markdown", "respond", "redirect", "include", "live", "state",
         };
 
         public static List<PageNode> Parse(string text, int firstLine = 1)
@@ -225,6 +225,15 @@ namespace KScript.Pages
                                 attr.Value = text.Substring(j + 1, close - j - 1);
                                 attr.Quote = q;
                                 j = close + 1;
+                            }
+                            else if (j < text.Length && text[j] == '{' && (j + 1 == text.Length || text[j + 1] != '{'))
+                            {
+                                int from = j + 1;
+                                if (from < text.Length && text[from] == '!') from++;
+                                KScript.Syntax.ExpressionParser.ParseEmbedded(text, from, out int end);
+                                if (end < 0) throw new PageException($"Line {startLine}: '{attr.Name}' is missing its closing brace.");
+                                attr.Value = text.Substring(j, end - j + 1);
+                                j = end + 1;
                             }
                             else
                             {

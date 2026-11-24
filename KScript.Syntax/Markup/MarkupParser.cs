@@ -407,6 +407,18 @@ namespace KScript.Syntax.Markup
             }
 
             int start = pos;
+            if (IsHtml && quote == '{' && Peek(1) != '{')
+            {
+                ExpressionParser.ParseEmbedded(text, start + (Peek(1) == '!' ? 2 : 1), out int close);
+                if (close >= 0)
+                {
+                    pos = close + 1;
+                    attribute.Value = DecodedText.Plain(text.Substring(start, pos - start), start);
+                    return;
+                }
+                Error(attribute.NameSpan, DiagnosticCodes.InvalidAttribute, $"The value of '{attribute.Name}' is missing its closing brace.");
+            }
+
             while (pos < text.Length && !char.IsWhiteSpace(text[pos]) && text[pos] != '>' && !(text[pos] == '/' && Peek(1) == '>'))
             {
                 pos++;

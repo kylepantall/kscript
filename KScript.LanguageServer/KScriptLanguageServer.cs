@@ -222,6 +222,7 @@ namespace KScript.LanguageServer
                 case "textDocument/semanticTokens/full": return SemanticTokens(p);
                 case "textDocument/inlayHint": return InlayHints(p);
                 case "textDocument/foldingRange": return FoldingRanges(p);
+                case "kscript/manifestOptions": return ManifestOptions(p);
                 case "kscript/blocks": return Blocks(p);
                 case "kscript/tests": return Tests(p);
                 case "textDocument/codeLens": return CodeLenses(p);

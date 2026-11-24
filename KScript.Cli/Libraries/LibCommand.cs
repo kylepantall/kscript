@@ -20,7 +20,7 @@ namespace KScript.Cli
     /// <summary>Installs a GitHub library as ordinary source files imported by their project-relative paths.</summary>
     public static partial class LibCommand
     {
-        private const string Receipt = ".kscript-lib.json";
+        private const string Receipt = LibraryDependency.ReceiptFileName;
         private const long SizeLimit = 64L * 1024 * 1024;
         private const string Usage = "Usage: kscript lib add <library | owner/repo@library | owner/repo | GitHub URL> or kscript lib restore";
 

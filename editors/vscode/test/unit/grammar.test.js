@@ -22,12 +22,22 @@ const jsonGrammar = {
   ],
 };
 
-async function load() {
+async function load(scope = 'source.kscript') {
   const wasm = fs.readFileSync(require.resolve('vscode-oniguruma/release/onig.wasm')).buffer;
   await oniguruma.loadWASM(wasm);
   const registry = new textmate.Registry({
     onigLib: Promise.resolve({ createOnigScanner: (p) => new oniguruma.OnigScanner(p), createOnigString: (s) => new oniguruma.OnigString(s) }),
+    getInjections: (name) => name === 'text.html.basic' ? ['kscript.pages.injection'] : [],
     loadGrammar: async (scope) => {
+      if (scope === 'text.html.basic') {
+        return textmate.parseRawGrammar(JSON.stringify({
+          scopeName: scope, patterns: [{ match: '(</?)([a-z]+)(>)', captures: { 2: { name: 'entity.name.tag.html' } } }],
+        }), 'html.json');
+      }
+      if (scope === 'kscript.pages.injection') {
+        const injection = path.join(path.dirname(grammarPath), 'kscript-pages.injection.json');
+        return textmate.parseRawGrammar(fs.readFileSync(injection, 'utf8'), injection);
+      }
       if (scope === 'source.kscript') return textmate.parseRawGrammar(fs.readFileSync(grammarPath, 'utf8'), grammarPath);
       if (scope === 'source.kscript-code') {
         const code = path.join(path.dirname(grammarPath), 'kscript-code.tmLanguage.json');
@@ -37,7 +47,7 @@ async function load() {
       return null;
     },
   });
-  return registry.loadGrammar('source.kscript');
+  return registry.loadGrammar(scope);
 }
 
 /** Every token as { text, scopes }. */
@@ -136,4 +146,13 @@ test('casts highlight the target in XML expressions', async () => {
   const tokens = tokenize(await load(), '<kscript><let name="items" value="$raw as Product[]"/></kscript>');
   assert.match(scopeOf(tokens, 'as'), /keyword\.operator\.word\.kscript/);
   assert.match(scopeOf(tokens, 'Product'), /entity\.name\.type\.kscript/);
+});
+
+
+test('KScript page commands have a different scope from ordinary HTML tags', async () => {
+  const tokens = tokenize(await load('text.html.basic'), '<main><layout path="_layout.html"><p>Hello</p><slot /></layout></main>');
+  assert.match(scopeOf(tokens, 'main'), /entity\.name\.tag\.html/);
+  assert.match(scopeOf(tokens, 'layout'), /keyword\.control\.page\.kscript/);
+  assert.match(scopeOf(tokens, 'slot'), /keyword\.control\.page\.kscript/);
+  assert.match(scopeOf(tokens, 'p'), /entity\.name\.tag\.html/);
 });

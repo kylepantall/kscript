@@ -11,6 +11,7 @@ const { commentEnter } = require('./src/comments');
 const { autoCloseChange } = require('./src/autoclose');
 const { registerCommands } = require('./src/commands');
 const { registerTestExplorer } = require('./src/testing');
+const { registerManifestCompletion } = require('./src/manifest');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -192,6 +193,7 @@ async function activate(context) {
   const kscript = () => resolveServer(config().get('server.path', ''), []);
   registerCommands(vscode, context, kscript);
   registerTestExplorer(vscode, context, kscript, () => client);
+  registerManifestCompletion(vscode, context, () => client?.state === State.Running ? client : null);
 
   await startClient(context);
 }

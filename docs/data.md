@@ -413,20 +413,30 @@ A model uses another connection with `connection: reports`, and `@db(connection:
 | MySQL | `mysql://user:password@host:3306/app` | Version 8.0.16 or later. |
 | MariaDB | `mariadb://user:password@host:3306/app` | Version 10.6 or later. |
 
-Anything after `?` goes to the driver as it is, such as `?sslmode=require` for Postgres or `?SslMode=Required` for MySQL. Write characters such as `@` or `:` in a password as `%40` and `%3A`. Instead of a url, a server connection can list its parts:
+Use a URL or a map of connection fields. Generated server-database projects use fields by default and use `DATABASE_URL` when it is set. In `config/config.kscript`, you can write:
 
-```yaml
-database:
-  connections:
-    main:
-      driver: postgres
-      host: db.example.com
-      port: 5432
-      database: app
-      username: app
-      password: ${DB_PASSWORD}
-      options: { sslmode: require }
+```kscript
+fn configure(environment: string) {
+  url = @env('DATABASE_URL', default: '')
+  main = {
+    driver: 'postgres'
+    host: @env('DB_HOST', default: 'localhost')
+    port: @env('DB_PORT', default: '5432')
+    database: @env('DB_NAME', default: 'app')
+    username: @env('DB_USER', default: 'app')
+    password: @env('DB_PASSWORD', default: '')
+  }
+  if !$url->is_blank() {
+    main = { url: $url }
+  }
+  if $environment == 'test' {
+    main = { url: 'sqlite::memory:' }
+  }
+  return { database: { connections: { main: $main } } }
+}
 ```
+
+Use `options: { sslmode: 'require' }` in a Postgres connection map. In a URL, put driver options after `?`, as in `?sslmode=require`, and percent-encode characters such as `@` and `:` in passwords. Separate password fields accept those characters directly.
 
 Models, queries, transactions and the database queue work the same on each database:
 
