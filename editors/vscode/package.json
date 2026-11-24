@@ -33,6 +33,16 @@
     ],
     "languages": [
       {
+        "id": "kscript-css",
+        "aliases": ["KScript CSS"],
+        "extensions": [".ks.css"]
+      },
+      {
+        "id": "kscript-scss",
+        "aliases": ["KScript Sass"],
+        "extensions": [".ks.scss", ".ks.sass"]
+      },
+      {
         "id": "kscript",
         "aliases": [
           "KScript",
@@ -73,6 +83,24 @@
       }
     ],
     "grammars": [
+      {
+        "language": "kscript-css",
+        "scopeName": "source.kscript-css",
+        "path": "./syntaxes/kscript-css.tmLanguage.json"
+      },
+      {
+        "language": "kscript-scss",
+        "scopeName": "source.kscript-scss",
+        "path": "./syntaxes/kscript-scss.tmLanguage.json"
+      },
+      {
+        "scopeName": "kscript.styles.injection",
+        "path": "./syntaxes/kscript-styles.injection.json",
+        "injectTo": ["source.kscript-css", "source.kscript-scss"],
+        "embeddedLanguages": {
+          "meta.embedded.expression.kscript": "kscript"
+        }
+      },
       {
         "language": "kscript",
         "scopeName": "source.kscript",

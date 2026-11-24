@@ -426,13 +426,16 @@ namespace KScript.Language.Agents
             w.Append(Rules);
 
             w.Append("\n## Required project conventions\n\n");
-            w.Append("- Before editing, read `kscript.json` and a neighboring feature. Follow the configured syntax and paths. Verify APIs in the generated package reference or MCP. Reuse existing types and operations.\n");
+            w.Append("- Read `kscript.json` and a neighboring feature. Follow the configured syntax and paths, reuse existing code, and verify APIs in the package reference or MCP.\n");
             w.Append("- Type domain values at the boundary. Use built-in types such as `email`, `uuid` and `duration`. Define shared domain rules once with `kscript make native`. Put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
             w.Append("- Use records for known shapes (`kscript make type`) and models and migrations for persisted rows. Validate external JSON with `as: Type` where supported. Use `map` for open keys and `any` for genuinely dynamic values.\n");
             if (project.Packages.Contains("KScript.Http") || project.Routes != null)
                 w.Append("- Use `kscript make route` for routing and a controller for the action. For a known JSON body, generate a request type with `kscript make request`, import it, and type the controller’s `json` parameter so the framework validates it.\n");
             if (project.Packages.Contains("KScript.Web") || project.Pages > 0)
+            {
                 w.Append("- Keep presentation in views or components. Put reusable domain behavior on the type or in a library module.\n");
+                w.Append("- Use `kscript make css` for `.ks.css` and link its `.css` URL. Use `.ks.scss` when the project builds Sass.\n");
+            }
             w.Append("- Run generators from the project so they follow its `paths` settings. Catch specific errors where recovery or reporting belongs. Rethrow when the caller owns recovery.\n");
 
             w.Append("\n## Mistakes to avoid\n\n");
@@ -443,11 +446,11 @@ namespace KScript.Language.Agents
             }
 
             w.Append("\n## Before finishing a change\n\n");
-            w.Append("1. For behavior changes, add or update tests beside the existing suite. Assert the result and cover applicable rejected inputs and recovery.\n");
-            w.Append("2. Run `kscript check --output json --warnings-as-errors`. Fix diagnostics at their source. For KS5016, handle the escaping error at the appropriate boundary.\n");
+            w.Append("1. Add tests for changed behavior, rejected inputs and recovery.\n");
+            w.Append("2. Run `kscript check --output json --warnings-as-errors`. For KS5016, handle the escaping error at the appropriate boundary.\n");
             string testPattern = project.IsXml ? "*.test.ks.xml" : "*.test.kscript";
             w.Append(project.Tests > 0 ? $"3. Run `kscript test` (runs the {project.Tests} test file{(project.Tests == 1 ? string.Empty : "s")}).\n" : $"3. Run `kscript test` (runs `{testPattern}` files).\n");
-            w.Append("4. Run `kscript fmt --check` and refresh generated notes with `kscript agents`. Report the verification results and any checks you could not run.\n");
+            w.Append("4. Run `kscript fmt --check` and `kscript agents`. Report results and any skipped checks.\n");
 
             w.Append("\n## This project\n\n");
             if (project.Main != null)

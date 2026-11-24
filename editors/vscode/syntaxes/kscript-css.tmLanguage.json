@@ -1,0 +1,5 @@
+{
+  "name": "KScript CSS",
+  "scopeName": "source.kscript-css",
+  "patterns": [{ "include": "source.css" }]
+}

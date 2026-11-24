@@ -139,15 +139,15 @@ namespace KScript.Language.Tests
             string path = At("p", "lib", "strings.ks.xml");
             DocumentAnalysis a = Analyzer.Analyze(files.ReadText(path), path, files);
             Assert.Equal(new[] { "KS6002:orphan", "KS6003:LOST" }, Unused(a));
-            Assert.Equal("The function orphan is never called. ../a.ks.xml and 3 other files import this script but don't call it.",
+            Assert.Equal("The function orphan is never called. ../a.ks.xml and 2 other files import this script but don't call it.",
                 Find(a, DiagnosticCodes.UnusedFunction, "orphan").Message);
-            Assert.Equal("The constant $LOST is never used. ../a.ks.xml and 3 other files import this script but don't use it.",
+            Assert.Equal("The constant $LOST is never used. ../a.ks.xml and 2 other files import this script but don't use it.",
                 Find(a, DiagnosticCodes.UnusedVariable, "LOST").Message);
 
             ProjectUses uses = ProjectUsage.Find(path, files.ReadText(path), files);
             Assert.Equal(new[] { "PI", "shout", "slugify", "whisper" }, uses.Names.OrderBy(n => n, StringComparer.Ordinal));
-            // Scripts come before pages in the list (and in the message).
-            Assert.EndsWith("README.md", uses.Importers.Last());
+            Assert.Equal(3, uses.Importers.Count);
+            Assert.DoesNotContain(uses.Importers, file => file.EndsWith("README.md", StringComparison.Ordinal));
         }
 
         [Fact]

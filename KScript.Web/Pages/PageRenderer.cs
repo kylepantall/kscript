@@ -268,7 +268,7 @@ namespace KScript.Pages
             List<PageNode> nodes;
             try
             {
-                nodes = PageTemplate.Parse(text, firstLine);
+                nodes = PageTemplate.Parse(text, firstLine, state.Markdown);
             }
             catch (PageException ex)
             {

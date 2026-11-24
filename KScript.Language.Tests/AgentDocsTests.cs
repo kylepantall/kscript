@@ -300,6 +300,8 @@ namespace KScript.Language.Tests
             Assert.Contains("runs the 2 test files", xml);
             Assert.Contains("1 page", xml);
             Assert.Contains("Keep presentation in views", xml);
+            Assert.Contains("Use `kscript make css` for `.ks.css` and link its `.css` URL", xml);
+            Assert.Contains("Use `.ks.scss` when the project builds Sass", xml);
             Assert.Contains("`.ks.xml`", xml);
         }
 
@@ -320,7 +322,7 @@ namespace KScript.Language.Tests
             Assert.Contains("kscript make native", section);
             Assert.Contains("kscript make request", section);
             Assert.Contains("type the controller’s `json` parameter", section);
-            Assert.Contains("cover applicable rejected inputs and recovery", section);
+            Assert.Contains("Add tests for changed behavior, rejected inputs and recovery", section);
             Assert.Contains("KS5016", section);
             string index = AgentDocs.Index(project);
             Assert.Contains("type ItemKey with [string]", index);

@@ -1,0 +1,16 @@
+{
+  "scopeName": "kscript.styles.injection",
+  "injectionSelector": "L:source.kscript-css -comment -string, L:source.kscript-scss -comment -string",
+  "patterns": [
+    { "include": "source.kscript#tag-shorthand" },
+    { "include": "kscript.pages.injection#page-command" },
+    {
+      "name": "meta.embedded.expression.kscript",
+      "begin": "(?<!#)\\{(?=\\s*(?:[!$]|@[A-Za-z_]\\w*\\s*\\())",
+      "end": "\\}",
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.kscript" } },
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.kscript" } },
+      "patterns": [{ "include": "source.kscript-code#expression" }]
+    }
+  ]
+}

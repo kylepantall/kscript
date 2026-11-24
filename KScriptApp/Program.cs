@@ -88,6 +88,7 @@ namespace KScript
             int? docsPort = null;
             bool withWorker = false;
             bool? withDocker = null;
+            bool liveReload = Environment.GetEnvironmentVariable(DockerServe.ReloadSetting) != "0";
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -118,6 +119,9 @@ namespace KScript
                         break;
                     case "--with-worker":
                         withWorker = true;
+                        break;
+                    case "--no-reload":
+                        liveReload = false;
                         break;
                     case "--docker":
                     case "--no-docker":
@@ -172,7 +176,7 @@ namespace KScript
                 Console.CancelKeyPress += interrupt;
                 try
                 {
-                    return DockerServe.Run(root, project?.Serve.Docker ?? new DockerServeSettings(), Error, dockerStop.Token);
+                    return DockerServe.Run(root, project?.Serve.Docker ?? new DockerServeSettings(), Error, dockerStop.Token, liveReload);
                 }
                 finally
                 {
@@ -194,14 +198,15 @@ namespace KScript
             }
 
             // The docs (which run examples) are for working on the site: never for a compiled program or in production.
+            string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+            bool production = string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase);
             System.Threading.Tasks.Task docs = System.Threading.Tasks.Task.CompletedTask;
             using var stopDocs = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             if (withDocs == true)
             {
-                string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
                 if (!allowDocs)
                     withDocs = false;
-                else if (string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase))
+                else if (production)
                     Error.WriteLine("Docs: not served in the production environment.");
                 else if (Directory.Exists(folder ?? "."))
                     docs = ServeDocs(folder ?? ".", project, docsPort, port ?? 8080, stopDocs.Token);
@@ -217,7 +222,8 @@ namespace KScript
             try
             {
                 if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
-                return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation).GetAwaiter().GetResult();
+                return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation,
+                    liveReload: watch && liveReload && !production).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
             {

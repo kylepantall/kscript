@@ -21,6 +21,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Pages\model-forms.js" LogicalName="KScript.Pages.model-forms.js" />
     <EmbeddedResource Include="Pages\live.js" LogicalName="KScript.Pages.live.js" />
+    <EmbeddedResource Include="Pages\browser-reload.js" LogicalName="KScript.Pages.browser-reload.js" />
     <EmbeddedResource Include="Pages\passkeys.js" LogicalName="KScript.Pages.passkeys.js" />
   </ItemGroup>
 

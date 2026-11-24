@@ -42,7 +42,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 
 - **Expressions**: `+ - * / %`, `== !=` (loose: `'3' == 3`), `=== !==` (strict: type and value), `lt le gt ge` (or `> >=`), `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]`, `->method()`, `|>` and `fn(x) => …`. Use the words `lt`, `le`, `and`, `or` in attributes, since XML can't hold a raw `<` or `&&` there.
 - **Escaping**: `{ value }` is HTML-escaped (Markdown-escaped in `.md` pages); `{! value }` outputs trusted HTML; `{{` and `}}` are literal braces. An attribute that is exactly `{ value }` is left out when the value is `false` or `null`, so `checked="{$done}"` just works.
-- **Markdown pages**: `.md` files can start with `---` front matter (`title: About`, `layout: _layout.html`); its keys become variables.
+- **Markdown pages**: `.md` files can start with `---` front matter (`title: About`, `layout: _layout.html`); its keys become variables. Inline code and fenced code blocks keep their contents literal.
 - **Routing**: `/people` serves `people.html`, `people.md` or `people/index.html`; `/people/42` can match `people/[id].html` (`$request.params.id`). Files and folders starting with `_` or `.` and KScript sources (`.kscript`, `.ks.xml` and any other `.xml`) are never served. `_404.html` is used for missing pages.
 - **`$request`** contains `method`, `scheme`, `path`, `url`, `query`, `form`, `headers`, `cookies`, `params` and `body`. For `https://example.com/people?page=2`, `$request.scheme` is `https`, `$request.path` is `/people` and `$request.url` is `/people?page=2`. A locale-prefixed page also receives `$request.locale`.
 - **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
@@ -50,7 +50,9 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
-For a containerised development site, run `kscript serve --docker` with a Compose file. The source is bind-mounted so changes are visible on refresh. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
+During development, open the site in a browser and save changes to a page, component, script, stylesheet, or asset. Open HTML pages reload automatically. Use `kscript serve --no-reload` to turn it off. Production and compiled sites serve pages without a browser reload script.
+
+For a containerised development site, run `kscript serve --docker` with a Compose file. The bind-mounted source lets the container see edits. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
 
 ## Model forms
 
@@ -195,6 +197,8 @@ A `<live>` block reacts to clicks and typing without any JavaScript in the page.
 
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server can restore the component from the browser's next request.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn(i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
+- A component can declare its own `<live>` block and use `on-keyup`, `on-escape`, `on-focusin`, `on-focusout`, `on-cancel`, `on-close`, `on-pointerdown`, `on-pointerup` and `on-pointercancel`. The event includes `code`, keyboard modifiers (`alt`, `ctrl`, `meta`, `shift`), `repeat`, pointer coordinates (`client_x`, `client_y`, `page_x`, `page_y`), `button`, `pointer_id` and `pointer_type` where applicable. On a handler's element, `prevent-default="keydown"` cancels that browser action before the request.
+- For native drag and drop within live blocks, mark a source `draggable="true" drag-value="{ $item.id }"` and handle `on-drop` on the destination. Read `$event.drag_value`. The browser handles movement. Validate the ID and permissions in a handler that saves changes. Offer a keyboard action for the same operation.
 - `on-tick="…" every="200ms"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
 - `bind="name"` ties an input to a state variable both ways and redraws the block as you type.
 - `kscript serve` adds its small runtime (`/_ks/live.js`) to pages that use `<live>`; pages never include it themselves. Set `KSCRIPT_SECRET` so pages keep working across server restarts.

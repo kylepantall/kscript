@@ -3,9 +3,13 @@
 // returns the block's new HTML. Pages never contain JavaScript of their own.
 (function () {
   "use strict";
-  var EVENTS = ["click", "input", "change", "submit", "keydown", "compositionstart", "compositionend"];
+  var EVENTS = ["click", "input", "change", "submit", "keydown", "keyup", "focusin", "focusout", "cancel", "close",
+    "pointerdown", "pointerup", "pointercancel", "dragstart", "dragover", "drop", "dragend",
+    "compositionstart", "compositionend"];
+  var DRAG_VALUE = "application/x-kscript-drag";
   var timers = Object.create(null);
   var ticks = Object.create(null);
+  var restoringFocus = false;
 
   // A click needs the same element under the pointer when it goes down and when it comes up. While a button
   // is held, new HTML for its block waits, so a block that redraws often (on-tick) doesn't swallow clicks.
@@ -73,7 +77,22 @@
       type: domEvent ? domEvent.type : "",
       value: target && "value" in target ? target.value : null,
       checked: target && target.type === "checkbox" ? target.checked : null,
-      key: domEvent && domEvent.key ? domEvent.key : null
+      target_id: target && target.id ? target.id : null,
+      key: domEvent?.key ?? null,
+      code: domEvent?.code ?? null,
+      alt: !!domEvent?.altKey,
+      ctrl: !!domEvent?.ctrlKey,
+      meta: !!domEvent?.metaKey,
+      shift: !!domEvent?.shiftKey,
+      repeat: !!domEvent?.repeat,
+      client_x: domEvent?.clientX ?? null,
+      client_y: domEvent?.clientY ?? null,
+      page_x: domEvent?.pageX ?? null,
+      page_y: domEvent?.pageY ?? null,
+      button: domEvent?.button ?? null,
+      pointer_id: domEvent?.pointerId ?? null,
+      pointer_type: domEvent?.pointerType ?? null,
+      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData(DRAG_VALUE) || null) : null,
     };
     var targetBind = target && target.getAttribute ? target.getAttribute("data-ks-bind") : null;
     var targetValue = target && target.type === "checkbox" ? target.checked : target && "value" in target ? target.value : null;
@@ -149,35 +168,58 @@
     var tpl = document.createElement("template");
     tpl.innerHTML = html.trim();
     var fresh = tpl.content.firstElementChild;
-    var modelFocus = modelForms.restore(block, fresh, checkpoint, active);
-    block.replaceWith(fresh);
-    scheduleTick(fresh);
-    if (!keep || (active.form?.hasAttribute("data-ks-model-form") && !modelFocus)) return;
-    var el = modelFocus || (keep.bind
-      ? fresh.querySelector('[data-ks-bind="' + CSS.escape(keep.bind) + '"]')
-      : keep.id ? document.getElementById(keep.id) : null);
-    if (!el) return;
-    if (!modelFocus && keepValue && keep.bind && "value" in el && el.type !== "checkbox") el.value = keep.value;
-    el.focus();
-    try { if (keep.start != null) el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text input */ }
+    restoringFocus = true;
+    try {
+      var modelFocus = modelForms.restore(block, fresh, checkpoint, active);
+      block.replaceWith(fresh);
+      scheduleTick(fresh);
+      if (!keep || (active.form?.hasAttribute("data-ks-model-form") && !modelFocus)) return;
+      var el = modelFocus || (keep.bind
+        ? fresh.querySelector('[data-ks-bind="' + CSS.escape(keep.bind) + '"]')
+        : keep.id ? document.getElementById(keep.id) : null);
+      if (!el) return;
+      if (!modelFocus && keepValue && keep.bind && "value" in el && el.type !== "checkbox") el.value = keep.value;
+      el.focus();
+      try { if (keep.start != null) el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text input */ }
+    } finally {
+      restoringFocus = false;
+    }
   }
 
   function handle(e) {
     var type = e.type;
     var target = e.target;
     var block = blockOf(target);
+    if (restoringFocus && (type === "focusin" || type === "focusout")) return;
     if (modelForms.handle(e, block)) return;
     if (type === "compositionend") setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
     if (type === "compositionstart" || type === "compositionend" || e.isComposing) return;
-    var el = target.closest ? target.closest("[data-ks-on-" + type + "]") : null;
-    if (type === "keydown" && !el && e.key === "Enter") {
-      el = target.closest ? target.closest("[data-ks-on-enter]") : null;
-      if (el) type = "enter";
-    }
     if (!block) return;
+    if (type === "dragstart") {
+      var source = target.closest?.("[drag-value]");
+      if (source && blockOf(source) === block && e.dataTransfer) {
+        e.dataTransfer.setData(DRAG_VALUE, source.getAttribute("drag-value").slice(0, 4096));
+      }
+      return;
+    }
+    if (type === "dragover") {
+      var drop = target.closest?.("[data-ks-on-drop]");
+      if (drop && blockOf(drop) === block && e.dataTransfer?.types.includes(DRAG_VALUE)) e.preventDefault();
+      return;
+    }
+    var el = target.closest ? target.closest("[data-ks-on-" + type + "]") : null;
+    if (type === "keydown" && !el) {
+      var shortcut = e.key === "Enter" ? "enter" : e.key === "Escape" ? "escape" : null;
+      if (shortcut) {
+        el = target.closest?.("[data-ks-on-" + shortcut + "]");
+        if (el) type = shortcut;
+      }
+    }
 
-    if (el) {
-      if (type === "submit" || type === "enter" || (type === "click" && el.tagName === "A")) e.preventDefault();
+    if (el && blockOf(el) === block) {
+      var prevent = el.getAttribute("prevent-default");
+      if (type === "submit" || type === "enter" || type === "drop" || (type === "click" && el.tagName === "A") ||
+          (prevent !== null && (prevent === "" || prevent.split(/[,\s]+/).includes(e.type)))) e.preventDefault();
       var handler = parseInt(el.getAttribute("data-ks-on-" + type), 10);
       var args = handlerArgs(el, handler);
       if (type === "input") {
