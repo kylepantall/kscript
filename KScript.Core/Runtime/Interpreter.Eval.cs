@@ -648,10 +648,10 @@ namespace KScript.Runtime
                 case "!=": return !Values.LooseEquals(a, b);
                 case "===": return Values.StrictEquals(a, b);
                 case "!==": return !Values.StrictEquals(a, b);
-                case "<": return Values.Compare(a, b, "lt") < 0;
-                case "<=": return Values.Compare(a, b, "le") <= 0;
-                case ">": return Values.Compare(a, b, "gt") > 0;
-                case ">=": return Values.Compare(a, b, "ge") >= 0;
+                case "<": return Values.CompareRelation(a, b, "lt") < 0;
+                case "<=": return Values.CompareRelation(a, b, "le") <= 0;
+                case ">": return Values.CompareRelation(a, b, "gt") > 0;
+                case ">=": return Values.CompareRelation(a, b, "ge") >= 0;
                 case "in":
                     return b switch
                     {

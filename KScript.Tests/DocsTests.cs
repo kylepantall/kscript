@@ -79,13 +79,17 @@ public sealed class DocsTests
     public static IEnumerable<(string Page, string Format, string Code, string Input)> Examples()
     {
         foreach (DocPage page in Site.Value.Pages)
+            foreach (var (format, code, input) in ReadRunnableExamples(page.Body))
+                yield return (page.Path, format, code, input);
+    }
+
+    private static IEnumerable<(string Format, string Code, string Input)> ReadRunnableExamples(string html)
+    {
+        foreach (Match box in TryBox.Matches(html))
         {
-            foreach (Match box in TryBox.Matches(page.Body))
-            {
-                Match input = InputAttribute.Match(box.Value);
-                foreach (Match data in DataAttribute.Matches(box.Value))
-                    yield return (page.Path, data.Groups[1].Value, WebUtility.HtmlDecode(data.Groups[2].Value), input.Success ? WebUtility.HtmlDecode(input.Groups[1].Value) : null);
-            }
+            Match input = InputAttribute.Match(box.Value);
+            foreach (Match data in DataAttribute.Matches(box.Value))
+                yield return (data.Groups[1].Value, WebUtility.HtmlDecode(data.Groups[2].Value), input.Success ? WebUtility.HtmlDecode(input.Groups[1].Value) : null);
         }
     }
 
@@ -106,6 +110,23 @@ public sealed class DocsTests
         }
         Assert.True(count > 500, $"Only {count} examples were found.");
         Assert.True(failures.Count == 0, $"{failures.Count} of {count} examples failed:\n\n" + string.Join("\n\n", failures));
+    }
+
+    [Theory]
+    [InlineData("/reference/core", "el-match", "kscript", "Unknown\n")]
+    [InlineData("/reference/core", "el-match", "xml", "Unknown\n")]
+    public void Runnable_reference_examples_produce_the_expected_output(string page, string anchor, string format, string expected)
+    {
+        string html = Site.Value.Find(page).Body;
+        int start = html.IndexOf($"id=\"{anchor}\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"{page} has no #{anchor} entry.");
+        int end = html.IndexOf("</section>", start, StringComparison.Ordinal);
+        var example = Assert.Single(ReadRunnableExamples(html[start..end]), example => example.Format == format);
+        PlaygroundResult result = Playground.Run(example.Code, example.Format, example.Input);
+
+        Assert.Null(result.Error);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(expected, result.Output);
     }
 
     [Fact]

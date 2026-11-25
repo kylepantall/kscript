@@ -300,13 +300,18 @@ namespace KScript.Runtime
             return string.Equals(ToStr(a), ToStr(b), StringComparison.Ordinal);
         }
 
-        public static int Compare(object a, object b, string op)
+        public static int Compare(object a, object b, string op) => Compare(a, b, op, allowUnordered: false).Value;
+
+        internal static int? CompareRelation(object a, object b, string op) => Compare(a, b, op, allowUnordered: true);
+
+        private static int? Compare(object a, object b, string op, bool allowUnordered)
         {
             a = Unwrap(a);
             b = Unwrap(b);
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (NativeTypeRegistry.TryCompare(a, b, op, out int native)) return native;
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
+            if (allowUnordered && ((a is double && b is string) || (a is string && b is double))) return null;
             if (a is DateTime da && b is DateTime db) return da.CompareTo(db);
             if (a == null || b == null)
                 throw new KScriptException($"Can't compare {Describe(a)} with {Describe(b)} using '{op}'.", "Type");
