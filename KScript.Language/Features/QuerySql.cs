@@ -56,7 +56,7 @@ namespace KScript.Language.Features
                         (string Text, int Rank) condition = Conditions(args);
                         if (m.Name == "where_not")
                         {
-                            condition = ("NOT (" + condition.Text + ")", Atom);
+                            condition = ("(" + condition.Text + ") IS NOT TRUE", Atom);
                         }
                         And(m.Name == "or_where" ? "OR" : "AND", condition);
                         break;
@@ -207,9 +207,14 @@ namespace KScript.Language.Features
                     {
                         return (left.Text + (op == "=" ? " IS NULL" : " IS NOT NULL"), Atom);
                     }
+                    // As the database is asked: a row whose column is empty is different from a value too.
+                    if (op == "<>" && right.Text == "?")
+                    {
+                        return ("(" + left.Text + " = ?) IS NOT TRUE", Atom);
+                    }
                     return (left.Text + " " + op + " " + right.Text, Atom);
                 case UnaryNode { Operator: "not" } u:
-                    return ("NOT (" + Condition(u.Operand, parameter).Text + ")", Atom);
+                    return ("(" + Condition(u.Operand, parameter).Text + ") IS NOT TRUE", Atom);
                 case MemberNode member when member.Target is VariableNode v && v.Name == parameter:
                     return (member.Name, Atom);
                 case MethodCallNode call when Column(call.Target, parameter) is string column:

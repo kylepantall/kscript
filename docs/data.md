@@ -187,7 +187,7 @@ echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().tot
 
 `->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
+These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`, also when the `null` comes from a variable. An empty column compares as it does in a script: `$o.status != 'paid'`, `not ($o.status == 'paid')` and `->where_not(status: 'paid')` keep the rows whose status is empty. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
 
 Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
 

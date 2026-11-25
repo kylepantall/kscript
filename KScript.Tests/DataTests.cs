@@ -748,6 +748,20 @@ public sealed class DataQueryTests : DataFixture
         Assert.Contains("/about", lines);
         Assert.Equal(new[] { "1", "7", "1", "1", "true", "true", "false" }, lines.Skip(lines.Length - 7).ToArray());
     }
+
+    [Fact]
+    public void NullsCompareInAQueryAsTheyDoInAScript()
+    {
+        Assert.Equal(new[] { "Cy", "Ada, Ben", "Ada, Cy", "Ada, Cy", "Ben, Cy", "Cy" }, Lines(Users + """
+            none = null
+            echo User->where(fn(u) => $u.age == $none)->pluck(name)
+            echo User->where(fn(u) => $u.age != $none)->pluck(name)
+            echo User->where(fn(u) => $u.age != 17)->pluck(name)
+            echo User->where_not(age: 17)->pluck(name)
+            echo User->where(fn(u) => not ($u.age > 20))->pluck(name)
+            echo User->where(fn(u) => not ($u.age > 20) and $u.active)->pluck(name)
+            """));
+    }
 }
 
 public sealed class DataSqlTests : DataFixture

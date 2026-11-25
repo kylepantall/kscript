@@ -151,7 +151,7 @@ namespace KScript.Data
             new("or_where", "conditions...", "Like ->where(), joined with or: rows that match the conditions so far, or these.", KType.Query,
                 (q, c) => q.Or(Conditions(q, c, "or_where")), Bare: true),
             new("where_not", "conditions...", "Leaves out the rows that match.", KType.Query,
-                (q, c) => q.And(new SqlUnary("NOT", Conditions(q, c, "where_not"))), Bare: true),
+                (q, c) => q.And(new SqlUnary("IS NOT TRUE", Conditions(q, c, "where_not"))), Bare: true),
             new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn(q) => $q->where(fn(u) => $u.name->contains($search)))`.", KType.Query,
                 (q, c) =>
                 {
