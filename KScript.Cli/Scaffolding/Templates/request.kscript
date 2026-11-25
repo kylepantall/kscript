@@ -5,6 +5,7 @@ usage: <Name> [--fields "name: string, age?: int"]
 --fields: The fields, comma separated, as name: type (? for optional, = for a default). Default: name: string
 example: kscript make request NewPerson --fields "name: string, age?: int, role?: string"
 example: kscript make request orders/NewOrder --fields "product: string, quantity: int = 1"
+checks: fields=fields
 to: {{ paths.requests }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Use it in a controller: import "../{{ paths.requests }}/{{ dir }}{{ kebab }}{{ ext }}", then fn store(json: {{ pascal }}). A body that doesn't fit gets 422.
 ---

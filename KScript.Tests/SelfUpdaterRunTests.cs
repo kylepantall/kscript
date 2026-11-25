@@ -122,6 +122,17 @@ public sealed class SelfUpdaterRunTests : IDisposable
     }
 
     [Fact]
+    public void A_mistyped_option_installs_nothing_and_asks_GitHub_nothing()
+    {
+        var (github, env) = Setup();
+        var (code, _, error) = Update(env, "--chek");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("Unknown option '--chek' for kscript update", error);
+        Assert.Empty(github.Requests);
+        Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
+    }
+
+    [Fact]
     public void Installs_a_newer_release()
     {
         var (github, env) = Setup();

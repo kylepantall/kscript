@@ -9,6 +9,7 @@ usage: <Name> [--fields "user_id: int, email: email"] [--queue mail] [--tries 5]
 --timeout: The longest one attempt may run, such as 30s or 5m (default: 60s)
 example: kscript make job SendWelcome --fields "user_id: int, email: email" --queue mail --tries 5
 example: kscript make job reports/BuildReport --fields "month: int" --timeout 5m
+checks: tries=int; timeout=duration; backoff=durations; fields=fields
 to: {{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Queue it: import "{{ paths.jobs }}/{{ dir }}{{ kebab }}{{ ext }}", then {{ pascal }}(...)->dispatch(). Run the queue with kscript worker (kscript queue failed lists failures).
 ---

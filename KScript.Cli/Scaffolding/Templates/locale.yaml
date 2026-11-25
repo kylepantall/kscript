@@ -5,6 +5,7 @@ usage: <locale> [--keys hello,goodbye]
 --keys: Keys to add, comma separated, each with its name as the text to translate
 example: kscript make locale fr
 example: kscript make locale en-GB --keys welcome,sign_in
+checks: name=locale
 to: {{ paths.locales }}/{{ name }}.yaml
 hint: Use it with locale(set: "{{ name }}") and @t('hello', { name: 'Ann' }). Pages pick it from /{{ name }}/… or ?lang={{ name }}
 ---

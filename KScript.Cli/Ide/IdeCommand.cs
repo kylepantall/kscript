@@ -91,24 +91,33 @@ namespace KScript.Ide
         /// <summary>Editors that speak LSP directly; <c>kscript ide config &lt;editor&gt;</c> prints their settings.</summary>
         public static readonly IReadOnlyDictionary<string, string> OtherEditors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
+            // .kscript is KScript's own syntax, so only the XML form (.ks.xml) borrows the editor's XML mode or grammar.
             ["neovim"] = "Neovim 0.11+ (add to init.lua):\n\n" +
-                "vim.filetype.add({ pattern = { ['.*%.ks%.xml'] = 'kscript' }, extension = { kscript = 'kscript' } })\n" +
-                "vim.lsp.config('kscript', { cmd = { 'kscript', 'lsp' }, filetypes = { 'kscript' }, root_markers = { '.git' } })\n" +
+                "vim.filetype.add({ pattern = { ['.*%.ks%.xml'] = 'kscriptxml' }, extension = { kscript = 'kscript' } })\n" +
+                "vim.lsp.config('kscript', { cmd = { 'kscript', 'lsp' }, filetypes = { 'kscript', 'kscriptxml' }, root_markers = { 'kscript.json', '.git' } })\n" +
                 "vim.lsp.enable('kscript')\n" +
-                "-- Optional: XML highlighting for KScript files\n" +
-                "vim.treesitter.language.register('xml', 'kscript')",
+                "-- Optional: XML highlighting for the XML form (.ks.xml)\n" +
+                "vim.treesitter.language.register('xml', 'kscriptxml')",
             ["helix"] = "Helix (add to ~/.config/helix/languages.toml):\n\n" +
                 "[language-server.kscript]\ncommand = \"kscript\"\nargs = [\"lsp\"]\n\n" +
-                "[[language]]\nname = \"kscript\"\nscope = \"source.kscript\"\nfile-types = [{ glob = \"*.ks.xml\" }, \"kscript\"]\n" +
-                "roots = [\".git\"]\nlanguage-servers = [\"kscript\"]\ngrammar = \"xml\"",
+                "[[language]]\nname = \"kscript\"\nscope = \"source.kscript\"\nfile-types = [\"kscript\"]\n" +
+                "roots = [\"kscript.json\", \".git\"]\nlanguage-servers = [\"kscript\"]\n\n" +
+                "[[language]]\nname = \"kscript-xml\"\nscope = \"text.xml.kscript\"\nfile-types = [{ glob = \"*.ks.xml\" }]\n" +
+                "roots = [\"kscript.json\", \".git\"]\nlanguage-servers = [\"kscript\"]\ngrammar = \"xml\"",
             ["sublime"] = "Sublime Text (install the LSP package, then Preferences > Package Settings > LSP > Settings):\n\n" +
                 "{\n  \"clients\": {\n    \"kscript\": {\n      \"enabled\": true,\n      \"command\": [\"kscript\", \"lsp\"],\n" +
-                "      \"selector\": \"text.xml\"\n    }\n  }\n}",
+                "      \"selector\": \"source.kscript | text.xml\"\n    }\n  }\n}\n\n" +
+                "Sublime Text has no syntax for .kscript files, so the language server would not start for them. Save this as\n" +
+                "KScript.sublime-syntax in Packages/User (Preferences > Browse Packages):\n\n" +
+                "%YAML 1.2\n---\nname: KScript\nfile_extensions: [kscript]\nscope: source.kscript\ncontexts:\n  main: []",
             ["emacs"] = "Emacs 29+ with Eglot (add to init.el):\n\n" +
-                "(define-derived-mode kscript-mode nxml-mode \"KScript\")\n" +
-                "(add-to-list 'auto-mode-alist '(\"\\\\.\\\\(kscript\\\\|ks\\\\.xml\\\\)\\\\'\" . kscript-mode))\n" +
-                "(with-eval-after-load 'eglot\n  (add-to-list 'eglot-server-programs '(kscript-mode \"kscript\" \"lsp\")))\n" +
-                "(add-hook 'kscript-mode-hook #'eglot-ensure)",
+                "(define-derived-mode kscript-mode prog-mode \"KScript\")\n" +
+                "(define-derived-mode kscript-xml-mode nxml-mode \"KScript XML\")\n" +
+                "(add-to-list 'auto-mode-alist '(\"\\\\.kscript\\\\'\" . kscript-mode))\n" +
+                "(add-to-list 'auto-mode-alist '(\"\\\\.ks\\\\.xml\\\\'\" . kscript-xml-mode))\n" +
+                "(with-eval-after-load 'eglot\n  (add-to-list 'eglot-server-programs '((kscript-mode kscript-xml-mode) \"kscript\" \"lsp\")))\n" +
+                "(add-hook 'kscript-mode-hook #'eglot-ensure)\n" +
+                "(add-hook 'kscript-xml-mode-hook #'eglot-ensure)",
         };
 
         public static int Run(string[] args, TextWriter output, TextWriter error, IIdeHost host = null)

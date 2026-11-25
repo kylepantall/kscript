@@ -40,8 +40,19 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
         $new = Join-Path $pkg 'kscript.exe'
         if (-not (Test-Path $new)) { throw "$asset has no kscript.exe inside" }
 
+        # Check the package before replacing an existing installation.
+        Get-ChildItem $pkg -File | ForEach-Object { Unblock-File $_.FullName -ErrorAction SilentlyContinue }
+        & $new --version | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "$asset could not run on this system" }
+
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
         $exe = Join-Path $installDir 'kscript.exe'
+        # The desktop UI's native libraries ship beside kscript.exe. They go in first, as install.sh does, so a
+        # library that is in use stops the install while the old kscript.exe is still in place.
+        Get-ChildItem $pkg -File | Where-Object { $_.Name -ne 'kscript.exe' } | ForEach-Object {
+            Move-Item $_.FullName (Join-Path $installDir $_.Name) -Force
+        }
+        $old = $null
         if (Test-Path $exe) {
             # A running kscript.exe can't be overwritten but can be renamed; it is deleted on the next start.
             $old = "$exe.old"
@@ -49,13 +60,12 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
             if (Test-Path $old) { $old = "$exe.$([Guid]::NewGuid().ToString('N')).old" }
             Move-Item $exe $old -Force
         }
-        Move-Item $new $exe -Force
-        Unblock-File $exe -ErrorAction SilentlyContinue
-        # The desktop UI's native libraries ship beside kscript.exe.
-        Get-ChildItem $pkg -File | ForEach-Object {
-            $dest = Join-Path $installDir $_.Name
-            Move-Item $_.FullName $dest -Force
-            Unblock-File $dest -ErrorAction SilentlyContinue
+        try {
+            Move-Item $new $exe -Force
+        } catch {
+            # Put the earlier kscript.exe back, so a failed install never leaves the folder without one.
+            if ($old -and -not (Test-Path $exe)) { Move-Item $old $exe -Force }
+            throw
         }
     } finally {
         Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue

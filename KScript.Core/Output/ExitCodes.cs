@@ -38,7 +38,7 @@ namespace KScript
             (Usage, "The command line or the settings are wrong: an unknown command or option, a missing file, or a kscript.json that can't be used."),
             (ScriptError, "A script stopped with an error."),
             (Internal, "An error inside kscript itself."),
-            (Interrupted, "Stopped with Ctrl+C."),
+            (Interrupted, "Stopped with Ctrl+C. (serve and watch run until they are stopped, so they end with 0.)"),
         };
     }
 }

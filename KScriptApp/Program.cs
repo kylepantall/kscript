@@ -137,6 +137,11 @@ namespace KScript
                         withDocs ??= true;
                         break;
                     default:
+                        if (args[i].StartsWith("-", StringComparison.Ordinal) && args[i].Length > 1)
+                        {
+                            Error.WriteLine($"Unknown option '{args[i]}' for kscript serve. Run kscript serve --help for the options.");
+                            return ExitCodes.Usage;
+                        }
                         folder = args[i];
                         break;
                 }
@@ -282,48 +287,49 @@ namespace KScript
         /// <summary>The environment from --env, also set as KSCRIPT_ENV so pages and child scripts see it.</summary>
         string EnvironmentName;
 
-        string[] TakeEnvironment(string[] args)
+        /// <summary>The options every command takes, read from the command line in one pass.</summary>
+        internal sealed record GlobalOptions(string[] Rest, bool Debug, bool? Ansi, string Environment);
+
+        /// <summary>
+        /// Takes --env name, --ansi, --no-ansi and --debug out of the arguments. After one of kscript's own commands
+        /// they are read anywhere; for a script (kscript app.kscript, or kscript run app.kscript) only before the
+        /// script, because what follows it is the script's own arguments.
+        /// </summary>
+        internal static GlobalOptions TakeGlobalOptions(string[] args)
         {
-            var rest = new List<string>();
-            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test" || args[0] == "css");
-            bool before = true;
+            var rest = new List<string>(args.Length);
+            bool debug = false;
+            bool? ansi = null;
+            string environment = null;
+            bool open = true, command = false, run = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
-                if ((before || anywhere) && (a == "--env" || a.StartsWith("--env=", StringComparison.Ordinal)))
+                if (open)
                 {
-                    string value = a == "--env" ? (i + 1 < args.Length ? args[++i] : null) : a.Substring(6);
-                    if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("--env needs a name, e.g. --env staging");
-                    EnvironmentName = value;
-                    Environment.SetEnvironmentVariable("KSCRIPT_ENV", value);
-                    continue;
+                    if (a == "--debug") { debug = true; continue; }
+                    if (a == "--ansi" || a == "--no-ansi") { ansi = a == "--ansi"; continue; }
+                    if (a == "--env" || a.StartsWith("--env=", StringComparison.Ordinal))
+                    {
+                        string value = a == "--env" ? (i + 1 < args.Length ? args[++i] : null) : a.Substring(6);
+                        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("--env needs a name, e.g. --env staging");
+                        environment = value;
+                        continue;
+                    }
+                    if (!a.StartsWith("-", StringComparison.Ordinal))
+                    {
+                        if (run) open = false;
+                        else if (!command)
+                        {
+                            command = true;
+                            if (a == "run") run = true;
+                            else if (a != "help" && a != "lsp" && a != "mcp" && CliReference.Find(a) == null && !a.StartsWith("make:", StringComparison.Ordinal)) open = false;
+                        }
+                    }
                 }
-                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
                 rest.Add(a);
             }
-            return rest.ToArray();
-        }
-
-        /// <summary>
-        /// --ansi and --no-ansi force colours on or off for the whole run (as artisan's do): before a script, or
-        /// anywhere after one of kscript's own commands.
-        /// </summary>
-        static string[] TakeAnsi(string[] args)
-        {
-            bool command = args.Length > 0 && (CliReference.Find(args[0]) != null || args[0] == "help");
-            var rest = new List<string>();
-            bool before = true;
-            foreach (string a in args)
-            {
-                if ((before || command) && (a == "--ansi" || a == "--no-ansi"))
-                {
-                    KScript.Output.CliStyle.Override = a == "--ansi";
-                    continue;
-                }
-                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
-                rest.Add(a);
-            }
-            return rest.ToArray();
+            return new GlobalOptions(rest.ToArray(), debug, ansi, environment);
         }
 
         /// <summary>kscript openapi [folder] [--output json|yaml] [--out file]: the OpenAPI document made from a site's routes.</summary>
@@ -367,6 +373,11 @@ namespace KScript
                         break;
                 }
             }
+            if (output != null && Path.GetDirectoryName(Path.GetFullPath(output)) is string outFolder && !Directory.Exists(outFolder))
+            {
+                Error.WriteLine($"Could not write {output}: there is no folder at '{outFolder}'.");
+                return ExitCodes.Usage;
+            }
             yaml ??= output != null && (output.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || output.EndsWith(".yml", StringComparison.OrdinalIgnoreCase));
             if (!TryFindSite(ref folder, out KScript.Projects.ProjectConfig project)) return ExitCodes.Usage;
             return KScript.Http.HttpServer.WriteOpenApi(folder ?? ".", project, yaml.Value, output, Out, Error);
@@ -408,6 +419,11 @@ namespace KScript
                 else if (args[i] == "--output" || args[i].StartsWith("--output=", StringComparison.Ordinal))
                     format = args[i] == "--output" ? (++i < args.Length ? args[i] : null) : args[i][9..];
                 else if (!args[i].StartsWith("-", StringComparison.Ordinal)) folder ??= args[i];
+                else
+                {
+                    Error.WriteLine($"Unknown option '{args[i]}' for kscript routes. Use -v or --output text|json.");
+                    return ExitCodes.Usage;
+                }
             }
             if (format is not ("text" or "json"))
             {
@@ -448,10 +464,20 @@ namespace KScript
         /// </summary>
         public int Run(string[] args)
         {
-            args = TakeDebug(args);
+            GlobalOptions options;
             try
             {
-                return RunCommand(args);
+                options = TakeGlobalOptions(args);
+            }
+            catch (ArgumentException ex)
+            {
+                ErrorReport.Write(Error, ex);
+                return ExitCodes.Usage;
+            }
+            if (options.Debug) ErrorReport.Debug = true;
+            try
+            {
+                return RunCommand(options);
             }
             catch (Exception ex)
             {
@@ -461,31 +487,9 @@ namespace KScript
             }
         }
 
-        /// <summary>
-        /// Takes --debug out of the arguments and turns on <see cref="ErrorReport.Debug"/>. Like --env, it is read before
-        /// the script path (later arguments are the script's own), or anywhere for commands such as serve.
-        /// </summary>
-        internal static string[] TakeDebug(string[] args)
+        int RunCommand(GlobalOptions options)
         {
-            var rest = new List<string>(args.Length);
-            bool before = true;
-            string first = args.FirstOrDefault(a => !a.StartsWith("-", StringComparison.Ordinal));
-            bool script = first != null && (first.Contains('.') || first.Contains('/') || first.Contains('\\'));
-            foreach (string a in args)
-            {
-                if (a == "--debug" && (before || !script))
-                {
-                    ErrorReport.Debug = true;
-                    continue;
-                }
-                if (!a.StartsWith("-", StringComparison.Ordinal)) before = false;
-                rest.Add(a);
-            }
-            return rest.ToArray();
-        }
-
-        int RunCommand(string[] args)
-        {
+            string[] args = options.Rest;
             AddProjectOutputs();
             if (args.Length > 0 && args[0] == "lsp")
             {
@@ -502,17 +506,13 @@ namespace KScript
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             KScript.Updates.SelfUpdater.CleanupPreviousBinary();
 
-            // --env staging (before the script, or anywhere after serve and test) picks the environment for $config.
-            try
+            // --ansi and --no-ansi force colours on or off for the whole run; --env staging picks the environment for
+            // $config, and is also set as KSCRIPT_ENV so pages and child scripts see it.
+            KScript.Output.CliStyle.Override = options.Ansi;
+            if (options.Environment != null)
             {
-                KScript.Output.CliStyle.Override = null;
-                args = TakeAnsi(args);
-                args = TakeEnvironment(args);
-            }
-            catch (ArgumentException ex)
-            {
-                ErrorReport.Write(Error, ex);
-                return ExitCodes.Usage;
+                EnvironmentName = options.Environment;
+                Environment.SetEnvironmentVariable("KSCRIPT_ENV", options.Environment);
             }
 
             if (args.Length > 0 && (args[0] == "--version" || args[0] == "version"))
@@ -699,6 +699,17 @@ namespace KScript
             {
                 new KScript.Output.CliOutput(Error).Error($"Unknown option '{args[0]}'.\nRun kscript --help for usage.");
                 return ExitCodes.Usage;
+            }
+
+            // kscript run app.kscript is kscript app.kscript.
+            if (args[0] == "run")
+            {
+                if (args.Length < 2)
+                {
+                    new KScript.Output.CliOutput(Error).Error("kscript run needs a script, e.g. kscript run hello.kscript");
+                    return ExitCodes.Usage;
+                }
+                args = args.Skip(1).ToArray();
             }
 
             string path = ResolveScriptPath(args[0]);
@@ -923,13 +934,17 @@ namespace KScript
                     report = Path.GetFullPath(at.File) + report.Substring(Path.GetFileName(at.File).Length);
                 }
                 ErrorReport.WriteMessage(Error, report);
-                return ExitCodes.ScriptError;
+                return ScriptExitCode(ex);
             }
             finally
             {
                 Console.CancelKeyPress -= stop;
             }
         }
+
+        /// <summary>The exit code for what stopped a script: 3 for the script's own error, 70 for a fault inside kscript.</summary>
+        internal static int ScriptExitCode(Exception ex) =>
+            ErrorReport.ToKScript(ex).Type == ErrorReport.InternalType ? ExitCodes.Internal : ExitCodes.ScriptError;
 
         /// <summary>
         /// Resolves the script path given on the command line. Falls back to a case-insensitive

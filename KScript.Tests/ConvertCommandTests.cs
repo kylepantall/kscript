@@ -26,6 +26,45 @@ public sealed class ConvertCommandTests : IDisposable
     }
 
     [Fact]
+    public void Converted_scripts_are_laid_out_as_fmt_would()
+    {
+        Write("p/kscript.json", "{}");
+        string xml = Write("p/lib/people.ks.xml", "<kscript>\n  <let name=\"people\" value=\"[{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }, { name: 'Ada', age: 36 }, { name: 'Grace', age: 45 }]\" />\n  <echo>{ $people->count() }</echo>\n</kscript>\n");
+        var (code, _, error) = Run(xml);
+        Assert.True(code == 0, error);
+        string written = Path.Combine(dir, "p", "lib", "people.kscript");
+        var check = new StringWriter();
+        Assert.True(KScript.LanguageServer.FormatCommand.Run(new[] { written, "--check" }, check) == 0, File.ReadAllText(written) + check);
+
+        string back = Path.Combine(dir, "p", "lib", "back.ks.xml");
+        Assert.Equal(0, Run(written, "--out", back).Code);
+        check = new StringWriter();
+        Assert.True(KScript.LanguageServer.FormatCommand.Run(new[] { back, "--check" }, check) == 0, File.ReadAllText(back) + check);
+    }
+
+    [Fact]
+    public void Scripts_left_in_their_own_syntax_import_the_converted_files()
+    {
+        Write("q/kscript.json", "{}");
+        Write("q/models/note.ks.xml", "<kscript>\n  <fn name=\"note\" value=\"'a note'\" />\n</kscript>\n");
+        string component = Write("q/lib/uses.kscript", "import \"../models/note.ks.xml\"\n\necho @note()\n");
+        var (code, output, error) = Run(Path.Combine(dir, "q"), "--syntax", "kscript");
+        Assert.True(code == 0, error);
+        Assert.Contains("import \"../models/note.kscript\"", File.ReadAllText(component));
+        Assert.Contains("uses.kscript: now names the converted files", output);
+    }
+
+    [Fact]
+    public void A_file_that_cannot_be_written_is_reported_in_plain_words()
+    {
+        string script = Write("w/a.kscript", "echo \"hi\"\n");
+        var (code, _, error) = Run(script, "--out", Path.Combine(dir, "w", "nowhere", "a.ks.xml"));
+        Assert.Equal(1, code);
+        Assert.Contains("there is no folder at", error);
+        Assert.DoesNotContain("Could not find a part of the path", error);
+    }
+
+    [Fact]
     public void Options_are_checked()
     {
         Assert.Contains("Usage: kscript convert", Run("--help").Out);

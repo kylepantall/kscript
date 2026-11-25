@@ -500,7 +500,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(File.Exists(Path.Combine(parent.Root, "api-only", "desktop.kscript")));
         string makefile = File.ReadAllText(Path.Combine(parent.Root, "api-only", "Makefile"));
         Assert.Contains("routes:\n\t$(KSCRIPT) routes", makefile);
-        Assert.Contains("app:\n\t$(KSCRIPT) app build", makefile);
+        Assert.Contains("app:\n\t$(KSCRIPT) compile", makefile);
         Assert.Contains("%:\n\t$(KSCRIPT) make $@ $(name) $(args)", makefile);
     }
 
@@ -540,10 +540,10 @@ public class MakeProjectTests : IDisposable
     public void AMistypedOptionIsPointedOut()
     {
         using var parent = new TempSite();
-        var (code, output, _) = Make(parent.Root, "site", "--no-dekstop");
-        Assert.Equal(0, code);
-        Assert.Contains("no 'dekstop' option", output);
-        Assert.True(File.Exists(Path.Combine(parent.Root, "site", "desktop.kscript")));
+        var (code, _, err) = Make(parent.Root, "site", "--no-dekstop");
+        Assert.Equal(2, code);
+        Assert.Contains("The web project template has no --dekstop option. Its options: --syntax, --desktop, --http, --port.", err);
+        Assert.False(Directory.Exists(Path.Combine(parent.Root, "site")));
     }
 
     [Fact]

@@ -44,8 +44,26 @@ namespace KScript.Scaffolding
                 .ToArray();
             if (segments.Any(s => s == ".." || s == "." || s.Contains(':') || s.Contains('"')))
                 throw new StubException($"'{request.Name}' is not a route path. Use words and {{parameters}}, e.g. users/{{id}}.");
+            // What is written into the routes file must be a path there: a space or a quote would break every route in it.
+            if (segments.Any(s => !Regex.IsMatch(s, @"\A(?:[\w\-.~]+|\{[A-Za-z_]\w*[?*]?\})\z")))
+                throw new StubException($"'{request.Name}' is not a route path. Use words and {{parameters}}, e.g. users/{{id}}.");
             string routePath = "/" + string.Join("/", segments);
             var parameters = segments.Where(IsParam).Select(s => s.Trim('{', '}').TrimEnd('?', '*')).ToList();
+            if (parameters.GroupBy(p => p, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
+                throw new StubException($"'{request.Name}' has the parameter {{{twice.Key}}} twice. Give each parameter its own name, e.g. teams/{{team}}/people/{{id}}.");
+            if (options.TryGetValue("name", out var givenName) && !Regex.IsMatch(givenName ?? "", @"\A[\w.\-:]+\z"))
+                throw new StubException($"--name is the route's name for @route('name'), such as users.show: letters, digits, '.', '-', '_' and ':', not '{givenName}'.");
+            if (options.TryGetValue("where", out var rules) && StubTemplate.IsSet(rules))
+            {
+                foreach (string rule in rules.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    Match match = Regex.Match(rule, @"\A(?<name>[A-Za-z_]\w*)\s*:\s*(?<type>[^""<>&]+)\z");
+                    if (!match.Success)
+                        throw new StubException($"--where takes rules such as \"id: int\", not '{rule}'.");
+                    if (!parameters.Contains(match.Groups["name"].Value))
+                        throw new StubException($"--where has a rule for '{match.Groups["name"].Value}', but the path has {(parameters.Count == 0 ? "no parameters" : "only " + string.Join(", ", parameters.Select(p => "{" + p + "}")))}.");
+                }
+            }
 
             string method = options.TryGetValue("method", out var m) ? m.Trim().ToLowerInvariant() : "get";
             if (!Methods.Contains(method)) throw new StubException($"--method should be one of {string.Join(", ", Methods)}, not '{m}'.");

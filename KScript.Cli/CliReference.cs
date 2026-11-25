@@ -30,14 +30,14 @@ namespace KScript
 
         public static readonly IReadOnlyList<CliCommand> Commands = new[]
         {
-            new CliCommand("run", "kscript [--env name] <script> [script arguments]",
-                "Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...).",
+            new CliCommand("run", "kscript [run] [--env name] <script> [script arguments]",
+                "Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...). The word run can be left out.",
                 new[]
                 {
                     O("--env name", "The environment for $config: reads <name>.yaml, .env.<name> and sets KSCRIPT_ENV."),
                     O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1). Works with every command."),
                 },
-                "kscript hello.kscript Joan\nkscript --env staging deploy.kscript", "language") { Group = "run" },
+                "kscript hello.kscript Joan\nkscript run hello.kscript Joan\nkscript --env staging deploy.kscript", "language") { Group = "run" },
             new CliCommand("check", "kscript check [file-or-folder]... [--fix] [--warnings-as-errors] [--output text|json]",
                 "Check scripts and pages without running them (no path: the current project).",
                 new[]
@@ -262,6 +262,7 @@ namespace KScript
             O("--version", "Show the version of kscript."),
             O("--env name", "The environment for $config: reads <name>.yaml and .env.<name>, and sets KSCRIPT_ENV."),
             O("--ansi | --no-ansi", "Force colours on, or turn them off. NO_COLOR and FORCE_COLOR do the same."),
+            O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1)."),
         };
 
         /// <summary>What kscript's exit code means, the same for every command.</summary>
@@ -278,7 +279,7 @@ namespace KScript
             o.NewLine();
             o.Heading("Usage:");
             o.Line("  kscript <command> [options] [arguments]");
-            o.Line("  kscript <script> [script arguments]");
+            o.Line("  kscript [run] <script> [script arguments]");
             o.NewLine();
             o.Heading("Options:");
             int width = Math.Max(GlobalOptions.Max(g => g.Name.Length), Commands.Max(c => c.Name.Length));

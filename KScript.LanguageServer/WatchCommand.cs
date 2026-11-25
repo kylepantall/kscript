@@ -55,6 +55,16 @@ namespace KScript.LanguageServer
             IReadOnlyList<IProjectOutput> enabled = ProjectOutputs.Enabled(root);
             if (enabled.Count == 0)
             {
+                // A kscript.json that can't be read is the problem to report, not "nothing to build".
+                try
+                {
+                    KScript.Projects.ProjectConfig.FindAndLoad(root);
+                }
+                catch (KScript.Projects.ProjectConfigException ex)
+                {
+                    KScript.Runtime.ErrorReport.Write(output, ex);
+                    return 2;
+                }
                 output.WriteLine($"Nothing to build in {root}. Run kscript agents to start the agent docs, which this then keeps up to date.");
                 return check ? 0 : 2;
             }

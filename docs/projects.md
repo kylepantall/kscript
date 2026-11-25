@@ -420,6 +420,8 @@ The files it makes have the functions each kind needs already written, with a `/
 
 A route goes in `routes/web.kscript`, or `routes/api.kscript` with `--api`. A project that already keeps `routes.kscript` or `api.kscript` at the top, or lists its route files in `http.routes`, gets the route there instead. The route file imports the controller, and the route is refused if the file already has one for the same method and path. `struct` and `record` are other names for `type`, and `fn` and `function` for `module`: there is a generator for every kind of thing a script can declare (functions, constants, enums and types).
 
+An option's value is checked before anything is written. `kscript make job Send --tries abc`, `make error E --status abc`, `make document d --template nope` and `make route "a b/{id}"` each stop with a message saying what the value should be, and exit with 2. `kscript make project` does the same for an option its template doesn't have, and lists the ones it has. `make document --template` takes `paper`, `report`, `plain`, `letter` or `invoice`.
+
 ### Where files go: the recommended layout
 
 `kscript make` puts each kind of file in its own folder, and makes the folder the first time it is needed, so a project only has the folders it uses:
@@ -502,7 +504,7 @@ hint: Use it in a page: <{{ kebab }}-card />
 </article>
 ```
 
-- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `category`, `usage`, `example:` lines (as many as you like) and `--option: what it does` lines fill in its entry in `kscript make --list`, and `defaults: actions=index` gives options a default. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
+- The `--- make` header is optional: `to` is where the file goes (default: the name with the template's extension), `hint` is printed afterwards, `description` shows in `kscript make`. `category`, `usage`, `example:` lines (as many as you like) and `--option: what it does` lines fill in its entry in `kscript make --list`, and `defaults: actions=index` gives options a default. `checks: tries=int; level=debug|info|warn` refuses a value that would not work before anything is written: a list of choices, or `int`, `number`, `status`, `duration`, `durations`, `fields`, `names`, `assignments`, `locale` or `file` (a file in the project); `name=` checks the name itself. `base: project` makes `to` relative to the project folder (where `kscript.json` is) rather than the site root, as the `test` template does.
 - `{{ name }}` is the name as typed; `{{ kebab }}`, `{{ snake }}`, `{{ pascal }}`, `{{ camel }}` and `{{ title }}` are its other spellings; `{{ dir }}` is its folder (`blog/` for `blog/first-post`), `{{ path }}` is folder and kebab name, `{{ url }}` its page URL, and `{{ params }}` lists `[id]` segments. `{{ paths.controllers }}` and the other `paths` are the project's folders, `{{ up }}` leads from the new file back to the project folder (`../` for `lib/x.kscript`), and `{{ ext }}` is `.kscript` or `.ks.xml`.
 - `{{ value | kebab }}` applies a filter (`kebab snake pascal camel title var lower upper trim`; `var` turns `sub-title` into the `sub_title` a component sees), and `{{ value ?? fallback }}` gives a default.
 - `{{#if value}} … {{else}} … {{/if}}`, `{{#unless value}}`, `{{#if value is text}}`, `{{#if value in a, b}}`, `{{#if list has text}}`, and `{{#each value}} … {{ item }} … {{/each}}` over a comma-separated list (`{{ index }}`, `{{ first }}` and `{{ last }}` are set). A block tag on its own line leaves no blank line behind.
@@ -518,7 +520,7 @@ Every `kscript` command ends with one of these, so a CI job can tell "the checks
 | 1 | The command ran and found problems: `kscript check` found errors (or warnings, with `--warnings-as-errors`), tests failed, or a `--check` (`fmt`, `agents`, `watch`) found something out of date. |
 | 2 | The command line or the settings are wrong: an unknown command or option, a missing value, a file or folder that is not there, or a `kscript.json` or standard that can't be used. |
 | 3 | A script stopped with an error (or the code the script gave to `exit`). |
-| 70 | An error inside `kscript` itself. |
-| 130 | Stopped with Ctrl+C. |
+| 70 | An error inside `kscript` itself, also when it happens while a script runs. |
+| 130 | Stopped with Ctrl+C. `kscript serve` and `kscript watch` run until they are stopped, so Ctrl+C is how they finish and they end with 0. |
 
-Options are written one way on every command: `--output text|json|yaml` chooses how results are printed (`check`, `queue`, `openapi`), and `--syntax kscript|xml` chooses the script syntax (`make`, `docs`, `mcp`, `convert`). Flags are kebab-case (`--warnings-as-errors`, `--stop-when-empty`), and settings in `kscript.json` are snake_case (`warnings_as_errors`).
+Options are written one way on every command: `--output text|json|yaml` chooses how results are printed (`check`, `queue`, `openapi`), and `--syntax kscript|xml` chooses the script syntax (`make`, `docs`, `mcp`, `convert`). Flags are kebab-case (`--warnings-as-errors`, `--stop-when-empty`), and settings in `kscript.json` are snake_case (`warnings_as_errors`). `--env name`, `--ansi`, `--no-ansi` and `--debug` work after any command (`kscript worker --env staging`); for a script they go before its name (`kscript --env staging deploy.kscript`, or `kscript run --env staging deploy.kscript`), because what follows the name is the script's `$args`.

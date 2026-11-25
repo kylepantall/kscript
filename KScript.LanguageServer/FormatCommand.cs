@@ -154,11 +154,14 @@ namespace KScript.LanguageServer
                 }
             }
 
-            string files1 = formatted == 1 ? "file" : "files";
+            // fmt tidies scripts and HTML pages; kscript check also reads Markdown pages, so its count can be higher.
+            string files1 = formatted == 1 ? "script or page" : "scripts and pages";
             if (changed + failed > 0) cli.NewLine();
             if (check)
             {
-                if (changed == 0) cli.Success($"{formatted} {files1} checked: all formatted.");
+                // Nothing could be read: the error below says so, and "all formatted" would be wrong.
+                if (formatted == 0 && failed > 0) { }
+                else if (changed == 0) cli.Success($"{formatted} {files1} checked: all formatted.");
                 else cli.Error($"{formatted} {files1} checked: {changed} need formatting. Run kscript fmt to fix {(changed == 1 ? "it" : "them")}.");
             }
             else
