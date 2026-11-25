@@ -590,7 +590,8 @@ namespace KScript.Syntax
                 }
                 break;
             }
-            return labels >= 2 ? i : -1;
+            // 1+@math.sqrt(4) is arithmetic with a call, not an address.
+            return labels >= 2 && !(i < end && text[i] == '(') ? i : -1;
         }
 
         /// <summary>Tokenizes the whole input (used for highlighting and completion).</summary>
