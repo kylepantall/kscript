@@ -48,8 +48,8 @@ namespace KScript.Runtime
                 (t, c) => Filter((List<object>)t, c.Str(0), keep: true, c));
             p.Method(KType.List, "without", "what: word", "The items that aren't of a type (->without(string)), or without the ones a filter of the items' type keeps (->without(prereleases)).", KType.List,
                 (t, c) => Filter((List<object>)t, c.Str(0), keep: false, c));
-            p.Method(KType.Any, "is_a", "type: word", "True when the value is of this type: $x->is_a(semver), $x->is_a(string).", KType.Bool,
-                (t, c) => IsOfType(t, c.Str(0)));
+            p.Method(KType.Any, "is_a", "type: word", "True when the value has this type, or when text passes validation for a native type such as uuid.", KType.Bool,
+                (t, c) => MatchesType(t, c.Str(0)));
             p.Examples(
                 ("list->only", Let + "<echo>{ $loads->only(number) }</echo>"),
                 ("list->without", Let + "<echo>{ $loads->without(string) }</echo>"),
@@ -70,6 +70,9 @@ namespace KScript.Runtime
                 _ => false,
             };
         }
+
+        private static bool MatchesType(object value, string type) =>
+            IsOfType(value, type) || (Values.Unwrap(value) is string && SemanticTypes.TryConvert(type, value, out _, out _));
 
         internal static bool IsTypeName(string what) => Values.IsDeclarable(what) || what is "null" or "error";
 

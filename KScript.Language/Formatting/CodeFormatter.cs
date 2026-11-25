@@ -193,6 +193,7 @@ namespace KScript.Language.Formatting
             Code,
             Single,
             Double,
+            Regex,
             LineComment,
             BlockComment,
         }
@@ -299,6 +300,13 @@ namespace KScript.Language.Formatting
                             // A slash path with route parameters (/people/{id}) is one value: its braces aren't a block.
                             for (int j = i; j < pathEnd; j++) s.States[j] = State.Double;
                             i = pathEnd - 1;
+                        }
+                        else if (c == '/' && CodeParser.RegexCanStart(text, i)
+                            && Lexer.SlashPathLiteralEnd(text, i, text.Length) < 0
+                            && Lexer.RegexEnd(text, i, text.Length) is int regexEnd && regexEnd > 0)
+                        {
+                            for (int j = i; j < regexEnd; j++) s.States[j] = State.Regex;
+                            i = regexEnd - 1;
                         }
                         else if (c == '\'' || c == '"')
                         {
@@ -1542,7 +1550,7 @@ namespace KScript.Language.Formatting
             List<int> arrows = new List<int>();
             for (int i = first; i <= end; i++)
             {
-                bool split = i == end || (top[i - start] && (char.IsWhiteSpace(text[i]) || text[i] == ',')) || (i > first && !s.IsCode(i) && s.States[i] != State.Single && s.States[i] != State.Double);
+                bool split = i == end || (top[i - start] && (char.IsWhiteSpace(text[i]) || text[i] == ',')) || (i > first && s.States[i] is State.LineComment or State.BlockComment);
                 if (split)
                 {
                     if (arrows.Count > 0 && (best == null || arrows.Count > best.Count))

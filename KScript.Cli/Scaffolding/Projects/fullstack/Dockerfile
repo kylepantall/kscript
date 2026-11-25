@@ -19,4 +19,4 @@ COPY . .
 RUN kscript check
 
 EXPOSE {{ port }}
-CMD ["kscript", "serve", "--host", "0.0.0.0", "--port", "{{ port }}"]
+CMD ["kscript", "serve", "--host", "0.0.0.0", "--port", "{{ port }}", "--migrate"]

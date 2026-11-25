@@ -104,17 +104,29 @@ namespace KScript.Http
             return a + b;
         }
 
+        /// <summary>Checks route constraints without registering or running a route.</summary>
+        public static void ValidateWhere(string path, string where)
+        {
+            if (path == null) ParseWhere(where, new Dictionary<string, string>(StringComparer.Ordinal));
+            else _ = new RoutePattern(path, where);
+        }
+
         private static Dictionary<string, Regex> ParseWhere(string where, Dictionary<string, string> rules)
         {
             var result = new Dictionary<string, Regex>(StringComparer.Ordinal);
             if (string.IsNullOrWhiteSpace(where)) return result;
-            // "id: number, slug: [a-z-]+": a comma inside a regex needs the regex in quotes.
-            foreach (string entry in SplitTopLevel(where))
+            string text = where.Trim();
+            if (text.StartsWith('{') && text.EndsWith('}')) text = text[1..^1];
+            // A comma inside a regular expression can be kept together with quotes.
+            foreach (string entry in SplitTopLevel(text))
             {
                 int colon = entry.IndexOf(':');
-                if (colon <= 0) throw new KScriptException($"where=\"{where}\": write name: rule pairs, such as where=\"id: number\".", "Http");
-                string name = entry[..colon].Trim();
-                string rule = entry[(colon + 1)..].Trim().Trim('\'', '"');
+                string name = colon < 0 ? string.Empty : entry[..colon].Trim();
+                string rule = colon < 0 ? string.Empty : entry[(colon + 1)..].Trim().Trim('\'', '"');
+                if (name.Length == 0 || !name.All(c => char.IsLetterOrDigit(c) || c == '_') || rule.Length == 0)
+                    throw new KScriptException($"Invalid route constraint '{entry.Trim()}'. Write name: rule pairs such as where: {{ id: int }}.", "Http");
+                if (rules.ContainsKey(name))
+                    throw new KScriptException($"where has more than one rule for '{name}'.", "Http");
                 string pattern = NamedConstraints.TryGetValue(rule, out string named) ? named : rule;
                 rules[name] = rule;
                 try

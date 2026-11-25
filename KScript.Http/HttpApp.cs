@@ -619,6 +619,7 @@ namespace KScript.Http
             {
                 Status = response.Status,
                 Body = method == "HEAD" ? string.Empty : response.Body ?? string.Empty,
+                BodyBytes = method == "HEAD" ? null : response.BodyBytes,
                 ContentType = response.ContentType ?? "text/plain; charset=utf-8",
             };
             foreach (var h in response.Headers) page.Headers[h.Key] = Values.ToStr(h.Value);

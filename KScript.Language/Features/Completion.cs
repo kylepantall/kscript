@@ -201,7 +201,7 @@ namespace KScript.Language.Features
             }
 
             // Plain script text: bare $ and @ references still complete.
-            if (wordStart > 0 && (text[wordStart - 1] == '$' || text[wordStart - 1] == '@') && analysis.Kind == DocumentKind.Script)
+            if (wordStart > 0 && (text[wordStart - 1] == '$' || text[wordStart - 1] == '@') && analysis.MarkupAt(offset).Kind == DocumentKind.Script)
             {
                 return text[wordStart - 1] == '$'
                     ? VariableCompletions(analysis, offset, TextSpan.FromBounds(wordStart, offset), withSigil: false)

@@ -6,6 +6,7 @@ namespace KScript.Runtime
         public int Status { get; init; }
         public string Reason { get; init; }
         public string Body { get; init; } = string.Empty;
+        public byte[] BodyBytes { get; init; }
         public Dictionary<string, object> Headers { get; init; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
     }
 

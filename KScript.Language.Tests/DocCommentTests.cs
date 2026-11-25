@@ -66,6 +66,26 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void BracesInTypeMemberDocumentationAreProse()
+        {
+            const string text = """
+                type Box {
+                  /// A JSON shape { name, size }.
+                  size: int = 1
+
+                  /// Sends { name, size } back from /files/{id}.
+                  fn info() => $size
+                }
+
+                box = Box()
+                echo $box->in‸fo()
+                """;
+            (DocumentAnalysis analysis, int offset) = At(text, "box.kscript");
+            AssertClean(analysis);
+            Assert.Contains("Sends { name, size } back from /files/{id}.", Service.GetHover(analysis, offset).Markdown);
+        }
+
+        [Fact]
         public void SignatureHelpShowsParameterDocs()
         {
             (DocumentAnalysis a, int offset) = At(Greet + "\necho @greet('Kyle', ‸)", "test.kscript");

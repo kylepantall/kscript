@@ -34,7 +34,7 @@ Routes {
 
   Get(path: /, view: "home", name: "home")
   Get(path: /people, to: @people.list, name: "people.list")
-  Get(path: /people/{id}, to: @people.page, name: "people.page", where: "id: int")
+  Get(path: /people/{id}, to: @people.page, name: "people.page", where: { id: int })
   Get(path: /team, redirect: "/people", status: 301)
 
   Get(path: /ping) {
@@ -62,7 +62,7 @@ A route has a `path` and one way to answer:
 | a `{ }` block | The route's own body, like an `fn`: `Get(path: /ping) { return 'pong' }`. |
 | `name` | A name for `@route('people.show', id: 3)`. Names must be unique. |
 | `middleware` | Middleware for this route only. |
-| `where` | Rules for parameters: `where="id: int, slug: slug"`. The rules are `number`, `int`, `alpha`, `alnum`, `slug`, `uuid`, or a regular expression in quotes. A request that breaks a rule doesn't match the route. |
+| `where` | Rules for parameters such as `where: { id: int, slug: slug }` in KScript or `where="id: int, slug: slug"` in XML. The rules are `number`, `int`, `alpha`, `alnum`, `slug`, `uuid`, or a regular expression in quotes. A request that breaks a rule doesn't match the route. |
 
 Routes are tried in the order they are written, and the first match wins. A path that matches but has no route for the method gets `405 Method Not Allowed` with an `Allow` header. An `OPTIONS` request gets `204` with `Allow`, which is how CORS preflights are answered (see [cors](#built-in-middleware)).
 
@@ -151,6 +151,8 @@ What a controller returns becomes the response:
 | `@redirect(/people)`, `@redirect(to: '/new', status: 301)` | A redirect. |
 | nothing (`null`) | `204 No Content`. |
 
+A `base64` body, such as `@response(@read_bytes('logo.png'), type: 'image/png')`, sends the original bytes. Its default content type is `application/octet-stream`.
+
 `@abort(404)` or `@abort(403, message: 'Admins only')` stops the request with that status, from anywhere: a controller, a function it calls, or middleware. `try` doesn't catch it. An error in a controller answers `500` with the file and line, and the server log shows it too.
 
 ### Errors and status codes
@@ -175,7 +177,7 @@ fn show(id: int) {
 
 `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) and `TooManyRequests` (429, with `Retry-After` when the error has a `retry_after` field) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
 
-Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
+Controllers and actions in views rendered with `@view()` can read and write files within the site folder. Set `"write_files": false` to make both read-only. Anything a controller prints with `echo` goes to the server log.
 
 ## Views
 
@@ -353,7 +355,7 @@ The Notes example in the [fullstack project template](projects.md#a-web-app-with
     "groups": { "api": ["cors", "throttle"] },  // names for lists of middleware
     "views": "views",                           // where @view() looks first; never served
     "api_prefix": "/api",                       // the prefix of api.* files
-    "write_files": true,                        // false: controllers can only read files
+    "write_files": true,                        // false: controllers and their live actions can only read files
     "cors": { "origins": ["*"], "methods": ["GET", "POST"], "headers": ["Content-Type", "Authorization"], "credentials": false },
     "auth": { "token_env": "API_TOKEN", "login": "/login", "lifetime": "2h" },  // and the KScript.Auth settings in auth.md
     "throttle": { "limit": 60, "seconds": 60 },

@@ -1,6 +1,8 @@
 using KScript.Http;
 using KScript.Pages;
 using KScript.Projects;
+using KScript.Runtime;
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 
 namespace KScript.Language.Analysis
@@ -9,6 +11,38 @@ namespace KScript.Language.Analysis
     {
         private bool? inHandlerFolder;
         private HashSet<string> routeHandlerNames;
+
+        private string routeFilePrefix;
+
+        private void CheckRouteWhere(MarkupElement route, MarkupAttribute where)
+        {
+            string path = route.GetAttributeValue("path");
+            if (path != null)
+            {
+                foreach (MarkupElement group in route.Ancestors().Where(parent => ElementInfo.BareName(parent.Name) is "Routes" or "Group"))
+                    path = RoutePattern.Join(group.GetAttributeValue("prefix"), path);
+                path = RoutePattern.Join(routeFilePrefix ??= RouteFilePrefix(), path);
+            }
+            try
+            {
+                RoutePattern.ValidateWhere(path, where.ValueText);
+            }
+            catch (KScriptException error)
+            {
+                Report(TrimmedSpan(where.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, error.Words);
+            }
+        }
+
+        private string RouteFilePrefix()
+        {
+            if (result.Path == null || ProjectFor(out _) is not ProjectConfig project) return string.Empty;
+            string current = Path.GetFullPath(result.Path);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var known = project.Http.Routes?.FirstOrDefault(route =>
+                Path.GetFullPath(Path.Combine(project.SiteRoot, route.File)).Equals(current, comparison));
+            return known?.Prefix ?? (known?.Api == true || ProjectConfig.ScriptName(current).Equals("api", StringComparison.OrdinalIgnoreCase)
+                ? project.Http.ApiPrefix : string.Empty);
+        }
 
         private bool InHttpFolder(params string[] names)
         {

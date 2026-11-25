@@ -76,6 +76,8 @@ key = @uuid(v: 8, name: 'joan@example.com')
 echo "{ $id.version } { $key.version } { $key == @uuid(v: 8, name: 'joan@example.com') }"
 ```
 
+To check whether text is a UUID, use `$text->is_a(uuid)`. Use `$text as uuid` to convert it and report invalid text as an error.
+
 `@uuid()` makes a random version 4 UUID. `@uuid(v: 8)` makes a version 8 UUID that is time-ordered. With `name:`, it is the same UUID every time for that name, and `namespace:` keeps names from different places apart.
 
 A value of the wrong form fails where it is made, with a `Shape` error that says why:

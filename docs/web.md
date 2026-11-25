@@ -47,12 +47,12 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **`$request`** contains `method`, `scheme`, `path`, `url`, `query`, `form`, `headers`, `cookies`, `params` and `body`. For `https://example.com/people?page=2`, `$request.scheme` is `https`, `$request.path` is `/people` and `$request.url` is `/people?page=2`. A locale-prefixed page also receives `$request.locale`.
 - **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
 - **Sharing code with scripts**: `<import path="lib/text.kscript" />` at the top of a page gives it that script's top-level functions and `const` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
-- **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
+- **Files**: paths start in the site folder and can't leave it, and page rendering can only read files. A live action in a controller view can write when `http.write_files` permits it.
 - **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
 
 During development, open the site in a browser and save changes to a page, component, script, stylesheet, or asset. Open HTML pages reload automatically. Use `kscript serve --no-reload` to turn it off. Production and compiled sites serve pages without a browser reload script.
 
-For a containerised development site, run `kscript serve --docker` with a Compose file. The bind-mounted source lets the container see edits. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
+For a containerised development site, add a Compose file and run `kscript serve`. Use `--no-docker` to serve on the host. The bind-mounted source lets the container see edits. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
 
 ## Model forms
 

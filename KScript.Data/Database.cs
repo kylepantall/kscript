@@ -236,7 +236,8 @@ namespace KScript.Data
         private DbConnection keeper;
 
         /// <summary>The transaction each running script has open on this database, if any.</summary>
-        private readonly ConditionalWeakTable<Interpreter, TransactionState> transactions = new ConditionalWeakTable<Interpreter, TransactionState>();
+        private readonly ConditionalWeakTable<Interpreter, TransactionState> transactions = new();
+        private readonly ConditionalWeakTable<KScriptHost, TransactionState> testTransactions = new();
 
         private Database(DatabaseSettings settings) => Settings = settings;
 
@@ -252,7 +253,8 @@ namespace KScript.Data
             if (host != null && (name == null || name == DatabaseSettings.DefaultName))
             {
                 if (host.MemoryDatabase) return ForSandbox(host);
-                if (host.TestFile != null && ForTest(host, folder) is Database test) return test;
+                KScriptHost testHost = AppFolders.TestHost ?? host;
+                if (testHost.TestFile != null && ForTest(testHost, folder) is Database test) return test;
             }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
             return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
@@ -275,7 +277,7 @@ namespace KScript.Data
         private void EnsureModelTable(Interpreter interpreter, ModelInfo model)
         {
             // A transaction may already own the database's write lock while another request waits for it.
-            if (transactions.TryGetValue(interpreter, out _))
+            if (Current(interpreter) != null)
                 Ensure();
             else
                 lock (modelTables) Ensure();
@@ -502,8 +504,13 @@ namespace KScript.Data
             public bool Test;
         }
 
-        private TransactionState Current(Interpreter interpreter) =>
-            interpreter != null && transactions.TryGetValue(interpreter, out TransactionState s) && s.Connection != null ? s : null;
+        private TransactionState Current(Interpreter interpreter)
+        {
+            if (interpreter == null) return null;
+            if (transactions.TryGetValue(interpreter, out TransactionState state) && state.Connection != null) return state;
+            KScriptHost host = AppFolders.TestHost ?? interpreter.Host;
+            return host.TestRunning && testTransactions.TryGetValue(host, out state) ? state : null;
+        }
 
         /// <summary>True while the script has a transaction open on this database.</summary>
         public bool InTransaction(Interpreter interpreter) => Current(interpreter) != null;
@@ -614,15 +621,15 @@ namespace KScript.Data
         /// </summary>
         private TransactionState BeginTest(Interpreter interpreter)
         {
-            KScriptHost host = interpreter?.Host;
+            KScriptHost host = interpreter == null ? null : AppFolders.TestHost ?? interpreter.Host;
             if (host == null || !host.TestRunning) return null;
             DbConnection connection = Connect();
             var state = new TransactionState { Connection = connection, Test = true };
             state.Transaction = connection.BeginTransaction();
-            transactions.AddOrUpdate(interpreter, state);
+            testTransactions.Add(host, state);
             host.AfterTest.Add(() =>
             {
-                transactions.Remove(interpreter);
+                testTransactions.Remove(host);
                 try
                 {
                     state.Transaction.Rollback();

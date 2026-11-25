@@ -23,4 +23,4 @@ EXPOSE {{ port }}
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s \
     CMD bash -ec 'exec 3<>/dev/tcp/127.0.0.1/{{ port }}; printf "GET /_ks/live.js HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; read -r reply <&3; [[ "$reply" == HTTP/*" 200 "* ]]'
 ENTRYPOINT ["kscript"]
-CMD ["serve", "--host", "0.0.0.0"]
+CMD ["serve", "--host", "0.0.0.0", "--migrate"]
