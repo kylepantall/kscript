@@ -201,7 +201,7 @@ namespace KScript
                 Group = "build",
                 Details = "A bare name searches kylepantall/kscript, all public repositories under orimovo and waggr-gb, and repositories registered in this project. Each repository can publish libraries/<name>/ or a matching library manifest at its root. One match installs immediately. For multiple matches, the CLI prints the count and each distinct owner/repo@library name. Rerun lib add with owner/repo@library to install your choice. A qualified name avoids the catalog search and uses GitHub API quota only for the selected publisher. Register another publisher with kscript repo add owner/repo. You can also install a GitHub repository or tree URL directly. The installer prints the import path and records the source and commit in the project's kscript.json. Commit that file so kscript lib restore fetches directly from the recorded repository at that commit.",
             },
-            new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist]",
+            new CliCommand("compile", "kscript compile [script or folder] [--target mac-arm64,win-x64,linux-x64|all] [--out dist] [--to exe]",
                 "Build programs that run without kscript.",
                 new[]
                 {
@@ -209,6 +209,7 @@ namespace KScript
                     O("--out folder", "Where programs go (default: dist/ next to the script or kscript.json), one folder per target."),
                     O("--name \"My App\"", "The program's name (default: the app section of kscript.json, or the script's name)."),
                     O("--runtime file", "A kscript release binary or archive for the target, instead of downloading one."),
+                    O("--to exe", "What to make: exe, a program, is the default and the only choice so far."),
                 },
                 "kscript compile hello.kscript\nkscript compile --target all", "compile") { Group = "build", Details = "It holds the script, its imports and files, and only the packages it uses: a terminal script, a KScript.Window desktop app, or a kscript serve site.\nWith no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }. A project without app.main but with pages compiles to a program that serves the site." },
             new CliCommand("make", "kscript make project [folder] [--template web|api|fullstack|bare] [--db sqlite] [--auth] [--docker] [--examples]\nkscript make <type> <name> [--key value]\nkscript make auth [--passkeys] [--origin URL] [--rp-id DOMAIN] [--api]\nkscript make --list",
@@ -225,8 +226,13 @@ namespace KScript
                     O("--key value", "Values for the template, such as --resource or --fields \"name: string\"."),
                 },
                 "kscript make project my-site\nkscript make project shop --template api --db postgres --docker\nkscript make route users --api\nkscript make controller people --resource", "projects") { Group = "build" },
-            new CliCommand("ide", "kscript ide [install|uninstall|config] [editor]",
-                "Set up VS Code, Cursor, VSCodium or another editor.", Array.Empty<CliOption>(),
+            new CliCommand("ide", "kscript ide [install|uninstall|config] [editor] [--version <tag>] [--vsix file]",
+                "Set up VS Code, Cursor, VSCodium or another editor.",
+                new[]
+                {
+                    O("--version tag", "With install: the extension of a specific release, such as v0.3.0 (default: the one for this kscript)."),
+                    O("--vsix file", "With install: an extension file you already have, instead of downloading one."),
+                },
                 "kscript ide install\nkscript ide config neovim", "install") { Group = "tools" },
             new CliCommand("lsp", "kscript lsp", "Start the language server (LSP over stdio).", Array.Empty<CliOption>(), null, "install") { Group = "tools" },
             new CliCommand("update", "kscript update [--check] [--force] [--version <tag>]",
