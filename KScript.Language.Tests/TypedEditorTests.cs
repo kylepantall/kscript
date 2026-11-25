@@ -232,6 +232,18 @@ namespace KScript.Language.Tests
             Assert.Equal(new[] { "fn none()⟦ → number⟧", "fn one(key)⟦ → bool⟧", "fn spaced (a, b = (1))⟦ → string⟧" }, hints);
         }
 
+        [Theory]
+        [InlineData("test.kscript", "fn declared(value: int): number { return $value }\nfn inferred() => 1")]
+        [InlineData("test.ks.xml", "<kscript><fn name=\"declared\" returns=\"number\" value=\"1\" />\n<fn name=\"inferred\" value=\"1\" /></kscript>")]
+        public void ReturnHintsOnlyAppearForInferredTypes(string path, string text)
+        {
+            DocumentAnalysis analysis = Service.Analyze(text, path);
+            InlayHint hint = Assert.Single(Service.GetInlayHints(analysis), h => h.Label.StartsWith(" →", StringComparison.Ordinal));
+
+            Assert.Equal(" → number", hint.Label);
+            Assert.Equal(1, analysis.Source.GetPosition(hint.Offset).Line);
+        }
+
         [Fact]
         public void AReceiverSpecificMethodOnAnyHasNoConcreteReturnHint()
         {

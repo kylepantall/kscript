@@ -236,17 +236,21 @@ grid = [1, 0, 0,
 
 ## In the editor
 
-The VS Code extension is the default formatter for KScript files, so **Format Document** (Shift+Alt+F, or Shift+Option+F on macOS) works straight away. To format on save:
+The VS Code extension is the default formatter for KScript files, so **Format Document** (Shift+Alt+F, or Shift+Option+F on macOS) works straight away. To format on save, add these entries to your VS Code settings:
 
 ```json
-"[kscript]": { "editor.formatOnSave": true },
-"[kscript-code]": { "editor.formatOnSave": true }
+{
+  "[kscript]": { "editor.formatOnSave": true },
+  "[kscript-code]": { "editor.formatOnSave": true }
+}
 ```
 
 VS Code has its own HTML formatter, which doesn't know about KScript elements or `{ }`. To use KScript's for pages, pick **KScript** when VS Code asks which formatter to use, or set it for a site's workspace:
 
 ```json
-"[html]": { "editor.defaultFormatter": "kylepantall.kscript" }
+{
+  "[html]": { "editor.defaultFormatter": "kylepantall.kscript" }
+}
 ```
 
 Other editors get formatting from `kscript lsp` (the LSP `textDocument/formatting` request). In CI, run `kscript fmt --check`.

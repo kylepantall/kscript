@@ -186,12 +186,14 @@ Each attempt runs in a fresh interpreter that loads the job's file again, so a w
 
 ## Looking after the queues: kscript queue
 
+Use a job ID from `kscript queue failed` in place of `42` below.
+
 ```sh
 kscript queue status              # waiting, delayed, running and failed jobs per queue
 kscript queue list mail           # the waiting jobs with their fields
 kscript queue failed              # the failed jobs and their errors
-kscript queue retry <id>          # put a failed job back, with its tries reset (or --all)
-kscript queue delete <id>         # delete a failed job (or --all)
+kscript queue retry 42            # put a failed job back, with its tries reset (or --all)
+kscript queue delete 42           # delete a failed job (or --all)
 kscript queue clear mail          # remove every waiting job on a queue
 ```
 

@@ -309,6 +309,36 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void An_edited_method_name_completes_without_retyping_the_arrow()
+        {
+            Initialize();
+            const string uri = "file:///work/model-method.kscript";
+            const string header = "import KScript.Data\nmodel BoardDetail { note_id: int }\n";
+            const string receiver = "BoardDetail->";
+            Open(header + receiver + "oldest()", uri);
+
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = uri, ["version"] = 2 },
+                ["contentChanges"] = new JsonArray(new JsonObject { ["range"] = Range(2, receiver.Length, 2, receiver.Length + "oldest".Length), ["text"] = "" }),
+            });
+            Notify("textDocument/didChange", new JsonObject
+            {
+                ["textDocument"] = new JsonObject { ["uri"] = uri, ["version"] = 3 },
+                ["contentChanges"] = new JsonArray(new JsonObject { ["range"] = Range(2, receiver.Length, 2, receiver.Length), ["text"] = "lat" }),
+            });
+
+            JsonObject at = At(2, receiver.Length + "lat".Length, uri);
+            at["context"] = new JsonObject { ["triggerKind"] = 1 };
+            JsonArray items = Request("textDocument/completion", at)["result"]["items"].AsArray();
+            JsonNode latest = Assert.Single(items, i => i["label"].GetValue<string>() == "latest");
+            Assert.DoesNotContain(items, i => i["label"].GetValue<string>() is "keys" or "find_last");
+            Assert.Contains(": query", latest["detail"].GetValue<string>());
+            Assert.Equal("latest", latest["textEdit"]["newText"].GetValue<string>());
+            Assert.True(JsonNode.DeepEquals(Range(2, receiver.Length, 2, receiver.Length + "lat".Length), latest["textEdit"]["range"]));
+        }
+
+        [Fact]
         public void SignatureHelpSendsEachParameterAsItsPlaceInTheLabel()
         {
             Initialize();

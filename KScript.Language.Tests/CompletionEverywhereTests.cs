@@ -12,6 +12,8 @@ namespace KScript.Language.Tests
 
         private static readonly LanguageService Service = new LanguageService(files: new MemoryFiles()
             .Add(Path.Combine(Folder, "lib.kscript"), "/// The limit.\nconst limit = 3\nenum Size { s, m }\ntype Repo {\n  name: string\n}\nfn add(a, b) => $a + $b\n")
+            .Add(Path.Combine(Folder, "board-detail.kscript"), "import KScript.Data\nmodel BoardDetail(unique: [note_id]) { note_id: int }")
+            .Add(Path.Combine(Folder, "other-model.kscript"), "import KScript.Data\nmodel OtherModel { name: string }")
             .Add(Path.Combine(Folder, "lib.ks.xml"), "<kscript>\n  <fn name=\"twice\" params=\"n\" value=\"$n * 2\" />\n</kscript>"));
 
         private static List<CompletionItem> Complete(string textWithCaret, string file)
@@ -128,6 +130,59 @@ namespace KScript.Language.Tests
         [InlineData(Code, "import a from \"missing.kscript\"\nimport ‸ from \"missing.kscript\"")]
         [InlineData(Xml, "<kscript>\n<echo>hello e‸</echo>\n</kscript>")]
         public void Naming_positions_comments_and_mistakes_offer_nothing(string file, string text) => Assert.Empty(Complete(text, file));
+
+        private const string BoardModel = """
+            import KScript.Data
+            import "board-detail.kscript"
+
+            model Note {
+              board?: BoardDetail(by: note)
+              fn save_board(board: map?) {
+                guard $board != null else {
+                  return
+                }
+                CARET
+                BoardDetail->upsert({note_id: 1}, key: 'note_id')
+              }
+            }
+            """;
+
+        [Fact]
+        public void An_imported_model_name_completes_at_the_start_of_a_statement()
+        {
+            const string written = "BoardD";
+            string source = BoardModel.Replace("CARET", written + "‸", StringComparison.Ordinal);
+            List<CompletionItem> items = Complete(source, Code);
+            CompletionItem model = Assert.Single(items, item => item.Label == "BoardDetail");
+            Assert.Equal(CompletionKind.Value, model.Kind);
+            Assert.Equal(written, source.Substring(model.ReplaceSpan.Start, model.ReplaceSpan.Length));
+            Assert.Equal("BoardDetail", model.InsertText ?? model.Label);
+            Assert.DoesNotContain(items, item => item.Label == "OtherModel");
+        }
+
+        [Theory]
+        [InlineData("BoardDetail->‸", true)]
+        [InlineData("BoardDetail->k‸", true)]
+        [InlineData("BoardDetail->lat‸", true)]
+        [InlineData("$board->‸", false)]
+        public void Completing_a_model_and_a_map_offers_the_methods_of_that_receiver(string expression, bool model)
+        {
+            List<CompletionItem> items = Complete(BoardModel.Replace("CARET", expression, StringComparison.Ordinal), Code);
+            if (model)
+            {
+                CompletionItem upsert = Assert.Single(items, item => item.Label == "upsert");
+                Assert.StartsWith("upsert(", upsert.InsertText);
+                Assert.DoesNotContain(items, item => item.Label == "keys" || item.Label == "find_last");
+                CompletionItem latest = Assert.Single(items, item => item.Label == "latest");
+                Assert.Contains(": query", latest.Detail);
+                Assert.DoesNotContain("semver", latest.Detail);
+            }
+            else
+            {
+                Assert.Contains(items, item => item.Label == "keys");
+                Assert.DoesNotContain(items, item => item.Label == "upsert");
+            }
+        }
 
         [Fact]
         public void Only_cases_go_in_a_match()

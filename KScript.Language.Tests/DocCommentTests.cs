@@ -154,6 +154,30 @@ namespace KScript.Language.Tests
             Assert.Contains("nope", AssertSingle(wrong, "KS4007").Message);
         }
 
+        [Theory]
+        [InlineData("import KScript.Http\nRoutes {\n  // @‸\n  Group(prefix: '/api') {}\n}")]
+        [InlineData("echo 'ready' // @‸")]
+        [InlineData("/* @‸ */\necho 'ready'")]
+        [InlineData("/* @‸")]
+        public void PlainCodeCommentsHaveNoCompletions(string source)
+        {
+            (DocumentAnalysis analysis, int offset) = At(source, "test.kscript");
+
+            Assert.Empty(Service.GetCompletions(analysis, offset, "@"));
+            Assert.Empty(Service.GetCompletions(analysis, offset));
+        }
+
+        [Fact]
+        public void CommandsStillCompleteOnTheLineAfterAComment()
+        {
+            (DocumentAnalysis analysis, int offset) = At("import KScript.Http\n// a comment\necho @‸", "test.kscript");
+
+            CompletionItem item = Assert.Single(Service.GetCompletions(analysis, offset, "@"), item => item.Label == "abort");
+            Assert.Equal(CompletionKind.Command, item.Kind);
+            Assert.Equal(offset, item.ReplaceSpan.Start);
+            Assert.StartsWith("abort(", item.InsertText);
+        }
+
         [Fact]
         public void TagsAreCompletedAfterTheAt()
         {
