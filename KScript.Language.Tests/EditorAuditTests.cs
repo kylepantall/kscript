@@ -256,6 +256,15 @@ namespace KScript.Language.Tests
             Assert.StartsWith("fn add(a: number, b: number = [1, 2]->count(), c = 1) =>", fixedText);
         }
 
+        [Fact]
+        public void SettingAFieldARecordDoesNotHaveIsReported()
+        {
+            DocumentAnalysis a = Check(Lines("type T {", "  n: int", "}", "t = T({ n: 1 })", "t.n = 2", "t.zz = 3", "echo $t"));
+            Diagnostic unknown = Assert.Single(a.Diagnostics, d => d.Code == DiagnosticCodes.UnknownField);
+            Assert.Equal("zz", a.Source[unknown.Span]);
+            Assert.Equal("T has no field 'zz'. Its fields are: n.", unknown.Message);
+        }
+
         #endregion
     }
 }
