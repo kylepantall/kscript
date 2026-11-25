@@ -121,7 +121,10 @@ namespace KScript.Runtime
         {
             using var stream = new MemoryStream();
             WriteJson(stream, value, indented);
-            return Encoding.UTF8.GetString(stream.ToArray());
+            string json = Encoding.UTF8.GetString(stream.ToArray());
+            // The writer ends lines the way the computer does. Line breaks inside strings are escaped, so every
+            // carriage return here is layout: the text is the same on every computer without them.
+            return indented ? json.Replace("\r\n", "\n") : json;
         }
 
         /// <summary>Writes KScript's JSON representation, optionally bounding the UTF-8 payload while building it.</summary>

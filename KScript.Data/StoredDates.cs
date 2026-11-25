@@ -42,7 +42,7 @@ namespace KScript.Data
         private static TimeSpan Skipped(TimeZoneInfo zone, DateTime clock)
         {
             foreach (TimeZoneInfo.AdjustmentRule rule in zone.GetAdjustmentRules())
-                if (clock >= rule.DateStart && clock <= rule.DateEnd.AddDays(1) && rule.DaylightDelta != TimeSpan.Zero) return rule.DaylightDelta.Duration();
+                if (clock.Date >= rule.DateStart && clock.Date <= rule.DateEnd && rule.DaylightDelta != TimeSpan.Zero) return rule.DaylightDelta.Duration();
             return TimeSpan.FromHours(1);
         }
     }

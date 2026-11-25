@@ -1189,7 +1189,9 @@ public sealed class DocsTests
 
         // A missing file or folder is said in KScript's words, not .NET's.
         PlaygroundResult missing = Playground.Run("import KScript.IO\necho @read_text('no/such/file.txt')", "kscript");
-        Assert.Contains("FileNotFound: There is no file at 'no/such/file.txt'", missing.Error);
+        // The path in the message is the computer's own spelling of it (Windows gives the whole path).
+        Assert.Contains("FileNotFound: There is no file at '", missing.Error);
+        Assert.Contains("file.txt'", missing.Error);
         Assert.DoesNotContain("Could not find", missing.Error);
 
         // The hint names the kind of file the example is written as.
