@@ -137,6 +137,22 @@ namespace KScript.Data
             return values;
         }
 
+        /// <summary>
+        /// The key ->find() looks for. A model whose key is a whole number has no record for text that isn't a
+        /// number, or for 1.5: those find nothing, rather than failing or finding record 1.
+        /// </summary>
+        private static bool KeyFor(Query q, object given, out object id)
+        {
+            id = Values.Unwrap(given);
+            if (q.Model == null || q.Model.KeyColumn.Kind != ColumnKind.Integer || id == null) return true;
+            if (id is string text)
+            {
+                if (!double.TryParse(text.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double parsed)) return false;
+                id = parsed;
+            }
+            return id is double n && n == Math.Floor(n) && !double.IsInfinity(n);
+        }
+
         private static int Count(object value, string what)
         {
             double n = Values.ToNumber(value, what);
@@ -151,7 +167,7 @@ namespace KScript.Data
             new("or_where", "conditions...", "Like ->where(), joined with or: rows that match the conditions so far, or these.", KType.Query,
                 (q, c) => q.Or(Conditions(q, c, "or_where")), Bare: true),
             new("where_not", "conditions...", "Leaves out the rows that match.", KType.Query,
-                (q, c) => q.And(new SqlUnary("NOT", Conditions(q, c, "where_not"))), Bare: true),
+                (q, c) => q.And(new SqlUnary("IS NOT TRUE", Conditions(q, c, "where_not"))), Bare: true),
             new("when", "test, then: fn, otherwise?: fn", "Changes the query only when the test is true: `->when($search != null, fn(q) => $q->where(fn(u) => $u.name->contains($search)))`.", KType.Query,
                 (q, c) =>
                 {
@@ -189,8 +205,8 @@ namespace KScript.Data
             new("get", "", "Runs the query: a list of records (maps, for a table with no model).", KType.List, (q, c) => q.Get(c)),
             new("first", "", "The first row, or null when none match.", KType.Any, (q, c) => q.First(c)),
             new("first_or_fail", "", "The first row, or a ModelNotFound error (a 404 in a route) when none match.", KType.Any, (q, c) => q.FirstOrFail(c)),
-            new("find", "id", "The record with this key, or null.", KType.Any, (q, c) => q.ById(c.Arg(0)).First(c)),
-            new("find_or_fail", "id", "The record with this key, or a ModelNotFound error (a 404 in a route).", KType.Any, (q, c) => q.ById(c.Arg(0)).FirstOrFail(c, c.Arg(0))),
+            new("find", "id", "The record with this key, or null.", KType.Any, (q, c) => KeyFor(q, c.Arg(0), out object id) ? q.ById(id).First(c) : null),
+            new("find_or_fail", "id", "The record with this key, or a ModelNotFound error (a 404 in a route).", KType.Any, (q, c) => KeyFor(q, c.Arg(0), out object id) ? q.ById(id).FirstOrFail(c, c.Arg(0)) : throw Records.NotFound(q.Model, q.Table, c.Arg(0))),
             new("exists", "", "True when any row matches.", KType.Bool, (q, c) => q.Exists(c)),
             new("count", "", "How many rows match.", KType.Number, (q, c) => q.Count(c)),
             new("sum", "column", "The total of a column over the rows that match (0 when none do).", KType.Number, (q, c) => q.Aggregate(c, "SUM", Word(c.Arg(0), "->sum()")), Bare: true),
@@ -204,7 +220,9 @@ namespace KScript.Data
                 {
                     int perPage = c.Has(0) && c.Arg(0) != null ? Count(c.Arg(0), "per_page") : 15;
                     object pageArg = c.Arg(1);
-                    int page = pageArg == null || (pageArg is string s && !double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? 1 : (int)Values.ToNumber(pageArg, "page");
+                    double asked = pageArg == null || (pageArg is string s && !double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? 1 : Values.ToNumber(pageArg, "page");
+                    // A page too big to count to is still a page past the end, not the first one.
+                    int page = double.IsNaN(asked) || asked < 1 ? 1 : asked >= int.MaxValue ? int.MaxValue : (int)asked;
                     return q.Paginate(c, perPage, page);
                 }),
             new("cursor_paginate", "per_page?: number, after?, key?: string, descending?: bool", "Reads one page using a unique, non-null key (the model key by default). Returns { items, has_more, next }; pass next as after to continue.", KType.Map,
@@ -216,7 +234,7 @@ namespace KScript.Data
             new("increment", "column, by?: number", "Adds to a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,
                 (q, c) => q.Increment(c, Word(c.Arg(0), "->increment()"), c.Num(1, 1)), Bare: true),
             new("decrement", "column, by?: number", "Takes away from a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,
-                (q, c) => q.Increment(c, Word(c.Arg(0), "->decrement()"), -c.Num(1, 1)), Bare: true),
+                (q, c) => q.Increment(c, Word(c.Arg(0), "->decrement()"), -c.Num(1, 1), "decrement"), Bare: true),
             new("delete", "", "Deletes every row that matches: models with soft_deletes only mark them deleted. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: false)),
             new("force_delete", "", "Deletes every row that matches, even for models with soft_deletes. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: true)),
             new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),

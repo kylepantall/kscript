@@ -36,6 +36,10 @@ namespace KScript.Runtime
 
         internal PasswordValue WithAlgorithm(string algorithm) => new PasswordValue(secret, algorithm);
 
+        /// <summary>The algorithm the project around <paramref name="module"/> sets for passwords (kscript.json "types"), or null.</summary>
+        public static string ProjectAlgorithm(Module module) =>
+            TypeDefaults.For(module, SemanticTypes.Password)?.Options.TryGetValue("algorithm", out object algorithm) == true ? Values.ToStr(algorithm) : null;
+
         public string TypeName => SemanticTypes.Password;
 
         /// <summary>The password's text. Only <c>->reveal()</c> and the hashing code read it.</summary>

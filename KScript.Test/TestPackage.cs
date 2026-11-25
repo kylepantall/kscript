@@ -367,7 +367,7 @@ namespace KScript.Testing
             {
                 run.RunChildren();
             }
-            catch (KScriptException ex) when (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase))
+            catch (KScriptException ex) when (ex.Type != "Cancelled" && (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase)))
             {
                 caught = ex;
             }
@@ -392,7 +392,7 @@ namespace KScript.Testing
             {
                 actual = run.Eval("value");
             }
-            catch (KScriptException ex) when (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase))
+            catch (KScriptException ex) when (ex.Type != "Cancelled" && (ex.Type != AssertionType || string.Equals(type, AssertionType, StringComparison.OrdinalIgnoreCase)))
             {
                 if (!ErrorTypes.Matches(ex, type)) throw Failure(run, $"Expected {subject} to throw {Article(type)} {type} error, but it threw {ex.Type}: {ex.Message}", "throws");
                 return null;

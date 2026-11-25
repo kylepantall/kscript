@@ -50,7 +50,7 @@ Files: 1 failed, 1 total
 Time:  0.08s
 ```
 
-The exit code is 0 when every test passed, 1 when any test failed, a test file couldn't run or no tests matched, and 2 when the command line or `kscript.json` is wrong (an unknown option, a path that is not there, no test files in the folder), so `kscript test` can gate a CI job. [Exit codes](projects.md#exit-codes) are the same for every command.
+The exit code is 0 when every test passed, 1 when any test failed, a test file couldn't run, no tests matched or the folder has no test files, and 2 when the command line or `kscript.json` is wrong (an unknown option, a path that is not there), so `kscript test` can gate a CI job. [Exit codes](projects.md#exit-codes) are the same for every command.
 
 ## Test files and folders
 
@@ -215,7 +215,7 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 
 `kscript test --env staging` and a `KSCRIPT_ENV` that is already set win over `test.env`.
 
-Tests that use [KScript.Data](data.md#testing-with-a-database) get a database of their own in memory whatever the config says, unless `test.database` is `config`. Each test's changes are undone when it ends. This includes users backed by a model in `http.auth.users`.
+Tests that use [KScript.Data](data.md#testing-with-a-database) get a database of their own in memory whatever the config says, unless `test.database` is `config`. Each test's changes are undone when it ends. This includes users backed by a model in `http.auth.users`. A route a test calls with `@api()` uses the same database, in the test's transaction: the route sees the records the test made, the test sees what the route saved, and both are undone together.
 
 Each test file also gets temporary app folders for file-backed auth, including configured `http.auth.folder` stores, and for `@storage()`. Commands and local `@api()` calls share those folders within the file. The runner removes them when the file finishes, including on failure. Use a fixture inside the test file or a setup hook when tests need seeded users or files.
 

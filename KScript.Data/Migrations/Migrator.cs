@@ -206,10 +206,14 @@ namespace KScript.Data.Migrations
         }
 
         /// <summary>Runs the pending migrations as one batch, and gives the ones it ran. With <paramref name="pretend"/>, only gives their SQL to <see cref="Pretended"/>.</summary>
-        public List<MigrationFile> Migrate(bool pretend = false) => Connected((connection, _) =>
+        /// <summary>
+        /// <paramref name="fromEmpty"/> (with pretend) shows what an empty database would run: every migration, as
+        /// db fresh --pretend needs, since it drops nothing.
+        /// </summary>
+        public List<MigrationFile> Migrate(bool pretend = false, bool fromEmpty = false) => Connected((connection, _) =>
         {
             if (!pretend) EnsureTable(connection);
-            List<AppliedMigration> applied = Applied(connection, null);
+            List<AppliedMigration> applied = pretend && fromEmpty ? new List<AppliedMigration>() : Applied(connection, null);
             List<MigrationFile> pending = Pending(applied);
             if (pending.Count == 0) return pending;
             Schema schema = Replay(Ordered(applied).Where(f => !pending.Contains(f)));
@@ -371,10 +375,11 @@ namespace KScript.Data.Migrations
             }
         }
 
-        /// <summary>Drops every table in the database, for db fresh.</summary>
-        public List<string> DropAll() => Connected((connection, _) =>
+        /// <summary>Drops every table in the database, for db fresh. With <paramref name="pretend"/>, only gives their names.</summary>
+        public List<string> DropAll(bool pretend = false) => Connected((connection, _) =>
         {
             List<string> tables = Query(connection, null, Database.Dialect.TablesQuery).Select(r => Values.ToStr(r.Values.First())).ToList();
+            if (pretend) return tables;
             switch (Database.Dialect)
             {
                 case SqliteDialect:

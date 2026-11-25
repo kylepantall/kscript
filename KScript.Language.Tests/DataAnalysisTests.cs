@@ -479,11 +479,11 @@ namespace KScript.Language.Tests
 
             Assert.Equal("SELECT * FROM posts\nWHERE title = ? AND views IN (…) AND deleted_at IS NULL\nORDER BY views, title DESC\nLIMIT ? OFFSET ?",
                 Sql("echo Post->where(title: 'x', views: [1])->order_by(views, title: desc)->limit(2)->offset(4)->get()", "->get"));
-            Assert.Equal("SELECT * FROM posts\nWHERE ((title LIKE ? OR views > ?) AND NOT (author_id IS NULL) OR UPPER(title) <> ?) AND deleted_at IS NULL\nORDER BY id DESC\nLIMIT 1",
+            Assert.Equal("SELECT * FROM posts\nWHERE ((title LIKE ? OR views > ?) AND (author_id IS NULL) IS NOT TRUE OR (UPPER(title) = ?) IS NOT TRUE) AND deleted_at IS NULL\nORDER BY id DESC\nLIMIT 1",
                 Sql("echo Post->where(fn(p) => ($p.title->starts_with('A') or $p.views > 3) and not ($p.author_id == null) or $p.title->upper() != $x)->latest()->first()", "->first"));
             Assert.Equal("SELECT DISTINCT COUNT(*) FROM posts\nWHERE (author_id IS NOT NULL OR …) AND deleted_at IS NOT NULL",
                 Sql("echo Post->where(fn(p) => $p.author_id != null)->or_where(fn(a, b) => 1)->only_trashed()->distinct()->count()", "->count"));
-            Assert.Equal("SELECT title FROM authors\nWHERE NOT (name IS NULL AND …) AND id = ?\nLIMIT 1\n-- then one query for posts.author",
+            Assert.Equal("SELECT title FROM authors\nWHERE (name IS NULL AND …) IS NOT TRUE AND id = ?\nLIMIT 1\n-- then one query for posts.author",
                 Sql("echo Author->select(title)->where_not(name: null, fn(a) => $a.name->trim())->with(posts.author)->find(1)", "->find"));
             Assert.Equal("SELECT SUM(views) FROM posts\nORDER BY id ASC",
                 Sql("echo Post->with_trashed()->oldest()->sum(views)", "->sum"));

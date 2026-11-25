@@ -620,6 +620,13 @@ public sealed class ProjectTemplateApiTests : IDisposable
         var o = new StringWriter();
         Assert.True(KScript.Testing.TestCommand.Run(new[] { Path.Combine(site.Root, "tests", "env.test.kscript") }, o, o, color: false) == 0, o.ToString());
 
+        // An option before the path changes nothing: the text after --filter is not taken for the path.
+        foreach (string[] before in new[] { new[] { "--filter", "env" }, new[] { "--timeout", "30" }, new[] { "-f", "env" } })
+        {
+            o = new StringWriter();
+            Assert.True(KScript.Testing.TestCommand.Run(before.Append(Path.Combine(site.Root, "tests")).ToArray(), o, o, color: false) == 0, o.ToString());
+        }
+
         // KSCRIPT_ENV that is already set wins.
         Environment.SetEnvironmentVariable("KSCRIPT_ENV", "staging");
         try

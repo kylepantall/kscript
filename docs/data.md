@@ -187,7 +187,7 @@ echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().tot
 
 `->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
+These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`, also when the `null` comes from a variable. An empty column compares as it does in a script: `$o.status != 'paid'`, `not ($o.status == 'paid')` and `->where_not(status: 'paid')` keep the rows whose status is empty. `/` divides as it does in a script, so two whole-number columns can give 3.5. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
 
 Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
 
@@ -217,7 +217,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 
 ### Changing many rows
 
-`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. `Model->insert(rows)` adds a list of rows, each checked like `->create()`.
+`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. They can't follow `->limit()` or `->offset()`, which is an `Argument` error rather than a change to every row: read the keys first, then change those rows with `->where(id: $query->pluck(id))`. `Model->insert(rows)` adds a list of rows, each checked like `->create()`.
 
 ## Relations
 
@@ -321,6 +321,8 @@ import KScript.Data
 echo $ada->posts()->where(published: false)->count()
 $ada->posts()->create(title: 'A second post')
 ```
+
+Everything added to it stays within that user's posts, `->or_where(...)` included.
 
 | Method | What it does |
 | --- | --- |
@@ -560,6 +562,7 @@ kscript db rollback           # undoes the last batch
 kscript db rollback --steps 2 # undoes the last two migrations
 kscript db status             # what has run, and what the models want that no migration makes (--output json too)
 kscript db fresh              # drops every table and runs every migration again
+kscript db fresh --pretend    # names the tables it would drop and prints the SQL, and changes nothing
 ```
 
 Each migration runs in a transaction on SQLite and Postgres, so one that fails changes nothing. MySQL and MariaDB commit each change to a table as it is made, so a migration that fails there stops where it failed: the error says how many of its steps ran and stay, and the migration isn't marked as run.

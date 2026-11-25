@@ -87,7 +87,8 @@ namespace KScript.Data
                     return word.Name;
                 case bool b:
                     return dialect.Bool(b);
-                case double d when column?.Kind == ColumnKind.Integer || (column == null && d == Math.Floor(d) && Math.Abs(d) < 9e15):
+                // A number that isn't whole stays as it is, so a column of whole numbers compares with 2.5, not with 2.
+                case double d when d == Math.Floor(d) && (column?.Kind == ColumnKind.Integer || (column == null && Math.Abs(d) < 9e15)):
                     return (long)d;
                 case double d:
                     return d;

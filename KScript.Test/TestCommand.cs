@@ -36,7 +36,13 @@ namespace KScript.Testing
         /// <summary>test.env of the project around the first path given (or the current folder).</summary>
         private static string TestEnvironment(string[] args, string cwd)
         {
-            string first = args.FirstOrDefault(a => !a.StartsWith('-'));
+            // The first path, not the text after --filter, --timeout or --junit.
+            string first = null;
+            for (int i = 0; i < args.Length && first == null; i++)
+            {
+                if (args[i] is "--filter" or "-f" or "--timeout" or "--junit") i++;
+                else if (!args[i].StartsWith('-')) first = args[i];
+            }
             string start = first == null ? cwd : Path.GetFullPath(Path.Combine(cwd, first));
             if (File.Exists(start)) start = Path.GetDirectoryName(start);
             try
@@ -271,8 +277,8 @@ namespace KScript.Testing
             foreach (TestFileResult file in results)
             {
                 var suite = new XElement("testsuite",
-                    new XAttribute("name", file.DisplayPath),
-                    new XAttribute("file", file.DisplayPath),
+                    new XAttribute("name", Clean(file.DisplayPath)),
+                    new XAttribute("file", Clean(file.DisplayPath)),
                     new XAttribute("tests", file.Tests.Count + (file.Error != null ? 1 : 0)),
                     new XAttribute("failures", file.Tests.Count(t => t.Outcome == TestOutcome.Failed && t.ErrorType == TestPackage.AssertionType)),
                     new XAttribute("errors", file.Tests.Count(t => t.Outcome == TestOutcome.Failed && t.ErrorType != TestPackage.AssertionType) + (file.Error != null ? 1 : 0)),
@@ -281,29 +287,29 @@ namespace KScript.Testing
 
                 if (file.Error != null)
                 {
-                    suite.Add(new XElement("testcase", new XAttribute("name", "(load)"), new XAttribute("classname", file.DisplayPath), new XAttribute("time", "0"),
-                        new XElement("error", new XAttribute("message", FirstLine(file.Error)), file.Error)));
+                    suite.Add(new XElement("testcase", new XAttribute("name", "(load)"), new XAttribute("classname", Clean(file.DisplayPath)), new XAttribute("time", "0"),
+                        new XElement("error", new XAttribute("message", FirstLine(file.Error)), Clean(file.Error))));
                 }
 
                 foreach (TestResult t in file.Tests)
                 {
                     var testcase = new XElement("testcase",
-                        new XAttribute("name", t.FullName),
-                        new XAttribute("classname", file.DisplayPath),
-                        new XAttribute("file", file.DisplayPath),
+                        new XAttribute("name", Clean(t.FullName)),
+                        new XAttribute("classname", Clean(file.DisplayPath)),
+                        new XAttribute("file", Clean(file.DisplayPath)),
                         new XAttribute("line", t.Line),
                         new XAttribute("time", Seconds(t.Duration)));
                     if (t.Outcome == TestOutcome.Skipped)
                     {
-                        testcase.Add(new XElement("skipped", string.IsNullOrEmpty(t.Message) ? null : new XAttribute("message", t.Message)));
+                        testcase.Add(new XElement("skipped", string.IsNullOrEmpty(t.Message) ? null : new XAttribute("message", Clean(t.Message))));
                     }
                     else if (t.Outcome == TestOutcome.Failed)
                     {
                         string details = t.Location != null ? $"{t.Message}\nat {t.Location}" : t.Message;
                         testcase.Add(new XElement(t.ErrorType == TestPackage.AssertionType ? "failure" : "error",
-                            new XAttribute("message", FirstLine(t.Message)), new XAttribute("type", t.ErrorType ?? "Error"), details));
+                            new XAttribute("message", FirstLine(t.Message)), new XAttribute("type", Clean(t.ErrorType ?? "Error")), Clean(details)));
                     }
-                    if (!string.IsNullOrEmpty(t.Output)) testcase.Add(new XElement("system-out", t.Output));
+                    if (!string.IsNullOrEmpty(t.Output)) testcase.Add(new XElement("system-out", Clean(t.Output)));
                     suite.Add(testcase);
                 }
                 suites.Add(suite);
@@ -314,6 +320,23 @@ namespace KScript.Testing
             new XDocument(new XDeclaration("1.0", "utf-8", null), suites).Save(path);
         }
 
-        private static string FirstLine(string text) => (text ?? string.Empty).Replace("\r\n", "\n").Split('\n')[0];
+        private static string FirstLine(string text) => Clean((text ?? string.Empty).Replace("\r\n", "\n").Split('\n')[0]);
+
+        /// <summary>
+        /// The text without the characters an XML file can't hold (such as the escape character of coloured output),
+        /// so what a test printed can never leave a report that CI can't read.
+        /// </summary>
+        private static string Clean(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            var clean = new System.Text.StringBuilder(text.Length);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (char.IsHighSurrogate(c) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) clean.Append(c).Append(text[++i]);
+                else if (!char.IsSurrogate(c) && System.Xml.XmlConvert.IsXmlChar(c)) clean.Append(c);
+            }
+            return clean.ToString();
+        }
     }
 }
