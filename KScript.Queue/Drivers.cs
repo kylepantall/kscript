@@ -167,7 +167,12 @@ namespace KScript.Queueing
 
         public int Clear(string queue)
         {
-            lock (gate) return waiting.RemoveAll(j => queue == null || j.Queue == queue);
+            lock (gate)
+            {
+                // A cleared unique job no longer holds its key, so it can be dispatched again.
+                foreach (QueuedJob job in waiting.Where(j => (queue == null || j.Queue == queue) && j.UniqueKey != null)) locks.Remove(job.UniqueKey);
+                return waiting.RemoveAll(j => queue == null || j.Queue == queue);
+            }
         }
 
         public bool Retry(string id)
@@ -471,7 +476,10 @@ namespace KScript.Queueing
             int removed = 0;
             foreach (string file in files)
             {
+                // A cleared unique job no longer holds its key, so it can be dispatched again.
+                string key = Read(file)?.UniqueKey;
                 File.Delete(file);
+                if (key != null) Unlock(key);
                 removed++;
             }
             return removed;

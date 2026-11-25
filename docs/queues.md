@@ -85,7 +85,7 @@ SendWelcome(user_id: 9, email: 'bo@example.com')->run()
 ```
 
 - `Job(...)->dispatch()` queues the job with its own options.
-- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. It returns `null` for a unique job that is already queued.
+- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. It returns `null` for a unique job that is already queued, and on the `sync` connection, where the job has already run and nothing is queued. `kscript test` uses `sync`, so code that reads `$queued.id` should allow for `null` there, or use `@fake_queue()`.
 - `->run()` runs `handle` here and now, with no queue and no retries. Errors reach the caller.
 
 A job's fields are given by name and checked against its declaration, both by the editor and when it runs.
@@ -103,7 +103,7 @@ import "jobs/orders.kscript"
 
 ### Inside a handle: @release_job and @fail_job
 
-`@release_job(after: 30s)` puts the job back on its queue to run again later without using up a try, for work that isn't ready yet. `@fail_job(err)` fails the job now, with no more tries, for work that will never succeed. Give it an error (`@fail_job(Validation(message: 'Bad data'))`) or a message.
+`@release_job(after: 30s)` puts the job back on its queue to run again later without using up a try, for work that isn't ready yet. `@fail_job(err)` fails the job now, with no more tries, for work that will never succeed. Give it an error (`@fail_job(Validation(message: 'Bad data'))`) or a message. Both only work inside a job's `handle`; anywhere else they raise a `Context` error. An `exit` in a handle ends that job only: `exit` or `exit 0` finishes it, and any other code fails the attempt like an error, so the worker carries on with the next job.
 
 ```kscript
 import KScript.Queue
