@@ -391,6 +391,7 @@ namespace KScript.Auth
                     session[Seen] = now;
                     session[Expires] = now + lifetime;
                     App.Sessions.Put(AuthApp.KeyOf(sessionId), session);
+                    App.Wrote();
                 }
                 if (sendCookie) cookies.Add(CookieHeader(sessionId, remember ? lifetime : null));
             }

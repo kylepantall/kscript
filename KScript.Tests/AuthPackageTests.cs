@@ -329,6 +329,31 @@ public sealed class AuthPackageTests : IDisposable
     }
 
     [Fact]
+    public void SessionsAndResetTokensThatRanOutAreSweptNowAndThen()
+    {
+        HttpApp app = App();
+        var b = new Browser(app);
+        string id = Id(b);
+        AuthApp auth = app.Auth;
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery" }"""))["user"]);
+        Assert.NotNull(Map(Post(b, "/reset-token", """{ "email": "joan@example.com" }"""))["token"]);
+        int sessions = auth.Sessions.All().Count();
+        Assert.True(sessions > 0);
+        Assert.Single(auth.Resets.All());
+
+        // Nothing that is still good is removed.
+        Assert.Equal(0, auth.Sweep());
+
+        // A visitor who never comes back leaves a session behind; the writes of other visitors clear it away.
+        now = now.AddDays(400);
+        Assert.Equal(sessions, auth.Sessions.All().Count());
+        for (int i = 0; i < AuthApp.SweepEvery; i++) auth.Wrote();
+        Assert.Empty(auth.Sessions.All());
+        Assert.Empty(auth.Resets.All());
+        Assert.NotNull(auth.Users.Get(id));
+    }
+
+    [Fact]
     public void SignInOutAndUsersFromAStoreOfYourOwn()
     {
         var b = new Browser(App());

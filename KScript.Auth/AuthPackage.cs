@@ -237,6 +237,7 @@ namespace KScript.Auth
                 ["created_at"] = AuthApp.Stamp(),
                 ["expires"] = AuthApp.Now() + app.Settings.ResetLifetime,
             });
+            app.Wrote();
             return token;
         }
 

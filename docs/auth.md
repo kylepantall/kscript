@@ -191,7 +191,7 @@ $session->flash('status', 'Your profile was saved.')
 | `->regenerate()` | Gives the session a new id with the same values. `@login` does this for you. |
 | `.token` | The CSRF token, like `@csrf_token()`. |
 
-Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cookie is `HttpOnly` and `SameSite=Lax`. It is `Secure` on https, behind a proxy that sends `X-Forwarded-Proto: https`, or with `SameSite=None`. A session lasts `http.auth.lifetime` (2 hours) after the last request.
+Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cookie is `HttpOnly` and `SameSite=Lax`. It is `Secure` on https, behind a proxy that sends `X-Forwarded-Proto: https`, or with `SameSite=None`. A session lasts `http.auth.lifetime` (2 hours) after the last request. Sessions and reset tokens that have run out are removed from the state folder now and then, as new ones are written.
 
 ## Users
 

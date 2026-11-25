@@ -180,6 +180,35 @@ namespace KScript.Auth
         public RecordStore Resets { get; }
         internal PasskeyStore PasskeyStore { get; }
 
+        /// <summary>How many sessions and reset tokens are written between two sweeps of the ones that have run out.</summary>
+        internal const int SweepEvery = 200;
+
+        private int written;
+
+        /// <summary>
+        /// Notes that a session or reset token was written. Now and then the ones that have run out are removed, so
+        /// sessions nobody came back to (a visitor who only loaded a form) don't pile up.
+        /// </summary>
+        internal void Wrote()
+        {
+            if (Interlocked.Increment(ref written) % SweepEvery == 0) Sweep();
+        }
+
+        /// <summary>Removes the sessions and reset tokens that have run out, and says how many there were.</summary>
+        internal int Sweep()
+        {
+            double now = Now();
+            int removed = 0;
+            foreach (RecordStore store in new[] { Sessions, Resets })
+            {
+                foreach (string key in store.All().Where(kv => kv.Value.GetValueOrDefault("expires") is double ends && ends <= now).Select(kv => kv.Key).ToList())
+                {
+                    if (store.Delete(key)) removed++;
+                }
+            }
+            return removed;
+        }
+
         /// <summary>The app for a site folder, with the settings the server read from kscript.json.</summary>
         public static AuthApp For(string root, AuthSettings settings)
         {
