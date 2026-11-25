@@ -288,5 +288,54 @@ namespace KScript.Language.Tests
         }
 
         #endregion
+
+        #region Completion, outline and hints
+
+        [Fact]
+        public void StatementSnippetsAreTheFormsAScriptWrites()
+        {
+            LanguageService service = new LanguageService(files: new MemoryFiles());
+            (string text, int offset) = WithCaret("x = 1\n‸\n");
+            DocumentAnalysis a = service.Analyze(text, At("snippets.kscript"));
+            List<CompletionItem> items = service.GetCompletions(a, offset);
+
+            Assert.Equal("error ${1:Name} {\n\t$0\n}", items.Single(i => i.Label == "error").InsertText);
+            Assert.Equal("extend ${1:string} {\n\tfn ${2:name}() => $0\n}", items.Single(i => i.Label == "extend").InsertText);
+            // A function is called with @name(...) in a .kscript file: call is the XML statement.
+            Assert.DoesNotContain(items, i => i.Label == "call");
+
+            // What the snippets insert checks, with a field and a method filled in.
+            AssertNoErrors(Check(Lines("error OutOfStock {", "  item: string", "}", "extend string {", "  fn shout() => $this->upper() + '!'", "}", "echo 'a'->shout()")));
+        }
+
+        private static void AssertNoErrors(DocumentAnalysis a) => Assert.True(!a.Errors.Any(), Describe(a));
+
+        [Fact]
+        public void NothingIsSuggestedAfterABareReferenceInDoubleQuotes()
+        {
+            LanguageService service = new LanguageService(files: new MemoryFiles());
+            (string text, int offset) = WithCaret(Lines("u = { login: 'k' }", "echo \"no braces $u.‸\"", "echo \"{ $u.login }\""));
+            Assert.Empty(service.GetCompletions(service.Analyze(text, At("bare.kscript")), offset));
+
+            (text, offset) = WithCaret(Lines("u = { login: 'k' }", "echo \"braces { $u.‸ }\""));
+            Assert.Contains(service.GetCompletions(service.Analyze(text, At("bare.kscript")), offset), i => i.Label == "login");
+        }
+
+        [Fact]
+        public void TypesAreNamedBareInTheOutlineAndGetNoHint()
+        {
+            LanguageService service = new LanguageService(files: new MemoryFiles());
+            DocumentAnalysis a = service.Analyze(Lines("enum Size { small, large }", "type User {", "  login: string", "}", "count = [1]->count()", "echo \"{ $count } { Size.small } { User.fields }\""), At("outline.kscript"));
+            List<string> names = service.GetOutline(a).Select(o => o.Name).ToList();
+            Assert.Contains("User", names);
+            Assert.Contains("Size", names);
+            Assert.Contains("$count", names);
+            Assert.DoesNotContain(names, n => n is "$User" or "$Size");
+
+            int typesEnd = a.Source.Text.IndexOf("count =", StringComparison.Ordinal);
+            Assert.DoesNotContain(service.GetInlayHints(a), h => h.Offset < typesEnd);
+        }
+
+        #endregion
     }
 }

@@ -116,6 +116,11 @@ namespace KScript.Language.Features
             {
                 return ExpectedValueCompletions(analysis, offset) ?? new List<CompletionItem>();
             }
+            // "Hi $user.name" in a .kscript file is an error (KS6019: a value goes in { }), so nothing carries it on.
+            if (analysis.BareQuotedReferences.Any(bare => offset > bare.Start && offset <= bare.End + 1))
+            {
+                return new List<CompletionItem>();
+            }
             if (AliasMemberCompletions(analysis, offset) is List<CompletionItem> members)
             {
                 return members;

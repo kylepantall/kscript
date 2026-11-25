@@ -448,7 +448,7 @@ namespace KScript.Language.Features
 
                 OutlineItem item = new OutlineItem
                 {
-                    Name = s.Kind == SymbolKind.Function ? s.Name : s.Kind == SymbolKind.Import ? s.Name : "$" + s.Name,
+                    Name = s.Kind == SymbolKind.Function ? s.Name : s.Kind == SymbolKind.Import || s.IsTypeDeclaration ? s.Name : "$" + s.Name,
                     Detail = s.Kind == SymbolKind.Function ? s.TypedSignature : s.Kind == SymbolKind.Import ? s.Description : s.Shape.ToString(),
                     Kind = kind.Value,
                     Span = s.DeclaringElement.Span,
