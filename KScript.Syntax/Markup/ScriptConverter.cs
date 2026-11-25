@@ -169,15 +169,47 @@ namespace KScript.Syntax.Markup
             {
                 return value;
             }
-            int common = lines.Skip(1).Where(l => l.Trim().Length > 0).Select(l => l.Length - l.TrimStart().Length).DefaultIfEmpty(0).Min();
+            // A line that starts inside a quoted string is part of the string's value, so it is left as written.
+            bool[] inString = StartsInsideString(string.Join("\n", lines), lines.Length);
+            int common = lines.Select((l, n) => (l, n)).Skip(1).Where(x => !inString[x.n] && x.l.Trim().Length > 0).Select(x => x.l.Length - x.l.TrimStart().Length).DefaultIfEmpty(0).Min();
             // A continuation (|> map(...)) is indented one more step; the inside of an open bracket already is.
             string first = lines[0].TrimEnd();
             if (first.Length > 0 && !"[{(".Contains(first[first.Length - 1]))
             {
                 indent += "  ";
             }
-            return string.Join("\n", new[] { lines[0] }.Concat(lines.Skip(1).Select(l =>
-                l.Trim().Length == 0 ? string.Empty : indent + (l.Length >= common ? l.Substring(common) : l.TrimStart()))));
+            return string.Join("\n", new[] { lines[0] }.Concat(lines.Skip(1).Select((l, n) =>
+                inString[n + 1] ? l : l.Trim().Length == 0 ? string.Empty : indent + (l.Length >= common ? l.Substring(common) : l.TrimStart()))));
+        }
+
+        /// <summary>For each line of <paramref name="value"/>, whether it starts inside a 'quoted' or "quoted" string.</summary>
+        private static bool[] StartsInsideString(string value, int lineCount)
+        {
+            var inside = new bool[lineCount];
+            int line = 0;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (c == '\n')
+                {
+                    line++;
+                }
+                else if (c == '`' && StringBlock.Read(value, i, value.Length) is StringBlock block && block.End > i)
+                {
+                    // A fenced block measures its own indentation from its closing fence, so it moves as a whole.
+                    line += value.AsSpan(i, block.End - i).Count('\n');
+                    i = block.End - 1;
+                }
+                else if (c is '"' or '\'' && Quotes.Close(value, i, value.Length) is int close && close > i)
+                {
+                    for (int j = i + 1; j <= close; j++)
+                    {
+                        if (value[j] == '\n') inside[++line] = true;
+                    }
+                    i = close;
+                }
+            }
+            return inside;
         }
 
         /// <summary>Drops blank first and last lines and the indentation all lines share.</summary>
@@ -637,7 +669,8 @@ namespace KScript.Syntax.Markup
                         {
                             string options = string.Join(", ", e.Attributes.Where(a => a.Name != "value").Select(a => FormatAttribute(e, a)));
                             sb.Append(pad).Append("echo").Append(options.Length > 0 ? "(" + options + ")" : string.Empty);
-                            string text = TrimLayout(TextOf(e));
+                            // XML lays its text out when it runs; a quoted string is printed as written, so it gets the laid-out text.
+                            string text = ElementText.Tidy(TextOf(e));
                             if (Attr("value") is string v)
                             {
                                 sb.Append(' ').Append(Reindent(v.Trim(), Pad(indent)));
@@ -920,7 +953,7 @@ namespace KScript.Syntax.Markup
                         }
                     case "throw" when Only("type", "message") && !e.ChildElements.Any() && (Attr("type") == null || IsName(Attr("type").Trim())):
                         {
-                            string message = Attr("message") ?? TrimLayout(TextOf(e));
+                            string message = Attr("message") ?? (TextOf(e) is string thrown ? ElementText.Tidy(thrown) : null);
                             Line(indent, "throw" + (Attr("type") != null ? " " + Attr("type").Trim() : string.Empty) + (message != null ? " " + Quote(message) : string.Empty));
                             return;
                         }
@@ -1680,6 +1713,13 @@ namespace KScript.Syntax.Markup
                 if (content.Count == 0)
                 {
                     sb.Append(" />\n");
+                    return;
+                }
+                if (content.All(c => c is MarkupText) && e.Name == "echo" && e.GetAttribute("value") == null
+                    && string.Concat(content.Cast<MarkupText>().Select(t => t.Value)) is string exact && ElementText.Tidy(exact) != exact)
+                {
+                    // echo "  - item" prints its spaces, which XML text would lose: the string goes in value instead.
+                    sb.Append(" value=\"").Append(EscapeAttribute(Quote(exact))).Append("\" />\n");
                     return;
                 }
                 if (content.All(c => c is MarkupText))

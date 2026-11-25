@@ -134,10 +134,10 @@ namespace KScript.Runtime
         public object EvalContent() => HasContent ? Interpreter.EvaluateText(Content, Scope, Module) : null;
 
         /// <summary>The element text with <c>{ }</c> and bare <c>$name</c> filled in, trimmed and with common indentation removed.</summary>
-        public string Text(Func<string, string> escape = null) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, escape, Values.ToStr, Definition.Info.LiteralText));
+        public string Text(Func<string, string> escape = null) => TextLayout.Fill(Interpreter, Content, Scope, Module, escape, Values.ToStr, Definition.Info.LiteralText);
 
         /// <summary>As <see cref="Text"/>, turning each inserted value into text with <paramref name="format"/>.</summary>
-        public string Text(Func<object, string> format) => Content == null ? string.Empty : TextLayout.Tidy(Interpreter.Interpolate(Content, Scope, Module, bareReferences: true, null, format, Definition.Info.LiteralText));
+        public string Text(Func<object, string> format) => TextLayout.Fill(Interpreter, Content, Scope, Module, null, format, Definition.Info.LiteralText);
 
         /// <summary>True if the element text is one value and nothing else: <c>&lt;echo&gt;$person&lt;/echo&gt;</c>.</summary>
         public bool ContentIsSingleValue => Content != null && Interpreter.IsSingleValue(Content, Module, bareReferences: true);
@@ -182,31 +182,51 @@ namespace KScript.Runtime
     /// <summary>Tidies element text for output: trims it and removes the indentation the lines share.</summary>
     public static class TextLayout
     {
-        public static string Tidy(string text)
+        /// <summary>
+        /// An element's text with its values filled in. In an XML file the text written between the tags is tidied
+        /// (<see cref="Tidy"/>) and the values go in afterwards, so a value's own spaces and line breaks are never
+        /// touched. In a .kscript file the text is a quoted string or a ``` block, and is used exactly as written.
+        /// </summary>
+        public static string Fill(Interpreter interpreter, DecodedText content, Scope scope, Module module,
+            Func<string, string> escape = null, Func<object, string> format = null, TextLiterals literals = TextLiterals.None)
         {
-            if (string.IsNullOrEmpty(text)) return string.Empty;
-            string[] lines = text.Replace("\r\n", "\n").Split('\n');
-            int start = 0, end = lines.Length - 1;
-            while (start <= end && lines[start].Trim().Length == 0) start++;
-            while (end >= start && lines[end].Trim().Length == 0) end--;
-            if (start > end) return string.Empty;
-            if (start == end) return lines[start].Trim();
+            if (content == null) return string.Empty;
+            format ??= Values.ToStr;
+            if (module?.IsCode == true) return interpreter.Interpolate(content, scope, module, bareReferences: true, escape, format, literals);
 
-            // The first line usually follows the opening tag directly, so it isn't counted for the indent.
-            int indent = int.MaxValue;
-            for (int i = start + 1; i <= end; i++)
+            // Each value is held back behind a marker while the written text is laid out.
+            var values = new List<string>();
+            string Hold(string value)
             {
-                if (lines[i].Trim().Length == 0) continue;
-                indent = Math.Min(indent, lines[i].Length - lines[i].TrimStart().Length);
+                values.Add(value);
+                return $"{Open}{values.Count - 1}{Close}";
             }
-            if (indent == int.MaxValue) indent = 0;
-            var result = new List<string> { lines[start].Trim() };
-            for (int i = start + 1; i <= end; i++)
+            Func<string, string> escapeHeld = escape == null ? null : marker =>
             {
-                string line = lines[i];
-                result.Add((line.Length >= indent ? line.Substring(indent) : line.TrimStart()).TrimEnd());
+                int index = int.Parse(marker.AsSpan(1, marker.Length - 2), System.Globalization.CultureInfo.InvariantCulture);
+                values[index] = escape(values[index]);
+                return marker;
+            };
+            string laid = Tidy(interpreter.Interpolate(content, scope, module, bareReferences: true, escapeHeld, value => Hold(format(value)), literals));
+            if (values.Count == 0) return laid;
+            var text = new System.Text.StringBuilder(laid.Length + 16);
+            for (int i = 0; i < laid.Length; i++)
+            {
+                int end = laid[i] == Open ? laid.IndexOf(Close, i + 1) : -1;
+                if (end > i && int.TryParse(laid.AsSpan(i + 1, end - i - 1), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int index) && index < values.Count)
+                {
+                    text.Append(values[index]);
+                    i = end;
+                }
+                else text.Append(laid[i]);
             }
-            return string.Join("\n", result);
+            return text.ToString();
         }
+
+        // Private-use characters that stand for a value while the text around it is tidied.
+        private const char Open = '\uE000', Close = '\uE001';
+
+        /// <summary>The one layout rule for XML element text; <c>kscript convert</c> applies the same one.</summary>
+        public static string Tidy(string text) => KScript.Syntax.Text.ElementText.Tidy(text);
     }
 }
