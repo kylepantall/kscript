@@ -225,7 +225,7 @@ before the element, or in its `description` attribute.
 ```
 kscript convert tour.ks.xml          # writes tour.kscript
 kscript convert tour.kscript         # writes tour.ks.xml
-kscript convert scripts/ --syntax kscript   # every XML script in a folder (tests are skipped)
+kscript convert scripts/ --syntax kscript   # every XML script in a folder, tests too
 kscript convert tour.ks.xml --stdout    # print instead of writing
 ```
 
@@ -246,6 +246,10 @@ Converting keeps a project working in the new format:
 - Converting a folder also converts its tests (`name.test.ks.xml` becomes `name.test.kscript`), renames converted
   files in its `.html` and `.md` pages, and updates the project's `kscript.json`: `"main"` and other file names, and
   each `*.ks.xml` include pattern gains a `*.kscript` twin.
+- Scripts in the folder that stay as they are (a `.kscript` component beside XML scripts) have their imports of
+  converted scripts renamed too.
+- The new file is laid out as `kscript fmt` would lay it out, with the project's `format` settings, so it passes
+  `kscript fmt --check`.
 
 ```
 kscript convert . --syntax kscript     # the whole project
