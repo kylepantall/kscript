@@ -32,9 +32,34 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ("kscript-install-" + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
+        if ($repo -ne 'kylepantall/kscript') { Write-Host "Using releases from $repo (KSCRIPT_REPO)." }
         Write-Host "Downloading $asset ($version)..."
         $zip = Join-Path $tmp $asset
         Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+
+        # The release lists the SHA-256 of each of its files in SHA256SUMS: check the download before unpacking it.
+        $sums = Join-Path $tmp 'SHA256SUMS'
+        $listed = $true
+        try {
+            Invoke-WebRequest -Uri ($url.Substring(0, $url.LastIndexOf('/')) + '/SHA256SUMS') -OutFile $sums -UseBasicParsing
+        } catch {
+            $listed = $false
+        }
+        if ($listed) {
+            $expected = $null
+            foreach ($line in Get-Content $sums) {
+                $parts = @($line.Trim() -split '\s+', 2)
+                if ($parts.Count -eq 2 -and $parts[1].TrimStart('*') -eq $asset) { $expected = $parts[0].ToLowerInvariant() }
+            }
+            if (-not $expected) { throw "SHA256SUMS doesn't list $asset, so the download can't be checked" }
+            $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) {
+                throw "The checksum of $asset is wrong: SHA256SUMS lists $expected but the download is $actual. It may be damaged or not the released file. Nothing was installed."
+            }
+            Write-Host "Checked $asset against the release's SHA256SUMS."
+        } else {
+            Write-Host "This release has no SHA256SUMS file (releases before 0.10 don't), so the download wasn't checked."
+        }
         $pkg = Join-Path $tmp 'pkg'
         Expand-Archive -Path $zip -DestinationPath $pkg -Force
         $new = Join-Path $pkg 'kscript.exe'

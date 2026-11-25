@@ -132,6 +132,101 @@ public sealed class SelfUpdaterRunTests : IDisposable
         Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
     }
 
+    private const string Sums = "https://example.test/SHA256SUMS";
+
+    /// <summary>A release that lists its checksums, as every release from 0.10.0 does.</summary>
+    private (FakeGitHub GitHub, UpdateEnvironment Env) SetupListed(string sums, string tag = "v0.10.0")
+    {
+        var (github, env) = Setup(tag);
+        github.Routes[Latest] = () => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent($"{{ \"tag_name\": \"{tag}\", \"assets\": [ {{ \"name\": \"kscript-linux-x64.tar.gz\", \"browser_download_url\": \"{Download}\" }}"
+                + (sums == null ? "" : $", {{ \"name\": \"SHA256SUMS\", \"browser_download_url\": \"{Sums}\" }}") + " ] }"),
+        };
+        if (sums != null) github.Routes[Sums] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sums) };
+        github.Routes[Download] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Release) };
+        env.RunVersion = _ => "kscript " + tag.TrimStart('v');
+        return (github, env);
+    }
+
+    /// <summary>The archive a listed release serves: made once, because an archive made twice differs by its times.</summary>
+    private static readonly byte[] Release = Tarball("new binary");
+
+    private static string Sha(byte[] data) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(data)).ToLowerInvariant();
+
+    [Fact]
+    public void Checks_the_download_against_the_releases_checksums()
+    {
+        string sha = Sha(Release);
+        var (_, env) = SetupListed($"{new string('1', 64)}  kscript-win-x64.zip\n{sha}  kscript-linux-x64.tar.gz\n");
+        var (code, output, error) = Update(env);
+        Assert.True(code == 0, error);
+        Assert.Contains("Updated kscript 0.1.0 -> 0.10.0", output);
+        Assert.DoesNotContain("wasn't checked", output);
+        Assert.Equal("new binary", File.ReadAllText(env.TargetPath));
+    }
+
+    [Fact]
+    public void A_download_with_the_wrong_checksum_is_refused_and_kscript_is_left_as_it_was()
+    {
+        string sha = Sha(Release);
+        var (_, env) = SetupListed($"{new string('0', 64)}  kscript-linux-x64.tar.gz\n");
+        bool ran = false;
+        env.RunVersion = _ => { ran = true; return "kscript 0.10.0"; };
+        var (code, _, error) = Update(env);
+        Assert.Equal(1, code);
+        Assert.Equal($"The checksum of kscript-linux-x64.tar.gz is wrong: SHA256SUMS lists {new string('0', 64)} but the download is {sha}. It may be damaged or not the released file. Nothing was installed.\n", error);
+        Assert.False(ran, "the download must not be run before it is checked");
+        Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
+        Assert.Equal(new[] { "kscript" }, Directory.GetFiles(dir).Select(Path.GetFileName));
+
+        // A list that leaves the file out is no better.
+        (_, env) = SetupListed($"{sha}  kscript-osx-arm64.tar.gz\n");
+        (code, _, error) = Update(env);
+        Assert.Equal(1, code);
+        Assert.Contains("SHA256SUMS doesn't list kscript-linux-x64.tar.gz, so the download can't be checked.", error);
+        Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
+    }
+
+    [Fact]
+    public void A_release_that_should_list_checksums_and_doesnt_is_refused()
+    {
+        var (github, env) = SetupListed(null);
+        var (code, _, error) = Update(env);
+        Assert.Equal(1, code);
+        Assert.Equal("Release v0.10.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.\n", error);
+        Assert.DoesNotContain(github.Requests, r => r.RequestUri!.ToString() == Download);
+        Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
+
+        // Releases before 0.10.0 never had the list: they install, and the output says they weren't checked.
+        (_, env) = SetupListed(null, "v0.9.0");
+        string output;
+        (code, output, error) = Update(env);
+        Assert.True(code == 0, error);
+        Assert.Contains("Release v0.9.0 was published before releases listed checksums, so the download wasn't checked.", output);
+        // Another repository's releases are named.
+        Assert.Contains("Using releases from me/ks (KSCRIPT_REPO).", output);
+    }
+
+    [Theory]
+    [InlineData("abc  kscript.zip", "kscript.zip", "abc")]
+    [InlineData("ABC *kscript.zip\r\n", "kscript.zip", "abc")]
+    [InlineData("abc  ./kscript.zip", "kscript.zip", "abc")]
+    [InlineData("abc\tkscript.zip", "kscript.zip", "abc")]
+    [InlineData("abc  kscript.zip.sig\ndef  kscript.zip", "kscript.zip", "def")]
+    [InlineData("abc  other.zip\n\nnonsense\n", "kscript.zip", null)]
+    [InlineData("", "kscript.zip", null)]
+    [InlineData(null, "kscript.zip", null)]
+    public void Reads_a_checksum_list(string sums, string name, string expected) => Assert.Equal(expected, Checksums.Listed(sums, name));
+
+    [Theory]
+    [InlineData("0.10.0", true)]
+    [InlineData("v1.2.0", true)]
+    [InlineData("v0.9.0", false)]
+    [InlineData("0.9.12", false)]
+    [InlineData("nonsense", false)]
+    public void Releases_from_0_10_must_list_checksums(string version, bool required) => Assert.Equal(required, Checksums.Required(version));
+
     [Fact]
     public void Installs_a_newer_release()
     {

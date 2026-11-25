@@ -534,6 +534,8 @@ namespace KScript.Compile
 
             string asset = SelfUpdater.RuntimeAssetName(target.Runtime);
             string url = $"https://github.com/{env.Repository}/releases/download/v{version}/{asset}";
+            if (!string.Equals(env.Repository, SelfUpdater.DefaultRepository, StringComparison.OrdinalIgnoreCase))
+                new KScript.Output.CliOutput(log).Info($"Using releases from {env.Repository} (KSCRIPT_REPO).");
             new KScript.Output.CliOutput(log).Info($"Downloading kscript {version} for {target.Name} (once; kept in {env.RuntimeCache})");
             using var client = new HttpClient(env.Handler, disposeHandler: false);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("kscript-compile");
@@ -541,9 +543,32 @@ namespace KScript.Compile
             if (!response.IsSuccessStatusCode)
                 throw new CompileException($"Couldn't download {url} ({(int)response.StatusCode}). kscript {version} may have no release for {target.Name}.");
 
+            // The archive is checked against the release's SHA256SUMS before anything in it is used.
+            byte[] bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using (HttpResponseMessage sums = client.GetAsync($"https://github.com/{env.Repository}/releases/download/v{version}/{Checksums.FileName}").GetAwaiter().GetResult())
+            {
+                if (sums.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        Checksums.Verify(bytes, asset, sums.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+                    }
+                    catch (ChecksumException ex)
+                    {
+                        throw new CompileException(ex.Message);
+                    }
+                }
+                else if (sums.StatusCode != System.Net.HttpStatusCode.NotFound)
+                    throw new CompileException($"Couldn't download the checksums of kscript {version} ({(int)sums.StatusCode}), so the download can't be checked. Try again.");
+                else if (Checksums.Required(version))
+                    throw new CompileException(Checksums.Missing("v" + version));
+                else
+                    new KScript.Output.CliOutput(log).Info(Checksums.Unchecked("v" + version));
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(cached));
             string staged = cached + ".download";
-            using (Stream archive = response.Content.ReadAsStream()) Extract(archive, asset, staged);
+            using (Stream archive = new MemoryStream(bytes)) Extract(archive, asset, staged);
             File.Move(staged, cached, overwrite: true);
             return cached;
         }

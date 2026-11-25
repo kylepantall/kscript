@@ -737,6 +737,55 @@ public sealed class CompileTests : IDisposable
     }
 
     [Fact]
+    public void A_downloaded_runtime_is_checked_against_the_releases_checksums()
+    {
+        string script = Write("tool/hello.ks.xml", "<kscript />");
+        byte[] archive = TarGz("kscript", Runtime(ElfHost()).ToBytes());
+        string sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(archive)).ToLowerInvariant();
+        string sums = $"{sha}  kscript-runtime-linux-arm64.tar.gz\n";
+        HttpStatusCode sumsStatus = HttpStatusCode.OK;
+        var releases = new FakeReleases
+        {
+            Respond = r => r.RequestUri!.AbsolutePath.EndsWith("/SHA256SUMS")
+                ? new HttpResponseMessage(sumsStatus) { Content = new StringContent(sums) }
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(archive) },
+        };
+        CompileEnvironment Release()
+        {
+            CompileEnvironment env = Env(releases);
+            env.Version = "0.10.0";
+            env.Repository = KScript.Updates.SelfUpdater.DefaultRepository;
+            return env;
+        }
+        string cached = Path.Combine(dir, "cache", "0.10.0", "linux-arm64", "kscript");
+
+        // The wrong file: refused, and nothing is kept.
+        sums = new string('0', 64) + "  kscript-runtime-linux-arm64.tar.gz\n";
+        var wrong = Compile(Release(), script, "--target", "linux-arm64");
+        Assert.NotEqual(0, wrong.Code);
+        Assert.Contains($"The checksum of kscript-runtime-linux-arm64.tar.gz is wrong: SHA256SUMS lists {new string('0', 64)} but the download is {sha}.", wrong.Err);
+        Assert.False(File.Exists(cached));
+
+        // A list without the file, a release without a list, and a list that can't be fetched are refused too.
+        sums = $"{sha}  kscript-runtime-win-x64.zip\n";
+        Assert.Contains("SHA256SUMS doesn't list kscript-runtime-linux-arm64.tar.gz", Compile(Release(), script, "--target", "linux-arm64").Err);
+        sumsStatus = HttpStatusCode.NotFound;
+        Assert.Contains("Release v0.10.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.", Compile(Release(), script, "--target", "linux-arm64").Err);
+        sumsStatus = HttpStatusCode.BadGateway;
+        Assert.Contains("Couldn't download the checksums of kscript 0.10.0 (502)", Compile(Release(), script, "--target", "linux-arm64").Err);
+        Assert.False(File.Exists(cached));
+
+        // The listed file is used. sha256sum marks a file read as binary with a star.
+        sumsStatus = HttpStatusCode.OK;
+        sums = $"{new string('1', 64)}  other.zip\n{sha.ToUpperInvariant()} *kscript-runtime-linux-arm64.tar.gz\n";
+        var (code, output, error) = Compile(Release(), script, "--target", "linux-arm64");
+        Assert.True(code == 0, error);
+        Assert.True(File.Exists(cached));
+        Assert.DoesNotContain("KSCRIPT_REPO", output);
+        Assert.DoesNotContain("wasn't checked", output);
+    }
+
+    [Fact]
     public void Runtimes_for_other_computers_are_downloaded_once_and_cached()
     {
         string script = Write("tool/hello.ks.xml", "<kscript />");
@@ -744,7 +793,8 @@ public sealed class CompileTests : IDisposable
         byte[] win = Runtime(PeHost()).ToBytes();
         var releases = new FakeReleases
         {
-            Respond = r => r.RequestUri!.AbsolutePath.EndsWith(".zip")
+            Respond = r => r.RequestUri!.AbsolutePath.EndsWith("/SHA256SUMS") ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : r.RequestUri!.AbsolutePath.EndsWith(".zip")
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Zip("kscript.exe", win)) }
                 : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(TarGz("kscript", linux)) },
         };
@@ -754,18 +804,24 @@ public sealed class CompileTests : IDisposable
         Assert.Equal(new[]
         {
             "https://github.com/example/kscript/releases/download/v0.4.0/kscript-runtime-linux-arm64.tar.gz",
+            "https://github.com/example/kscript/releases/download/v0.4.0/SHA256SUMS",
             "https://github.com/example/kscript/releases/download/v0.4.0/kscript-runtime-win-x64.zip",
+            "https://github.com/example/kscript/releases/download/v0.4.0/SHA256SUMS",
         }, releases.Urls);
+        // 0.4.0 was published before releases listed checksums, and a release from another repository is named.
+        Assert.Contains("Release v0.4.0 was published before releases listed checksums, so the download wasn't checked.", output);
+        Assert.Contains("Using releases from example/kscript (KSCRIPT_REPO).", output);
         Assert.True(File.Exists(Path.Combine(dir, "cache", "0.4.0", "win-x64", "kscript.exe")));
         Assert.True(File.Exists(Path.Combine(dir, "tool", "dist", "win-x64", "hello.exe")));
 
         // The second time comes from the cache.
         Assert.Equal(0, Compile(Env(releases), script, "--target", "linux-arm64").Code);
-        Assert.Equal(2, releases.Urls.Count);
+        Assert.Equal(4, releases.Urls.Count);
 
         // A missing release, a broken archive, and no network.
         Assert.Contains("Couldn't download", Compile(Env(), script, "--target", "mac-x64").Err);
-        releases.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(TarGz("readme.txt", new byte[1])) };
+        releases.Respond = r => r.RequestUri!.AbsolutePath.EndsWith("/SHA256SUMS") ? new HttpResponseMessage(HttpStatusCode.NotFound)
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(TarGz("readme.txt", new byte[1])) };
         Assert.Contains("has no kscript binary inside", Compile(Env(releases), script, "--target", "mac-x64").Err);
         releases.Respond = _ => throw new HttpRequestException("offline");
         string offline = Compile(Env(releases), script, "--target", "mac-arm64").Err;
