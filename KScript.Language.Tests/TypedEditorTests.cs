@@ -142,8 +142,8 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("test.kscript", "choice = 'other'\nlarge = $choice > 9")]
-        [InlineData("test.ks.xml", "<kscript><let name=\"choice\" value=\"'other'\" /><let name=\"large\" value=\"$choice gt 9\" /></kscript>")]
+        [InlineData("test.kscript", "choice = 'other'\nlarge = $choice > 9\necho $large")]
+        [InlineData("test.ks.xml", "<kscript><let name=\"choice\" value=\"'other'\" /><let name=\"large\" value=\"$choice gt 9\" /><echo value=\"$large\" /></kscript>")]
         public void ComparingTextWithANumberHasBooleanType(string path, string source)
         {
             DocumentAnalysis analysis = Service.Analyze(source, path);
