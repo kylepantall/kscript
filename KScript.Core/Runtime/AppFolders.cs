@@ -16,6 +16,36 @@ namespace KScript.Runtime
         /// <summary>When set, every app's folders are under this folder instead (<c>&lt;root&gt;/&lt;app&gt;/&lt;kind&gt;</c>): handy for tests and portable installs.</summary>
         public const string RootVariable = "KSCRIPT_STORAGE_ROOT";
 
+        private static readonly AsyncLocal<TestStorage> Testing = new AsyncLocal<TestStorage>();
+
+        /// <summary>The host owning the current test file's temporary app folders, if any.</summary>
+        public static KScriptHost TestHost => Testing.Value?.Host;
+
+        /// <summary>Uses temporary app folders for this test file and its in-process requests.</summary>
+        public static IDisposable IsolateForTest(KScriptHost host) => new TestStorage(host);
+
+        private sealed class TestStorage : IDisposable
+        {
+            private readonly TestStorage previous = Testing.Value;
+            private readonly Lazy<DirectoryInfo> folder = new Lazy<DirectoryInfo>(() => Directory.CreateTempSubdirectory("kscript-test-storage-"));
+
+            public TestStorage(KScriptHost host)
+            {
+                Host = host;
+                Testing.Value = this;
+            }
+
+            public KScriptHost Host { get; }
+
+            public string Folder(string app, string kind) => Path.Combine(folder.Value.FullName, CleanName(app), CheckKind(kind));
+
+            public void Dispose()
+            {
+                Testing.Value = previous;
+                if (folder.IsValueCreated) folder.Value.Delete(recursive: true);
+            }
+        }
+
         /// <summary>Resolves a configured SQLite or auth data path, optionally under a private deployment volume.</summary>
         public static string ProjectDataPath(string project, string path)
         {
@@ -36,7 +66,7 @@ namespace KScript.Runtime
 
         /// <summary>The folder of one kind for an app on this computer. The folder isn't created.</summary>
         public static string Folder(string app, string kind) =>
-            Folder(app, kind, CurrentPlatform, Environment.GetEnvironmentVariable, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+            Testing.Value?.Folder(app, kind) ?? Folder(app, kind, CurrentPlatform, Environment.GetEnvironmentVariable, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
         /// <summary>The folder of one kind for an app on a platform, with its environment variables and home folder.</summary>
         public static string Folder(string app, string kind, string platform, Func<string, string> environment, string home)

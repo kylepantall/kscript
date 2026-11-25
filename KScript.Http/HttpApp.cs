@@ -51,7 +51,9 @@ namespace KScript.Http
         private AuthApp auth;
 
         /// <summary>The app's users, sessions and tokens (KScript.Auth), with http.auth's settings.</summary>
-        public AuthApp Auth => auth ??= AuthApp.For(projectRoot, Settings.Auth);
+        public AuthApp Auth => AppFolders.TestHost != null
+            ? AuthApp.For(projectRoot, Settings.Auth)
+            : auth ??= AuthApp.For(projectRoot, Settings.Auth);
         public HttpSettings Settings { get; }
 
         /// <summary>The project, or null; the OpenAPI document takes its title and version from it.</summary>

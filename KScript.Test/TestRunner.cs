@@ -185,18 +185,24 @@ namespace KScript.Testing
 
         private static void RunFileHere(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult)
         {
-            KScriptHost host = null;
+            var fileOutput = new StringWriter();
+            var host = new KScriptHost(fileOutput, fileOutput, new StringReader(string.Empty))
+            {
+                WorkingDirectory = System.IO.Path.GetDirectoryName(full),
+                TestFile = full,
+            };
+            using var storage = AppFolders.IsolateForTest(host);
             try
             {
-                RunFileIn(full, settings, result, onResult, h => host = h);
+                RunFileIn(full, settings, result, onResult, host, fileOutput);
             }
             finally
             {
-                foreach (Action done in host?.AfterFile ?? new List<Action>()) done();
+                foreach (Action done in host.AfterFile) done();
             }
         }
 
-        private static void RunFileIn(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult, Action<KScriptHost> made)
+        private static void RunFileIn(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult, KScriptHost host, StringWriter fileOutput)
         {
             ProjectConfig project;
             try
@@ -218,13 +224,6 @@ namespace KScript.Testing
             }
             options.DefaultPackages.Add("KScript.Test");
 
-            var fileOutput = new StringWriter();
-            var host = new KScriptHost(fileOutput, fileOutput, new StringReader(string.Empty))
-            {
-                WorkingDirectory = System.IO.Path.GetDirectoryName(full),
-                TestFile = full,
-            };
-            made(host);
             var session = new TestSession();
             session.Attach(host);
             var interpreter = new Interpreter(host, settings.Packages ?? PackageRegistry.Default, options);

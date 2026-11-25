@@ -58,12 +58,12 @@ It ignores its own files, hidden folders (such as `.git` and `.kscript`), `bin`,
 
 | File | What it holds | Size |
 | --- | --- | --- |
-| `AGENTS.md` | Links to the symbol index and package references, project guidance, a short KScript example, and a checklist | about 1,000 tokens plus project guidance |
+| `AGENTS.md` | Links to the symbol index and package references, a short KScript example, project-specific feature guidance and a checklist | up to about 2,100 tokens plus project guidance |
 | `CLAUDE.md` | `@AGENTS.md`, so Claude Code reads the same file (made by `kscript make project`) | 1 line |
 | `.kscript/agents/index.md` | The project's routes, then one line per top-level `fn`, `type`, `enum` and `const`, by file | up to about 4,000 tokens |
-| `.kscript/agents/packages/<name>.md` | One line per command, method and statement of each package the project imports | up to about 7,000 tokens each |
+| `.kscript/agents/packages/<name>.md` | Package guidance and one line per command, method and statement | up to about 7,000 tokens each |
 
-Only packages the project uses get a file, and a file whose package is no longer imported is removed. When a file
+Only packages the project uses get a file, and a file whose package is no longer used is removed. When a file
 would go over its budget, it stops at a whole entry and says how many were left out; the [`kscript mcp`](mcp.md) server has the
 rest. KScript leaves AGENTS.md and CLAUDE.md out of script checking, formatting, testing and serving.
 

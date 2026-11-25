@@ -3,6 +3,7 @@ using KScript.Language.Analysis;
 using KScript.Language.Catalog;
 using KScript.Language.Formatting;
 using KScript.Metadata;
+using KScript.Pages;
 using KScript.Projects;
 using KScript.Runtime;
 using KScript.Syntax.Markup;
@@ -109,7 +110,7 @@ namespace KScript.Language.Agents
         public const int ExampleLimit = 100;
 
         /// <summary>Budgets in characters (about four to a token): AGENTS.md's section, index.md and each package file. KScript.Core is the biggest package file, with the methods of every native type.</summary>
-        public static int AgentsBudget = 7000;
+        public static int AgentsBudget = 8500;
         public static int IndexBudget = 16000;
         public static int PackageBudget = 44000;
 
@@ -181,6 +182,8 @@ namespace KScript.Language.Agents
                 foreach (string p in analysis.ImportedPackages) packages.Add(p);
                 symbols.AddRange(SymbolsOf(analysis, relative, root));
             }
+
+            if (pages > 0 && catalog.FindPackage("KScript.Web") is string web) packages.Add(web);
 
             // The call graph: who calls each function, from the calls found in each one's body.
             var byDeclaration = symbols.Where(symbol => symbol.Kind == "fn").ToLookup(symbol => (symbol.File, symbol.Name));
@@ -429,14 +432,19 @@ namespace KScript.Language.Agents
             w.Append("- Read `kscript.json` and a neighboring feature. Follow the configured syntax and paths, reuse existing code, and verify APIs in the package reference or MCP.\n");
             w.Append("- Type domain values at the boundary. Use built-in types such as `email`, `uuid` and `duration`. Define shared domain rules once with `kscript make native`. Put normalization, validation and value methods on the type. Project natives load from the manifest’s `natives` setting (default `natives/`).\n");
             w.Append("- Use records for known shapes (`kscript make type`) and models and migrations for persisted rows. Validate external JSON with `as: Type` where supported. Use `map` for open keys and `any` for genuinely dynamic values.\n");
-            if (project.Packages.Contains("KScript.Http") || project.Routes != null)
+            bool http = project.Packages.Contains("KScript.Http") || project.Routes != null;
+            bool web = project.Packages.Contains("KScript.Web") || project.Pages > 0;
+            if (http)
                 w.Append("- Use `kscript make route` for routing and a controller for the action. For a known JSON body, generate a request type with `kscript make request`, import it, and type the controller’s `json` parameter so the framework validates it.\n");
-            if (project.Packages.Contains("KScript.Web") || project.Pages > 0)
+            if (web)
             {
                 w.Append("- Keep presentation in views or components. Put reusable domain behavior on the type or in a library module.\n");
+                w.Append("- Build interactive pages with component state and live actions. Use client directives and actions for browser-only behavior.\n");
                 w.Append("- Use `kscript make css` for `.ks.css` and link its `.css` URL. Use `.ks.scss` when the project builds Sass.\n");
             }
             w.Append("- Run generators from the project so they follow its `paths` settings. Catch specific errors where recovery or reporting belongs. Rethrow when the caller owns recovery.\n");
+
+            WriteTaskGuide(w, project, web, http);
 
             w.Append("\n## Mistakes to avoid\n\n");
             w.Append(Mistakes);
@@ -475,6 +483,28 @@ namespace KScript.Language.Agents
             // Keep project instructions whole. Budgets apply only to the generated reference.
             string guidance = "## Project guidance\n\n" + string.Join("\n\n", project.Markdown.Select(text => text.TrimEnd('\n'))) + "\n\n";
             return generated.Insert(Math.Min(guidanceAt, generated.IndexOf(End, StringComparison.Ordinal)), guidance);
+        }
+
+        private const string Guides = "https://github.com/kylepantall/kscript/blob/master/docs/";
+
+        private static void WriteTaskGuide(StringBuilder w, AgentProject project, bool web, bool http)
+        {
+            bool auth = project.Packages.Contains("KScript.Auth");
+            bool storage = project.Packages.Contains("KScript.Storage");
+            if (!web && !http && !auth && !storage) return;
+
+            w.Append("\n## Choose a feature for the task\n\n| Task | Use | Guide |\n| --- | --- | --- |\n");
+            if (web)
+            {
+                w.Append($"| Clicks, forms and in-place updates | A `Component` with state and `@on-click`, `@on-submit` and `@bind`, or a `<live>` block | [Components]({Guides}components.md) |\n");
+                w.Append($"| Browser-only work such as drag previews or reading files | A `KScriptLive.directive` or `KScriptLive.action`. Call a named live action when the server needs the result | [Client-side extensions]({Guides}components.md#client-side-extensions) |\n");
+            }
+            if (http)
+                w.Append($"| JSON for another program | `kscript make route --api`, a controller and a typed request | [Routes and APIs]({Guides}http.md) |\n");
+            if (auth)
+                w.Append($"| Check sign-in or read the current user | `@is_signed_in()` and `@user()` | [Sign-in]({Guides}auth.md) |\n");
+            if (storage)
+                w.Append($"| Files owned by the app | `KScript.Storage` and `@storage()` | [App folders]({Guides}storage.md) |\n");
         }
 
         private static string Count(int n, string one, string many = null) => $"{n} {(n == 1 ? one : many ?? one + "s")}";
@@ -599,6 +629,8 @@ namespace KScript.Language.Agents
             if (description != null) w.Append(description).Append('\n');
             w.Append(package == "KScript.Core" ? "Always available.\n" : xml ? $"Import with `<import package=\"{package}\" />`.\n" : $"Import with `import {package}`.\n");
 
+            if (package == "KScript.Web") WriteWebGuide(w);
+
             var entries = new List<string>();
             List<CallableInfo> commands = catalog.Commands.Where(c => c.Package == package).OrderBy(c => c.Name, StringComparer.Ordinal).ToList();
             if (commands.Count > 0)
@@ -635,6 +667,33 @@ namespace KScript.Language.Agents
                 return w.ToString();
             }
             return Join(w.ToString(), entries, PackageBudget, "entries");
+        }
+
+        private static void WriteWebGuide(StringBuilder w)
+        {
+            w.Append($"\n## Components and live blocks\n\nSee the [components guide]({Guides}components.md).\n");
+            w.Append("""
+                - Put reusable UI in `_components`. In a `.kscript` file, `type Counter extends Component` has typed fields for props and per-instance state. Return KScript HTML from `fn render(): Component`. An optional `override fn style(): ComponentStyle` returns a `css` or `ks.css` fence.
+                - Keep writes in actions. For example, `<button @on-click(count += 1)>Add</button>` updates an instance's `count`. Use `<input @bind('title')>` to send a field back to the server.
+                - For a small interaction in a page, wrap the controls in `<live>` and declare values with `<state name="count" value="0" />`.
+                - Expose a named action with `<span hidden @live-action('save') @on-action(@save($event.data))></span>`. Validate inputs and authorize writes in the handler.
+
+                ## Live directives
+
+                """).Append('\n');
+            foreach (AttributeInfo directive in LiveAttributes.All.OrderBy(a => a.Name, StringComparer.Ordinal))
+            {
+                string name = directive.Name == "live-use-" ? "live-use-<name>" : directive.Name;
+                w.Append("- `@").Append(name).Append("` ").Append(directive.Description).Append('\n');
+            }
+            w.Append($"\n## Browser extensions\n\nRegister browser behavior on `kscript:init`. See [client-side extensions]({Guides}components.md#client-side-extensions).\n");
+            w.Append("""
+                - `KScriptLive.directive('focus', ({ element }) => element.focus())` attaches behavior to `live-use-focus`.
+                - `KScriptLive.action('copy', ({ element }) => navigator.clipboard.writeText(element.dataset.text))` handles `live-client="copy"`.
+                - `KScriptLive.call(component, 'save', payload)` invokes the component's named server action.
+                - `KScriptLive.on('commit', ({ component }) => console.log(component))` subscribes to updates after the DOM changes.
+
+                """).Append('\n');
         }
 
         /// <summary>One field of a type of value: <c>- `.status: number` The status code.</c></summary>
