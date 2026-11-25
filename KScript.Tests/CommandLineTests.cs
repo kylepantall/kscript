@@ -97,7 +97,7 @@ public sealed class CommandLineTests : IDisposable
             foreach (string usage in command.Usage.Split('\n')) Assert.Contains("  " + usage, one.Out);
             foreach (CliOption option in command.Options) Assert.Contains(option.Name, one.Out);
         }
-        Assert.Contains("kscript [--env name] <script>", Kscript("help", "run").Out);
+        Assert.Contains("kscript [run] [--env name] <script>", Kscript("help", "run").Out);
         Assert.Contains("kscript serve [site folder]", Kscript("serve", "--help").Out);
         Assert.Contains("kscript serve [site folder]", Kscript("serve", "-h").Out);
         Assert.Contains("kscript make project", Kscript("help", "make").Out);
@@ -176,7 +176,7 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("  kscript docs ", Kscript("docs", "--help").Out);
         Assert.Contains("1 file checked: 0 errors", Kscript("check", script, "--warnings-as-errors").Out);
         Assert.Contains("kscript:recommended", Kscript("check", "--print-config", dir).Out);
-        Assert.Contains("1 file checked: all formatted", Kscript("fmt", script, "--check").Out);
+        Assert.Contains("1 script or page checked: all formatted", Kscript("fmt", script, "--check").Out);
         Assert.Equal(0, Kscript("css", Write("site.ks.css", "a { color: red; }")).Code);
         Assert.Equal(0, Kscript("make", "--dir", dir).Code);
         Assert.Contains("Created", Kscript("make", "component", "Hero", "--dir", dir).Out);
@@ -479,6 +479,122 @@ public sealed class CommandLineTests : IDisposable
         using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
         var (code, output, error) = Run(new[] { "--port", "0", "--host", "127.0.0.1" }, (o, e) => new CommandLine { Cancellation = stop.Token }, manifest);
         Assert.True(code == 0, error);
+    }
+
+    [Fact]
+    public void Run_is_a_command_that_runs_a_script()
+    {
+        string script = Write("hello.kscript", "echo \"hi {$args[0]}\"\n");
+        var (code, output, error) = Kscript("run", script, "Ann", "--env");
+        Assert.True(code == 0, error);
+        Assert.Contains("hi Ann", output);
+
+        var none = Kscript("run");
+        Assert.Equal(ExitCodes.Usage, none.Code);
+        Assert.Contains("kscript run needs a script", none.Err);
+    }
+
+    [Fact]
+    public void Global_options_are_read_anywhere_after_a_command_and_only_before_a_script()
+    {
+        var check = CommandLine.TakeGlobalOptions(new[] { "--env", "staging.eu", "check", "--no-ansi", "a.kscript", "--debug", "--env=test" });
+        Assert.Equal(new[] { "check", "a.kscript" }, check.Rest);
+        Assert.True(check.Debug);
+        Assert.False(check.Ansi);
+        Assert.Equal("test", check.Environment);
+
+        var script = CommandLine.TakeGlobalOptions(new[] { "--ansi", "app.kscript", "--env", "x", "--no-ansi", "--debug" });
+        Assert.Equal(new[] { "app.kscript", "--env", "x", "--no-ansi", "--debug" }, script.Rest);
+        Assert.True(script.Ansi);
+        Assert.Null(script.Environment);
+
+        var run = CommandLine.TakeGlobalOptions(new[] { "run", "--env", "staging", "app.kscript", "--env", "x" });
+        Assert.Equal(new[] { "run", "app.kscript", "--env", "x" }, run.Rest);
+        Assert.Equal("staging", run.Environment);
+
+        string file = Write("ok.kscript", "echo \"hi\"\n");
+        var (code, _, error) = Kscript("check", file, "--env", "staging");
+        Assert.True(code == 0, error);
+        Assert.Equal("staging", Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
+        Assert.Equal(ExitCodes.Usage, Kscript("check", "--env").Code);
+    }
+
+    [Fact]
+    public void Routes_and_serve_reject_options_they_do_not_have()
+    {
+        Write("site/index.html", "<h1>Hi</h1>");
+        var routes = Kscript("routes", "--bogus", Path.Combine(dir, "site"));
+        Assert.Equal(ExitCodes.Usage, routes.Code);
+        Assert.Contains("Unknown option '--bogus' for kscript routes", routes.Err);
+        var serve = Kscript("serve", "--bogus", Path.Combine(dir, "site"));
+        Assert.Equal(ExitCodes.Usage, serve.Code);
+        Assert.Contains("Unknown option '--bogus' for kscript serve", serve.Err);
+    }
+
+    [Fact]
+    public void A_fault_inside_kscript_while_a_script_runs_exits_70()
+    {
+        Assert.Equal(ExitCodes.Internal, CommandLine.ScriptExitCode(new NullReferenceException()));
+        Assert.Equal(ExitCodes.ScriptError, CommandLine.ScriptExitCode(new KScript.Runtime.KScriptException("boom")));
+        Assert.Equal(ExitCodes.ScriptError, CommandLine.ScriptExitCode(new FileNotFoundException("gone")));
+    }
+
+    [Fact]
+    public void Json_routes_with_nothing_to_list_fail_as_the_text_table_does()
+    {
+        Directory.CreateDirectory(Path.Combine(dir, "empty"));
+        var (code, output, error) = Kscript("routes", Path.Combine(dir, "empty"), "--output", "json");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Equal("", output);
+        Assert.Contains("There are no route files", error);
+    }
+
+    [Fact]
+    public void Check_json_errors_carry_no_terminal_label()
+    {
+        Write("bad/kscript.json", "{ nope");
+        Write("bad/a.kscript", "echo \"hi\"\n");
+        var (code, output, _) = Kscript("check", Path.Combine(dir, "bad"), "--output", "json");
+        Assert.Equal(ExitCodes.Usage, code);
+        using var json = System.Text.Json.JsonDocument.Parse(output);
+        Assert.StartsWith("Config:", json.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public void Check_fails_a_project_whose_packages_setting_stops_every_script()
+    {
+        Write("pk/kscript.json", "{ \"packages\": [\"KScript.Nope\"] }");
+        Write("pk/a.kscript", "echo \"hi\"\n");
+        var (code, output, _) = Kscript("check", Path.Combine(dir, "pk"));
+        Assert.Equal(1, code);
+        Assert.Contains("kscript.json: error packages: there is no package 'KScript.Nope'", output);
+        Assert.Contains("1 error", output);
+
+        var json = Kscript("check", Path.Combine(dir, "pk"), "--output", "json");
+        Assert.Equal(1, json.Code);
+        using var parsed = System.Text.Json.JsonDocument.Parse(json.Out);
+        Assert.Equal(1, parsed.RootElement.GetProperty("errors").GetInt32());
+
+        Write("pk/kscript.json", "{ \"packages\": \"KScript.IO\" }");
+        Assert.Contains("packages should be a list of package names, e.g. [\"KScript.IO\"]", Kscript("check", Path.Combine(dir, "pk")).Out);
+    }
+
+    [Fact]
+    public void Watch_reports_a_broken_kscript_json()
+    {
+        Write("broken/kscript.json", "{ nope");
+        var (code, output, error) = Kscript("watch", Path.Combine(dir, "broken"), "--once");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("not valid JSON", output + error);
+    }
+
+    [Fact]
+    public void Fmt_check_does_not_say_all_formatted_when_nothing_could_be_read()
+    {
+        string bad = Write("syn.kscript", "echo \"x\n");
+        var (code, output, _) = Kscript("fmt", "--check", bad);
+        Assert.Equal(1, code);
+        Assert.DoesNotContain("all formatted", output);
     }
 
     [Fact]

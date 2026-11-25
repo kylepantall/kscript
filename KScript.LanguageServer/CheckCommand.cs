@@ -30,7 +30,10 @@ namespace KScript.LanguageServer
                 var result = new System.Text.Json.Nodes.JsonObject();
                 if (code == 2)
                 {
-                    result["error"] = text.ToString().Trim();
+                    // The text report labels its errors ("ERROR  ..."); the label is for a terminal, not for JSON.
+                    string message = text.ToString().Trim();
+                    if (message.StartsWith("ERROR ", StringComparison.Ordinal)) message = message.Substring(6).TrimStart();
+                    result["error"] = message;
                 }
                 else
                 {
@@ -109,6 +112,7 @@ namespace KScript.LanguageServer
             int warnings = 0;
             int fixedCount = 0, fixedFiles = 0;
             bool anyWarningsAsErrors = warningsAsErrors;
+            var countedConfigs = new HashSet<string>(StringComparer.Ordinal);
             foreach (var (file, isExplicit) in files.DistinctBy(f => Path.GetFullPath(f.File)).OrderBy(f => f.File, StringComparer.Ordinal))
             {
                 ProjectConfig config;
@@ -122,6 +126,19 @@ namespace KScript.LanguageServer
                     return 2;
                 }
                 anyWarningsAsErrors |= config?.Lint.WarningsAsErrors == true;
+                // A setting that stops every script (a package that doesn't exist) is an error of the project, counted once.
+                if (config != null && config.Errors.Count > 0 && countedConfigs.Add(config.FilePath))
+                {
+                    errors += config.Errors.Count;
+                    foreach (string problem in config.Errors)
+                    {
+                        report?.Problems.Add(new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["file"] = config.FilePath, ["line"] = 1, ["column"] = 1, ["endLine"] = 1, ["endColumn"] = 1,
+                            ["severity"] = "error", ["code"] = "", ["message"] = problem, ["fixes"] = new System.Text.Json.Nodes.JsonArray(),
+                        });
+                    }
+                }
 
                 string fileText = File.ReadAllText(file);
                 if (fix)
@@ -369,7 +386,7 @@ namespace KScript.LanguageServer
                 cache[file] = config;
                 foreach (string warning in config.Warnings)
                 {
-                    output.WriteLine($"{file}: warning {warning}");
+                    output.WriteLine($"{file}: {(config.Errors.Contains(warning) ? "error" : "warning")} {warning}");
                 }
             }
             return config;

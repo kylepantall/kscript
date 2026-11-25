@@ -139,17 +139,22 @@ namespace KScript.Http
                 KScript.Runtime.ErrorReport.Write(error, ex);
                 return ExitCodes.Usage;
             }
-            if (!json && !app.HasRoutes)
+            int NoRoutes()
             {
                 new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.kscript (or api.kscript) with import KScript.Http and a Routes {{ }} block, or routes.ks.xml starting with <KScript.Routes>.");
                 return ExitCodes.Usage;
             }
+            if (!json && !app.HasRoutes) return NoRoutes();
             try
             {
                 if (json)
                 {
                     app.LoadStartupConfig();
-                    output.WriteLine(Values.ToJson(RouteCatalog.Entries(app, app.Table()), indented: true));
+                    var entries = RouteCatalog.Entries(app, app.Table());
+                    // JSON also lists file-based pages, so a site of pages alone has something to show. With no route
+                    // files and no pages it is the same mistake it is as text.
+                    if (!app.HasRoutes && entries.Count == 0) return NoRoutes();
+                    output.WriteLine(Values.ToJson(entries, indented: true));
                     return 0;
                 }
                 if (plain)

@@ -710,6 +710,12 @@ namespace KScript.Projects
         /// <summary>Unknown keys and values that were ignored.</summary>
         public List<string> Warnings { get; } = new List<string>();
 
+        /// <summary>
+        /// The warnings that stop every script in the project from running (a package that doesn't exist), so
+        /// kscript check counts them as errors. Each is also in <see cref="Warnings"/>.
+        /// </summary>
+        public List<string> Errors { get; } = new List<string>();
+
         /// <summary>The standards kscript.json names in "standard", as written. Unset means kscript:recommended.</summary>
         public List<string> Standard { get; private set; } = new List<string> { Standards.Recommended };
 
@@ -873,11 +879,14 @@ namespace KScript.Projects
                             config.Natives = Strings(prop.Value, "natives", config) ?? config.Natives;
                             break;
                         case "packages":
-                            config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
+                            config.Packages = Strings(prop.Value, "packages", config, "[\"KScript.IO\"]", "package names") ?? config.Packages;
                             foreach (string package in config.Packages)
                             {
-                                if (!KScript.Runtime.PackageRegistry.Default.IsKnown(package))
-                                    config.Warnings.Add($"packages: there is no package '{package}'. Packages: {string.Join(", ", KScript.Runtime.PackageRegistry.Default.Names.Where(n => n != "KScript.Core"))}.");
+                                if (KScript.Runtime.PackageRegistry.Default.IsKnown(package)) continue;
+                                // Every script imports these, so a wrong name stops them all: an error, not a warning.
+                                string unknown = $"packages: there is no package '{package}'. Packages: {string.Join(", ", KScript.Runtime.PackageRegistry.Default.Names.Where(n => n != "KScript.Core"))}.";
+                                config.Warnings.Add(unknown);
+                                config.Errors.Add(unknown);
                             }
                             break;
                         default:
@@ -1647,7 +1656,7 @@ namespace KScript.Projects
                         else config.Warnings.Add("test.timeout should be a number of seconds (0 for no limit).");
                         break;
                     case "packages":
-                        config.Test.Packages = Strings(p.Value, "test.packages", config) ?? config.Test.Packages;
+                        config.Test.Packages = Strings(p.Value, "test.packages", config, "[\"KScript.Test\"]", "package names") ?? config.Test.Packages;
                         foreach (string package in config.Test.Packages)
                         {
                             if (!KScript.Runtime.PackageRegistry.Default.IsKnown(package))
@@ -1836,11 +1845,11 @@ namespace KScript.Projects
             return null;
         }
 
-        private static List<string> Strings(JsonElement e, string name, ProjectConfig config)
+        private static List<string> Strings(JsonElement e, string name, ProjectConfig config, string example = "[\"drafts/**\"]", string what = "paths")
         {
             if (e.ValueKind == JsonValueKind.Array && e.EnumerateArray().All(i => i.ValueKind == JsonValueKind.String))
                 return e.EnumerateArray().Select(i => i.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-            config.Warnings.Add($"{name} should be a list of paths, e.g. [\"drafts/**\"].");
+            config.Warnings.Add($"{name} should be a list of {what}, e.g. {example}.");
             return null;
         }
 

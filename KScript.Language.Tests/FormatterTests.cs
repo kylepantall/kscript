@@ -588,7 +588,7 @@ namespace KScript.Language.Tests
             Assert.Equal(1, code);
             Assert.Matches(@"a\.ks\.xml \.+ NOT FORMATTED", output);
             Assert.DoesNotContain("b.ks.xml", output);
-            Assert.Contains("2 files checked: 1 need formatting.", output);
+            Assert.Contains("2 scripts and pages checked: 1 need formatting.", output);
             Assert.Equal(Messy, File.ReadAllText(path));
         }
 
@@ -598,7 +598,7 @@ namespace KScript.Language.Tests
             string path = Write("a.ks.xml", Messy);
             (int code, string output) = Run(dir);
             Assert.Equal(0, code);
-            Assert.Contains("1 file checked: 1 formatted.", output);
+            Assert.Contains("1 script or page checked: 1 formatted.", output);
             Assert.Equal(Tidy, File.ReadAllText(path));
             Assert.Equal(0, Run(dir, "--check").Code);
         }
@@ -728,7 +728,7 @@ namespace KScript.Language.Tests
             File.CreateSymbolicLink(Path.Combine(dir, "gone.xml"), Path.Combine(dir, "nowhere.xml"));
             (int code, string output) = Run(dir);
             Assert.Equal(0, code);
-            Assert.Contains("1 file checked: 1 formatted.", output);
+            Assert.Contains("1 script or page checked: 1 formatted.", output);
             Assert.Equal(Tidy, File.ReadAllText(xml));
             Assert.Equal(Messy, File.ReadAllText(other));
         }
