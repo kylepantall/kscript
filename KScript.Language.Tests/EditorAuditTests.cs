@@ -265,6 +265,15 @@ namespace KScript.Language.Tests
             Assert.Equal("T has no field 'zz'. Its fields are: n.", unknown.Message);
         }
 
+        [Fact]
+        public void AnUnexpectedEmojiIsReportedWhole()
+        {
+            DocumentAnalysis a = Check(Lines("a = 1", "echo $a😀"));
+            Diagnostic d = Assert.Single(a.Diagnostics, x => x.Message.StartsWith("Unexpected character", StringComparison.Ordinal));
+            Assert.Equal("Unexpected character '😀'.", d.Message);
+            Assert.Equal("😀", a.Source[d.Span]);
+        }
+
         #endregion
     }
 }

@@ -311,8 +311,10 @@ namespace KScript.Syntax
                 }
             }
 
-            Position++;
-            return new Token(TokenKind.Error, c.ToString(), new TextSpan(start, 1), $"Unexpected character '{c}'.");
+            // A character outside the basic plane (an emoji) is two code units: report it whole.
+            Position += char.IsHighSurrogate(c) && Position + 1 < end && char.IsLowSurrogate(text[Position + 1]) ? 2 : 1;
+            string unexpected = text.Substring(start, Position - start);
+            return new Token(TokenKind.Error, unexpected, new TextSpan(start, unexpected.Length), $"Unexpected character '{unexpected}'.");
         }
 
         /// <summary>
