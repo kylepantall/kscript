@@ -197,6 +197,19 @@ namespace KScript
                 withDocs ??= project.Serve.Docs;
             }
 
+            // Checked here, for --port/--host and kscript.json alike, so a wrong value is explained before anything starts.
+            // (--port 0 is allowed: the system picks a free port.)
+            if (port is int wrongPort && (wrongPort < 0 || wrongPort > 65535))
+            {
+                Error.WriteLine($"{wrongPort} isn't a port. Use a number from 1 to 65535, e.g. --port 8080");
+                return ExitCodes.Usage;
+            }
+            if (host != null && host != "localhost" && host != "*" && !System.Net.IPAddress.TryParse(host, out _))
+            {
+                Error.WriteLine($"'{host}' isn't an address this computer can listen on. Use localhost, an IP address such as 127.0.0.1, or 0.0.0.0 for every network, e.g. --host 0.0.0.0");
+                return ExitCodes.Usage;
+            }
+
             // The docs (which run examples) are for working on the site: never for a compiled program or in production.
             string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
             bool production = string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase);
@@ -223,7 +236,7 @@ namespace KScript
             {
                 if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation,
-                    liveReload: watch && liveReload && !production).GetAwaiter().GetResult();
+                    liveReload: watch && liveReload && !production, production: production).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
             {

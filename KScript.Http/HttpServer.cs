@@ -12,14 +12,18 @@ namespace KScript.Http
     {
         /// <summary>
         /// Serves a site. <paramref name="before"/> may answer a request before the routes and pages do (it returns
-        /// null to let them); <paramref name="started"/> gets the address once the server is listening.
+        /// null to let them); <paramref name="started"/> gets the address once the server is listening. With
+        /// <paramref name="production"/> an error is answered with a plain 500 and its details go to the log only.
         /// </summary>
         public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default,
-            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null, bool liveReload = false)
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null, bool liveReload = false,
+            bool production = false)
         {
             var app = new HttpApp(siteFolder, project, log);
             app.LoadStartupConfig();
             PageSite site = app.PageSite;
+            // In production a visitor is not shown an error's message, file and line; the log has them.
+            site.HideErrorDetails = production;
             site.RenderPage = app.RenderFilePage;
             if (app.HasRoutes)
             {

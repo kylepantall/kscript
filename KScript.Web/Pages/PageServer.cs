@@ -68,6 +68,15 @@ namespace KScript.Pages
         public string Root { get; }
         public KScript.Runtime.ConfigValue StartupConfig { get; set; }
 
+        /// <summary>The page for addresses the site has nothing at.</summary>
+        public const string NotFoundFile = "_404.html";
+
+        /// <summary>
+        /// True in the production environment: an error is answered with a plain 500 page, and its message, file and
+        /// line go to the server log only.
+        /// </summary>
+        public bool HideErrorDetails { get; set; }
+
         /// <summary>The folder of translation files that /fr/... prefixes are checked against.</summary>
         public string LocalesFolder { get; set; } = "locales";
 
@@ -104,7 +113,9 @@ namespace KScript.Pages
 
         public PageRoute Resolve(string urlPath) => Resolve(urlPath, IsRoutedPath);
 
-        public PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath)
+        public PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath) => Resolve(urlPath, isRoutedPath, localePrefix: true);
+
+        private PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath, bool localePrefix)
         {
             string path = Uri.UnescapeDataString((urlPath ?? "/").Split('?')[0]).Replace('\\', '/');
             var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -113,9 +124,10 @@ namespace KScript.Pages
             if (IsHidden(segments, relative)) return NotFound();
 
             // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
-            if (segments.Count > 0 && IsLocalePrefix(segments[0]))
+            // Only the first part of the path is a locale: /fr/fr/about is not another address of the page.
+            if (localePrefix && segments.Count > 0 && IsLocalePrefix(segments[0]))
             {
-                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)), isRoutedPath);
+                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)), isRoutedPath, localePrefix: false);
                 return new PageRoute { Kind = inner.Kind, File = inner.File, Params = inner.Params, Locale = segments[0] };
             }
 
@@ -342,8 +354,16 @@ namespace KScript.Pages
                 }
                 catch (Exception ex)
                 {
-                    result = ErrorPage(ex);
+                    result = ErrorPage(ex, !site.HideErrorDetails);
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
+                }
+
+                // A status or header the server can't send is the page's mistake: say so, instead of an empty 500.
+                if (liveStream?.Started != true && ResponseProblem(result) is string problem)
+                {
+                    var unsendable = new PageException(problem);
+                    result = ErrorPage(unsendable, !site.HideErrorDetails);
+                    if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", unsendable);
                 }
 
                 try
@@ -380,17 +400,18 @@ namespace KScript.Pages
             });
 
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
-            if (onStarted == null && cli != null)
-            {
-                cli.NewLine();
-                cli.Info($"Serving [{site.Root}] on [{url}].");
-                cli.NewLine();
-                cli.Comment("  Press Ctrl+C to stop the server");
-                cli.NewLine();
-            }
             try
             {
                 await app.StartAsync(stop);
+                // Only once the port is taken: a server that could not start never says it is serving.
+                if (onStarted == null && cli != null)
+                {
+                    cli.NewLine();
+                    cli.Info($"Serving [{site.Root}] on [{url}].");
+                    cli.NewLine();
+                    cli.Comment("  Press Ctrl+C to stop the server");
+                    cli.NewLine();
+                }
                 onStarted?.Invoke(url);
                 await app.WaitForShutdownAsync(stop);
             }
@@ -422,7 +443,11 @@ namespace KScript.Pages
 
             var route = site.Resolve(request.Path.Value);
             bool live = site.RenderPage != null && IsLiveRequest(request);
-            if (live && route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 409 };
+            // The not-found page can hold live blocks too (a search box in its layout): they post back to the
+            // missing address, which renders the same page again.
+            bool hostedNotFound = route.Kind == PageRoute.RouteKind.NotFound && site.RenderPage != null &&
+                File.Exists(Path.Combine(site.Root, PageSite.NotFoundFile));
+            if (live && route.Kind != PageRoute.RouteKind.Page && !hostedNotFound) return new PageResult { Status = 409 };
 
             switch (route.Kind)
             {
@@ -448,6 +473,7 @@ namespace KScript.Pages
                     catch (KScript.Runtime.KScriptException ex)
                     {
                         // The browser ignores a broken stylesheet, so the error goes into it as a comment too.
+                        if (site.HideErrorDetails) throw;
                         return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {KScript.Runtime.ErrorReport.Format(ex).Replace("*/", "* /")} */" };
                     }
                 }
@@ -467,13 +493,23 @@ namespace KScript.Pages
 
                 default:
                 {
-                    string notFound = Path.Combine(site.Root, "_404.html");
+                    string notFound = Path.Combine(site.Root, PageSite.NotFoundFile);
                     if (File.Exists(notFound))
                     {
-                        var ctx = new PageContext(site.Root, await BuildRequestAsync(request)) { StartupConfig = site.StartupConfig };
-                        var page = PageRenderer.RenderFile(ctx, "_404.html");
-                        page.Status = 404;
-                        return page;
+                        var (built, error) = await ReadPageRequestAsync(request, live);
+                        if (error != null) return error;
+                        if (site.RenderPage == null)
+                        {
+                            var ctx = new PageContext(site.Root, built) { StartupConfig = site.StartupConfig };
+                            var page = PageRenderer.RenderFile(ctx, PageSite.NotFoundFile);
+                            page.Status = 404;
+                            return page;
+                        }
+                        PageResult rendered = site.RenderPage(new PageRoute { Kind = PageRoute.RouteKind.Page, File = PageSite.NotFoundFile }, built);
+                        // The page itself is a 404. A live block's redraw (or its "expired" answer) keeps its own status.
+                        if (!live && rendered.Status == 200) rendered.Status = 404;
+                        rendered.Cookies.AddRange(KScript.Runtime.RequestHooks.Finish(built));
+                        return rendered;
                     }
                     return new PageResult { Status = 404, Body = $"<!doctype html><title>Not found</title><h1>Not found</h1><p>{KScript.Runtime.Values.HtmlEscape(request.Path.Value)}</p>" };
                 }
@@ -516,7 +552,7 @@ namespace KScript.Pages
             }
             catch (PageException ex)
             {
-                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = KScript.Runtime.ErrorReport.Format(ex) };
+                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = site.HideErrorDetails ? HiddenErrorMessage : KScript.Runtime.ErrorReport.Format(ex) };
             }
         }
 
@@ -529,7 +565,82 @@ namespace KScript.Pages
 
         public static bool IsLiveRequest(HttpRequest request) => HttpMethods.IsPost(request.Method) && request.Headers.ContainsKey("X-KScript-Live");
 
+        /// <summary>
+        /// What stops a response being sent, or null: a status that isn't an HTTP status, or a header value with a line
+        /// break, a control character or (anywhere but Location) a character outside ASCII. A Location with such
+        /// characters is sent percent-encoded, as browsers expect.
+        /// </summary>
+        internal static string ResponseProblem(PageResult result)
+        {
+            if (result.Status < 100 || result.Status > 999)
+                return $"{result.Status} isn't an HTTP status. Use a status from 100 to 999, such as 200, 302 or 404.";
+            if (result.Headers.TryGetValue("Location", out string location) && location != null && !location.Any(char.IsControl))
+                result.Headers["Location"] = EncodeNonAscii(location);
+            foreach (var header in result.Headers.Append(new KeyValuePair<string, string>("Content-Type", result.ContentType))
+                .Concat(result.Cookies.Select(cookie => new KeyValuePair<string, string>("Set-Cookie", cookie))))
+            {
+                if (header.Key.Length == 0 || header.Key.Any(c => c <= ' ' || c > '~' || c == ':'))
+                    return $"'{header.Key}' can't be the name of a response header. Use letters, digits and hyphens.";
+                if (header.Value == null) continue;
+                if (header.Value.Any(char.IsControl))
+                    return $"The {header.Key} response header has a line break or control character in its value, which HTTP doesn't allow.";
+                if (header.Value.Any(c => c > '~'))
+                    return $"The {header.Key} response header has a character outside ASCII in its value, which HTTP doesn't allow. Encode the value first, for example with ->url_encode().";
+            }
+            return null;
+        }
+
+        private static string EncodeNonAscii(string text)
+        {
+            if (text.All(c => c is > ' ' and <= '~')) return text;
+            var sb = new StringBuilder(text.Length + 16);
+            foreach (byte b in Encoding.UTF8.GetBytes(text))
+            {
+                if (b is > (byte)' ' and <= (byte)'~') sb.Append((char)b);
+                else sb.Append('%').Append(b.ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            return sb.ToString();
+        }
+
         public static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadPageRequestAsync(HttpRequest request, bool live)
+        {
+            try
+            {
+                return await ReadRequestAsync(request, live);
+            }
+            catch (Exception ex) when (BodyProblem(ex) is int status)
+            {
+                return (null, BodyError(status));
+            }
+        }
+
+        /// <summary>
+        /// The status for a request whose body could not be read (too large, too many fields, cut short or not what
+        /// its Content-Type says), or null for any other error. These are the client's mistakes, not the site's.
+        /// </summary>
+        internal static int? BodyProblem(Exception ex) => ex switch
+        {
+            BadHttpRequestException bad => bad.StatusCode,
+            InvalidDataException data => data.Message.Contains("limit", StringComparison.OrdinalIgnoreCase) ? 413 : 400,
+            IOException => 400,
+            _ => null,
+        };
+
+        public static string BodyErrorMessage(int status) =>
+            status == 413 ? "The request is too large." : "The request body could not be read.";
+
+        internal static PageResult BodyError(int status)
+        {
+            string reason = Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status);
+            string message = BodyErrorMessage(status);
+            return new PageResult
+            {
+                Status = status,
+                Body = $"<!doctype html><meta charset=\"utf-8\"><title>{status} {reason}</title><h1>{status} {reason}</h1><p>{message}</p>",
+            };
+        }
+
+        private static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadRequestAsync(HttpRequest request, bool live)
         {
             if (!live) return (await BuildRequestAsync(request), null);
             if (!System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type))
@@ -571,13 +682,9 @@ namespace KScript.Pages
                     ValueLengthLimit = MaxLiveBodyBytes,
                 }).ReadFormAsync(request.HttpContext.RequestAborted);
             }
-            catch (BadHttpRequestException ex)
+            catch (Exception ex) when (BodyProblem(ex) is int status)
             {
-                return (null, new PageResult { Status = ex.StatusCode });
-            }
-            catch (InvalidDataException)
-            {
-                return (null, new PageResult { Status = 400 });
+                return (null, new PageResult { Status = status });
             }
 
             if (form.Count != 1 || !form.TryGetValue("state", out var parts) || parts.Count != 1 || form.Files.Count == 0)
@@ -609,16 +716,24 @@ namespace KScript.Pages
 
         private static async Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request, string readBody)
         {
-            var query = request.Query.ToDictionary(q => q.Key, q => (object)q.Value.ToString());
+            var query = request.Query.ToDictionary(q => q.Key, q => RequestValue(q.Value));
             var headers = request.Headers.ToDictionary(h => h.Key.ToLowerInvariant(), h => (object)h.Value.ToString());
             var cookies = request.Cookies.ToDictionary(c => c.Key, c => (object)c.Value);
             var form = new Dictionary<string, object>();
             string body = readBody ?? string.Empty;
 
-            if (readBody == null && request.HasFormContentType)
+            if (readBody == null && request.HasFormContentType && !IsUrlEncodedForm(request))
             {
                 var f = await request.ReadFormAsync();
-                foreach (var kv in f) form[kv.Key] = kv.Value.ToString();
+                foreach (var kv in f) form[kv.Key] = RequestValue(kv.Value);
+            }
+            else if (readBody == null && request.HasFormContentType)
+            {
+                // An ordinary form post: $request.body keeps the text as sent, and the fields are read from it.
+                using var reader = new StreamReader(request.Body, Encoding.UTF8);
+                body = await reader.ReadToEndAsync();
+                using var fields = new Microsoft.AspNetCore.WebUtilities.FormReader(body);
+                foreach (var kv in await fields.ReadFormAsync(request.HttpContext.RequestAborted)) form[kv.Key] = RequestValue(kv.Value);
             }
             else if (readBody == null && (request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding") ||
                      request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true))
@@ -645,12 +760,36 @@ namespace KScript.Pages
             return built;
         }
 
+        private static bool IsUrlEncodedForm(HttpRequest request) =>
+            System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type) &&
+            string.Equals(type.MediaType, "application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>A query or form value: text, or a list of texts when the name was sent more than once (?tag=a&amp;tag=b).</summary>
+        internal static object RequestValue(Microsoft.Extensions.Primitives.StringValues values) =>
+            values.Count > 1 ? values.Select(v => (object)(v ?? string.Empty)).ToList() : values.ToString();
+
         /// <summary>
         /// The page for an error: the KScript error (<c>file:line: Type: message</c>), never a .NET stack trace unless
         /// kscript runs with --debug or KSCRIPT_DEBUG.
         /// </summary>
-        public static PageResult ErrorPage(Exception ex)
+        public static PageResult ErrorPage(Exception ex) => ErrorPage(ex, details: true);
+
+        /// <summary>What a visitor is told about an error in production; the details are in the server log.</summary>
+        public const string HiddenErrorMessage = "Something went wrong on our side. Please try again later.";
+
+        /// <summary>
+        /// The page for an error. Without <paramref name="details"/> (the production environment) the visitor gets a
+        /// plain 500 page; the error's message, file and line are for the server log.
+        /// </summary>
+        public static PageResult ErrorPage(Exception ex, bool details)
         {
+            if (!details)
+                return new PageResult
+                {
+                    Status = 500,
+                    Body = "<!doctype html><meta charset=\"utf-8\"><title>500 Internal Server Error</title>" +
+                           $"<h1>500 Internal Server Error</h1><p>{HiddenErrorMessage}</p>",
+                };
             string text = KScript.Runtime.ErrorReport.Format(ex);
             return new PageResult
             {
