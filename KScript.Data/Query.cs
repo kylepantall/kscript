@@ -28,6 +28,11 @@ namespace KScript.Data
 
         public SqlExpr Where { get; private init; }
 
+        /// <summary>The part of <see cref="Where"/> every row must meet whatever is added with ->or_where(), and the part ->or_where() widens.</summary>
+        private SqlExpr Pinned { get; init; }
+
+        private SqlExpr Loose { get; init; }
+
         public IReadOnlyList<(SqlExpr Expr, bool Descending)> Order { get; private init; } = Array.Empty<(SqlExpr, bool)>();
 
         public int? Limit { get; private init; }
@@ -84,9 +89,15 @@ namespace KScript.Data
 
         #region Building
 
-        public Query And(SqlExpr condition) => this with { Where = Where == null ? condition : new SqlBinary("AND", Where, condition) };
+        public Query And(SqlExpr condition) => Narrowed(Loose == null ? condition : new SqlBinary("AND", Loose, condition));
 
-        public Query Or(SqlExpr condition) => this with { Where = Where == null ? condition : new SqlBinary("OR", Where, condition) };
+        /// <summary>Widens what the script asked for. What the query is tied to (the record of <c>$user->posts()</c>) still holds.</summary>
+        public Query Or(SqlExpr condition) => Narrowed(Loose == null ? condition : new SqlBinary("OR", Loose, condition));
+
+        private Query Narrowed(SqlExpr loose) => this with { Loose = loose, Where = Pinned == null ? loose : new SqlBinary("AND", Pinned, loose) };
+
+        /// <summary>Ties the query to its conditions so far: a later ->or_where() adds to what follows, never to these.</summary>
+        public Query Pin() => this with { Pinned = Where, Loose = null };
 
         public Query OrderBy(SqlExpr expr, bool descending) => this with { Order = Order.Append((expr, descending)).ToList() };
 

@@ -322,6 +322,8 @@ echo $ada->posts()->where(published: false)->count()
 $ada->posts()->create(title: 'A second post')
 ```
 
+Everything added to it stays within that user's posts, `->or_where(...)` included.
+
 | Method | What it does |
 | --- | --- |
 | `->create(values)` | Adds a record to the relation: `$ada->posts()->create(...)` sets the post's author. On a many to many relation it saves the record and links it. |
