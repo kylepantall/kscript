@@ -188,5 +188,54 @@ namespace KScript.Language.Tests
         }
 
         #endregion
+
+        #region Quick fixes
+
+        private static DocumentAnalysis Check(string text, string file = "fix.kscript", IFileSystem files = null) =>
+            Analyzer.Analyze(text, At(file), files ?? new MemoryFiles());
+
+        private static Diagnostic Find(DocumentAnalysis a, string code, string marked) =>
+            a.Diagnostics.Single(d => d.Code == code && a.Source[d.Span] == marked);
+
+        private static string Fix(DocumentAnalysis a, Diagnostic d, string titleStart) =>
+            AnalyzerTests.Apply(a.Source.Text, d.Fixes.Single(f => f.Title.StartsWith(titleStart, StringComparison.Ordinal)).Changes);
+
+        [Fact]
+        public void RemovingAnUnusedVariableKeepsTheCallThatFilledIt()
+        {
+            DocumentAnalysis a = Check(Lines("fn log_it(msg: string) {", "  echo $msg", "  return 1", "}", "r = @log_it('side effect')", "plain = 3"));
+            Diagnostic call = Find(a, DiagnosticCodes.UnusedVariable, "r");
+            Assert.DoesNotContain(call.Fixes, f => f.Title == "Remove $r");
+            Assert.Contains("}\n@log_it('side effect')\nplain = 3", Fix(a, call, "Remove $r and keep the call"));
+            // A plain value does nothing, so the whole line goes.
+            Assert.EndsWith("@log_it('side effect')\n", Fix(a, Find(a, DiagnosticCodes.UnusedVariable, "plain"), "Remove $plain"));
+        }
+
+        [Fact]
+        public void AParameterACallPassesIsNotOfferedForRemoval()
+        {
+            DocumentAnalysis a = Check(Lines("fn f(a: int, b: int) => $a", "fn g(a: int, spare: int = 0) => $a", "echo \"{ @f(1, 2) } { @f(b: 2, a: 1) } { @g(1) }\""));
+            Diagnostic passed = Find(a, DiagnosticCodes.UnusedParameter, "b");
+            Assert.DoesNotContain(passed.Fixes, f => f.Title.StartsWith("Remove", StringComparison.Ordinal));
+            // The rename follows the call that names the parameter.
+            Assert.Equal(
+                Lines("fn f(a: int, _b: int) => $a", "fn g(a: int, spare: int = 0) => $a", "echo \"{ @f(1, 2) } { @f(_b: 2, a: 1) } { @g(1) }\""),
+                Fix(a, passed, "Rename"));
+            // No call passes spare, so it can go.
+            Assert.StartsWith("fn f(a: int, b: int) => $a\nfn g(a: int) => $a\n", Fix(a, Find(a, DiagnosticCodes.UnusedParameter, "spare"), "Remove"));
+        }
+
+        [Fact]
+        public void AParameterOfAFunctionOtherFilesCallGetsNoFixThatChangesItsSignature()
+        {
+            MemoryFiles files = new MemoryFiles()
+                .Add(At("q", "kscript.json"), "{}")
+                .Add(At("q", "main.kscript"), "import \"lib.kscript\"\necho @shared(1, extra: 2)\n")
+                .Add(At("q", "lib.kscript"), "fn shared(a: int, extra: int = 0) => $a\n");
+            DocumentAnalysis a = Check("fn shared(a: int, extra: int = 0) => $a\n", Path.Combine("q", "lib.kscript"), files);
+            Assert.Empty(Find(a, DiagnosticCodes.UnusedParameter, "extra").Fixes ?? Array.Empty<QuickFix>());
+        }
+
+        #endregion
     }
 }

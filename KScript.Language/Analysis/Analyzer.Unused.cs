@@ -102,7 +102,7 @@ namespace KScript.Language.Analysis
 
             HashSet<Symbol> unusedFunctions = projectWide ? CheckUnusedFunctions(Project) : new HashSet<Symbol>();
             CheckUnusedVariables(projectWide, Project);
-            CheckUnusedParameters(unusedFunctions);
+            CheckUnusedParameters(unusedFunctions, projectWide ? Project : null);
             CheckUnusedImports();
         }
 
@@ -277,7 +277,39 @@ namespace KScript.Language.Analysis
             List<QuickFix> fixes = new List<QuickFix>();
             if (!written && IsRemovableDeclaration(s))
             {
-                fixes.Add(RemoveElementFix(s.DeclaringElement, $"Remove ${s.Name}"));
+                // A value that does work (a call) may be there for what it does: the call stays, or there is no fix.
+                MarkupElement e = s.DeclaringElement;
+                ExprNode value = null;
+                int valueStart = -1;
+                foreach (ExpressionRegion region in result.Regions.Where(r => r.Element == e && r.Parse != null))
+                {
+                    if (region.Kind == RegionKind.Statements
+                        && region.Parse.Nodes.OfType<AssignmentNode>().FirstOrDefault(n => region.Source.ToSource(n.Span).Contains(s.DeclarationSpan.Start)) is AssignmentNode assigned)
+                    {
+                        value = assigned.Value;
+                    }
+                    else if (region.Kind == RegionKind.Expression && region.Attribute?.Name == "value")
+                    {
+                        value = region.Parse.Root;
+                    }
+                    if (value != null)
+                    {
+                        valueStart = region.Source.ToSource(value.Span).Start;
+                        break;
+                    }
+                }
+                bool doesWork = value == null
+                    ? source.Text.AsSpan(e.Span.Start, e.Span.Length).IndexOfAny('@', '(') >= 0
+                    : value.DescendantsAndSelf().Any(n => n is CommandCallNode or MethodCallNode or CallNode or PipeNode);
+                if (!doesWork)
+                {
+                    fixes.Add(RemoveElementFix(e, $"Remove ${s.Name}"));
+                }
+                else if (IsCode && value is CommandCallNode or MethodCallNode or CallNode && valueStart > e.Span.Start
+                    && source.Text[valueStart] is '@' or '$' && result.Regions.Count(r => r.Element == e) == 1)
+                {
+                    fixes.Add(new QuickFix($"Remove ${s.Name} and keep the call", new TextChange(TextSpan.FromBounds(e.Span.Start, valueStart), string.Empty)));
+                }
             }
             fixes.Add(PrefixFix(s));
             Report(s.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedVariable, message, fixes);
@@ -295,7 +327,7 @@ namespace KScript.Language.Analysis
 
         #region Parameters
 
-        private void CheckUnusedParameters(HashSet<Symbol> unusedFunctions)
+        private void CheckUnusedParameters(HashSet<Symbol> unusedFunctions, Func<ProjectUses> project)
         {
             foreach ((MarkupElement fn, List<Symbol> parameters) in functionParameters)
             {
@@ -311,12 +343,22 @@ namespace KScript.Language.Analysis
                     {
                         continue;
                     }
+                    // A fix must leave every call working. Calls in this file say what they pass; a method's calls
+                    // and the calls other files make aren't known here, so those get no fix that changes the signature.
+                    (int, string) key = (fn.Span.Start, p.Name);
+                    bool nested = fn.Parent?.Name == "fn";
+                    bool callsKnown = nested || ((fn.Parent == null || fn.Parent.Name == "kscript")
+                        && project != null && !project().Names.Contains(fn.GetAttributeValue("name")?.Trim() ?? string.Empty));
                     List<QuickFix> fixes = new List<QuickFix>();
-                    if (i == parameters.Count - 1)
+                    if (callsKnown && i == parameters.Count - 1 && !callArguments.ContainsKey(key))
                     {
                         fixes.Add(RemoveParameterFix(fn, p, first: i == 0));
                     }
-                    fixes.Add(PrefixFix(p));
+                    if (callsKnown)
+                    {
+                        namedArgumentUses.TryGetValue(key, out List<TextSpan> named);
+                        fixes.Add(PrefixFix(p, named));
+                    }
                     Report(p.DeclarationSpan, DiagnosticSeverity.Warning, DiagnosticCodes.UnusedParameter, $"The parameter ${p.Name} is never used.", fixes);
                 }
             }
@@ -464,9 +506,10 @@ namespace KScript.Language.Analysis
         #region Fixes
 
         /// <summary>Renames the symbol (its declaration and every write) to _name, which marks it as unused on purpose.</summary>
-        private QuickFix PrefixFix(Symbol symbol)
+        private QuickFix PrefixFix(Symbol symbol, IEnumerable<TextSpan> namedArguments = null)
         {
             List<TextSpan> spans = new List<TextSpan> { symbol.DeclarationSpan };
+            spans.AddRange(namedArguments ?? Enumerable.Empty<TextSpan>());
             foreach (Symbol s in SameDeclaration(symbol))
             {
                 spans.AddRange(uses[s].Select(r => r.Span));

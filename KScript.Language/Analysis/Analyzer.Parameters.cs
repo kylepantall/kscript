@@ -14,6 +14,9 @@ namespace KScript.Language.Analysis
         /// <summary>What each call passed, by the offset of the &lt;fn&gt; element and the parameter's name.</summary>
         private readonly Dictionary<(int Fn, string Name), List<TypeShape>> callArguments = new Dictionary<(int, string), List<TypeShape>>();
 
+        /// <summary>Where calls in this file name a parameter (<c>@send(to: $user)</c>), so a rename of the parameter can follow.</summary>
+        private readonly Dictionary<(int Fn, string Name), List<TextSpan>> namedArgumentUses = new Dictionary<(int, string), List<TextSpan>>();
+
         /// <summary>Parameter types the previous pass found from the calls, by the offset of the &lt;fn&gt; element and the parameter's name.</summary>
         private IReadOnlyDictionary<(int Fn, string Name), TypeShape> knownParameters = new Dictionary<(int, string), TypeShape>();
 
@@ -32,6 +35,15 @@ namespace KScript.Language.Analysis
             foreach (ArgumentNode a in args)
             {
                 Note(fn, a.Name == null ? position++ : -1, a.Name, Infer(a.Value, region));
+                if (a.Name != null)
+                {
+                    (int, string) key = (fn.DeclaringElement.Span.Start, a.Name);
+                    if (!namedArgumentUses.TryGetValue(key, out List<TextSpan> spans))
+                    {
+                        namedArgumentUses[key] = spans = new List<TextSpan>();
+                    }
+                    spans.Add(region.Source.ToSource(a.NameSpan));
+                }
             }
         }
 
