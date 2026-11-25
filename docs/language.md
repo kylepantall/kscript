@@ -342,6 +342,8 @@ On a list, `contains(value)`, `index_of(value)`, `remove(value)` and `count_of(v
 
 A number is always written in plain digits, never with an exponent: `echo 10 ** 20` prints `100000000000000000000` and `echo 0.1 ** 20` prints `0.00000000000000000001`. A whole number keeps every digit up to 9007199254740992 (16 digits), so a long id prints as it was read, and a fraction shows 15 significant digits, so `0.1 + 0.2` prints `0.3`.
 
+On text, `->count()` and positions (in `->slice()`, `->index_of()` and `$text[0]`) count most characters as one place and a character such as an emoji as two. No method cuts such a character in half: `->chars()`, `->first()`, `->last()` and `->reverse()` work with whole characters as a reader sees them, and `->slice()` and `->truncate()` move a cut that would fall inside one back to before it.
+
 A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
 
 ```kscript
