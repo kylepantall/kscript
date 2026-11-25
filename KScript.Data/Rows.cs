@@ -95,7 +95,7 @@ namespace KScript.Data
                 case string s when column?.Kind == ColumnKind.Integer && long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out long n):
                     return n;
                 case DateTime dt:
-                    return dialect.Date(dt);
+                    return dialect.Date(StoredDates.ToStored(dt));
                 case PasswordValue password:
                     return password.Hash(password.Algorithm);
                 case PasswordHash hash:
@@ -175,7 +175,7 @@ namespace KScript.Data
                 case ColumnKind.Bool:
                     return raw is bool b ? b : Convert.ToInt64(raw, CultureInfo.InvariantCulture) != 0;
                 case ColumnKind.Date:
-                    return raw is DateTime dt ? dt : DateTime.Parse(Values.ToStr(Plain(raw)), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal);
+                    return StoredDates.FromStored(raw is DateTime dt ? dt : DateTime.Parse(Values.ToStr(Plain(raw)), CultureInfo.InvariantCulture, DateTimeStyles.None));
                 case ColumnKind.Email:
                 case ColumnKind.Handle:
                 case ColumnKind.Uuid:

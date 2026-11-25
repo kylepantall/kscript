@@ -252,12 +252,23 @@ namespace KScript.Data
         {
             if (host != null && (name == null || name == DatabaseSettings.DefaultName))
             {
-                if (host.MemoryDatabase) return ForSandbox(host);
+                if (host.MemoryDatabase) return ForSandbox(host).InZoneOf(folder);
                 KScriptHost testHost = AppFolders.TestHost ?? host;
-                if (testHost.TestFile != null && ForTest(testHost, folder) is Database test) return test;
+                if (testHost.TestFile != null && ForTest(testHost, folder) is Database test) return test.InZoneOf(folder);
             }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
-            return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
+            return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings)).InZoneOf(folder);
+        }
+
+        /// <summary>The time zone this database's dates are stored in: the project's (kscript.json "timezone").</summary>
+        public TimeZoneInfo Zone { get; private set; }
+
+        /// <summary>Makes this database's time zone the one dates are written and read in from here on.</summary>
+        private Database InZoneOf(string folder)
+        {
+            Zone ??= ProjectConfig.FindAndLoad(folder)?.Zone ?? ProjectConfig.DefaultZone;
+            StoredDates.Zone = Zone;
+            return this;
         }
 
         /// <summary>The database of the script making a call (its module's folder), with an optional connection name.</summary>

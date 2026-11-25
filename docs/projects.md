@@ -315,6 +315,7 @@ git submodule add https://github.com/acme/slug-tools.git libraries/slugs
 ```jsonc
 {
   "name": "my-site",
+  "timezone": "Europe/London",                     // the zone stored dates are in (see docs/data.md); this is the default
   "standard": "kscript:recommended",               // lint rules and format settings to start from (see Standards)
   "packages": ["KScript.Terminal", "KScript.IO"],   // imported by every script in the project
   "extensions": ["extensions", "shared/**/*.kscript"], // where the project's extend files are (default: extensions/)

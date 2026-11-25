@@ -222,7 +222,7 @@ namespace KScript.Data.Migrations
             {
                 var steps = file.Plan.Up.ToList();
                 Run(connection, file, steps, schema, pretend, record: transaction =>
-                    Execute(connection, transaction, $"INSERT INTO {Q(Table)} (migration, batch, ran_at) VALUES ({P(1)}, {P(2)}, {P(3)})", file.Name, (long)batch, Database.Dialect.Date(Rows.Clock())));
+                    Execute(connection, transaction, $"INSERT INTO {Q(Table)} (migration, batch, ran_at) VALUES ({P(1)}, {P(2)}, {P(3)})", file.Name, (long)batch, Database.Dialect.Date(StoredDates.ToStored(Rows.Clock()))));
             }
             return pending;
         });

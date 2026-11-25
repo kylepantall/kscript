@@ -478,6 +478,7 @@ Models, queries, transactions and the database queue work the same on each datab
 - Nulls sort first going up and last going down.
 - `->lock_for_update()` and `->skip_locked()` lock rows on Postgres, MySQL and MariaDB. SQLite locks the whole database for a transaction's writes instead.
 - Dates are kept to the microsecond.
+- A date is stored as a clock time, and the clock is the project's: `"timezone"` in `kscript.json`, which is `Europe/London` unless you set another (`America/New_York`, `UTC`, any IANA name). A date is converted to that zone when it is written and back when it is read, so a row is the same moment on a laptop in one zone and a server in another. Change the setting before the project has data, not after: rows already stored keep the clock time they were written with. A database written before this setting existed holds the clock times of the computer that wrote it, so set `"timezone"` to that computer's zone (`"UTC"` for most servers and containers).
 
 Raw SQL in `@sql` is given to the database as it is, so it is written in that database's own SQL.
 

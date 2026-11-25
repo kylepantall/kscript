@@ -25,6 +25,7 @@ public abstract class DataFixture : IDisposable
         Database.Log = null;
         if (Server != null) Environment.SetEnvironmentVariable("DATABASE_URL", null);
         Rows.Clock = () => DateTime.Now;
+        StoredDates.Machine = () => TimeZoneInfo.Local;
         try { Directory.Delete(Project, recursive: true); } catch (IOException) { }
         GC.SuppressFinalize(this);
     }

@@ -450,6 +450,41 @@ namespace KScript.Projects
         public string Directory { get; private set; }
 
         public string Name { get; set; }
+
+        /// <summary>The time zone the project's stored dates are in, by its IANA name. Europe/London when not set.</summary>
+        public string TimeZone { get; private set; } = DefaultTimeZone;
+
+        /// <summary><see cref="TimeZone"/> as a zone.</summary>
+        public TimeZoneInfo Zone { get; private set; } = DefaultZone;
+
+        public const string DefaultTimeZone = "Europe/London";
+
+        /// <summary>Europe/London: from the computer's own time zone data, or by its rule where there is none (a bare container).</summary>
+        public static TimeZoneInfo DefaultZone { get; } = FindZone(DefaultTimeZone) ?? London();
+
+        /// <summary>The zone with an IANA name such as Europe/Paris or America/New_York (or UTC), or null when there is none.</summary>
+        public static TimeZoneInfo FindZone(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(name.Trim());
+            }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException || ex is InvalidTimeZoneException || ex is System.Security.SecurityException || ex is ArgumentException)
+            {
+                return string.Equals(name.Trim(), "UTC", StringComparison.OrdinalIgnoreCase) ? TimeZoneInfo.Utc : null;
+            }
+        }
+
+        // London's rule since 1996: an hour ahead from 01:00 UTC on the last Sunday of March to 01:00 UTC on the last Sunday of October.
+        private static TimeZoneInfo London()
+        {
+            var start = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 1, 0, 0), 3, 5, DayOfWeek.Sunday);
+            var end = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 2, 0, 0), 10, 5, DayOfWeek.Sunday);
+            var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(DateTime.MinValue.Date, DateTime.MaxValue.Date, TimeSpan.FromHours(1), start, end);
+            return TimeZoneInfo.CreateCustomTimeZone(DefaultTimeZone, TimeSpan.Zero, DefaultTimeZone, "GMT", "BST", new[] { rule });
+        }
+
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
         public TestSettings Test { get; } = new TestSettings();
@@ -832,6 +867,17 @@ namespace KScript.Projects
                             break;
                         case "name":
                             config.Name = String(prop.Value, "name", config);
+                            break;
+                        case "timezone":
+                            if (String(prop.Value, "timezone", config) is string zoneName)
+                            {
+                                if (FindZone(zoneName) is TimeZoneInfo found)
+                                {
+                                    config.TimeZone = zoneName.Trim();
+                                    config.Zone = found;
+                                }
+                                else config.Errors.Add($"timezone: there is no time zone called '{zoneName}' on this computer. Use a name such as Europe/London, America/New_York or UTC.");
+                            }
                             break;
                         case "serve":
                             ReadServe(prop.Value, config);
