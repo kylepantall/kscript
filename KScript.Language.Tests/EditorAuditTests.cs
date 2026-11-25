@@ -114,5 +114,79 @@ namespace KScript.Language.Tests
         }
 
         #endregion
+
+        #region Formatting
+
+        private static string Fmt(string text)
+        {
+            FormatResult result = Formatter.Format(text, "test.kscript");
+            Assert.True(result.Succeeded, result.Error);
+            FormatResult again = Formatter.Format(result.Text, "test.kscript");
+            Assert.True(again.Succeeded, again.Error);
+            Assert.Equal(result.Text, again.Text);
+            return result.Text;
+        }
+
+        [Fact]
+        public void ABlockAfterSingleQuotedTextIsABlock()
+        {
+            Assert.Equal(
+                Lines("s = 'a'", "if $s == 'a' {", "  m = { a: 1 }", "  echo $m", "} else {", "  echo 'no'", "}", "for c in 'abc' {", "  echo $c", "}"),
+                Fmt(Lines("s = 'a'", "if $s == 'a' { m={a:1}; echo $m }", "else { echo 'no' }", "for c in 'abc' { echo $c }")));
+        }
+
+        [Fact]
+        public void AMatchUsedAsAValueIsKeptWhateverItsSubjectEndsWith()
+        {
+            string text = Lines("x = [1]", "label = match $x->count() { 1 => 'one', _ => 'many' }", "other = match $x[0] { 1 => 'one', _ => 'many' }", "echo $label + $other");
+            Assert.Equal(text, Fmt(text));
+        }
+
+        [Fact]
+        public void AStatementAfterAnAssignmentOnTheSameLineIsFormattedInOnePass()
+        {
+            Assert.Equal(
+                Lines("x = 5", "if $x > 3 {", "  echo 'gt'", "}", "echo 'after'"),
+                Fmt(Lines("x = 5; if $x > 3 { echo 'gt' }; echo 'after'")));
+        }
+
+        [Fact]
+        public void WrappingADocCommentNeverStartsALineWithATag()
+        {
+            string formatted = Fmt(Lines(
+                "/// Sends the welcome mail to one person; the tags you can use on a function are @deprecated and @param.",
+                "fn send(who: string) => $who",
+                "echo @send('k')"));
+            Assert.Equal(
+                Lines(
+                    "/// Sends the welcome mail to one person; the tags you can use on a function",
+                    "/// are @deprecated and @param.",
+                    "fn send(who: string) => $who",
+                    "echo @send('k')"),
+                formatted);
+            // The formatted file checks as the original did: the function is not deprecated.
+            Assert.DoesNotContain(Analyzer.Analyze(formatted, At("doc.kscript"), new MemoryFiles()).Diagnostics, d => d.Code == DiagnosticCodes.Deprecated);
+        }
+
+        [Fact]
+        public void WrappingACommentNeverStartsALineWithAListItem()
+        {
+            string formatted = Fmt(Lines("// The total is the price times the quantity, and the result of that sum is then - if there is one - reduced.", "x = 1", "echo $x"));
+            Assert.DoesNotContain(formatted.Split('\n'), line => line.StartsWith("// - ", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public void ExampleCodeThatStartsWithACallIsLeftAlone()
+        {
+            string text = Lines(
+                "/// Greets someone.",
+                "/// @example",
+                "///   @greet('Kyle')   // a very long example line that should be left alone even though it is past the width",
+                "fn greet(who: string) => 'Hi ' + $who",
+                "echo @greet('k')");
+            Assert.Equal(text, Fmt(text));
+        }
+
+        #endregion
     }
 }
