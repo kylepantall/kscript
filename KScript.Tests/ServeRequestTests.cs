@@ -340,7 +340,7 @@ public sealed class ServeRequestTests
         Assert.Contains("needs a whole number, but got a number (1.9)", part.Body);
         PageResult huge = Post("{\"name\":\"tea\",\"qty\":1,\"price\":\"1e999\"}");
         Assert.Equal(422, huge.Status);
-        Assert.Contains("too large", huge.Body);
+        Assert.Contains("needs a float, but got the string '1e999'", huge.Body);
 
         Assert.Equal("{\"page\":3}", Get("/api/items", "3").Body);
         Assert.Equal(422, Get("/api/items", "3.5").Status);
