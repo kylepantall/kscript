@@ -307,6 +307,28 @@ public sealed class AuthPackageTests : IDisposable
     }
 
     [Fact]
+    public void AProjectThatHashesWithBcryptKeepsItsHashesAtSignIn()
+    {
+        HttpApp app = App(types: "\"types\": { \"password\": { \"min\": 10, \"algorithm\": \"bcrypt\" } },");
+        var b = new Browser(app);
+        string id = Id(b);
+        AuthApp auth = app.Auth;
+        string registered = Values.ToStr(auth.Users.Get(id)["password_hash"]);
+        Assert.StartsWith("$2", registered);
+
+        // Signing in leaves a hash of the project's own algorithm as it is.
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery", "session": false }"""))["user"]);
+        Assert.Equal(registered, Values.ToStr(auth.Users.Get(id)["password_hash"]));
+
+        // A weaker one is made again, still with bcrypt.
+        Dictionary<string, object> record = auth.Users.Get(id);
+        record["password_hash"] = BCrypt.Net.BCrypt.HashPassword("correct horse battery", 4);
+        auth.Users.Put(id, record);
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery", "session": false }"""))["user"]);
+        Assert.StartsWith("$2a$12$", Values.ToStr(auth.Users.Get(id)["password_hash"]).Replace("$2b$", "$2a$"));
+    }
+
+    [Fact]
     public void SignInOutAndUsersFromAStoreOfYourOwn()
     {
         var b = new Browser(App());
