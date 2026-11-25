@@ -257,7 +257,8 @@ namespace KScript.IO
             c.Host.CheckWrite($"@{c.Name}()");
             string path = PathOf(c.Need(0), c);
             EnsureFolder(path);
-            if (append) File.AppendAllText(path, text, Encoding.UTF8);
+            // No encoding argument: naming UTF-8 here would start a new file with a byte order mark, which @write_text never does.
+            if (append) File.AppendAllText(path, text);
             else File.WriteAllText(path, text);
             return null;
         }
@@ -287,6 +288,8 @@ namespace KScript.IO
             if (!isFolder && !File.Exists(from)) throw new KScriptException($"There is no file or folder at '{from}'.", "FileNotFound");
             if (Directory.Exists(to)) to = System.IO.Path.Combine(to, System.IO.Path.GetFileName(from.TrimEnd(System.IO.Path.DirectorySeparatorChar)));
             if (string.Equals(from, to, StringComparison.Ordinal)) return new FileValue(to);
+            if (isFolder && to.StartsWith(from.TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                throw new KScriptException($"'{from}' can't be {(move ? "moved" : "copied")} into itself ('{to}'). Choose a folder outside it.", "Argument");
             if (!overwrite && (File.Exists(to) || Directory.Exists(to)))
                 throw new KScriptException($"'{to}' already exists. Add overwrite: true to replace it.", "IO");
             EnsureFolder(to);

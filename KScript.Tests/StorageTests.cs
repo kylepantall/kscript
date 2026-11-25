@@ -240,6 +240,31 @@ public sealed class StorageTests : StorageFixture
     }
 
     [Fact]
+    public void AListPatternMustStayInsideTheFolder()
+    {
+        Directory.CreateDirectory(AppFolder("notes", "config"));
+        File.WriteAllText(Path.Combine(AppFolder("notes", "config"), "secret.txt"), "x");
+        Run("<do>@storage(data)->write('notes/c.txt', '3')</do>");
+        foreach (string pattern in new[] { "../*", "../config/*", "notes/../../config/*", "..\\config\\*", "/etc/host*" })
+        {
+            KScriptException error = Fails($"<echo>{{ @storage(data)->list('{pattern}', recursive) }}</echo>");
+            Assert.Equal("Permission", error.Type);
+            Assert.Contains("isn't inside the app's data folder", error.Message);
+        }
+        Assert.Equal("notes/c.txt|\n", Run("<echo>{ @storage(data)->list('notes/*.txt') }|{ @storage(data)->list('nowhere/*.txt') }</echo>"));
+    }
+
+    [Fact]
+    public void AppendStartsAFileWithoutAByteOrderMarkAndAFailedWriteLeavesNothingBehind()
+    {
+        Run("<do>@storage(data)->append('log.txt', 'héllo'); @storage(data)->write('notes/c.txt', '3')</do>");
+        Assert.Equal(new byte[] { 0x68, 0xC3, 0xA9, 0x6C, 0x6C, 0x6F }, File.ReadAllBytes(Path.Combine(AppFolder("notes", "data"), "log.txt")));
+        // notes is a folder, so the file can't be put in its place.
+        Assert.ThrowsAny<Exception>(() => Run("<do>@storage(data)->write('notes', 'x')</do>"));
+        Assert.Empty(Directory.GetFiles(AppFolder("notes", "data"), "*.tmp-*"));
+    }
+
+    [Fact]
     public void NamesMustStayInsideTheFolder()
     {
         Assert.Contains("isn't inside the app's data folder", Fails("<echo>{ @storage()->read('../other/x.txt') }</echo>").Message);
