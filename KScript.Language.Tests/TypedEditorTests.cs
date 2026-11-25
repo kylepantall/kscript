@@ -142,6 +142,17 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
+        [InlineData("test.kscript", "choice = 'other'\nlarge = $choice > 9")]
+        [InlineData("test.ks.xml", "<kscript><let name=\"choice\" value=\"'other'\" /><let name=\"large\" value=\"$choice gt 9\" /></kscript>")]
+        public void ComparingTextWithANumberHasBooleanType(string path, string source)
+        {
+            DocumentAnalysis analysis = Service.Analyze(source, path);
+
+            Assert.Empty(analysis.Diagnostics);
+            Assert.Equal("bool", Named(analysis, "large").Shape.Display());
+        }
+
+        [Theory]
         [InlineData("<echo>$x->‸</echo>")]
         [InlineData("<echo>Value: $x->up‸</echo>")]
         public void MethodsCompleteAfterBareReferencesInText(string echo)
