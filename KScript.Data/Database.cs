@@ -388,13 +388,18 @@ namespace KScript.Data
         /// Runs work with a connection: the script's open transaction's, or a new one that is closed afterwards.
         /// Database errors become KScript errors (UniqueViolation, ForeignKeyViolation, Query).
         /// </summary>
-        public T With<T>(Interpreter interpreter, string table, Func<DbConnection, DbTransaction, T> work)
+        public T With<T>(Interpreter interpreter, string table, Func<DbConnection, DbTransaction, T> work) =>
+            With(interpreter, table, work, guarded: true);
+
+        private T With<T>(Interpreter interpreter, string table, Func<DbConnection, DbTransaction, T> work, bool guarded)
         {
             TransactionState open = Current(interpreter) ?? BeginTest(interpreter);
             DbConnection connection = open?.Connection ?? Connect();
             // Postgres ends a transaction at its first error, so in a test's transaction each statement is a
             // savepoint: a test can expect a UniqueViolation and go on.
-            bool guard = open?.Test == true && Dialect is PostgresDialect;
+            // A savepoint of the script's own ($db->transaction in a test) isn't wrapped: releasing the wrapper
+            // would release the savepoint just made inside it.
+            bool guard = guarded && open?.Test == true && Dialect is PostgresDialect;
             try
             {
                 if (guard) Raw(connection, open.Transaction, "SAVEPOINT kscript_test_statement");
@@ -540,28 +545,36 @@ namespace KScript.Data
 
         private bool IsBusy(KScriptException ex) => ex.InnerException != null && Dialect.IsBusy(ex.InnerException);
 
+        /// <summary>Makes, releases or goes back to a savepoint of a transaction inside a transaction.</summary>
+        private void Savepoint(Interpreter interpreter, string sql) =>
+            With(interpreter, null, (connection, transaction) =>
+            {
+                using DbCommand command = Command(connection, transaction, new SqlStatement(sql, Array.Empty<object>()), interpreter);
+                return command.ExecuteNonQuery();
+            }, guarded: false);
+
         private T Once<T>(Interpreter interpreter, Func<T> work, IsolationLevel isolation)
         {
             TransactionState open = Current(interpreter) ?? BeginTest(interpreter);
             if (open != null)
             {
                 string savepoint = "kscript_" + (++open.Depth).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                Execute(interpreter, new SqlStatement("SAVEPOINT " + savepoint, Array.Empty<object>()));
+                Savepoint(interpreter, "SAVEPOINT " + savepoint);
                 try
                 {
                     T result = work();
-                    Execute(interpreter, new SqlStatement("RELEASE SAVEPOINT " + savepoint, Array.Empty<object>()));
+                    Savepoint(interpreter, "RELEASE SAVEPOINT " + savepoint);
                     return result;
                 }
                 catch (Exception ex) when (Commits(ex))
                 {
-                    Execute(interpreter, new SqlStatement("RELEASE SAVEPOINT " + savepoint, Array.Empty<object>()));
+                    Savepoint(interpreter, "RELEASE SAVEPOINT " + savepoint);
                     throw;
                 }
                 catch
                 {
-                    Execute(interpreter, new SqlStatement("ROLLBACK TO SAVEPOINT " + savepoint, Array.Empty<object>()));
-                    Execute(interpreter, new SqlStatement("RELEASE SAVEPOINT " + savepoint, Array.Empty<object>()));
+                    Savepoint(interpreter, "ROLLBACK TO SAVEPOINT " + savepoint);
+                    Savepoint(interpreter, "RELEASE SAVEPOINT " + savepoint);
                     throw;
                 }
                 finally
