@@ -68,6 +68,15 @@ namespace KScript.Pages
         public string Root { get; }
         public KScript.Runtime.ConfigValue StartupConfig { get; set; }
 
+        /// <summary>The page for addresses the site has nothing at.</summary>
+        public const string NotFoundFile = "_404.html";
+
+        /// <summary>
+        /// True in the production environment: an error is answered with a plain 500 page, and its message, file and
+        /// line go to the server log only.
+        /// </summary>
+        public bool HideErrorDetails { get; set; }
+
         /// <summary>The folder of translation files that /fr/... prefixes are checked against.</summary>
         public string LocalesFolder { get; set; } = "locales";
 
@@ -431,7 +440,11 @@ namespace KScript.Pages
 
             var route = site.Resolve(request.Path.Value);
             bool live = site.RenderPage != null && IsLiveRequest(request);
-            if (live && route.Kind != PageRoute.RouteKind.Page) return new PageResult { Status = 409 };
+            // The not-found page can hold live blocks too (a search box in its layout): they post back to the
+            // missing address, which renders the same page again.
+            bool hostedNotFound = route.Kind == PageRoute.RouteKind.NotFound && site.RenderPage != null &&
+                File.Exists(Path.Combine(site.Root, PageSite.NotFoundFile));
+            if (live && route.Kind != PageRoute.RouteKind.Page && !hostedNotFound) return new PageResult { Status = 409 };
 
             switch (route.Kind)
             {
@@ -477,13 +490,23 @@ namespace KScript.Pages
 
                 default:
                 {
-                    string notFound = Path.Combine(site.Root, "_404.html");
+                    string notFound = Path.Combine(site.Root, PageSite.NotFoundFile);
                     if (File.Exists(notFound))
                     {
-                        var ctx = new PageContext(site.Root, await BuildRequestAsync(request)) { StartupConfig = site.StartupConfig };
-                        var page = PageRenderer.RenderFile(ctx, "_404.html");
-                        page.Status = 404;
-                        return page;
+                        var (built, error) = await ReadPageRequestAsync(request, live);
+                        if (error != null) return error;
+                        if (site.RenderPage == null)
+                        {
+                            var ctx = new PageContext(site.Root, built) { StartupConfig = site.StartupConfig };
+                            var page = PageRenderer.RenderFile(ctx, PageSite.NotFoundFile);
+                            page.Status = 404;
+                            return page;
+                        }
+                        PageResult rendered = site.RenderPage(new PageRoute { Kind = PageRoute.RouteKind.Page, File = PageSite.NotFoundFile }, built);
+                        // The page itself is a 404. A live block's redraw (or its "expired" answer) keeps its own status.
+                        if (!live && rendered.Status == 200) rendered.Status = 404;
+                        rendered.Cookies.AddRange(KScript.Runtime.RequestHooks.Finish(built));
+                        return rendered;
                     }
                     return new PageResult { Status = 404, Body = $"<!doctype html><title>Not found</title><h1>Not found</h1><p>{KScript.Runtime.Values.HtmlEscape(request.Path.Value)}</p>" };
                 }

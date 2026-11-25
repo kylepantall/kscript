@@ -58,6 +58,9 @@ namespace KScript.Pages
         public Func<string> RoutedLiveProof { get; set; }
         private string routeProof;
         internal string RouteProof => routeProof ??= RoutedLiveProof?.Invoke();
+
+        /// <summary>For a routed view, why its live blocks could not call back (in plain words), or null when they can.</summary>
+        public Func<string> LiveUnavailable { get; set; }
         internal string EntryFile { get; set; }
         internal List<string> LiveParents { get; } = new();
         internal List<object> LiveEffects { get; } = new();
@@ -1023,6 +1026,7 @@ namespace KScript.Pages
             string id = inferredId ?? (el.Attr("id") is string explicitId ? Interpolate(explicitId, scope, state, EscapeMode.None) : $"live-{++ctx.LiveCounter}");
             if (string.IsNullOrWhiteSpace(id) || ctx.LiveParents.Contains(id, StringComparer.Ordinal) || depth == 32)
                 throw new PageException("Live components need distinct, nonempty IDs and no more than 32 parents.");
+            if (ctx.LiveUnavailable?.Invoke() is string unavailable) throw new PageException(unavailable);
             string proof = ctx.RouteProof;
             bool fileComponent = proof == null && classFields?.Count > 0;
             string ownerProof = fileComponent ? "file-component\0" + ctx.SiteRoot + "\0" + ctx.EntryFile + "\0" +

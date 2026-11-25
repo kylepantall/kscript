@@ -41,6 +41,67 @@ public sealed class ServeRequestTests
 
     private const string Counter = """<live id="counter"><state name="n" value="0"/><b>{$n}</b><button on-click="n += 1">Add</button></live>""";
 
+    #region Live blocks and the page's GET
+
+    [Fact]
+    public async Task A_live_block_on_the_not_found_page_calls_back_to_the_missing_address()
+    {
+        using var site = new TempSite(("index.html", "<h1>Home</h1>"), ("_404.html", "<h1>Not here</h1>" + Counter));
+        await Serve(site, async http =>
+        {
+            using var page = await http.GetAsync("/nowhere");
+            Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
+            string html = await page.Content.ReadAsStringAsync();
+            Assert.Contains("Not here", html);
+            string proof = Attribute(html, "data-ks-route");
+            Assert.NotEmpty(proof);
+
+            var click = new { block = "counter", handler = 0, state = Attribute(html, "data-ks-state"), args = Attribute(html, "data-ks-args-0") };
+            http.DefaultRequestHeaders.Add("X-KScript-Live", proof);
+            using var clicked = await http.PostAsJsonAsync("/nowhere", click);
+            Assert.Equal(HttpStatusCode.OK, clicked.StatusCode);
+            Assert.Contains("<b>1</b>", await clicked.Content.ReadAsStringAsync());
+            Assert.True(clicked.Headers.Contains("X-KScript-Fragment"));
+
+            // The proof is for that address only, and a file that is not a page still has nothing to call back to.
+            using var elsewhere = await http.PostAsJsonAsync("/somewhere-else", click);
+            Assert.Equal(HttpStatusCode.Conflict, elsewhere.StatusCode);
+        });
+    }
+
+    [Fact]
+    public void A_view_with_a_live_block_answered_for_a_post_needs_a_get_to_call_back_to()
+    {
+        using var site = new TempSite(
+            ("views/counter.html", Counter),
+            ("routes.kscript", """
+                import KScript.Http
+                Routes {
+                  Post(path: /only-post) { return @view('counter') }
+                  Get(path: /both) { return @view('counter') }
+                  Post(path: /both) { return @view('counter') }
+                }
+                """));
+        var app = new HttpApp(site.Root);
+        PageResult Send(string method, string path) =>
+            app.Handle(new Dictionary<string, object> { ["method"] = method, ["path"] = path, ["url"] = path });
+
+        // Nothing could render /only-post again for a click, so the page says so instead of reloading for ever.
+        PageResult alone = Send("POST", "/only-post");
+        Assert.Equal(500, alone.Status);
+        Assert.Contains("GET /only-post, which has no route", alone.Body);
+        Assert.Contains("add a GET route for /only-post", alone.Body);
+
+        // With a GET at the same address the POST's page works like the GET's: its blocks call the GET.
+        PageResult posted = Send("POST", "/both");
+        Assert.Equal(200, posted.Status);
+        Assert.NotEmpty(Attribute(posted.Body, "data-ks-route"));
+        Assert.NotEmpty(Attribute(Send("GET", "/both").Body, "data-ks-route"));
+        Assert.Equal(200, Send("HEAD", "/both").Status);
+    }
+
+    #endregion
+
     #region Statuses and headers that can't be sent
 
     [Fact]

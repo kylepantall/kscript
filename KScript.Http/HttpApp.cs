@@ -295,7 +295,7 @@ namespace KScript.Http
         internal PageResult RenderFilePage(PageRoute route, Dictionary<string, object> request)
         {
             request[RequestFields.RouteInfo.Name] = RouteCatalog.PageInfo(route.Path, route.Params.Keys, RouteCatalog.PageLabelKey(this, route.File));
-            var ctx = new RequestContext(this, request);
+            var ctx = new RequestContext(this, request) { FilePage = true };
             try
             {
                 return RestoreLiveRequest(ctx) ?? PageRenderer.RenderFile(ctx.Page, route.File, route.Params);
