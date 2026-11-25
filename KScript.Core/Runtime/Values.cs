@@ -147,7 +147,7 @@ namespace KScript.Runtime
                 case null: w.WriteNullValue(); break;
                 case bool b: w.WriteBooleanValue(b); break;
                 case double d when double.IsNaN(d) || double.IsInfinity(d): w.WriteNullValue(); break;
-                case double d when d == Math.Floor(d) && Math.Abs(d) < 1e15: w.WriteNumberValue((long)d); break;
+                case double d when d == Math.Floor(d) && Math.Abs(d) < ExactWhole: w.WriteNumberValue((long)d); break;
                 case double d: w.WriteNumberValue(d); break;
                 case string s: CheckSize(s.Length); w.WriteStringValue(s); break;
                 case DateTime dt: w.WriteStringValue(dt.ToString("o", CultureInfo.InvariantCulture)); break;
@@ -195,11 +195,36 @@ namespace KScript.Runtime
             var other => other.ToString(),
         };
 
+        /// <summary>Below this (2 to the power 53) every whole number is held exactly, so it is written digit for digit.</summary>
+        private const double ExactWhole = 9007199254740992d;
+
+        /// <summary>
+        /// A number as text: always plain digits, never an exponent. A fraction shows 15 significant digits, which
+        /// hides the noise of binary arithmetic (0.1 + 0.2 reads 0.3); a number of 1e15 and above shows the shortest
+        /// digits that read back as the same number, so a 16 digit id keeps every digit.
+        /// </summary>
         public static string FormatNumber(double d)
         {
             if (double.IsNaN(d) || double.IsInfinity(d)) return d.ToString(CultureInfo.InvariantCulture);
-            if (d == Math.Floor(d) && Math.Abs(d) < 1e15) return ((long)d).ToString(CultureInfo.InvariantCulture);
-            return d.ToString("0.###############", CultureInfo.InvariantCulture);
+            if (d == Math.Floor(d) && Math.Abs(d) < ExactWhole) return ((long)d).ToString(CultureInfo.InvariantCulture);
+            return Plain(d.ToString(Math.Abs(d) < 1e15 ? "G15" : "R", CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>Rewrites a number .NET wrote with an exponent (1.5E-07, 1E+20) as plain digits (0.00000015).</summary>
+        private static string Plain(string text)
+        {
+            int e = text.IndexOf('E');
+            if (e < 0) return text;
+            int exponent = int.Parse(text.AsSpan(e + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+            bool negative = text[0] == '-';
+            string mantissa = text.Substring(negative ? 1 : 0, e - (negative ? 1 : 0));
+            int dot = mantissa.IndexOf('.');
+            string digits = dot < 0 ? mantissa : mantissa.Remove(dot, 1);
+            int point = (dot < 0 ? mantissa.Length : dot) + exponent;
+            string plain = point <= 0 ? "0." + new string('0', -point) + digits
+                : point >= digits.Length ? digits + new string('0', point - digits.Length)
+                : digits.Insert(point, ".");
+            return negative ? "-" + plain : plain;
         }
 
         public static bool Truthy(object value) => Unwrap(value) switch

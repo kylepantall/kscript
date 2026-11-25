@@ -56,15 +56,19 @@ namespace KScript.Queueing
                 KType.Queue, c => new QueueHandle(QueueContext.For(c.Interpreter, c.Module), c.Has(0) && c.Arg(0) != null ? c.Str(0) : "default", c.Has(1) && c.Arg(1) != null ? c.Str(1) : null));
 
             p.Command("release_job", "after?: duration", "In a job's handle: puts the job back on its queue without using up a try, to run again after a while: `@release_job(after: 30s)`.",
-                KType.Null, c => throw new JobReleaseSignal(c.Has(0) && c.Arg(0) != null ? Durations.Seconds(c.Arg(0), "after") : 0));
+                KType.Null, c => throw (JobType.InHandle
+                    ? new JobReleaseSignal(c.Has(0) && c.Arg(0) != null ? Durations.Seconds(c.Arg(0), "after") : 0)
+                    : OutsideAJob(c)));
 
             p.Command("fail_job", "error?", "In a job's handle: fails the job now, without more tries. Give an error (`@fail_job(Validation('Bad data'))`) or a message.",
-                KType.Null, c => throw new JobFailSignal(c.Arg(0) switch
-                {
-                    ErrorValue e => e.Exception,
-                    null => new KScriptException("The job failed.", "JobFailed"),
-                    object other => new KScriptException(Values.ToStr(other), "JobFailed"),
-                }));
+                KType.Null, c => throw (JobType.InHandle
+                    ? new JobFailSignal(c.Arg(0) switch
+                    {
+                        ErrorValue e => e.Exception,
+                        null => new KScriptException("The job failed.", "JobFailed"),
+                        object other => new KScriptException(Values.ToStr(other), "JobFailed"),
+                    })
+                    : OutsideAJob(c)));
 
             p.Command("fake_queue", "", "For tests: from now on in this run, dispatched jobs are kept instead of queued or run. `$q->pushed(SendWelcome)` lists them and `$q->run_all()` runs them.",
                 KType.FakeQueue, c =>
@@ -78,6 +82,7 @@ namespace KScript.Queueing
             Method(p, KType.Job, "run", "", "Runs the job's handle now, here, without a queue. Errors reach the caller.", KType.Any);
             Method(p, KType.Chain, "dispatch", "delay?: duration, at?: date, queue?: string, connection?: string", "Queues the first job of the chain; each of the others is queued when the one before it succeeds.", KType.Map);
             Method(p, KType.Chain, "run", "", "Runs the jobs now, here, one after another.", KType.Null);
+            Method(p, KType.Chain, "count", "", "How many jobs are in the chain.", KType.Number);
             p.Field(KType.Queue, "name", KType.String, "The queue's name.");
             p.Field(KType.Queue, "connection", KType.String, "The connection the queue is on.");
             Method(p, KType.Queue, "size", "", "How many jobs are waiting, including delayed ones.", KType.Number);
@@ -101,6 +106,7 @@ namespace KScript.Queueing
                 ("job->dispatch", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<let name=\"queued\" value=\"Hello(who: 'Joan')->dispatch(delay: 10m, queue: 'high')\" />\n<echo>{ $queued.queue }</echo>"),
                 ("job->run", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<do>Hello(who: 'Joan')->run()</do>"),
                 ("chain->dispatch", "<job name=\"Step\" fields=\"n: int\">\n  <fn name=\"handle\"><echo>Step { $n }</echo></fn>\n</job>\n<do>@fake_queue()</do>\n<do>@chain([Step(n: 1), Step(n: 2)])->dispatch()</do>"),
+                ("chain->count", "<job name=\"Step\" fields=\"n: int\">\n  <fn name=\"handle\"><echo>Step { $n }</echo></fn>\n</job>\n<echo>{ @chain([Step(n: 1), Step(n: 2)])->count() }</echo>"),
                 ("chain->run", "<job name=\"Step\" fields=\"n: int\">\n  <fn name=\"handle\"><echo>Step { $n }</echo></fn>\n</job>\n<do>@chain([Step(n: 1), Step(n: 2)])->run()</do>"),
                 ("queue->size", "<echo>{ @queue('default', connection: 'memory')->size() }</echo>"),
                 ("queue->waiting", "<echo>{ @queue('default', connection: 'memory')->waiting()->count() }</echo>"),
@@ -114,6 +120,9 @@ namespace KScript.Queueing
                 ("fake_queue->run_all", "<job name=\"Hello\" fields=\"who: string\">\n  <fn name=\"handle\"><echo>Hello { $who }</echo></fn>\n</job>\n<let name=\"q\" value=\"@fake_queue()\" />\n<do>Hello(who: 'Joan')->dispatch()</do>\n<echo>{ $q->run_all() } ran</echo>"),
                 ("fake_queue->clear", "<let name=\"q\" value=\"@fake_queue()\" />\n<echo>{ $q->clear() }</echo>"));
         }
+
+        /// <summary>@release_job() and @fail_job() anywhere but a job's handle: an ordinary error, which a script can catch.</summary>
+        private static Exception OutsideAJob(CallContext c) => c.Error($"{c.Display} only works inside a job's handle.", "Context");
 
         /// <summary>A method whose work is done by the value's own TryCallMethod, registered so it is documented and its arguments are bound.</summary>
         private static void Method(PackageBuilder p, string receiver, string name, string parameters, string description, string returns) =>

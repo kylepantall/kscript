@@ -187,6 +187,10 @@ public sealed class CommandLineTests : IDisposable
         Assert.Equal(0, Kscript("test", test, "--env=ci").Code);
         Assert.Contains("  kscript worker ", Kscript("worker", "--help").Out);
         Assert.Contains("  kscript queue ", Kscript("queue", "--help").Out);
+        // --env goes after these commands too, as their usage lines say.
+        Assert.Contains("  kscript worker ", Kscript("worker", "--env", "staging", "--help").Out);
+        Assert.Contains("  kscript queue ", Kscript("queue", "--env=staging", "--help").Out);
+        Assert.Equal("staging", Environment.GetEnvironmentVariable("KSCRIPT_ENV"));
         Assert.Contains("Did you mean db migrate?", Kscript("db", "migrat").Err);
     }
 

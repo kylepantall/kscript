@@ -818,7 +818,10 @@ namespace KScript.Runtime
                 {
                     int i = Values.ToInt(key, "A text index");
                     if (i < 0) i += s.Length;
-                    return i >= 0 && i < s.Length ? s[i].ToString() : null;
+                    if (i < 0 || i >= s.Length) return null;
+                    // Either half of a character that takes two places gives the whole character, never half of one.
+                    if (char.IsLowSurrogate(s[i]) && i > 0 && char.IsHighSurrogate(s[i - 1])) return s.Substring(i - 1, 2);
+                    return char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1]) ? s.Substring(i, 2) : s[i].ToString();
                 }
                 case IKObject obj when obj.TryGetMember(Values.ToStr(key), out object field):
                     return field;

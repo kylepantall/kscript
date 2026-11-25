@@ -563,6 +563,11 @@ public sealed class AuthPackageTests : IDisposable
 
         Assert.Equal(90.0, ProjectConfig.Seconds("90"));
         Assert.Equal(3600.0, ProjectConfig.Seconds("1H"));
+        // The same lengths of time a script takes: milliseconds and joined units too.
+        Assert.Equal(0.5, ProjectConfig.Seconds("500ms"));
+        Assert.Equal(5400.0, ProjectConfig.Seconds("1h30m"));
+        Assert.Null(ProjectConfig.Seconds("soon"));
+        Assert.Null(ProjectConfig.Seconds("-5s"));
         Assert.Null(ProjectConfig.Seconds("0"));
         Assert.Null(ProjectConfig.Seconds(null));
     }

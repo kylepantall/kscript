@@ -320,7 +320,9 @@ public sealed class QueueTests : StorageFixture
         // Run here, a release just ends the run and a fail throws.
         Assert.Equal(string.Empty, Code("import \"jobs/poll.kscript\"\nPoll(n: 1)->run()"));
         Assert.Equal("no good", CodeFails("import \"jobs/poll.kscript\"\nPoll(n: 2)->run()").Message);
-        Assert.Contains("@release_job() outside a job", Assert.ThrowsAny<Exception>(() => Code("import KScript.Queue\n@release_job()")).Message);
+        // Anywhere else they are ordinary errors, which a script can catch.
+        Assert.Contains("@release_job() only works inside a job's handle", CodeFails("import KScript.Queue\n@release_job()").Message);
+        Assert.Equal("Context\n", Code("import KScript.Queue\ntry {\n  @fail_job('x')\n} catch err {\n  echo $err.type\n}"));
     }
 
     [Fact]
@@ -397,7 +399,7 @@ public sealed class QueueTests : StorageFixture
             import KScript.Queue
             import "jobs/step.kscript"
             c = @chain([Step(n: 1), Step(n: 2), Step(n: 3)])
-            echo "{$c.count} {$c}"
+            echo "{$c->count()} {$c}"
             $c->dispatch(queue: 'steps')
             """);
         Assert.Equal("3 chain [Step, Step, Step]\n", output);
@@ -407,6 +409,61 @@ public sealed class QueueTests : StorageFixture
         Assert.Single(Driver().Failed());
 
         Assert.Equal("step 1\nstep 3\n", Code("import KScript.Queue\nimport \"jobs/step.kscript\"\n@chain([Step(n: 1), Step(n: 3)])->run()"));
+    }
+
+    [Fact]
+    public void AnExitOrAnInternalErrorInAHandleFailsTheJobNotTheWorker()
+    {
+        FileOf("jobs/stops.kscript", """
+            job Stops(tries: 1) {
+              how: string
+
+              fn handle() {
+                if $how == 'exit' {
+                  exit 4
+                }
+                if $how == 'done' {
+                  exit
+                }
+                if $how == 'break' {
+                  break
+                }
+                echo "ran {$how}"
+              }
+            }
+            """);
+        Code("import \"jobs/stops.kscript\"\nfor how in ['exit', 'done', 'break', 'fine'] {\n  Stops(how: $how)->dispatch()\n}");
+        string log = Work();
+        IQueueDriver driver = Driver();
+        Assert.Contains("failed: Cancelled: Stops stopped with exit code 4.", log);
+        Assert.Contains("failed: Context:", log);
+        Assert.Equal("ran fine\n", JobOutput());
+        Assert.Equal(2, driver.Failed().Count);
+        Assert.Empty(driver.Running());
+        Assert.Empty(driver.Waiting(null));
+    }
+
+    [Fact]
+    public void ClearingAQueueFreesItsUniqueJobs()
+    {
+        FileOf("jobs/sync.kscript", "job SyncUser(unique_for: 10m) {\n  user_id: int\n\n  fn handle() {\n    echo \"sync {$user_id}\"\n  }\n}");
+        const string dispatch = "import \"jobs/sync.kscript\"\nq = SyncUser(user_id: 1)->dispatch()\necho \"{$q == null}\"";
+        foreach (string connection in new[] { "file", "memory", "database" })
+        {
+            UseProject("{ \"name\": \"" + app + "\", \"queue\": { \"default\": \"" + connection + "\" } }");
+            Assert.Equal("false\n", Code(dispatch));
+            Assert.Equal("true\n", Code(dispatch));
+            Assert.Equal(1, Driver().Clear(null));
+            Assert.Equal("false\n", Code(dispatch));
+            Assert.Equal(1, Driver().Clear("default"));
+            Assert.Equal("false\n", Code(dispatch));
+        }
+    }
+
+    [Fact]
+    public void DispatchRefusesAnEmptyQueueName()
+    {
+        Assert.Contains("queue: can't be empty", CodeFails("import \"jobs/welcome.kscript\"\nWelcome(user_id: 1, email: 'a@example.com')->dispatch(queue: ' ')").Message);
     }
 
     [Fact]
@@ -610,7 +667,7 @@ public sealed class QueueTests : StorageFixture
             Welcome(user_id: 1, email: 'a@example.com')->dispatch()
             Welcome(user_id: 2, email: 'b@example.com')->dispatch(delay: 1m, queue: 'later', connection: 'x')
             @chain([Welcome(user_id: 3, email: 'c@example.com')])->dispatch()
-            echo "{$q.count} {$q->count_of(Welcome)} {$q->count_of('Other')} {$q->pushed(Welcome)[1].user_id} {$q->dispatches()[1].queue} {$q->dispatches()[1].connection} {$q->dispatches()[1].delay} {$q}"
+            echo "{$q->count()} {$q->count_of(Welcome)} {$q->count_of('Other')} {$q->pushed(Welcome)[1].user_id} {$q->dispatches()[1].queue} {$q->dispatches()[1].connection} {$q->dispatches()[1].delay} {$q}"
             echo "{$q->run_all()} ran, {$q->count()} left, {$q->clear()}"
             """);
         Assert.Equal("3 3 0 2 later x 60 fake queue (3 pushed)\nWelcome there <a@example.com> #1 attempt 1 of 3 on mail\nWelcome there <b@example.com> #2 attempt 1 of 3 on mail\nWelcome there <c@example.com> #3 attempt 1 of 3 on mail\n3 ran, 0 left, 0\n", output);

@@ -38,6 +38,39 @@ namespace KScript.Runtime
 
         private static int Clamp(int i, int count) => Math.Clamp(i < 0 ? i + count : i, 0, count);
 
+        /// <summary>
+        /// A place to cut text, moved back when it falls inside a character that takes two places (an emoji, say),
+        /// so no method hands back half of one.
+        /// </summary>
+        private static int Whole(string text, int at) =>
+            at > 0 && at < text.Length && char.IsLowSurrogate(text[at]) && char.IsHighSurrogate(text[at - 1]) ? at - 1 : at;
+
+        /// <summary>The characters of text as a reader sees them: an emoji, or a letter with its accents, is one.</summary>
+        private static List<string> Characters(string text)
+        {
+            var characters = new List<string>();
+            TextElementEnumerator each = StringInfo.GetTextElementEnumerator(text);
+            while (each.MoveNext()) characters.Add(each.GetTextElement());
+            return characters;
+        }
+
+        /// <summary>Text without the given characters at its ends. Works by whole characters, so trimming one emoji never cuts another.</summary>
+        private static string Trim(string text, string characters, bool start, bool end)
+        {
+            var remove = new HashSet<Rune>(characters.EnumerateRunes());
+            int from = 0, to = text.Length;
+            while (start && from < to && Rune.DecodeFromUtf16(text.AsSpan(from, to - from), out Rune first, out int used) == System.Buffers.OperationStatus.Done && remove.Contains(first)) from += used;
+            while (end && to > from && Rune.DecodeLastFromUtf16(text.AsSpan(from, to - from), out Rune last, out int used) == System.Buffers.OperationStatus.Done && remove.Contains(last)) to -= used;
+            return text.Substring(from, to - from);
+        }
+
+        private static string Pad(string text, int width, string with, bool left)
+        {
+            string fill = Characters(with).FirstOrDefault() ?? " ";
+            string padding = string.Concat(Enumerable.Repeat(fill, Math.Max(0, width - text.Length)));
+            return left ? padding + text : text + padding;
+        }
+
         private static void RegisterMethods(PackageBuilder p)
         {
             // Any value.
@@ -325,11 +358,26 @@ namespace KScript.Runtime
             p.Method(n, "abs", "", "Without its sign.", n, (t, c) => Math.Abs(N(t)));
             p.Method(n, "min", "other: number", "The smaller of the two.", n, (t, c) => Math.Min(N(t), c.Num(0)));
             p.Method(n, "max", "other: number", "The larger of the two.", n, (t, c) => Math.Max(N(t), c.Num(0)));
-            p.Method(n, "clamp", "min: number, max: number", "The number limited to min..max.", n, (t, c) => Math.Clamp(N(t), c.Num(0), c.Num(1)));
+            p.Method(n, "clamp", "min: number, max: number", "The number limited to min..max.", n, (t, c) =>
+            {
+                double min = c.Num(0), max = c.Num(1);
+                if (min > max) throw c.Error($"->clamp() needs min ({Values.FormatNumber(min)}) to be at most max ({Values.FormatNumber(max)}).", "Argument");
+                return Math.Clamp(N(t), min, max);
+            });
             p.Method(n, "between", "min: number, max: number", "True when min ≤ the number ≤ max.", KType.Bool, (t, c) => N(t) >= c.Num(0) && N(t) <= c.Num(1));
             p.Method(n, "to_number", "default?", "The number itself.", n, (t, c) => N(t));
             p.Method(n, "to_int", "", "The whole-number part.", n, (t, c) => Math.Truncate(N(t)));
-            p.Method(n, "format", "pattern?", "Formats the number (.NET format, N0 by default: 1,234).", KType.String, (t, c) => N(t).ToString(c.Str(0, "N0"), CultureInfo.InvariantCulture));
+            p.Method(n, "format", "pattern?", "Formats the number (.NET format, N0 by default: 1,234).", KType.String, (t, c) =>
+            {
+                try
+                {
+                    return N(t).ToString(c.Str(0, "N0"), CultureInfo.InvariantCulture);
+                }
+                catch (FormatException)
+                {
+                    throw c.Error($"'{c.Str(0)}' isn't a number format. Use one such as N2 (1,234.50), 0.00 or P0.", "Argument");
+                }
+            });
             p.Method(n, "increment", "", "The number plus 1.", n, (t, c) => N(t) + 1);
             p.Method(n, "decrement", "", "The number minus 1.", n, (t, c) => N(t) - 1);
             p.Method(n, "is_even", "", "True when the number is even.", KType.Bool, (t, c) => N(t) % 2 == 0);
@@ -369,9 +417,9 @@ namespace KScript.Runtime
             string s = KType.String;
             p.Method(s, "upper", "", "The text in upper case.", s, (t, c) => S(t).ToUpperInvariant());
             p.Method(s, "lower", "", "The text in lower case.", s, (t, c) => S(t).ToLowerInvariant());
-            p.Method(s, "trim", "characters?", "The text without spaces (or the given characters) at either end.", s, (t, c) => c.Has(0) ? S(t).Trim(c.Str(0).ToCharArray()) : S(t).Trim());
-            p.Method(s, "trim_start", "characters?", "The text without spaces (or the given characters) at the start.", s, (t, c) => c.Has(0) ? S(t).TrimStart(c.Str(0).ToCharArray()) : S(t).TrimStart());
-            p.Method(s, "trim_end", "characters?", "The text without spaces (or the given characters) at the end.", s, (t, c) => c.Has(0) ? S(t).TrimEnd(c.Str(0).ToCharArray()) : S(t).TrimEnd());
+            p.Method(s, "trim", "characters?", "The text without spaces (or the given characters) at either end.", s, (t, c) => c.Has(0) ? Trim(S(t), c.Str(0), true, true) : S(t).Trim());
+            p.Method(s, "trim_start", "characters?", "The text without spaces (or the given characters) at the start.", s, (t, c) => c.Has(0) ? Trim(S(t), c.Str(0), true, false) : S(t).TrimStart());
+            p.Method(s, "trim_end", "characters?", "The text without spaces (or the given characters) at the end.", s, (t, c) => c.Has(0) ? Trim(S(t), c.Str(0), false, true) : S(t).TrimEnd());
             p.Method(s, "count", "", "The number of characters.", KType.Number, (t, c) =>
                 c.Has(0) ? throw c.Error("->count() takes no arguments. To count how often text occurs, use ->count_of(text).", "Argument") : (double)S(t).Length);
             p.Method(s, "count_of", "match", "How many times a piece of text occurs.", KType.Number, (t, c) =>
@@ -400,27 +448,27 @@ namespace KScript.Runtime
                 (Values.Unwrap(c.Arg(0)) is RegexValue rx ? RegexValue.Run(rx, r => r.Split(S(t)))
                 : c.Has(0) ? S(t).Split(c.Str(0)) : S(t).Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).Cast<object>().ToList());
             p.Method(s, "lines", "", "The lines of the text, as a list.", KType.List, (t, c) => S(t).Replace("\r\n", "\n").Split('\n').Cast<object>().ToList());
-            p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => S(t).Select(ch => (object)ch.ToString()).ToList());
+            p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => Characters(S(t)).Cast<object>().ToList());
             p.Method(s, "index_of", "text", "Where text first occurs, or -1.", KType.Number, (t, c) => (double)S(t).IndexOf(c.Str(0), StringComparison.Ordinal));
             p.Method(s, "repeat", "count: number", "The text repeated count times.", s, (t, c) =>
                 (double)Math.Max(0, c.Int(0)) * S(t).Length > 100_000_000 ? throw c.Error($"Repeating the text {c.Int(0)} times would make it too long.", "Limit")
                 : string.Concat(Enumerable.Repeat(S(t), Math.Max(0, c.Int(0)))));
-            p.Method(s, "reverse", "", "The text backwards.", s, (t, c) => { char[] a = S(t).ToCharArray(); Array.Reverse(a); return new string(a); });
-            p.Method(s, "first", "", "The first character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(0, 1) : string.Empty);
-            p.Method(s, "last", "", "The last character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(S(t).Length - 1) : string.Empty);
+            p.Method(s, "reverse", "", "The text backwards.", s, (t, c) => string.Concat(Characters(S(t)).AsEnumerable().Reverse()));
+            p.Method(s, "first", "", "The first character.", s, (t, c) => Characters(S(t)).FirstOrDefault() ?? string.Empty);
+            p.Method(s, "last", "", "The last character.", s, (t, c) => Characters(S(t)).LastOrDefault() ?? string.Empty);
             p.Method(s, "slice", "start: number, end?: number", "Part of the text; negative positions count from the end.", s, (t, c) =>
             {
-                int start = Clamp(c.Int(0), S(t).Length);
-                int end = Math.Max(start, Clamp(c.Int(1, S(t).Length), S(t).Length));
+                int start = Whole(S(t), Clamp(c.Int(0), S(t).Length));
+                int end = Math.Max(start, Whole(S(t), Clamp(c.Int(1, S(t).Length), S(t).Length)));
                 return S(t).Substring(start, end - start);
             });
             p.Method(s, "truncate", "length: number, suffix?", "Shortens the text to length, adding suffix (… by default).", s, (t, c) =>
             {
                 int max = c.Int(0);
-                return S(t).Length <= max ? S(t) : S(t).Substring(0, Math.Max(0, max)).TrimEnd() + c.Str(1, "…");
+                return S(t).Length <= max ? S(t) : S(t).Substring(0, Whole(S(t), Math.Max(0, max))).TrimEnd() + c.Str(1, "…");
             });
-            p.Method(s, "pad_left", "width: number, char?", "The text padded on the left to width.", s, (t, c) => S(t).PadLeft(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
-            p.Method(s, "pad_right", "width: number, char?", "The text padded on the right to width.", s, (t, c) => S(t).PadRight(c.Int(0), c.Str(1, " ").FirstOrDefault(' ')));
+            p.Method(s, "pad_left", "width: number, char?", "The text padded on the left to width.", s, (t, c) => Pad(S(t), c.Int(0), c.Str(1, " "), left: true));
+            p.Method(s, "pad_right", "width: number, char?", "The text padded on the right to width.", s, (t, c) => Pad(S(t), c.Int(0), c.Str(1, " "), left: false));
             p.Method(s, "capitalize", "", "The text with its first letter upper-cased.", s, (t, c) => S(t).Length == 0 ? S(t) : char.ToUpperInvariant(S(t)[0]) + S(t).Substring(1));
             p.Method(s, "title", "", "The text in Title Case.", s, (t, c) => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(S(t).ToLowerInvariant()));
             p.Method(s, "escape", "", "The text HTML-escaped.", s, (t, c) => Values.HtmlEscape(S(t)));
