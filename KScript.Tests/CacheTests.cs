@@ -32,6 +32,34 @@ public sealed class CacheTests : StorageFixture
         Assert.True(store.TryGet("slot", out _, out _));
     }
 
+    [Fact]
+    public void CountingAtTheSameMomentLosesNothing()
+    {
+        string path = Path.Combine(Root, "counters");
+        Parallel.For(0, 8, _ =>
+        {
+            var file = new FileCacheStore("main", path);
+            for (int i = 0; i < 25; i++) file.Add("hits", 1, null);
+        });
+        Assert.True(new FileCacheStore("main", path).TryGet("hits", out object total, out _));
+        Assert.Equal(200d, total);
+
+        MemoryCacheStore memory = MemoryCacheStore.Named("counters-" + Guid.NewGuid().ToString("N"));
+        Parallel.For(0, 2000, _ => memory.Add("hits", 2, null));
+        Assert.True(memory.TryGet("hits", out total, out _));
+        Assert.Equal(4000d, total);
+    }
+
+    [Fact]
+    public void ATimeLimitOrStoreNameThatCannotBeUsedSaysSoInPlainWords()
+    {
+        KScriptException limit = Assert.Throws<KScriptException>(() => Run("<do>$cache->set('a', 1, ttl: 99999999999999999)</do>"));
+        Assert.Equal("Argument", limit.Type);
+        Assert.Contains("A time limit can be at most 100 years", limit.Message);
+        Assert.Contains("A time limit can be at most 100 years", Assert.Throws<KScriptException>(() => Run("<echo>{ $cache->increment('n', ttl: 99999999999999999) }</echo>")).Message);
+        Assert.Contains("'..' can't be used as a cache name", Assert.Throws<KScriptException>(() => Run("<do>@cache(file, name: '..')</do>")).Message);
+    }
+
     private string ScriptFile { get; }
 
     private string Run(string body) => base.Run(body, ScriptFile);
