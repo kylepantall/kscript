@@ -23,6 +23,7 @@ public class SemanticTypesTests
     [InlineData("u: uuid = 'urn:uuid:3f2a8c1e9b7d4c2a8e1f0a9b8c7d6e5f'\necho $u", "3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f")]
     [InlineData("u: uuid = 00000000-0000-0000-0000-000000000000\necho $u.version", "0")]
     [InlineData("u: uuid = 'ffffffff-ffff-ffff-ffff-ffffffffffff'\necho $u.version", "15")]
+    [InlineData("text = '3F2A8C1E-9B7D-4C2A-8E1F-0A9B8C7D6E5F'\necho $text->is_a(uuid)\necho 'bad'->is_a(uuid)\necho $text as uuid", "true\nfalse\n3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f")]
     [InlineData("echo \"{ @uuid().version } { @uuid(v: 8).version } { @uuid(v: 8, name: 'a') == @uuid(v: 8, name: 'a') } { @uuid(v: 8, name: 'a') == @uuid(v: 8, name: 'a', namespace: 'b') }\"", "4 8 true false")]
     [InlineData("echo 3f2a8c1e-9b7d-4c2a-8e1f-0a9b8c7d6e5f.version", "4")]
     // regex
@@ -58,6 +59,7 @@ public class SemanticTypesTests
     [InlineData("u: uuid = 'nope'", "32 hex digits")]
     [InlineData("u: uuid = '3f2a8c1e-9b7d-9c2a-8e1f-0a9b8c7d6e5f'", "version")]
     [InlineData("u: uuid = '3f2a8c1e-9b7d-4c2a-0e1f-0a9b8c7d6e5f'", "variant")]
+    [InlineData("echo uuid('bad')", "Use 'value as uuid'")]
     [InlineData("echo @uuid(v: 5)", "version 4 (random) or 8 (custom)")]
     [InlineData("r: regex = '(['", "the pattern is invalid at character 2. Unterminated [] set.")]
     [InlineData("r: regex = '/a/q'", "flag")]

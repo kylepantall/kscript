@@ -20,7 +20,7 @@ public sealed class DockerServeTests
         Assert.Equal(new[]
         {
             "compose", "--file", Path.Combine(site.Root, "compose.dev.yaml"), "run", "--rm", "--service-ports",
-            "--name", "test-container", "--env", "KSCRIPT_SERVE_IN_DOCKER=1", "--volume", $"{site.Root}:/site:ro",
+            "--name", "test-container", "--env", "KSCRIPT_SERVE_IN_DOCKER=1", "--env", "KSCRIPT_SERVE_MIGRATE=1", "--volume", $"{site.Root}:/site:ro",
             "--env", "KSCRIPT_ENV=development", "web",
         }, start.ArgumentList);
     }
@@ -40,6 +40,28 @@ public sealed class DockerServeTests
         Assert.DoesNotContain("--volume", start.ArgumentList);
         Assert.Contains("KSCRIPT_ENV=test", start.ArgumentList);
         Assert.Equal("app", start.ArgumentList.Last());
+    }
+
+    [Theory]
+    [InlineData("", true)]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("\"auto\"", true)]
+    [InlineData("{\"enabled\":\"auto\"}", true)]
+    public void LocalDockerDefaultsCanBeOverriddenInProjectConfig(string value, bool expected)
+    {
+        string config = value == "" ? "{}" : "{\"serve\":{\"docker\":" + value + "}}";
+        using var site = new TempSite(("kscript.json", config), ("compose.yaml", "services: {}"));
+        var project = ProjectConfig.Load(Path.Combine(site.Root, "kscript.json"));
+        Assert.Empty(project.Warnings);
+        var settings = project.Serve.Docker;
+        Assert.Equal(expected, DockerServe.ShouldLaunch(site.Root, settings, null, "development", true));
+        Assert.False(DockerServe.ShouldLaunch(site.Root, settings, null, "production", true));
+        Assert.False(DockerServe.ShouldLaunch(site.Root, settings, false, "development", true));
+        Assert.True(DockerServe.ShouldLaunch(site.Root, settings, true, "production", false));
+        Assert.False(DockerServe.ShouldLaunch(site.Root, new DockerServeSettings(), null, "development", false));
+        System.IO.File.Delete(Path.Combine(site.Root, "compose.yaml"));
+        Assert.False(DockerServe.ShouldLaunch(site.Root, new DockerServeSettings(), null, "development", true));
     }
 
     [Fact]

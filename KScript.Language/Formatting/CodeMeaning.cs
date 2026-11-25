@@ -1,5 +1,6 @@
 using System.Text;
 
+using KScript.Syntax;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
 
@@ -168,6 +169,15 @@ namespace KScript.Language.Formatting
                     pendingSpace = false;
                     sb.Append("```").Append(block.Tag).Append('\n').Append(block.Value).Append(block.Error != null ? "\n!" + block.Error : string.Empty).Append("```");
                     i = block.End;
+                    continue;
+                }
+                if (c == '/' && CodeParser.RegexCanStart(value, i)
+                    && Lexer.SlashPathLiteralEnd(value, i, value.Length) < 0
+                    && Lexer.RegexEnd(value, i, value.Length) is int regexEnd && regexEnd > 0)
+                {
+                    sb.Append(value, i, regexEnd - i);
+                    pendingSpace = false;
+                    i = regexEnd;
                     continue;
                 }
                 if (char.IsWhiteSpace(c))

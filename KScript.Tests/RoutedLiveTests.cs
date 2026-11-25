@@ -79,6 +79,39 @@ public sealed class RoutedLiveTests : AuthSiteFixture
     }
 
     [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void FileWritesFollowTheControllerPermissionOnlyDuringTheAction(bool controller, bool permission, bool succeeds)
+    {
+        Write("kscript.json", Read("kscript.json").Replace("\"auth\":", $"\"write_files\": {permission.ToString().ToLowerInvariant()}, \"auth\":"));
+        if (controller)
+            Write("routes/web.kscript", Read("routes/web.kscript").Replace(
+                """Get(path: "/edit/{id}", view: "editor", middleware: [auth:session, cache_response:1m])""",
+                """Get(path: "/edit/{id}", middleware: [auth:session]) { return @view('editor') }"""));
+        Write("_components/counter.html", "<import package='KScript.IO' />" + Read("_components/counter.html")
+            .Replace("count += 1", "@write_text('saved.txt', 'saved')"));
+        var browser = new Browser(App());
+        browser.Get("/sign-in");
+        var page = browser.Get("/edit/7");
+        Assert.Equal(200, page.Status);
+        string saved = Path.Combine(Dir, "saved.txt");
+        Assert.False(File.Exists(saved));
+        var action = Click(browser, page);
+        if (succeeds)
+        {
+            Assert.True(action.Status == 200, action.Body);
+            Assert.Equal("saved", File.ReadAllText(saved));
+        }
+        else
+        {
+            Assert.Equal(500, action.Status);
+            Assert.Contains("files are read-only", action.Body);
+            Assert.False(File.Exists(saved));
+        }
+    }
+
+    [Theory]
     [InlineData("@live-action('move-note')")]
     [InlineData("live-action=\"move-note\"")]
     public void NamedActionInFencedComponentDispatchesItsSignedHandler(string action)

@@ -296,8 +296,8 @@ namespace KScript.Pages
                         if (end < 0) end = text.Length;
                         if (end > i)
                         {
-                            // <pre> keeps { } interpolation; script, style and textarea content are left alone.
-                            el.Children.Add(new PageText { Text = text.Substring(i, end - i), Raw = el.Name != "pre", Line = line });
+                            // Preformatted text and textarea values can both contain interpolations.
+                            el.Children.Add(new PageText { Text = text.Substring(i, end - i), Raw = el.Name is not ("pre" or "textarea"), Line = line });
                         }
                         Advance(end);
                         int gt = text.IndexOf('>', i);

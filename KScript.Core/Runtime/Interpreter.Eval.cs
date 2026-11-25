@@ -1061,6 +1061,8 @@ namespace KScript.Runtime
                     {
                         return Construct(stored, args, named, scope, ctx);
                     }
+                    if (!piped && id.Name == SemanticTypes.Uuid)
+                        throw Fail(call, ctx, "Use 'value as uuid' to validate text as a UUID. Use @uuid() to generate a UUID.", "Argument");
                     object receiver = pipedValue;
                     if (piped && pipedValue is RefinedValue refined)
                     {

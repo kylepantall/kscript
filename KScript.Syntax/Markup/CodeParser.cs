@@ -2334,9 +2334,11 @@ namespace KScript.Syntax.Markup
         }
 
         /// <summary>True where a value can start, so a / begins a regex rather than dividing: after =, (, a comma, an operator or a keyword.</summary>
-        private bool RegexCanStart(int start)
+        private bool RegexCanStart(int start) => RegexCanStart(text, pos, start);
+
+        public static bool RegexCanStart(string text, int position, int start = 0)
         {
-            int p = pos - 1;
+            int p = position - 1;
             while (p >= start && (text[p] == ' ' || text[p] == '\t'))
             {
                 p--;
@@ -2354,9 +2356,9 @@ namespace KScript.Syntax.Markup
                     w--;
                 }
                 string word = text.Substring(w + 1, p - w);
-                return word is "return" or "not" or "and" or "or" or "in" or "is" or "when" or "if" or "elif" or "while" or "match";
+                return word is "echo" or "return" or "not" or "and" or "or" or "in" or "is" or "when" or "if" or "elif" or "while" or "match";
             }
-            return before is '=' or '(' or ',' or ':' or '[' or '{' or '!' or '&' or '|' or '?' or ';' or '>' or '<' or '+' or '-' or '*' or '%';
+            return before is '\n' or '=' or '(' or ',' or ':' or '[' or '{' or '!' or '&' or '|' or '?' or ';' or '>' or '<' or '+' or '-' or '*' or '%';
         }
 
         /// <summary>Moves past a regex literal at pos (<c>/^[a-z]+$/i</c>). False, without moving, if it doesn't close on this line.</summary>

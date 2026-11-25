@@ -19,6 +19,7 @@ namespace KScript.Http
 
         public int Status { get; set; }
         public string Body { get; set; }
+        public byte[] BodyBytes { get; init; }
         public string ContentType { get; set; }
         public Dictionary<string, object> Headers { get; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
@@ -83,7 +84,7 @@ namespace KScript.Http
                     return true;
                 case "with_etag":
                     bool weak = Values.Truthy(call.Arg(1, "weak"));
-                    Headers["ETag"] = call.Arg(0, "value") is object value ? HttpCaching.TagFor(value, weak) : HttpCaching.Tag(Body, weak);
+                    Headers["ETag"] = call.Arg(0, "value") is object value ? HttpCaching.TagFor(value, weak) : HttpCaching.Tag(this, weak);
                     result = this;
                     return true;
                 case "with_cache":

@@ -625,6 +625,11 @@ namespace KScript.Language.Analysis
                         Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Call functions with @: @{id.Name}(...).",
                             new[] { new QuickFix($"Change to @{id.Name}", new TextChange(new TextSpan(span.Start, 0), "@")) });
                     }
+                    else if (id.Name == SemanticTypes.Uuid)
+                    {
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand,
+                            "Use 'value as uuid' to validate text as a UUID. Use @uuid() to generate a UUID.");
+                    }
                     else if (!char.IsUpper(id.Name[0]) && catalog.GetCommand(id.Name) != null)
                     {
                         // A capitalised name is a type being called (User($data)), never a command spelt without @.

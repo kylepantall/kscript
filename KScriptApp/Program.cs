@@ -88,6 +88,7 @@ namespace KScript
             int? docsPort = null;
             bool withWorker = false;
             bool? withDocker = null;
+            bool migrate = watch && Environment.GetEnvironmentVariable(DockerServe.MigrateSetting) == "1";
             bool liveReload = Environment.GetEnvironmentVariable(DockerServe.ReloadSetting) != "0";
 
             for (int i = 0; i < args.Length; i++)
@@ -123,6 +124,14 @@ namespace KScript
                     case "--no-reload":
                         liveReload = false;
                         break;
+                    case "--migrate":
+                        if (!watch)
+                        {
+                            Error.WriteLine("Apply migrations with kscript db migrate before starting a compiled site.");
+                            return ExitCodes.Usage;
+                        }
+                        migrate = true;
+                        break;
                     case "--docker":
                     case "--no-docker":
                         withDocker = args[i] == "--docker";
@@ -156,17 +165,21 @@ namespace KScript
             if (project != null)
                 foreach (string warning in project.Warnings) Error.WriteLine($"{project.FilePath}: {warning}");
 
-            if (watch && Environment.GetEnvironmentVariable(DockerServe.ContainerMarker) != "1"
-                && (withDocker ?? project?.Serve.Docker.Enabled) == true)
+            string root = project?.Directory ?? Path.GetFullPath(folder ?? ".");
+            string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+            bool inDocker = DockerServe.IsContainer(Environment.GetEnvironmentVariable(DockerServe.ContainerMarker));
+            bool subfolder = folder != null && project != null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)).Equals(
+                root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+            bool localOptions = port.HasValue || host != null || withDocs.HasValue || docsPort.HasValue || withWorker;
+            var dockerSettings = project?.Serve.Docker ?? new DockerServeSettings();
+            if (watch && !inDocker && DockerServe.ShouldLaunch(root, dockerSettings, withDocker, environment, !subfolder && !localOptions))
             {
-                string root = project?.Directory ?? Path.GetFullPath(folder ?? ".");
-                if (folder != null && project != null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)).Equals(
-                    root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                if (subfolder)
                 {
                     Error.WriteLine("Use the project folder with --docker. Set serve.root for the site served inside Docker.");
                     return ExitCodes.Usage;
                 }
-                if (port.HasValue || host != null || withDocs.HasValue || docsPort.HasValue || withWorker)
+                if (localOptions)
                 {
                     Error.WriteLine("Set Docker ports and the service command in Compose, or use --no-docker with local server options.");
                     return ExitCodes.Usage;
@@ -176,7 +189,7 @@ namespace KScript
                 Console.CancelKeyPress += interrupt;
                 try
                 {
-                    return DockerServe.Run(root, project?.Serve.Docker ?? new DockerServeSettings(), Error, dockerStop.Token, liveReload);
+                    return DockerServe.Run(root, dockerSettings, Error, dockerStop.Token, liveReload, environment);
                 }
                 finally
                 {
@@ -197,8 +210,13 @@ namespace KScript
                 withDocs ??= project.Serve.Docs;
             }
 
+            if (migrate)
+            {
+                int code = RunStartupMigrations(root, environment);
+                if (code != ExitCodes.Ok) return code;
+            }
+
             // The docs (which run examples) are for working on the site: never for a compiled program or in production.
-            string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
             bool production = string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase);
             System.Threading.Tasks.Task docs = System.Threading.Tasks.Task.CompletedTask;
             using var stopDocs = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
@@ -221,7 +239,7 @@ namespace KScript
             using var watching = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(Cancellation);
             try
             {
-                if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
+                if (watch && !inDocker) WatchOutputs(root, watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation,
                     liveReload: watch && liveReload && !production).GetAwaiter().GetResult();
             }
@@ -262,6 +280,12 @@ namespace KScript
         /// Starts the docs for kscript serve --with-docs. A method of its own, so serving a compiled site (whose program
         /// leaves KScript.Docs out) never loads that assembly.
         /// </summary>
+        // Compiled sites do not bundle KScript.Cli. The server can run without resolving it.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        int RunStartupMigrations(string root, string environment) =>
+            KScript.Databases.DbCommand.Run(new[] { "migrate", "--force" }, Out, Error,
+                workingDirectory: root, environment: environment, startup: true);
+
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         System.Threading.Tasks.Task ServeDocs(string folder, KScript.Projects.ProjectConfig project, int? docsPort, int sitePort, System.Threading.CancellationToken stop) =>
             KScript.Docs.DocsCommand.ServeProjectAsync(folder, project, docsPort, sitePort, Out, Error, stop);

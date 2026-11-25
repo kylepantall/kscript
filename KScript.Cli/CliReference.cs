@@ -77,11 +77,12 @@ namespace KScript
                     O("--junit file", "Also write a JUnit XML report, for CI."),
                 },
                 "kscript test\nkscript test tests/cart.test.kscript --filter total", "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests." },
-            new CliCommand("serve", "kscript serve [site folder] [--docker | --no-docker] [--port 8080] [--host localhost] [--env name] [--no-reload] [--with-docs [--docs-port 4180]] [--with-worker]",
+            new CliCommand("serve", "kscript serve [site folder] [--docker | --no-docker] [--port 8080] [--host localhost] [--env name] [--no-reload] [--migrate] [--with-docs [--docs-port 4180]] [--with-worker]",
                 "Serve pages, and routes.kscript / api.kscript routes.",
                 new[]
                 {
                     O("--docker | --no-docker", "Launch the project's Compose service or serve locally. serve.docker sets the default."),
+                    O("--migrate", "Apply pending database migrations before the server starts."),
                     O("--no-reload", "Disable automatic browser reload when site source or assets change. Production and compiled sites never inject the reload script."),
                     O("--port, -p N", "The port to listen on (default 8080, or serve.port in kscript.json)."),
                     O("--host H", "The address to listen on: localhost (default), 0.0.0.0 or * for every address."),

@@ -17,6 +17,7 @@ namespace KScript.Pages
         public int Status { get; set; } = 200;
         public string ContentType { get; set; } = "text/html; charset=utf-8";
         public string Body { get; set; } = string.Empty;
+        public byte[] BodyBytes { get; set; }
         public Dictionary<string, string> Headers { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Set-Cookie header values, each sent as a header of its own.</summary>
@@ -53,6 +54,9 @@ namespace KScript.Pages
 
         /// <summary>Set when re-rendering a &lt;live&gt; block for a browser event.</summary>
         public LiveEvent Live { get; set; }
+
+        /// <summary>Allows a signed controller view action to write within the same file root as its controller.</summary>
+        public bool CanWriteLiveFiles { get; set; }
 
         /// <summary>For a routed GET view, issues the proof required to replay its route in this session.</summary>
         public Func<string> RoutedLiveProof { get; set; }
@@ -1114,9 +1118,16 @@ namespace KScript.Pages
                     foreach (var kv in ctx.Live.Args) handlerScope.Declare(kv.Key, kv.Value);
                     ctx.Live.Event["files"] = ctx.Live.Files ?? new Dictionary<string, object>();
                     handlerScope.Declare("event", ctx.Live.Event);
+                    KScriptHost host = ctx.Runtime.Interpreter.Host;
+                    bool previousCanWrite = host.CanWriteFiles;
                     ctx.InLiveAction = true;
+                    host.CanWriteFiles = ctx.CanWriteLiveFiles;
                     try { ctx.Runtime.RunHandler(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module); }
-                    finally { ctx.InLiveAction = false; }
+                    finally
+                    {
+                        host.CanWriteFiles = previousCanWrite;
+                        ctx.InLiveAction = false;
+                    }
                     // A list or nested map can be changed in place inside an action without assigning its field.
                     if (instance != null)
                         foreach (string name in classFields)

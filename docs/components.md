@@ -88,7 +88,7 @@ Add `<hello-card name="Sam" />` to `index.html` to render **Hello, Sam!**. Use k
 | Children | Put `<slot />` in the template to render the caller's child markup. |
 | Template components | HTML and Markdown components can declare `<prop name="title" required />`. A companion script can expose `load(props: map)` and other functions. |
 
-The page may render more than once during an action. Keep render methods, computed values and companion `load` functions free of writes. Put persistent changes in a live action or a controller. See [template props and companion scripts](web.md#template-props-and-component-scripts) for the template form and its `onLoad` callback.
+The page may render more than once during an action. Keep render methods, computed values and companion `load` functions free of writes. Put persistent changes in a live action or a controller. Actions can persist through KScript.Data. File and storage writes require a controller view rendered with `@view()` and permission from `http.write_files`. See [template props and companion scripts](web.md#template-props-and-component-scripts) for the template form and its `onLoad` callback.
 
 ## How a live update works
 
