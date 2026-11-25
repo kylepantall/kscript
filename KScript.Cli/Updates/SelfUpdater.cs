@@ -161,6 +161,12 @@ namespace KScript.Updates
                     output.WriteLine("The KScript extension is updated to the same release in every editor that has it (VS Code, Cursor, VSCodium, Windsurf).");
                     return 0;
                 }
+                else if (args[i] is not ("--check" or "--force" or "--no-ide"))
+                {
+                    // A mistyped --check must never go on to install a release.
+                    error.WriteLine($"Unknown option '{args[i]}' for kscript update. Use --check, --force, --version <tag> or --no-ide.");
+                    return ExitCodes.Usage;
+                }
             }
 
             try
