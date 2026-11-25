@@ -189,7 +189,7 @@ namespace KScript.Data
         public SqlStatement SelectStatement(string select = null, bool withOrder = true)
         {
             Dialect d = Database.Dialect;
-            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct && select == null ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d));
+            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d));
             if (select == null)
             {
                 // ->with_count(posts): (SELECT COUNT(*) FROM posts AS c1 WHERE c1.author_id = users.id) AS posts_count
@@ -285,7 +285,7 @@ namespace KScript.Data
             return Rows.FromDb(raw, c.Column, call.Interpreter);
         }
 
-        public bool Exists(CallContext call) => Database.Rows(call.Interpreter, Taking(1).SelectStatement("1"), Table).Count > 0;
+        public bool Exists(CallContext call) => Database.Rows(call.Interpreter, (this with { Distinct = false }).Taking(1).SelectStatement("1"), Table).Count > 0;
 
         public List<object> Pluck(CallContext call, string column)
         {
@@ -302,8 +302,10 @@ namespace KScript.Data
             if (page < 1) page = 1;
             double total = (this with { Limit = null, Offset = null }).Count(call);
             int last = Math.Max(1, (int)Math.Ceiling(total / perPage));
-            List<object> items = Taking(perPage).Skipping((page - 1) * perPage).Get(call);
-            int from = items.Count == 0 ? 0 : (page - 1) * perPage + 1;
+            // A page past the last one a database can count to has no rows, like any page past the end.
+            long skip = (long)(page - 1) * perPage;
+            List<object> items = skip > int.MaxValue ? new List<object>() : Taking(perPage).Skipping((int)skip).Get(call);
+            int from = items.Count == 0 ? 0 : (int)skip + 1;
             return new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 ["items"] = items,
@@ -344,12 +346,17 @@ namespace KScript.Data
         {
             if (size < 1) throw new KScriptException("->chunk() needs a size of 1 or more.", "Argument");
             Query ordered = Order.Count > 0 ? this : OrderBy(Model != null ? new SqlColumn(Model.Key, Model.KeyColumn) : Database.Dialect.RowOrder, false);
+            int? left = Limit;
             for (int page = 0; ; page++)
             {
-                List<object> batch = ordered.Taking(size).Skipping((Offset ?? 0) + page * size).Get(call);
+                // ->limit(n) is the most rows read in all, so the last batch may be smaller.
+                int take = left is int rest ? Math.Min(size, rest) : size;
+                if (take == 0) return;
+                List<object> batch = ordered.Taking(take).Skipping((Offset ?? 0) + page * size).Get(call);
                 if (batch.Count == 0) return;
                 if (call.Call(fn, batch, (double)page) is false) return;
                 if (batch.Count < size) return;
+                if (left != null) left -= batch.Count;
             }
         }
 

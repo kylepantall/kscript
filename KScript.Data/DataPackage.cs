@@ -204,7 +204,9 @@ namespace KScript.Data
                 {
                     int perPage = c.Has(0) && c.Arg(0) != null ? Count(c.Arg(0), "per_page") : 15;
                     object pageArg = c.Arg(1);
-                    int page = pageArg == null || (pageArg is string s && !double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? 1 : (int)Values.ToNumber(pageArg, "page");
+                    double asked = pageArg == null || (pageArg is string s && !double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)) ? 1 : Values.ToNumber(pageArg, "page");
+                    // A page too big to count to is still a page past the end, not the first one.
+                    int page = double.IsNaN(asked) || asked < 1 ? 1 : asked >= int.MaxValue ? int.MaxValue : (int)asked;
                     return q.Paginate(c, perPage, page);
                 }),
             new("cursor_paginate", "per_page?: number, after?, key?: string, descending?: bool", "Reads one page using a unique, non-null key (the model key by default). Returns { items, has_more, next }; pass next as after to continue.", KType.Map,

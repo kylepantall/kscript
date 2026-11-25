@@ -762,6 +762,22 @@ public sealed class DataQueryTests : DataFixture
             echo User->where(fn(u) => not ($u.age > 20) and $u.active)->pluck(name)
             """));
     }
+
+    [Fact]
+    public void DistinctChunkAndPagesKeepToWhatTheQuerySays()
+    {
+        Assert.Equal(new[] { "false, true", "2", "1", "2147483647 0 false", "3 0 false" }, Lines(Users + """
+            echo User->distinct()->order_by(active)->pluck(active)
+            fn show(rows, n) {
+              echo $rows->count()
+            }
+            User->order_by(name)->limit(3)->chunk(2, @show)
+            far = User->paginate(2, 3000000000)
+            echo "{$far.page} {$far.items->count()} {$far.has_more}"
+            past = User->paginate(2, 3)
+            echo "{$past.page} {$past.items->count()} {$past.has_more}"
+            """));
+    }
 }
 
 public sealed class DataSqlTests : DataFixture
