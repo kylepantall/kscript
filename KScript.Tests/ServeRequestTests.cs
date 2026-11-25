@@ -41,6 +41,73 @@ public sealed class ServeRequestTests
 
     private const string Counter = """<live id="counter"><state name="n" value="0"/><b>{$n}</b><button on-click="n += 1">Add</button></live>""";
 
+    #region Numbers a request sends
+
+    [Fact]
+    public void A_number_sent_for_an_int_has_to_be_a_whole_number()
+    {
+        using var site = new TempSite(
+            ("controllers/c.kscript", """
+                import KScript.Http
+
+                type Item {
+                  name: string
+                  qty: int
+                  price?: number
+                }
+
+                type Paging {
+                  page?: int
+                }
+
+                fn item(json: Item) => $json
+                fn list(query: Paging) => $query
+                fn show(n: int) => { n: $n }
+                """),
+            ("api.kscript", """
+                import KScript.Http
+                import "controllers/c.kscript" as c
+
+                Routes {
+                  Post(path: /items, to: @c.item)
+                  Get(path: /items, to: @c.list)
+                  Get(path: /items/{n}, to: @c.show)
+                }
+                """));
+        var app = new HttpApp(site.Root);
+        PageResult Get(string path, string query = null) => app.Handle(new Dictionary<string, object>
+        {
+            ["method"] = "GET", ["path"] = path,
+            ["query"] = query == null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["page"] = query },
+        });
+        PageResult Post(string body) => app.Handle(new Dictionary<string, object>
+        {
+            ["method"] = "POST", ["path"] = "/api/items", ["body"] = body,
+            ["headers"] = new Dictionary<string, object> { ["content-type"] = "application/json" },
+        });
+
+        Assert.Equal("{\"name\":\"tea\",\"qty\":2,\"price\":1.5}", Post("{\"name\":\"tea\",\"qty\":2,\"price\":1.5}").Body);
+        Assert.Equal("{\"name\":\"tea\",\"qty\":2,\"price\":null}", Post("{\"name\":\"tea\",\"qty\":\"2.0\"}").Body);
+
+        // 1.9 was once cut down to 1 without a word.
+        PageResult part = Post("{\"name\":\"tea\",\"qty\":1.9}");
+        Assert.Equal(422, part.Status);
+        Assert.Contains("needs a whole number, but got a number (1.9)", part.Body);
+        PageResult huge = Post("{\"name\":\"tea\",\"qty\":1,\"price\":\"1e999\"}");
+        Assert.Equal(422, huge.Status);
+        Assert.Contains("too large", huge.Body);
+
+        Assert.Equal("{\"page\":3}", Get("/api/items", "3").Body);
+        Assert.Equal(422, Get("/api/items", "3.5").Status);
+        Assert.Equal(422, Get("/api/items", "1e999").Status);
+
+        Assert.Equal("{\"n\":7}", Get("/api/items/7").Body);
+        Assert.Equal(404, Get("/api/items/7.5").Status);
+        Assert.Equal(404, Get("/api/items/1e999").Status);
+    }
+
+    #endregion
+
     #region An answer's own status
 
     [Fact]

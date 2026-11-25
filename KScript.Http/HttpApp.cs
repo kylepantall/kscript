@@ -597,7 +597,7 @@ namespace KScript.Http
                 }
                 try
                 {
-                    named[p.Name] = Shapes.Convert(interpreter, value, p.Type, what, fn.Closure, fn.Module);
+                    named[p.Name] = Shapes.ConvertRequest(interpreter, value, p.Type, what, fn.Closure, fn.Module);
                 }
                 catch (KScriptException ex) when (ex.Type == "Shape" || ex.Type == "Type" || ex.Type == "Argument")
                 {

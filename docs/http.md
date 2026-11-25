@@ -79,7 +79,7 @@ A controller is a plain `fn`. Its parameters are filled in by name:
 - `input`: the query, form and JSON fields together.
 - `query`, `form`, `headers`, `cookies`.
 
-A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
+A typed parameter is converted, so `id: int` gives a number. Numbers a request sends are not rounded to fit: `1.9` for an `int` (or a number too large to hold) answers `422`, or `404` in the path, while `2` and `2.0` are both 2. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
 ```kscript
 type NewPerson {
