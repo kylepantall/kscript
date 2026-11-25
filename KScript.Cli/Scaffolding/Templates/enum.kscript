@@ -5,6 +5,7 @@ usage: <Name> [--values small,medium,large]
 --values: The values, comma separated (default one, two, three)
 example: kscript make enum Size --values small,medium,large
 example: kscript make enum OrderStatus --values pending,paid,shipped,cancelled
+checks: values=names
 to: {{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}", then use it as a type: fn pack(size: {{ pascal }})
 ---

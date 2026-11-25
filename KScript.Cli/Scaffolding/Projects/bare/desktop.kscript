@@ -2,7 +2,7 @@
 when: desktop
 ---
 // {{ title }} as a desktop app. Open it with: kscript desktop{{ ext }}; package
-// it with: kscript app build
+// it with: kscript compile
 import KScript.UI
 
 Window(title: "{{ title }}", width: 400, height: 300, theme: system) {

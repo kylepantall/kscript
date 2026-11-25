@@ -5,6 +5,7 @@ usage: <name> [--level warn]
 --level: The lowest level it gets: trace, debug, info, warn (the default), error or fatal
 example: kscript make logger alerts --level error
 example: kscript make logger audit --level info
+checks: level=trace|debug|info|warn|error|fatal
 to: {{ paths.logging }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Turn it on in a script that imports it with log_provider(fn: @{{ snake }}, level: {{ level ?? warn }}), or set fn to '{{ snake }}' under logging.providers in the project config.
 ---

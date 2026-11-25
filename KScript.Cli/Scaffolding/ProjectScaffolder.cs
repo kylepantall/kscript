@@ -101,7 +101,7 @@ namespace KScript.Scaffolding
                 values[key] = match;
             }
 
-            // A mistyped option (--no-dekstop) would otherwise be silently ignored.
+            // A mistyped option (--no-dekstop), or one another template has (--docker), is refused: made as asked or not at all.
             var notes = new List<string>();
             if (template.Options.Count > 0)
             {
@@ -109,7 +109,11 @@ namespace KScript.Scaffolding
                 foreach (string key in given.Keys.Where(k => !known.Contains(k)).OrderBy(k => k, StringComparer.Ordinal))
                 {
                     if (key is "type" or "input" or "name" or "kebab" or "snake" or "pascal" or "camel" or "title" or ScriptFormat.Option) continue;
-                    notes.Add($"Note: the project template has no '{key.Replace('_', '-')}' option, so --{key.Replace('_', '-')} was not used. Its options: {string.Join(", ", template.Options.Select(o => o.Name))}.");
+                    // A template may use a value it doesn't list as an option ("when: api", {{#if api}}).
+                    var uses = new System.Text.RegularExpressions.Regex(@"(?:\{\{[^}]*|^(?:when|unless):.*)\b" + System.Text.RegularExpressions.Regex.Escape(key) + @"\b", System.Text.RegularExpressions.RegexOptions.Multiline);
+                    if (template.Files.Any(f => uses.IsMatch(f.Source)) || template.Next.Concat(template.Makes).Concat(template.Notes).Any(uses.IsMatch)) continue;
+                    string label = template.Name != null ? $"The {template.Name} project template" : "The project template";
+                    throw new StubException($"{label} has no --{key.Replace('_', '-')} option. Its options: {string.Join(", ", template.Options.Select(o => "--" + o.Name))}.");
                 }
             }
 
