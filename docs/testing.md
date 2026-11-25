@@ -50,7 +50,7 @@ Files: 1 failed, 1 total
 Time:  0.08s
 ```
 
-The exit code is 0 when every test passed, 1 when any test failed, a test file couldn't run or no tests matched, and 2 when the command line or `kscript.json` is wrong (an unknown option, a path that is not there, no test files in the folder), so `kscript test` can gate a CI job. [Exit codes](projects.md#exit-codes) are the same for every command.
+The exit code is 0 when every test passed, 1 when any test failed, a test file couldn't run, no tests matched or the folder has no test files, and 2 when the command line or `kscript.json` is wrong (an unknown option, a path that is not there), so `kscript test` can gate a CI job. [Exit codes](projects.md#exit-codes) are the same for every command.
 
 ## Test files and folders
 
