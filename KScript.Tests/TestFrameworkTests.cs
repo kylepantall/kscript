@@ -436,6 +436,21 @@ public class TestFrameworkTests
     }
 
     [Fact]
+    public void JUnitReportLeavesOutWhatXmlCanNotHold()
+    {
+        // Coloured output and other control characters a test prints or fails with must not break the report.
+        using var site = new TempSite(("a.test.kscript", "test(name: 'colour') {\n  echo 'red\u001b[31m'\n  @assert(false, 'bell\u0007!')\n}\n"));
+        string report = Path.Combine(site.Root, "junit.xml");
+        var (code, output, err) = Command(site.Root, "--junit", report);
+        Assert.True(code == 1, output + err);
+        Assert.Contains("Wrote ", output);
+
+        XElement test = XDocument.Load(report).Root.Descendants("testcase").Single();
+        Assert.Equal("bell!", test.Element("failure").Attribute("message").Value);
+        Assert.Contains("red[31m", test.Element("system-out").Value);
+    }
+
+    [Fact]
     public void TheSampleTestsPass()
     {
         foreach (string samples in new[] { ScriptRunner.RepoFile("samples", "scripts"), ScriptRunner.RepoFile("samples", "xml") })
