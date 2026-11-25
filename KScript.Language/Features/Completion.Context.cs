@@ -61,11 +61,6 @@ namespace KScript.Language.Features
             int offset = cursor.Offset;
             bool code = analysis.Markup.Syntax == SourceSyntax.Code;
 
-            if (code && analysis.Markup.DescendantNodes().OfType<MarkupComment>().Any(c => offset > c.Span.Start && offset <= c.Span.End))
-            {
-                return new List<CompletionItem>();
-            }
-
             // A line of a type or model block (min: ...), and rules given to a type: string(m‸).
             if (code && TypeBodyCompletions(analysis, offset) is List<CompletionItem> body)
             {
@@ -260,15 +255,17 @@ namespace KScript.Language.Features
             }
             List<CompletionItem> items = CodeStatementItems(analysis, parent, previous, replace, followOn: false);
 
-            // x = 3 assigns: offer the variables in scope by their bare names.
+            // A statement can start with an assignment or a call on a declared type.
             Scope scope = analysis.ScopeAt(offset);
             items.AddRange(scope.VisibleAt(offset)
-                .Where(s => s.Kind is SymbolKind.Variable or SymbolKind.Parameter or SymbolKind.LoopVariable)
+                .Where(s => s.IsTypeDeclaration ? scope.Lookup(s.Name, offset) == s
+                    : s.Kind is SymbolKind.Variable or SymbolKind.Parameter or SymbolKind.LoopVariable)
                 .GroupBy(s => s.Name).Select(g => g.First())
                 .Select(s => new CompletionItem
                 {
                     Label = s.Name,
-                    Kind = s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : CompletionKind.Variable,
+                    Kind = s.IsTypeDeclaration ? CompletionKind.Value
+                        : s.Kind == SymbolKind.Parameter ? CompletionKind.Parameter : CompletionKind.Variable,
                     Detail = s.Shape.Display(),
                     Documentation = SymbolMarkdown(analysis, s),
                     ReplaceSpan = replace,

@@ -195,7 +195,7 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | --- | --- |
 | `->where(...)`, `->or_where(...)`, `->where_not(...)` | Keep the rows that match, or that match these instead, or that don't. |
 | `->when(test, fn(q) => ...)` | Changes the query only when the test is true, for optional filters. |
-| `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` sort by `created_at`. |
+| `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` default to `created_at`, or the primary key on models with timestamps disabled. Both accept a column name. |
 | `->limit(n)`, `->offset(n)` | Reads at most `n` rows, after skipping `n`. |
 | `->select(id, name)`, `->distinct()` | Reads only these columns, and leaves out rows that repeat. |
 | `->with_trashed()`, `->only_trashed()` | With `soft_deletes`: keep the deleted records too, or read only them. |

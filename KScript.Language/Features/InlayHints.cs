@@ -54,7 +54,7 @@ namespace KScript.Language.Features
 
                 if (s.Kind == SymbolKind.Function)
                 {
-                    if (s.ReturnShape.IsVague)
+                    if (s.ReturnShape.IsVague || !string.IsNullOrWhiteSpace(s.DeclaringElement.GetAttributeValue("returns")))
                     {
                         continue;
                     }

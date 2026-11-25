@@ -9,6 +9,8 @@ using KScript.Metadata;
 using KScript.Runtime;
 using KScript.Syntax;
 
+using Markdig.Syntax;
+
 using Microsoft.AspNetCore.Http;
 
 namespace KScript.Tests;
@@ -110,6 +112,25 @@ public sealed class DocsTests
         }
         Assert.True(count > 500, $"Only {count} examples were found.");
         Assert.True(failures.Count == 0, $"{failures.Count} of {count} examples failed:\n\n" + string.Join("\n\n", failures));
+    }
+
+    [Fact]
+    public void Every_runnable_example_can_be_opened_in_both_formats()
+    {
+        var missing = new List<string>();
+        foreach (DocPage page in Site.Value.Pages)
+        {
+            foreach (Match box in TryBox.Matches(page.Body))
+            {
+                MatchCollection formats = DataAttribute.Matches(box.Value);
+                if (formats.Select(match => match.Groups[1].Value).ToHashSet().Count != 2)
+                {
+                    string code = WebUtility.HtmlDecode(formats.FirstOrDefault()?.Groups[2].Value);
+                    missing.Add($"{page.Path}: {code}");
+                }
+            }
+        }
+        Assert.True(missing.Count == 0, "Examples missing a format:\n" + string.Join("\n", missing.Distinct()));
     }
 
     [Theory]
@@ -274,6 +295,31 @@ public sealed class DocsTests
             }
         }
         Assert.True(broken.Count == 0, "Broken links:\n" + string.Join("\n", broken.Distinct()));
+    }
+
+    [Fact]
+    public void Page_paths_and_fragment_targets_are_unique_and_searchable()
+    {
+        DocsSite site = Site.Value;
+        var destinations = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var problems = new List<string>();
+        foreach (DocPage page in site.Pages)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            if (!destinations.TryAdd(page.Path, ids)) problems.Add($"Duplicate page {page.Path}");
+            foreach (Match match in Regex.Matches(site.Render(page), @"\sid=""([^""]+)"""))
+            {
+                string id = WebUtility.HtmlDecode(match.Groups[1].Value);
+                if (!ids.Add(id)) problems.Add($"Duplicate fragment {page.Path}#{id}");
+            }
+        }
+        foreach (SearchEntry entry in site.Search)
+        {
+            string[] target = entry.Url.Split('#', 2);
+            if (!destinations.TryGetValue(target[0], out var ids) || (target.Length == 2 && !ids.Contains(target[1])))
+                problems.Add($"Missing search destination {entry.Url} ({entry.Title})");
+        }
+        Assert.True(problems.Count == 0, string.Join("\n", problems.Distinct()));
     }
 
     [Fact]
@@ -821,12 +867,11 @@ public sealed class DocsTests
         DiagnosticCodes.MissingAttribute, DiagnosticCodes.InvalidAttributeValue, DiagnosticCodes.Deprecated, DiagnosticCodes.UnknownCommand,
         DiagnosticCodes.RetiredCommand, DiagnosticCodes.UnknownMethod, DiagnosticCodes.ArgumentCount, DiagnosticCodes.UnknownParameter,
         DiagnosticCodes.NamedArgument, DiagnosticCodes.InvalidArgumentValue, DiagnosticCodes.UnknownPackage,
+        DiagnosticCodes.MarkupSyntax, DiagnosticCodes.ExpressionSyntax,
     };
 
     /// <summary>Functions that examples call as if the reader's script declared them; every other unknown @name fails.</summary>
     private static readonly HashSet<string> AssumedFunctions = new HashSet<string> { "greet", "greeting", "slugify", "set_age", "sign_up" };
-
-    private static readonly Regex ScriptFence = new Regex(@"^```(kscript|xml)(?<info>[^\n]*)\n(.*?)^```[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline);
 
     [Fact]
     public void Every_example_in_the_guides_and_readme_matches_the_code()
@@ -840,17 +885,33 @@ public sealed class DocsTests
         int checkedCount = 0;
         foreach (var (file, markdown) in sources)
         {
-            foreach (Match m in ScriptFence.Matches(markdown.Replace("\r\n", "\n")))
+            foreach (FencedCodeBlock example in Markdig.Markdown.Parse(markdown, Html.Pipeline).Descendants<FencedCodeBlock>())
             {
-                bool code = m.Groups[1].Value == "kscript";
-                string body = m.Groups[2].Value;
+                if (example.Info == "json")
+                {
+                    try
+                    {
+                        using var json = JsonDocument.Parse(example.Lines.ToString());
+                    }
+                    catch (JsonException ex)
+                    {
+                        problems.Add($"{file}:{example.Line + 2 + ex.LineNumber}: {ex.Message}");
+                    }
+                }
+                if (example.Info is not ("kscript" or "xml")) continue;
+                bool code = example.Info == "kscript";
+                string body = example.Lines.ToString();
                 string ruleFile = KScript.Language.Rules.DocumentRules.FileName;
-                bool rules = code && m.Groups["info"].Value.Trim() == ruleFile;
-                if (!code && !Regex.IsMatch(body.TrimStart(), @"^(<!--.*?-->\s*)*<(kscript|KScript\.)", RegexOptions.Singleline)) body = "<kscript>\n" + body + "\n</kscript>";
+                bool rules = code && example.Arguments?.Trim() == ruleFile;
+                string expected = Regex.Match(example.Arguments ?? string.Empty, @"^wrong\s+(KS\d{4})$").Groups[1].Value;
+                bool wrap = !code && !Regex.IsMatch(body.TrimStart(), @"^(<!--.*?-->\s*)*<(kscript|KScript\.)", RegexOptions.Singleline);
+                if (wrap) body = "<kscript>\n" + body + "\n</kscript>";
                 string path = rules ? ruleFile : code ? "example.kscript" : "example.ks.xml";
                 var analysis = KScript.Language.Analysis.Analyzer.Analyze(body, path, KScript.Language.Analysis.EmptyFileSystem.Instance);
                 checkedCount++;
-                foreach (var d in analysis.Diagnostics.Where(d => OutOfSync.Contains(d.Code) || (rules && d.Severity == DiagnosticSeverity.Error)))
+                if (expected.Length > 0 && !analysis.Diagnostics.Any(d => d.Code == expected))
+                    problems.Add($"{file}:{example.Line + 1}: the example should report {expected}.");
+                foreach (var d in analysis.Diagnostics.Where(d => d.Code != expected && (OutOfSync.Contains(d.Code) || (rules && d.Severity == DiagnosticSeverity.Error))))
                 {
                     // Examples import files of the reader's that aren't here, and use types declared in an earlier example.
                     if (d.Code == DiagnosticCodes.InvalidAttributeValue && (d.Message.StartsWith("File not found", StringComparison.Ordinal)
@@ -858,7 +919,7 @@ public sealed class DocsTests
                     // Jobs and other types made by calling them (SendWelcome(user_id: 7)) come from those files too.
                     if (d.Code == DiagnosticCodes.UnknownCommand && Regex.IsMatch(d.Message, "^Unknown function '[A-Z]")) continue;
                     if (d.Code == DiagnosticCodes.UnknownCommand && Regex.Match(d.Message, @"Unknown command @(\w+)\.") is { Success: true } unknown && AssumedFunctions.Contains(unknown.Groups[1].Value)) continue;
-                    int line = markdown.Replace("\r\n", "\n").Substring(0, m.Index).Count(c => c == '\n') + 2 + body.Substring(0, Math.Min(d.Span.Start, body.Length)).Count(c => c == '\n') - (code || body == m.Groups[2].Value ? 0 : 1);
+                    int line = example.Line + 2 + body.AsSpan(0, Math.Min(d.Span.Start, body.Length)).Count('\n') - (wrap ? 1 : 0);
                     problems.Add($"{file}:{line}: {d.Code} {d.Message}");
                 }
             }

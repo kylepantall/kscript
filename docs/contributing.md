@@ -108,7 +108,7 @@ The first text says why and the second is what to use instead, as written in a s
 
 The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
 
-The docs tests run every playground example in each format the site offers. Add a case to `DocsTests.Runnable_reference_examples_produce_the_expected_output` when an example demonstrates a specific result readers should be able to verify.
+The docs tests require every playground example to convert to both formats and run each one. The tests parse JSON fences and check the syntax of KScript and XML fences, including examples that contain a fenced string. To test an intentionally broken example in the error guide, label its fence `kscript wrong KS1001` (using the code it should report). Add a case to `DocsTests.Runnable_reference_examples_produce_the_expected_output` when an example demonstrates a specific result readers should be able to verify.
 
 ## The rules the engine enforces
 

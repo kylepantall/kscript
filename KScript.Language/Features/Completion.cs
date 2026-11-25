@@ -39,6 +39,8 @@ namespace KScript.Language.Features
         /// </summary>
         public List<CompletionItem> GetCompletions(DocumentAnalysis analysis, int offset, string trigger = null)
         {
+            if (InCodeComment(analysis, offset)) return new List<CompletionItem>();
+
             // Typing the function's opening brace should leave Enter free to start its first statement.
             if (trigger == "{" && analysis.Markup.Syntax == SourceSyntax.Code && offset > 0 && analysis.Source.Text[offset - 1] == '{'
                 && analysis.Markup.FindElementAt(offset - 1) is { Name: "fn" } fn && fn.StartTagSpan.End == offset - 1)
@@ -379,6 +381,20 @@ namespace KScript.Language.Features
                 ReplaceSpan = replace,
                 SortText = i.ToString("D2"),
             }).ToList();
+        }
+
+        private static bool InCodeComment(DocumentAnalysis analysis, int offset)
+        {
+            if (analysis.Markup.Syntax != SourceSyntax.Code) return false;
+
+            string text = analysis.Source.Text;
+            foreach (MarkupComment comment in analysis.Markup.DescendantNodes().OfType<MarkupComment>())
+            {
+                TextSpan span = comment.Span;
+                if (offset < span.Start + 2 || offset > span.End) continue;
+                if (offset < span.End || !comment.IsBlock || !text.AsSpan(span.End - 2, 2).SequenceEqual("*/")) return true;
+            }
+            return false;
         }
 
         private static bool InComment(string text, int offset)
@@ -1037,20 +1053,31 @@ namespace KScript.Language.Features
         /// <summary>Methods after <c>-&gt;</c> or <c>|&gt;</c>, for the type of the value on the left.</summary>
         private List<CompletionItem> MethodCompletions(DocumentAnalysis analysis, ExpressionRegion region, int operatorIndex, TextSpan replace, bool pipe)
         {
-            TypeShape receiver = TypeShape.Unknown;
-            ExprNode owner = region.Nodes.SelectMany(n => n.DescendantsAndSelf())
-                .FirstOrDefault(n => (n is MethodCallNode m && m.NameSpan.Start >= operatorIndex && m.NameSpan.Start <= operatorIndex + 3 + (replace.Length))
-                                     || (n is PipeNode pn && pn.Left.Span.End <= operatorIndex && pn.Right.Span.Start >= operatorIndex));
-            if (owner is MethodCallNode mc)
+            string text = region.Source.Value;
+            ExprNode target = null;
+            bool existingArguments = false;
+            if (pipe)
             {
-                receiver = InferAt(analysis, region, mc.Target);
+                target = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<PipeNode>()
+                    .FirstOrDefault(p => p.Left.Span.End <= operatorIndex && p.Right.Span.Start >= operatorIndex)?.Left;
             }
-            else if (owner is PipeNode pipeNode)
+            else
             {
-                receiver = InferAt(analysis, region, pipeNode.Left);
+                // An incomplete arrow can take the next line's first word as its method name. Match the receiver
+                // to the current arrow instead of relying on the recovered method name's position.
+                target = region.Nodes.SelectMany(n => n.DescendantsAndSelf()).OfType<MethodCallNode>()
+                    .FirstOrDefault(m => m.NameSpan.Start >= operatorIndex + 2 && m.Target.Span.End <= operatorIndex
+                        && text.AsSpan(m.Target.Span.End, operatorIndex - m.Target.Span.End).Trim().IsEmpty)?.Target;
+                int nameEnd = region.Source.FromSource(replace.End);
+                while (nameEnd < text.Length && Lexer.IsIdentChar(text[nameEnd])) nameEnd++;
+                replace = TextSpan.FromBounds(replace.Start, region.Source.ToSource(nameEnd));
+                int arguments = nameEnd;
+                while (arguments < text.Length && text[arguments] is ' ' or '\t') arguments++;
+                existingArguments = arguments < text.Length && text[arguments] == '(';
             }
 
-            List<CompletionItem> items = MethodItems(analysis, receiver, replace);
+            TypeShape receiver = target == null ? TypeShape.Unknown : InferAt(analysis, region, target);
+            List<CompletionItem> items = MethodItems(analysis, receiver, replace, existingArguments);
 
             if (pipe)
             {
@@ -1074,7 +1101,7 @@ namespace KScript.Language.Features
         /// The methods a value of this shape has. The value's own type's methods come first, then the ones every
         /// value has, then the ones it gets by conversion (a string's number methods, for text that holds a number).
         /// </summary>
-        private List<CompletionItem> MethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace)
+        private List<CompletionItem> MethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace, bool existingArguments = false)
         {
             // A <type>'s own fn methods and the methods extend blocks add (this file's, imports', the project's);
             // an override replaces the built-in method of the same name.
@@ -1088,16 +1115,16 @@ namespace KScript.Language.Features
                 Kind = CompletionKind.Method,
                 Detail = m.TypedSignature + (m.SourcePath != null ? "  (" + Path.GetFileName(m.SourcePath) + ")" : string.Empty),
                 Documentation = m.Description,
-                InsertText = m.Name + (m.Parameters.Count == 0 ? "()" : "($1)"),
-                IsSnippet = true,
+                InsertText = existingArguments ? m.Name : m.Name + (m.Parameters.Count == 0 ? "()" : "($1)"),
+                IsSnippet = !existingArguments,
                 ReplaceSpan = replace,
                 SortText = "0" + m.Name,
             }).ToList();
-            items.AddRange(BuiltInMethodItems(analysis, receiver, replace).Where(i => !names.Contains(i.Label)));
+            items.AddRange(BuiltInMethodItems(analysis, receiver, replace, existingArguments).Where(i => !names.Contains(i.Label)));
             return items;
         }
 
-        private List<CompletionItem> BuiltInMethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace) =>
+        private List<CompletionItem> BuiltInMethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace, bool existingArguments) =>
             BuiltInMethods(receiver).Where(m => !NeedsImport(analysis, m.Package))
                 .Select(m => new CompletionItem
                 {
@@ -1107,8 +1134,8 @@ namespace KScript.Language.Features
                              + (m.ReceiverType != KType.Any && m.ReceiverType != receiver.Type ? "  (" + m.ReceiverType + ")" : string.Empty),
                     Documentation = CallableMarkdown(m, receiver.Type != KType.Any ? receiver : null),
                     Deprecated = m.Deprecated != null,
-                    InsertText = m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
-                    IsSnippet = true,
+                    InsertText = existingArguments ? m.Name : m.Name + (m.MaxArgs == 0 ? "()" : "($1)"),
+                    IsSnippet = !existingArguments,
                     ReplaceSpan = replace,
                     SortText = m.Deprecated != null ? "9" + m.Name
                         : receiver.Type == KType.Any || m.ReceiverType == receiver.Type || m.ReceiverType == TypeInference.TypedListReceiver(receiver) ? "0" + Ranking.Method(m.ReceiverType, m.Name)
@@ -1119,8 +1146,13 @@ namespace KScript.Language.Features
         /// The catalog's methods for a value of this shape. A list of one native type (semver[]) has that type's list
         /// methods (->latest()) first, on top of a list's.
         /// </summary>
-        private IEnumerable<CallableInfo> BuiltInMethods(TypeShape receiver) =>
-            Catalog.MethodsFor(TypeInference.TypedListReceiver(receiver) ?? receiver.Type);
+        private IEnumerable<CallableInfo> BuiltInMethods(TypeShape receiver)
+        {
+            var methods = Catalog.MethodsFor(TypeInference.TypedListReceiver(receiver) ?? receiver.Type);
+            return receiver.Kind == null ? methods
+                : Catalog.MethodsFor(receiver.Kind).Where(m => m.ReceiverType == receiver.Kind)
+                    .Concat(methods).DistinctBy(m => m.Name, StringComparer.OrdinalIgnoreCase);
+        }
 
         /// <summary>What a method returns on this receiver: list methods such as filter keep the item type.</summary>
         private TypeShape MethodResult(CallableInfo m, TypeShape receiver) => TypeInference.MethodResult(m, receiver);

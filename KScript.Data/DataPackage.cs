@@ -175,9 +175,9 @@ namespace KScript.Data
                     if (c.Args.Count == 0 && c.Named.Count == 0) throw new KScriptException("->order_by() needs a column: ->order_by(name), or ->order_by(created_at: desc).", "Argument");
                     return q;
                 }, Bare: true),
-            new("latest", "column?", "Newest first: sorts by created_at (or the column given) from the newest down.", KType.Query,
+            new("latest", "column?", "Sorts newest first by the supplied column. Defaults to created_at, or the primary key for a model with timestamps disabled.", KType.Query,
                 (q, c) => q.OrderBy(q.ColumnNamed(c.Has(0) ? Word(c.Arg(0), "->latest()") : DefaultTimeColumn(q), " for ->latest()"), true), Bare: true),
-            new("oldest", "column?", "Oldest first: sorts by created_at (or the column given) from the oldest up.", KType.Query,
+            new("oldest", "column?", "Sorts oldest first by the supplied column. Defaults to created_at, or the primary key for a model with timestamps disabled.", KType.Query,
                 (q, c) => q.OrderBy(q.ColumnNamed(c.Has(0) ? Word(c.Arg(0), "->oldest()") : DefaultTimeColumn(q), " for ->oldest()"), false), Bare: true),
             new("limit", "count: number", "Reads at most this many rows.", KType.Query, (q, c) => q.Taking(Count(c.Arg(0), "->limit()"))),
             new("offset", "count: number", "Skips this many rows first.", KType.Query, (q, c) => q.Skipping(Count(c.Arg(0), "->offset()"))),
