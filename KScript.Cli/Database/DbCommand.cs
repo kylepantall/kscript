@@ -24,7 +24,7 @@ namespace KScript.Databases
 
         private static readonly string[] Valued = { "steps", "project", "output", "syntax", "name" };
 
-        public static int Run(string[] args, TextWriter output, TextWriter error, string workingDirectory = null, string environment = null, TextReader input = null, bool? interactive = null)
+        public static int Run(string[] args, TextWriter output, TextWriter error, string workingDirectory = null, string environment = null, TextReader input = null, bool? interactive = null, bool startup = false)
         {
             var cli = new CliOutput(output);
             var err = new CliOutput(error);
@@ -66,6 +66,7 @@ namespace KScript.Databases
                     case "diff":
                         return Diff(migrator, a, cli, err, prompt, project);
                     case "migrate":
+                        if (startup && migrator.Files().Count == 0) return ExitCodes.Ok;
                         if (production && !Allowed(a, prompt, "migrate the production database")) return Refused(err, "migrate");
                         Migrate(migrator, a, cli);
                         return a.Flag("seed") == true ? Seed(migrator, null, cli) : 0;

@@ -34,7 +34,8 @@ namespace KScript.Projects
     /// <summary>How kscript serve launches the project's Docker Compose service.</summary>
     public sealed class DockerServeSettings
     {
-        public bool Enabled { get; set; }
+        /// <summary>Null means detect a Compose file for local serving.</summary>
+        public bool? Enabled { get; set; }
         public string ComposeFile { get; set; }
         public string Service { get; set; } = "app";
         public bool Build { get; set; } = true;
@@ -317,7 +318,7 @@ namespace KScript.Projects
         /// <summary>The prefix of api.* route files.</summary>
         public string ApiPrefix { get; set; } = "/api";
 
-        /// <summary>False makes controllers read-only, like pages. Writes never leave the site folder.</summary>
+        /// <summary>False makes controllers and their view actions read-only. Writes never leave the site folder.</summary>
         public bool WriteFiles { get; set; } = true;
 
         public List<string> CorsOrigins { get; set; } = new List<string> { "*" };
@@ -1525,6 +1526,11 @@ namespace KScript.Projects
                 docker.Enabled = value.GetBoolean();
                 return;
             }
+            if (value.ValueKind == JsonValueKind.String && value.GetString() == "auto")
+            {
+                docker.Enabled = null;
+                return;
+            }
             if (!Object(value, "serve.docker", config)) return;
             docker.Enabled = true;
             foreach (var property in value.EnumerateObject())
@@ -1532,7 +1538,8 @@ namespace KScript.Projects
                 switch (property.Name)
                 {
                     case "enabled":
-                        docker.Enabled = Bool(property.Value, "serve.docker.enabled", config) ?? false;
+                        docker.Enabled = property.Value.ValueKind == JsonValueKind.String && property.Value.GetString() == "auto"
+                            ? null : Bool(property.Value, "serve.docker.enabled", config) ?? false;
                         break;
                     case "build":
                         docker.Build = Bool(property.Value, "serve.docker.build", config) ?? true;

@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Syntax.Text;
 
 namespace KScript.Syntax
@@ -1015,13 +1016,14 @@ namespace KScript.Syntax
 
         /// <summary>
         /// A ``` block tagged with a type parses its text: <c>```&lt;json&gt;</c> is <c>'...'-&gt;json()</c> and
-        /// <c>```&lt;Repo&gt;</c> is <c>'...'-&gt;json(as: Repo)</c>. Any other block is the string itself.
+        /// <c>```&lt;Repo&gt;</c> is <c>'...'-&gt;json(as: Repo)</c>. Document and file fences keep their language tag.
         /// </summary>
         private static ExprNode TypedBlock(Token t, LiteralNode literal)
         {
             string tag = t.Tag;
             if (tag == null || tag.Length < 3 || tag[0] != '<' || tag[tag.Length - 1] != '>')
             {
+                if (StringBlock.ValueType(tag) != KType.String) literal.FenceTag = tag;
                 return literal;
             }
             string type = tag.Substring(1, tag.Length - 2).Trim();

@@ -35,21 +35,17 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
-        public void OnlyKnownLanguagesCanBeNamed()
+        public void AFileExtensionCanNameAnOtherwiseUnknownFormat()
         {
-            StringBlock typo = StringBlock.Read("```textc\nx\n```", 0);
-            Assert.StartsWith("'textc' isn't a language a ``` block can name. Did you mean text?", typo.Error);
-            Assert.Equal(3, typo.ErrorSpan.Start);
-            Assert.Equal(5, typo.ErrorSpan.Length);
-            Assert.Contains("Did you mean yaml?", StringBlock.Read("```yaml2\nx\n```", 0).Error);
-            Assert.Contains("Did you mean html?", StringBlock.Read("```htnl\nx\n```", 0).Error);
-            string other = StringBlock.Read("```c++\nx\n```", 0).Error;
-            Assert.DoesNotContain("Did you mean", other);
-            Assert.Contains("Use text, sql, html", other);
-            foreach (string bad in new[] { "<>", "<1x>", "<a b>", "<a", "a b", "a!" })
+            foreach (string tag in new[] { "ps1", "rb", "d.ts", "textc" })
             {
-                Assert.NotNull(StringBlock.Read("```" + bad + "\nx\n```", 0).Error);
+                StringBlock file = StringBlock.Read("```" + tag + "\nx\n```", 0);
+                Assert.Null(file.Error);
+                Assert.Equal(tag, file.Language);
+                Assert.Equal(KScript.Metadata.KType.FormattedFile, StringBlock.ValueType(file.Tag));
             }
+            foreach (string bad in new[] { "<>", "<1x>", "<a b>", "<a", "a b", "a!", "a..b", "../ps1", "/ps1" })
+                Assert.NotNull(StringBlock.Read("```" + bad + "\nx\n```", 0).Error);
         }
 
         [Fact]
@@ -90,6 +86,29 @@ namespace KScript.Language.Tests
             Assert.Equal("plain text", items[0].Detail);
             (string xml, int at) = TestHelpers.WithCaret("<kscript><echo>```te\u2038</echo></kscript>");
             Assert.DoesNotContain(service.GetCompletions(service.Analyze(xml, "test.ks.xml"), at), i => i.Label == "javascript");
+        }
+        [Fact]
+        public void LatexReturnTypeFlowsIntoCompletion()
+        {
+            var service = new KScript.Language.Features.LanguageService(files: KScript.Language.Analysis.EmptyFileSystem.Instance);
+            const string code = """
+                import KScript.Document
+
+                fn paper() => ```latex
+                  \section{Example}
+                  ```
+
+                echo @document(@paper())->latex()
+                """;
+            var analysis = service.Analyze(code, "test.kscript");
+            Assert.Empty(analysis.Errors);
+            Assert.DoesNotContain(analysis.Diagnostics, d => d.Code == KScript.Syntax.DiagnosticCodes.TypeMismatch);
+            Assert.Equal("latex", Assert.Single(analysis.Symbols, s => s.Name == "paper").ReturnShape.Type);
+            (string text, int offset) = TestHelpers.WithCaret(code.Replace("@document(@paper())->latex()", "@paper()->‸"));
+            var methods = service.GetCompletions(service.Analyze(text, "test.kscript"), offset).Select(item => item.Label).ToList();
+            Assert.Contains("save", methods);
+            Assert.Contains("replace", methods);
+            Assert.DoesNotContain("to_pdf", methods);
         }
     }
 }

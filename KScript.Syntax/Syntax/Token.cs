@@ -404,7 +404,7 @@ namespace KScript.Syntax
         }
 
         /// <summary>The end of a /pattern/flags regex at <paramref name="start"/> (as the lexer reads one), or -1.</summary>
-        private static int RegexEnd(string text, int start, int end)
+        public static int RegexEnd(string text, int start, int end)
         {
             int i = start + 1;
             bool inClass = false;

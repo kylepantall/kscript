@@ -236,10 +236,8 @@ namespace KScript.Data
         private DbConnection keeper;
 
         /// <summary>The transaction each running script has open on this database, if any.</summary>
-        private readonly ConditionalWeakTable<Interpreter, TransactionState> transactions = new ConditionalWeakTable<Interpreter, TransactionState>();
-
-        /// <summary>The transaction of the test each test file's host is running, if it has used this database.</summary>
-        private readonly ConditionalWeakTable<KScriptHost, TransactionState> testTransactions = new ConditionalWeakTable<KScriptHost, TransactionState>();
+        private readonly ConditionalWeakTable<Interpreter, TransactionState> transactions = new();
+        private readonly ConditionalWeakTable<KScriptHost, TransactionState> testTransactions = new();
 
         private Database(DatabaseSettings settings) => Settings = settings;
 
@@ -255,9 +253,8 @@ namespace KScript.Data
             if (host != null && (name == null || name == DatabaseSettings.DefaultName))
             {
                 if (host.MemoryDatabase) return ForSandbox(host);
-                // A route a test calls with @api() runs on a host of its own, and reads the test file's database.
-                KScriptHost tested = host.TestFile != null ? host : AppFolders.TestHost;
-                if (tested?.TestFile != null && ForTest(tested, folder) is Database test) return test;
+                KScriptHost testHost = AppFolders.TestHost ?? host;
+                if (testHost.TestFile != null && ForTest(testHost, folder) is Database test) return test;
             }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
             return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
@@ -280,7 +277,7 @@ namespace KScript.Data
         private void EnsureModelTable(Interpreter interpreter, ModelInfo model)
         {
             // A transaction may already own the database's write lock while another request waits for it.
-            if (transactions.TryGetValue(interpreter, out _))
+            if (Current(interpreter) != null)
                 Ensure();
             else
                 lock (modelTables) Ensure();
@@ -507,8 +504,13 @@ namespace KScript.Data
             public bool Test;
         }
 
-        private TransactionState Current(Interpreter interpreter) =>
-            interpreter != null && transactions.TryGetValue(interpreter, out TransactionState s) && s.Connection != null ? s : null;
+        private TransactionState Current(Interpreter interpreter)
+        {
+            if (interpreter == null) return null;
+            if (transactions.TryGetValue(interpreter, out TransactionState state) && state.Connection != null) return state;
+            KScriptHost host = AppFolders.TestHost ?? interpreter.Host;
+            return host.TestRunning && testTransactions.TryGetValue(host, out state) ? state : null;
+        }
 
         /// <summary>True while the script has a transaction open on this database.</summary>
         public bool InTransaction(Interpreter interpreter) => Current(interpreter) != null;
@@ -619,36 +621,26 @@ namespace KScript.Data
         /// </summary>
         private TransactionState BeginTest(Interpreter interpreter)
         {
-            // A route the test calls with @api() runs on a host of its own: it works in the test's transaction, so
-            // each sees the other's rows and both are undone together.
-            KScriptHost host = interpreter?.Host;
-            if (host != null && !host.TestRunning && host.TestFile == null) host = AppFolders.TestHost;
+            KScriptHost host = interpreter == null ? null : AppFolders.TestHost ?? interpreter.Host;
             if (host == null || !host.TestRunning) return null;
-            lock (testTransactions)
+            DbConnection connection = Connect();
+            var state = new TransactionState { Connection = connection, Test = true };
+            state.Transaction = connection.BeginTransaction();
+            testTransactions.Add(host, state);
+            host.AfterTest.Add(() =>
             {
-                if (testTransactions.TryGetValue(host, out TransactionState running)) return running;
-                DbConnection connection = Connect();
-                var state = new TransactionState { Connection = connection, Test = true };
-                state.Transaction = connection.BeginTransaction();
-                testTransactions.Add(host, state);
-                Interpreter first = interpreter;
-                transactions.AddOrUpdate(first, state);
-                host.AfterTest.Add(() =>
+                testTransactions.Remove(host);
+                try
                 {
-                    lock (testTransactions) testTransactions.Remove(host);
-                    transactions.Remove(first);
-                    try
-                    {
-                        state.Transaction.Rollback();
-                    }
-                    finally
-                    {
-                        state.Transaction.Dispose();
-                        connection.Dispose();
-                    }
-                });
-                return state;
-            }
+                    state.Transaction.Rollback();
+                }
+                finally
+                {
+                    state.Transaction.Dispose();
+                    connection.Dispose();
+                }
+            });
+            return state;
         }
 
         #region Test databases

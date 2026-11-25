@@ -81,6 +81,47 @@ public sealed class TestStorageIsolationTests : StorageFixture
     }
 
     [Fact]
+    public void InProcessRoutesShareTheTestDatabaseAndItsRollback()
+    {
+        using var site = new TempSite(
+            ("kscript.json", """{ "name": "test-db", "test": { "database": "memory" } }"""),
+            ("models/note.kscript", """
+                import KScript.Data
+                model Note { title: string }
+                """),
+            ("routes/api.kscript", """
+                import KScript.Http
+                import KScript.Data
+                import "../models/note.kscript"
+                Routes {
+                  Get(path: /notes) { return Note->count() }
+                  Post(path: /notes) { return Note->create(title: 'route').title }
+                }
+                """),
+            ("notes.test.kscript", """
+                import KScript.Net
+                import KScript.Data
+                import "models/note.kscript"
+                test(name: 'shares the open transaction') {
+                  Note->create(title: 'test')
+                  expect(value: @api('/api/notes')->json(), equals: 1)
+                  expect(value: @api('/api/notes', options: { method: 'POST' }).text, equals: 'route')
+                  expect(value: Note->count(), equals: 2)
+                }
+                test(name: 'rolls back test and route writes') {
+                  expect(value: @api('/api/notes')->json(), equals: 0)
+                  expect(value: Note->count(), equals: 0)
+                }
+                """));
+
+        var result = TestRunner.RunFile(Path.Combine(site.Root, "notes.test.kscript"), new TestRunSettings());
+        Assert.Null(result.Error);
+        Assert.Equal(2, result.Tests.Count);
+        Assert.All(result.Tests, test => Assert.True(test.Outcome == TestOutcome.Passed, test.Message));
+        Assert.Empty(Directory.EnumerateFiles(site.Root, "*.sqlite", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public void Model_backed_auth_uses_the_test_database()
     {
         File.WriteAllText(Path.Combine(Project, "kscript.json"), """

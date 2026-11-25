@@ -25,6 +25,7 @@ namespace KScript.Runtime
             RegisterCommands(p);
             RegisterVariables(p);
             RegisterMethods(p);
+            FencedFile.Register(p);
             RegisterConfig(p);
             RegisterLogging(p);
             RegisterI18n(p);

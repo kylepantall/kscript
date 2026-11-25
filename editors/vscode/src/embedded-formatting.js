@@ -4,11 +4,11 @@ const { posix } = require('node:path');
 
 const fenceScheme = 'kscript-fence';
 const aliases = new Map(Object.entries({
-  kscript: 'kscript-code', js: 'javascript', ts: 'typescript', md: 'markdown', tex: 'latex',
+  ps1: 'powershell', kscript: 'kscript-code', js: 'javascript', ts: 'typescript', md: 'markdown', tex: 'latex',
   yml: 'yaml', 'ks.css': 'kscript-css', 'ks.scss': 'kscript-scss',
 }));
 const suffixes = new Map(Object.entries({
-  'kscript-code': 'kscript', javascript: 'js', typescript: 'ts', markdown: 'md',
+  powershell: 'ps1', 'kscript-code': 'kscript', javascript: 'js', typescript: 'ts', markdown: 'md',
   latex: 'tex', 'kscript-css': 'ks.css', 'kscript-scss': 'ks.scss',
 }));
 const builtInFormatters = new Map(Object.entries({
@@ -40,7 +40,7 @@ function embeddedFormatting(vscode, context, getClient) {
 
   async function formatFence(source, block, options, eol, languages, token) {
     const language = aliases.get(block.language) ?? block.language;
-    if (!block.text || token.isCancellationRequested || !languages.has(language)) return null;
+    if (!block.text || token.isCancellationRequested) return null;
     const extension = suffixes.get(language) ?? language;
     const uri = source.uri.with({
       scheme: fenceScheme,
@@ -51,11 +51,12 @@ function embeddedFormatting(vscode, context, getClient) {
     contents.set(key, block.text + '\n');
     try {
       let embedded = await vscode.workspace.openTextDocument(uri);
-      if (embedded.languageId !== language) {
+      if (languages.has(language) && embedded.languageId !== language) {
         embedded = await vscode.languages.setTextDocumentLanguage(embedded, language);
       }
+      if (embedded.languageId === 'plaintext') return null;
       // Opening the document can start built-in activation without waiting for its provider.
-      const formatter = builtInFormatters.get(language);
+      const formatter = builtInFormatters.get(embedded.languageId);
       if (formatter) await vscode.extensions.getExtension(formatter)?.activate();
       const edits = await vscode.commands.executeCommand('vscode.executeFormatDocumentProvider', uri, options);
       if (!edits?.length) return null;

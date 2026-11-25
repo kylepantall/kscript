@@ -132,6 +132,17 @@ public class PageExpressionTests
 
 public class PageRendererTests
 {
+    [Fact]
+    public void TextareasRenderEscapedValuesWithoutLosingWhitespace()
+    {
+        using var site = new TempSite(("index.html",
+            "<textarea>  Before\n  {$draft}\n  After</textarea><script>let n = { raw: true };</script>"));
+        var result = PageRenderer.RenderFile(new PageContext(site.Root), "index.html", parameters: null,
+            variables: new Dictionary<string, object> { ["draft"] = "</textarea><b>&" });
+        Assert.Contains("<textarea>  Before\n  &lt;/textarea&gt;&lt;b&gt;&amp;\n  After</textarea>", result.Body);
+        Assert.Contains("<script>let n = { raw: true };</script>", result.Body);
+    }
+
     private static string Render(string template) => PageRenderer.RenderString(template).Body;
 
     [Fact]

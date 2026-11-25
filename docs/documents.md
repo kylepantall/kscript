@@ -60,12 +60,34 @@ echo "{ $doc->pages() } pages, { $doc->words() } words"
 
 | Method | What it does |
 | --- | --- |
-| `->save(path)` | Saves it, in the format the extension names. |
+| `->save(path, as?)` | Saves in the format selected by the filename extension or by `as:`. |
 | `->pages()` | How many pages the PDF has. |
 | `->words()` | How many words the text has, not counting maths and code. |
 | `->markdown()`, `->latex()`, `->html()` | The document as text, to print, send or save yourself. |
 
 `$doc.title` is the title.
+
+
+## Documents from source
+
+Import `KScript.Document` to work with Markdown and LaTeX fences. Use `@document(source)` to turn a fence into a
+document, or pass a string with `as: latex` for LaTeX source. A plain string defaults to Markdown.
+
+````kscript
+import KScript.Document
+
+fn paper() => ```latex
+  \section{Draft}
+  ```
+
+@document(@paper())->replace('Draft', 'Final')->save('paper', as: latex)
+@document('# Notes')->save('notes', as: pdf)
+````
+
+Use `->find(text)` for the first source offset, `->replace(search, replacement)` for every literal match, and
+`->insert(content, at?)` to insert text or a same-format document. Offsets are zero-based and an omitted offset
+appends. These methods return a new value for each edit. Markdown can be rendered as PDF, Word, LaTeX or HTML.
+LaTeX source saves as `.tex` for use with a LaTeX engine.
 
 ## Templates
 

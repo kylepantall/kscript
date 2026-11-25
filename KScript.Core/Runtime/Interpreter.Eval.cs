@@ -237,6 +237,9 @@ namespace KScript.Runtime
             if (node is BinaryNode or MemberNode && CompoundLiteral(node, scope, ctx) is Func<object> compound) return compound();
             switch (node)
             {
+                case LiteralNode { FenceTag: not null } fence:
+                    return new FencedFile(fence.FenceTag, fence.Value);
+
                 case LiteralNode lit:
                     return lit.Kind switch
                     {
@@ -1073,6 +1076,8 @@ namespace KScript.Runtime
                             throw Fail(call, ctx, ex.Words, ex.Type);
                         }
                     }
+                    if (!piped && id.Name == SemanticTypes.Uuid)
+                        throw Fail(call, ctx, "Use 'value as uuid' to validate text as a UUID. Use @uuid() to generate a UUID.", "Argument");
                     object receiver = pipedValue;
                     if (piped && pipedValue is RefinedValue refined)
                     {

@@ -146,12 +146,13 @@ namespace KScript.Http
         /// Renders a view: <c>people/show</c> is views/people/show.html (or .md), else people/show.html in the site
         /// folder. The data become the page's variables; the page still sees <c>$request</c>.
         /// </summary>
-        public HttpResponse RenderView(string name, IReadOnlyDictionary<string, object> data)
+        public HttpResponse RenderView(string name, IReadOnlyDictionary<string, object> data, bool fromController = false)
         {
             string file = App.FindView(name)
                 ?? throw new KScriptException($"There is no view '{name}'. Looked for {string.Join(", ", App.ViewCandidates(name))} in the site folder.", "FileNotFound");
+            Page.CanWriteLiveFiles = fromController && Settings.WriteFiles;
             PageResult result = PageRenderer.RenderFile(Page, file, Route == null ? null : (Request["params"] as Dictionary<string, object>), data);
-            var response = new HttpResponse(result.Status, result.Body, result.ContentType);
+            var response = new HttpResponse(result.Status, result.Body, result.ContentType) { BodyBytes = result.BodyBytes };
             foreach (var h in result.Headers) response.Headers[h.Key] = h.Value;
             return response;
         }

@@ -233,7 +233,7 @@ test('a backslash at the end of a line joins a string to the next line', async (
 
 test('``` blocks: text, a language or a <Type>, closed by a fence of their own', async () => {
   const tokens = tokenize(await load(), [
-    'echo ```',
+    'echo ```text',
     '  Hi $name',
     '  ```',
     'query = ```sql',
@@ -260,6 +260,12 @@ test('``` blocks: text, a language or a <Type>, closed by a fence of their own',
 
 test('fenced source uses the grammar of each tagged language', async () => {
   const tokens = tokenize(await load(), [
+    'guide = ```',
+    '  # Title',
+    '  ```',
+    'shell = ```ps1',
+    '  Write-Output $name',
+    '  ```',
     'sample = ```kscript',
     '  count = 1',
     '  ```',
@@ -273,6 +279,8 @@ test('fenced source uses the grammar of each tagged language', async () => {
     '  const amount = 1;',
     '  ```',
   ].join('\n'));
+  assert.match(scopeOf(tokens, '# Title'), /meta\.embedded\.block\.markdown/);
+  assert.match(scopeOf(tokens, 'Write-Output $name'), /meta\.embedded\.block\.powershell/);
   assert.match(scopeOf(tokens, 'count'), /meta\.embedded\.block\.kscript.*variable\.other\.assignment\.kscript/);
   assert.match(scopeOf(tokens, '.card { color: red; }'), /meta\.embedded\.block\.kscript-css/);
   assert.match(scopeOf(tokens, '$accent: red;'), /meta\.embedded\.block\.scss/);

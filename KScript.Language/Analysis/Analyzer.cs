@@ -722,6 +722,11 @@ namespace KScript.Language.Analysis
             }
 
             CheckAttributes(e, info);
+            if (info.Package == "KScript.Http" && info.GetAttribute("where") != null
+                && e.GetAttribute("where") is { Value: not null, FormError: null } where)
+            {
+                CheckRouteWhere(e, where);
+            }
             if (Kind != DocumentKind.Script && info.Name is "layout" or "include")
                 CheckTemplateInputs(e, ResolvePath(e.GetAttributeValue("path")));
             if (Kind != DocumentKind.Script && info.Name == "prop" && e.Parent != null)
@@ -1251,6 +1256,8 @@ namespace KScript.Language.Analysis
         private void AnalyzeAttribute(MarkupElement e, MarkupAttribute attr, AttributeInfo a, Scope scope)
         {
             CheckArgumentForm(e, attr, a);
+            // A declaration's attached doc comment is prose.
+            if (attr.Name == "description" && attr.NameSpan.IsEmpty) return;
             if (attr.Name == "value" && e.Name is "fn" or "return")
             {
                 var fn = e.Name == "fn" ? e : e.Ancestors().FirstOrDefault(parent => parent.Name == "fn");

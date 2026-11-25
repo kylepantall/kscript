@@ -42,6 +42,9 @@ namespace KScript.Metadata
         public const string Session = "session";
         public const string Users = "users";
         public const string Document = "document";
+        public const string Markdown = "markdown";
+        public const string Latex = "latex";
+        public const string FormattedFile = "formatted_file";
 
         // KScript.Data: a model (<c>User</c>), one of its records, a query, and a database connection.
         public const string Model = "model";
@@ -64,7 +67,7 @@ namespace KScript.Metadata
         public const string ErrorType = "error_type";
 
         /// <summary>The types a parameter or variable can declare: the basic ones, then every native type.</summary>
-        public static IReadOnlyList<string> Declarable => new[] { "string", "int", "float", "bool", "list", "map", "fn" }.Concat(NativeTypes.Names).ToList();
+        public static IReadOnlyList<string> Declarable => new[] { "string", "int", "float", "bool", "list", "map", "fn", Markdown, Latex, FormattedFile, Document }.Concat(NativeTypes.Names).ToList();
 
         /// <summary>True for text with a meaning of its own (email, url, country, ...), which keeps some string methods.</summary>
         public static bool IsNativeText(string type) => NativeTypes.Get(type) is NativeTypeInfo info && info.StringMethods.Count > 0;

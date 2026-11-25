@@ -47,7 +47,7 @@ namespace KScript.Http
         protected override void Register(PackageBuilder p)
         {
             p.Element(new ElementInfo("Routes", "A route file: maps HTTP methods and paths to controllers, views and redirects. kscript serve loads routes.ks.xml (or routes.kscript) and api.ks.xml (under /api, with JSON errors). Its <import>, <fn> and <let> children run on every request before the route is matched.", ContentKind.Statements,
-                new A("prefix", K.Text, "A path in front of every route in the file, such as /v1.") { Type = "slash_path" },
+                new A("prefix", K.Text, "A path in front of every route in the file, such as /v1.") { Type = "slash_path", Literal = true },
                 Middleware("Middleware for every route in the file, comma separated: built-ins (log, cors, auth, throttle:30) or <fn>s taking ($request, $next)."),
                 new A("name", K.Text, "Put in front of every route name, such as admin."),
                 new A("api", K.Bool, "true: errors and missing routes are answered with JSON (api.* files are API files already)."))
@@ -93,7 +93,7 @@ namespace KScript.Http
             });
 
             p.Element(new ElementInfo("Group", "Routes that share a path prefix, middleware or a name prefix.", ContentKind.Statements,
-                new A("prefix", K.Text, "A path in front of every route inside, such as /admin.") { Type = "slash_path" },
+                new A("prefix", K.Text, "A path in front of every route inside, such as /admin.") { Type = "slash_path", Literal = true },
                 Middleware("Middleware for every route inside, comma separated."),
                 new A("name", K.Text, "Put in front of every route name inside, such as admin."))
             {
@@ -161,7 +161,7 @@ namespace KScript.Http
                 "Renders a page from the views folder (or the site folder) with its layout, giving it the named values as variables: @view('people/show.html', person: $p). The extension may be left off.",
                 KType.HttpResponse, View, "<return value=\"@view('people/show', person: $person)\" />");
             p.Command("response", "body?, status?: number, type?, headers?: map",
-                "A response with a status code and headers. A map or list body is sent as JSON, text as HTML (or the type you give).",
+                "A response with a status code and headers. A map or list body is sent as JSON, text as HTML, and a base64 value as raw bytes. Set type to override the default Content-Type.",
                 KType.HttpResponse, Response, "<return value=\"@response($person, status: 201)\" />");
             p.Command("redirect", "to, status?: number", "A redirect to another address (302 Found by default; 301 for a permanent move).",
                 KType.HttpResponse, c => Redirect(c.Str(0), c.Has(1, "status") ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 302),
@@ -210,7 +210,7 @@ namespace KScript.Http
             new A("label_key", K.Text, "A translation key for the route's display label."),
             new A("data", K.Expression, "Optional route metadata made from a declared record type.") { RequiresDeclaredRecord = true },
             Middleware("Middleware for this route, comma separated."),
-            new A("where", K.Text, "Rules for the parameters: where=\"id: int, slug: slug\". Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
+            new A("where", K.Text, "Rules for the parameters: where: { id: int, slug: slug } (XML: where=\"id: int, slug: slug\"). Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
             new A("etag", K.Bool, "true tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
             new A("cache", K.Text, "The Cache-Control header for GET answers: public, max-age=300, or just a number of seconds (300 is public for 5 minutes), private, no-store...") { Literal = true },
         };
@@ -455,7 +455,7 @@ namespace KScript.Http
                 foreach (var kv in map) data[kv.Key] = kv.Value;
             }
             foreach (var kv in c.Named) data[kv.Key] = kv.Value;
-            return ctx.RenderView(c.Str(0), data);
+            return ctx.RenderView(c.Str(0), data, fromController: true);
         }
 
         private static object Response(CallContext c)
@@ -463,9 +463,14 @@ namespace KScript.Http
             object body = Values.Unwrap(c.Arg(0, "body"));
             bool statusGiven = c.Has(1, "status") && c.Arg(1, "status") != null;
             int status = statusGiven ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 200;
-            HttpResponse response = body is HttpResponse existing ? existing : body is string || body == null
-                ? new HttpResponse(status, Values.ToStr(body))
-                : HttpResponse.Json(body, status);
+            HttpResponse response = body switch
+            {
+                HttpResponse existing => existing,
+                string or null => new HttpResponse(status, Values.ToStr(body)),
+                _ when Base64Type.TryDecodeBytes(body, out byte[] bytes) =>
+                    new HttpResponse(status, contentType: "application/octet-stream") { BodyBytes = bytes },
+                _ => HttpResponse.Json(body, status),
+            };
             // An answer passed in (a redirect, a 404 view) keeps its own status unless one is given here.
             if (statusGiven) response.Status = status;
             if (c.Has(2, "type") && c.Arg(2, "type") != null) response.ContentType = Values.ToStr(c.Arg(2, "type"));

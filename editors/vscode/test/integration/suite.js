@@ -389,6 +389,8 @@ async function componentAndFieldCompletions(folder) {
 async function highlightsFencedLanguages(folder) {
   const fence = "```";
   const cases = [
+    ['', '# Untagged heading', [['Untagged heading', /heading.*markdown/]]],
+    ['ps1', "Write-Output 'sample'", [['Write-Output', /support\.function\.powershell/]]],
     ['string', 'literal text', [['literal text', /string\.unquoted\.block\.kscript/]]],
     ['html', '<article>Card</article>', [['article', /entity\.name\.tag\.html/]]],
     ['xml', '<book isbn="42" />', [['book', /entity\.name\.tag\.localname\.xml/], ['isbn', /attribute-name.*xml/]]],

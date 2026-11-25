@@ -91,7 +91,7 @@ public class MultilineStringTests
     public void CodeCanCarryOnAfterTheClosingFence()
     {
         Assert.Equal("INSIDE\n", Run(Lines(
-            "msg = (```",
+            "msg = (```text",
             "    inside",
             "    ```)->upper()",
             "echo $msg")));
@@ -144,7 +144,7 @@ public class MultilineStringTests
         // In an expression, the expression parser does.
         Assert.Contains("missing its closing ```", Fails(Lines("x = ```", "  a")));
         Assert.Contains("indented less than the closing fence", Fails(Lines("x = ```", "    a", "  b", "    ```")));
-        Assert.Contains("isn't a language or a <Type>", Fails(Lines("x = ```sql query", "  a", "  ```")));
+        Assert.Contains("isn't a language, file extension or <Type>", Fails(Lines("x = ```sql query", "  a", "  ```")));
         Assert.Contains("closing fence on a line of its own", Fails("x = ```a```\n"));
     }
 
@@ -185,6 +185,38 @@ public class MultilineStringTests
 /// <summary>A paper written with joined lines and ```latex blocks, cut down from a real one.</summary>
 public sealed class MultilineDocumentTests : DocumentFixture
 {
+    [Fact]
+    public void TypedFencesCanBeEditedAndSavedThroughTheDocumentLibrary()
+    {
+        string output = Run("""
+            fn paper(): latex => ```latex
+              \section{Before}
+              ```
+            echo @paper()->type()
+            doc = @document(@paper())
+            echo $doc->latex()
+            echo $doc->find('Before')
+            $doc->replace('Before', 'After')->save('paper', as: latex)
+
+            notes = ```
+              # Notes
+              ```
+            echo $notes->type()
+            @document($notes)->insert(@document(' Added.'))->save('notes', as: pdf)
+
+            script = ```ps1
+              Write-Output 'Hi'
+              ```
+            echo $script.extension
+            $script->save('hello')
+            """);
+        Assert.Equal("latex\n\\section{Before}\n9\nmarkdown\nps1\n", output);
+        Assert.Equal("\\section{After}", Read("paper.tex"));
+        Assert.Equal("Write-Output 'Hi'", Read("hello.ps1"));
+        byte[] pdf = File.ReadAllBytes(PathOf("notes.pdf"));
+        Assert.StartsWith("%PDF-", System.Text.Encoding.ASCII.GetString(pdf, 0, 5));
+    }
+
     [Fact]
     public void JoinedLinesAndLatexBlocksBuildAPaper()
     {

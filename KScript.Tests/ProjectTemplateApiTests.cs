@@ -163,7 +163,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.Contains("image: postgres:17-alpine", compose);
         Assert.Contains("DB_HOST: db", compose);
         Assert.Contains("DB_PASSWORD: ${DB_PASSWORD:-secret}", compose);
-        Assert.Contains("CMD [\"kscript\", \"serve\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\"]", File.ReadAllText(Path.Combine(root, "Dockerfile")));
+        Assert.Contains("CMD [\"kscript\", \"serve\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\", \"--migrate\"]", File.ReadAllText(Path.Combine(root, "Dockerfile")));
         Assert.True(File.Exists(Path.Combine(root, ".dockerignore")));
         Assert.Contains("up:\n\tdocker compose up --build", File.ReadAllText(Path.Combine(root, "Makefile")));
         string generatedConfig = File.ReadAllText(Path.Combine(root, "config", "config.kscript"));

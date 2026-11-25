@@ -384,7 +384,7 @@ namespace KScript.Runtime
         public static IReadOnlyList<string> DeclarableTypes =>
             BasicTypes.Concat(KScript.Metadata.NativeTypes.Names.Where(n => !BasicTypes.Contains(n))).Append("any").ToList();
 
-        private static readonly string[] BasicTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex" };
+        private static readonly string[] BasicTypes = { "string", "int", "float", "number", "bool", "list", "map", "fn", "date", "email", "password", "handle", "uuid", "regex", "markdown", "latex", "formatted_file", "document" };
 
         /// <summary>
         /// True for a built-in type name. The basic types and the first native ones (email, handle, ...) ignore case; the
@@ -414,6 +414,9 @@ namespace KScript.Runtime
                     if (value is bool) return value;
                     if (value is string s && ParseBool(s) is bool parsed) return parsed;
                     if (value is double d) return d != 0;
+                    break;
+                case "markdown" or "latex" or "formatted_file" or "document":
+                    if (TypeOf(value) == name) return value;
                     break;
                 case "list":
                     if (value is List<object>) return value;

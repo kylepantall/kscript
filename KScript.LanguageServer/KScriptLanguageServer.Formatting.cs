@@ -59,7 +59,7 @@ namespace KScript.LanguageServer
                         while (result.Text[openingEnd] == '`') openingEnd++;
                         fences.Add((JsonNode)new JsonObject
                         {
-                            ["language"] = block.Language ?? "json",
+                            ["language"] = block.Language ?? (block.TypeName == null ? "markdown" : "json"),
                             ["text"] = block.Value,
                             ["start"] = block.ContentStart,
                             ["end"] = block.ContentEnd,
