@@ -206,7 +206,10 @@ namespace KScript.Documents
                 c => Templates.Descriptions.ToDictionary(kv => kv.Key, kv => (object)kv.Value), "@document_templates()->keys()");
 
             p.Examples(
-                ("document->save", "<do>$doc->save('report.docx')</do>"),
+                ("document->save", "@document('# Notes')->save('notes', as: pdf)"),
+                ("document->find", "echo @document('# Notes')->find('Notes')"),
+                ("document->replace", "echo @document('# Notes')->replace('Notes', 'Outline')->markdown()"),
+                ("document->insert", "echo @document('# Notes')->insert(' and ideas')->markdown()"),
                 ("document->pages", "<echo>{ $doc->pages() } pages</echo>"),
                 ("document->markdown", "<echo>{ $doc->markdown() }</echo>"),
                 ("document->latex", "<do>@write_file('paper.tex', $doc->latex())</do>"),
