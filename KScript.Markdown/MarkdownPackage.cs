@@ -25,10 +25,13 @@ namespace KScript.Markdown
             text ??= string.Empty;
             string normalised = text.Replace("\r\n", "\n");
             if (!normalised.StartsWith("---\n", StringComparison.Ordinal)) return (meta, text);
+            // The block ends at the next line that is exactly ---; that can be the very next line (an empty block).
             int end = normalised.IndexOf("\n---", 3, StringComparison.Ordinal);
+            while (end >= 0 && !(end + 4 == normalised.Length || (end + 4 < normalised.Length && normalised[end + 4] == '\n')))
+                end = normalised.IndexOf("\n---", end + 1, StringComparison.Ordinal);
             if (end < 0) return (meta, text);
 
-            string block = normalised.Substring(4, end - 4);
+            string block = end < 4 ? string.Empty : normalised.Substring(4, end - 4);
             int bodyStart = normalised.IndexOf('\n', end + 1);
             string body = bodyStart < 0 ? string.Empty : normalised.Substring(bodyStart + 1);
             foreach (string raw in block.Split('\n'))

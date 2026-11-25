@@ -274,6 +274,19 @@ public class PackageTests
     }
 
     [Fact]
+    public void FrontMatterEndsAtALineOfThreeDashes()
+    {
+        // An empty block, with nothing between its two lines.
+        Assert.Equal("0|body", Eval("@markdown('---' + @char_of(10) + '---' + @char_of(10) + 'body').meta->count() + '|' + @markdown('---' + @char_of(10) + '---' + @char_of(10) + 'body').text", "KScript.Markdown"));
+        Assert.Equal("0|", Eval("@markdown('---' + @char_of(10) + '---').meta->count() + '|' + @markdown('---' + @char_of(10) + '---').text", "KScript.Markdown"));
+        // Only a line that is exactly --- ends the block: not a value with dashes in it, and not ----.
+        var (meta, body) = KScript.Markdown.MarkdownText.SplitFrontMatter("---\ntitle: A\nnote: --- x\n---\nbody\n---\nmore");
+        Assert.Equal("A", meta["title"]);
+        Assert.Equal("body\n---\nmore", body);
+        Assert.Equal("---\ntitle: A\n----\nbody", KScript.Markdown.MarkdownText.SplitFrontMatter("---\ntitle: A\n----\nbody").Body);
+    }
+
+    [Fact]
     public void FrontMatter()
     {
         Assert.Equal("Post 3", Eval("@markdown('---\ntitle: Post\nn: 3\n---\nBody').title + ' ' + @markdown('---\ntitle: Post\nn: 3\n---\nBody').meta.n", "KScript.Markdown"));
