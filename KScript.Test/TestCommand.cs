@@ -36,7 +36,13 @@ namespace KScript.Testing
         /// <summary>test.env of the project around the first path given (or the current folder).</summary>
         private static string TestEnvironment(string[] args, string cwd)
         {
-            string first = args.FirstOrDefault(a => !a.StartsWith('-'));
+            // The first path, not the text after --filter, --timeout or --junit.
+            string first = null;
+            for (int i = 0; i < args.Length && first == null; i++)
+            {
+                if (args[i] is "--filter" or "-f" or "--timeout" or "--junit") i++;
+                else if (!args[i].StartsWith('-')) first = args[i];
+            }
             string start = first == null ? cwd : Path.GetFullPath(Path.Combine(cwd, first));
             if (File.Exists(start)) start = Path.GetDirectoryName(start);
             try
