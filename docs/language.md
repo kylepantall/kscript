@@ -22,7 +22,7 @@ A map, or a list of maps, on its own in `echo` prints as indented JSON, coloured
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 
-`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written.
+`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written. Quoted text after `echo` is printed as written too, with its spaces: `echo "  - { $item }"` prints the two spaces. In XML, the text between `<echo>` and `</echo>` is trimmed and loses the indentation its lines share, and the values filled into it are left alone.
 
 ```kscript
 greeting = "Hello { $name }, you have { $count * 2 } points."
@@ -35,9 +35,9 @@ A `{ }` in double quotes always holds an expression, whatever it opens with: a v
 
 ## Expressions
 
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded, also with a step such as `0.1`), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
-When comparing a number with a string using `<`, `<=`, `>` or `>=`, KScript compares numerically if the string can be parsed as a number. If parsing fails, the comparison returns `false`.
+When comparing a number with a string using `<`, `<=`, `>` or `>=`, KScript compares numerically if the string can be parsed as a number. If parsing fails, the comparison returns `false`. Comparisons can't be chained: `1 < $n < 10` is an error, so write `1 < $n and $n < 10`. Two dates are equal with `==` only when they are the same moment, seconds included.
 
 Use `expression as Type` for a checked conversion, for example `$text as int`. The target can also be a declared record, enum or refinement type. [Checked conversions](types.md#checked-conversions-with-as)
 
@@ -90,7 +90,7 @@ Shorthand tags make a `.ks.xml` file KScript markup rather than strict XML: KScr
 ### Early returns instead of else
 
 Inside a function or a loop, end a branch early instead of writing `else`: `return` in a function,
-`continue` or `break` in a loop. The main path then stays at the left edge and each special case is dealt with
+`continue` or `break` in a loop (they act on a loop in the same function, never on the loop that called it). The main path then stays at the left edge and each special case is dealt with
 first.
 
 ```kscript try
@@ -769,6 +769,8 @@ import "lib/strings.kscript" as str // another script's top-level functions and 
 import slugify from "lib/strings.kscript"
 // …
 ```
+
+Only `.kscript` and `.ks.xml` files can be imported. A function the script declares itself wins over an imported one of the same name, and an imported `const` stays a constant.
 
 | Package | What it adds |
 | --- | --- |
