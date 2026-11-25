@@ -48,7 +48,8 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 - **Same language as scripts**: pages run on the KScript 2 interpreter, so every KScript.Core command and method works in them. Pages also get KScript.IO, KScript.Markdown and KScript.Web without importing them: `@read_json`, `@read_text`, `@read_markdown` (gives `html`, `title` and `meta`), `@files`, `@exists`, `@markdown`. Other packages are imported at the top of the page, as in a script: `<import package="KScript.Math" as="math" />` and then `{ @math.sqrt(2) }`.
 - **Sharing code with scripts**: `<import path="lib/text.kscript" />` at the top of a page gives it that script's top-level functions and `const` values. `as="text"` (then `@text.shout(...)`) and `names="shout"` work as they do in scripts.
 - **Files**: paths start in the site folder and can't leave it, and pages can only read files, not write, move or delete them.
-- **Safety**: errors show the file and line; endless loops and runaway recursion are stopped.
+- **Safety**: errors show the file and line; endless loops and runaway recursion are stopped. In the production environment (`kscript serve --env production`) a visitor gets a plain `500` page instead, and the message, file and line go to the server's log only.
+- **What can be sent**: a status from 100 to 999, and header values in plain ASCII without line breaks. Anything else is an error page that says which value was wrong, so a visitor's text put in a header can't add a header of its own. A `redirect` to an address with other characters (`/café`) is sent percent-encoded.
 
 During development, open the site in a browser and save changes to a page, component, script, stylesheet, or asset. Open HTML pages reload automatically. Use `kscript serve --no-reload` to turn it off. Production and compiled sites serve pages without a browser reload script.
 

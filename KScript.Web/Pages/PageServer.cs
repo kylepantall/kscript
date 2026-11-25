@@ -346,6 +346,14 @@ namespace KScript.Pages
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
                 }
 
+                // A status or header the server can't send is the page's mistake: say so, instead of an empty 500.
+                if (liveStream?.Started != true && ResponseProblem(result) is string problem)
+                {
+                    var unsendable = new PageException(problem);
+                    result = ErrorPage(unsendable, !site.HideErrorDetails);
+                    if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", unsendable);
+                }
+
                 try
                 {
                     if (liveStream?.Started == true) await liveStream.FinishAsync(result);
@@ -530,6 +538,43 @@ namespace KScript.Pages
         public const string LiveFilesKey = "__kscriptLiveFiles";
 
         public static bool IsLiveRequest(HttpRequest request) => HttpMethods.IsPost(request.Method) && request.Headers.ContainsKey("X-KScript-Live");
+
+        /// <summary>
+        /// What stops a response being sent, or null: a status that isn't an HTTP status, or a header value with a line
+        /// break, a control character or (anywhere but Location) a character outside ASCII. A Location with such
+        /// characters is sent percent-encoded, as browsers expect.
+        /// </summary>
+        internal static string ResponseProblem(PageResult result)
+        {
+            if (result.Status < 100 || result.Status > 999)
+                return $"{result.Status} isn't an HTTP status. Use a status from 100 to 999, such as 200, 302 or 404.";
+            if (result.Headers.TryGetValue("Location", out string location) && location != null && !location.Any(char.IsControl))
+                result.Headers["Location"] = EncodeNonAscii(location);
+            foreach (var header in result.Headers.Append(new KeyValuePair<string, string>("Content-Type", result.ContentType))
+                .Concat(result.Cookies.Select(cookie => new KeyValuePair<string, string>("Set-Cookie", cookie))))
+            {
+                if (header.Key.Length == 0 || header.Key.Any(c => c <= ' ' || c > '~' || c == ':'))
+                    return $"'{header.Key}' can't be the name of a response header. Use letters, digits and hyphens.";
+                if (header.Value == null) continue;
+                if (header.Value.Any(char.IsControl))
+                    return $"The {header.Key} response header has a line break or control character in its value, which HTTP doesn't allow.";
+                if (header.Value.Any(c => c > '~'))
+                    return $"The {header.Key} response header has a character outside ASCII in its value, which HTTP doesn't allow. Encode the value first, for example with ->url_encode().";
+            }
+            return null;
+        }
+
+        private static string EncodeNonAscii(string text)
+        {
+            if (text.All(c => c is > ' ' and <= '~')) return text;
+            var sb = new StringBuilder(text.Length + 16);
+            foreach (byte b in Encoding.UTF8.GetBytes(text))
+            {
+                if (b is > (byte)' ' and <= (byte)'~') sb.Append((char)b);
+                else sb.Append('%').Append(b.ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            return sb.ToString();
+        }
 
         public static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadPageRequestAsync(HttpRequest request, bool live)
         {

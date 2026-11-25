@@ -41,6 +41,65 @@ public sealed class ServeRequestTests
 
     private const string Counter = """<live id="counter"><state name="n" value="0"/><b>{$n}</b><button on-click="n += 1">Add</button></live>""";
 
+    #region Statuses and headers that can't be sent
+
+    [Fact]
+    public async Task A_status_or_header_that_cannot_be_sent_is_explained()
+    {
+        using var site = new TempSite(
+            ("status.html", """<respond status="$request.query.s->to_number()">s</respond>"""),
+            ("header.html", """<respond status="200" type="text/plain" header-x-echo="{$request.query.v ?? ''}">ok</respond>"""),
+            ("go.html", """<respond redirect="{$request.query.next ?? '/'}" />"""));
+        var log = new StringWriter();
+        await Serve(site, async http =>
+        {
+            using var teapot = await http.GetAsync("/status?s=418");
+            Assert.Equal(418, (int)teapot.StatusCode);
+
+            foreach (string status in new[] { "0", "99", "1000", "99999" })
+            {
+                using var wrong = await http.GetAsync("/status?s=" + status);
+                Assert.Equal(HttpStatusCode.InternalServerError, wrong.StatusCode);
+                Assert.Contains($"{status} isn&#39;t an HTTP status", await wrong.Content.ReadAsStringAsync());
+            }
+
+            using var plain = await http.GetAsync("/header?v=fine");
+            Assert.Equal("fine", plain.Headers.GetValues("X-Echo").Single());
+
+            // A line break would start a header of the visitor's choosing; other characters outside ASCII can't be sent.
+            using var split = await http.GetAsync("/header?v=a%0d%0aSet-Cookie:%20x=1");
+            Assert.Equal(HttpStatusCode.InternalServerError, split.StatusCode);
+            Assert.False(split.Headers.Contains("Set-Cookie"));
+            Assert.Contains("line break or control character", await split.Content.ReadAsStringAsync());
+            using var accent = await http.GetAsync("/header?v=caf%C3%A9");
+            Assert.Equal(HttpStatusCode.InternalServerError, accent.StatusCode);
+            Assert.Contains("outside ASCII", await accent.Content.ReadAsStringAsync());
+
+            // A redirect to an address with such characters is sent encoded, as a browser would write it.
+            using var moved = await http.GetAsync("/go?next=/caf%C3%A9%20menu");
+            Assert.Equal(HttpStatusCode.Redirect, moved.StatusCode);
+            Assert.Equal("/caf%C3%A9%20menu", moved.Headers.GetValues("Location").Single());
+            using var broken = await http.GetAsync("/go?next=/a%0d%0aX-Injected:%201");
+            Assert.Equal(HttpStatusCode.InternalServerError, broken.StatusCode);
+            Assert.False(broken.Headers.Contains("X-Injected"));
+        }, log: log);
+        Assert.Contains("99999 isn't an HTTP status", log.ToString());
+
+        // In production the visitor is told nothing about the page's mistake; the log still has it.
+        var production = new StringWriter();
+        await Serve(site, async http =>
+        {
+            using var wrong = await http.GetAsync("/status?s=99999");
+            Assert.Equal(HttpStatusCode.InternalServerError, wrong.StatusCode);
+            string body = await wrong.Content.ReadAsStringAsync();
+            Assert.Contains(PageServer.HiddenErrorMessage, body);
+            Assert.DoesNotContain("99999", body);
+        }, production: true, log: production);
+        Assert.Contains("99999 isn't an HTTP status", production.ToString());
+    }
+
+    #endregion
+
     #region Numbers a request sends
 
     [Fact]
