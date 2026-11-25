@@ -173,7 +173,7 @@ namespace KScript.Language.Formatting
                 .Select(entry => entry.Value.ToSource(entry.Block.Start)).ToHashSet();
             return scan.Blocks.Where(block => block.Error == null
                 && !scan.Verbatim[block.Start] && !componentHtml.Contains(block.Start)
-                && (block.TypeName != null || block.Language is not (null or "text" or "string")));
+                && (block.TypeName != null || block.Language is not ("text" or "string")));
         }
 
         internal static IEnumerable<(DecodedText Value, StringBlock Block)> ComponentHtmlBlocks(MarkupDocument document)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using KScript.Metadata;
 
 namespace KScript.Syntax.Text
 {
@@ -96,18 +97,8 @@ namespace KScript.Syntax.Text
             }
             if (!ValidTag(block.Tag))
             {
-                block.Fail(block.TagSpan, $"'{block.Tag}' isn't a language or a <Type>. Write ```sql, ```<Repo> or nothing after the fence.");
+                block.Fail(block.TagSpan, $"'{block.Tag}' isn't a language, file extension or <Type>. Write ```sql, ```<Repo> or nothing after the fence.");
             }
-            else if (block.Language != null && !Languages.Contains(block.Language))
-            {
-                string near = Languages.Where(l => l.StartsWith(block.Language, StringComparison.OrdinalIgnoreCase) || block.Language.StartsWith(l, StringComparison.OrdinalIgnoreCase)
-                        || Distance(l, block.Language.ToLowerInvariant()) <= 1)
-                    .OrderByDescending(l => l.Length).FirstOrDefault();
-                block.Fail(block.TagSpan, $"'{block.Tag}' isn't a language a ``` block can name."
-                    + (near != null ? $" Did you mean {near}?" : string.Empty)
-                    + " Use " + string.Join(", ", Languages) + ", a <Type>, or nothing after the fence.");
-            }
-
             // The lines of the block, up to the closing fence.
             int contentStart = lineEnd + 1;
             block.ContentStart = contentStart;
@@ -196,32 +187,31 @@ namespace KScript.Syntax.Text
             return true;
         }
 
-        /// <summary>
-        /// The languages a block can name: the ones editors highlight inside a .kscript file, and <c>text</c> for plain
-        /// text. Any other word after the fence is an error, so a typo such as <c>```textc</c> is caught.
-        /// </summary>
+        /// <summary>Well-known language names suggested at the fence header.</summary>
         public static IReadOnlyList<string> Languages { get; } = new[]
         {
             "text", "sql", "html", "css", "js", "javascript", "json", "md", "markdown", "latex", "tex", "yaml", "yml", "xml",
-            "string", "kscript", "scss", "ks.css", "ks.scss", "ts", "typescript", "jsonc",
+            "string", "kscript", "scss", "ks.css", "ks.scss", "ts", "typescript", "jsonc", "ps1",
         };
 
-        private static int Distance(string a, string b)
+        /// <summary>The type of a fence in an expression, independent of its use as markup text.</summary>
+        public static string ValueType(string tag) => tag?.ToLowerInvariant() switch
         {
-            int[] row = Enumerable.Range(0, b.Length + 1).ToArray();
-            for (int i = 1; i <= a.Length; i++)
-            {
-                int diagonal = row[0];
-                row[0] = i;
-                for (int j = 1; j <= b.Length; j++)
-                {
-                    int above = row[j];
-                    row[j] = Math.Min(Math.Min(row[j] + 1, row[j - 1] + 1), diagonal + (a[i - 1] == b[j - 1] ? 0 : 1));
-                    diagonal = above;
-                }
-            }
-            return row[b.Length];
-        }
+            "" or "md" or "markdown" => KType.Markdown,
+            "latex" or "tex" => KType.Latex,
+            "kscript" => KType.FormattedFile,
+            null => KType.String,
+            string language when Languages.Contains(language, StringComparer.Ordinal) && language != "ps1" => KType.String,
+            _ => KType.FormattedFile,
+        };
+
+        /// <summary>The filename extension for a document fence.</summary>
+        public static string FileExtension(string tag) => tag.ToLowerInvariant() switch
+        {
+            "" or "md" or "markdown" => "md",
+            "latex" or "tex" => "tex",
+            _ => tag.ToLowerInvariant(),
+        };
 
         private static bool ValidTag(string tag)
         {
@@ -237,11 +227,8 @@ namespace KScript.Syntax.Text
                 }
                 return true;
             }
-            foreach (char c in tag)
-            {
-                if (!(char.IsLetterOrDigit(c) || c is '_' or '-' or '+' or '#' or '.')) return false;
-            }
-            return true;
+            return tag.Length <= 64 && tag.Split('.').All(part => part.Length > 0
+                && part.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'));
         }
 
         private void Fail(TextSpan span, string message)

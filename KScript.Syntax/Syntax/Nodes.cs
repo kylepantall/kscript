@@ -60,6 +60,9 @@ namespace KScript.Syntax
     {
         public LiteralKind Kind { get; internal set; }
 
+        /// <summary>The original header of a fenced source literal, or null for ordinary literals.</summary>
+        public string FenceTag { get; internal set; }
+
         /// <summary>The literal's value as text: the unquoted string, the number as written, "true"/"false", or "null".</summary>
         public string Value { get; internal set; }
 

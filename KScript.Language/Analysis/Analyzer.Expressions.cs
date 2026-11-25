@@ -46,7 +46,7 @@ namespace KScript.Language.Analysis
                         }
                         return;
                     }
-                    CheckTextIsNotATemplate(literal, region, scope);
+                    if (literal.FenceTag == null) CheckTextIsNotATemplate(literal, region, scope);
                     return;
 
                 case CastNode cast:

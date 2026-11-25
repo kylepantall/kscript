@@ -298,7 +298,7 @@ namespace KScript.Language.Analysis
             return value switch
             {
                 LiteralNode { Kind: LiteralKind.Number } => new TypeShape(KType.Number),
-                LiteralNode { Kind: LiteralKind.String } => new TypeShape(KType.String),
+                LiteralNode { Kind: LiteralKind.String } literal => new TypeShape(StringBlock.ValueType(literal.FenceTag)),
                 LiteralNode { Kind: LiteralKind.Bool } => new TypeShape(KType.Bool),
                 ListNode => new TypeShape(KType.List),
                 MapNode => new TypeShape(KType.Map),

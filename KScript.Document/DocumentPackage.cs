@@ -190,6 +190,11 @@ namespace KScript.Documents
                 new A("notes", K.Template, "Payment details or terms, under the table."),
                 new A("title", K.Template, "The heading (default Invoice).")), DocumentElements.Invoice);
 
+            FencedFile.RegisterDocumentMethods(p);
+            p.Command("document", "text, as?: markdown|latex",
+                "Makes a document from Markdown or LaTeX source. A fenced value supplies the format. A plain string defaults to Markdown.",
+                KType.Document, DocumentValue.FromSource, "@document('# Notes')->save('notes.pdf')");
+
             foreach (var f in DocumentValue.Fields)
                 p.Field(KType.Document, f.Name, f.Type, f.Description);
             foreach (var m in DocumentValue.Methods)

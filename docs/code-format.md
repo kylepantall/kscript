@@ -132,18 +132,19 @@ repo = ```<Repo>
 - The closing fence's indentation is taken off every line, so the block sits at the code's indentation and keeps any
   indentation inside it. A line indented less than the closing fence is an error. The new lines just inside the
   fences aren't part of the text.
-- A word after the fence selects highlighting. Use `text` or `string` for plain text, `kscript`, `html`, `xml`,
-  `css`, `scss`, `ks.css`, `ks.scss`, `js` or `javascript`, `ts` or `typescript`, `json`, `jsonc`, `sql`,
-  `md` or `markdown`, `latex` or `tex`, or `yaml` or `yml`. A tag preserves the string value. A typed component
-  return uses the tag to choose its renderer. VS Code highlights the contents in place using the corresponding
-  language grammar. KScript stylesheet fences also highlight KScript expressions. **Format Document** formats
-  the whole file and uses available formatters for the tagged contents, including Markdown. Embedded formatters
-  must support virtual documents. Use `text` or `string` for literal text that should keep its spacing.
+- In an expression, an empty header or `md` or `markdown` produces a `markdown` value. `latex` or `tex` produces
+  a `latex` value. Import `KScript.Document` for document methods, or read the original text with `.text`.
+- `kscript` and other file extensions such as `ps1` produce a `formatted_file` with `.extension` and `.text`.
+  Use `->save('filename')` to write it, or pass a complete filename to choose the exact path.
+- `text` and `string` produce plain strings. Existing `html`, `xml`, `css`, `scss`, `ks.css`, `ks.scss`,
+  `js`, `javascript`, `ts`, `typescript`, `json`, `jsonc`, `sql`, `yaml` and `yml` fences also produce
+  strings in expressions. A typed component return uses the tag to choose its renderer.
+- VS Code highlights known fence languages in place. A compatible editor formatter can format a fence during
+  **Format Document**. Use `text` or `string` for literal text that should keep its spacing.
 - A type in angle brackets parses the block: `` ```<json> `` is the parsed JSON, and `` ```<Repo> `` maps it onto a
   `type`, with the same checks (and `Shape` errors) as `->json(as: Repo)`.
 - As an element's text (after `echo`, `Paragraph`, `Math`, ...) a block is the same as `"text"`: `{ }` interpolates
-  where the element interpolates, and `Math` keeps its braces. In an expression it is a string, like `'single quotes'`.
-  No escapes apply inside a block.
+  where the element interpolates, and `Math` keeps its braces. No escapes apply inside a block.
 - Code can carry on after the closing fence on the same line: `` ``` ) `` or `` ```->trim() ``.
 
 ## Rules
