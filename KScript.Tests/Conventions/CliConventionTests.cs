@@ -376,6 +376,7 @@ public sealed class CliConventionTests : IDisposable
         string inBadProject = Write("cfg/main.kscript", "echo \"hi\"\n");
 
         // 0: it worked.
+        Assert.Equal(ExitCodes.Ok, Kscript().Code);
         Assert.Equal(ExitCodes.Ok, Kscript(good).Code);
         Assert.Equal(ExitCodes.Ok, Kscript("check", good).Code);
 
@@ -391,7 +392,6 @@ public sealed class CliConventionTests : IDisposable
         // 2: the command line or the settings are wrong, whichever command it is.
         var usage = new List<string[]>
         {
-            Array.Empty<string>(),
             new[] { "--nope" },
             new[] { "nope.kscript" },
             new[] { "help", "nope" },
