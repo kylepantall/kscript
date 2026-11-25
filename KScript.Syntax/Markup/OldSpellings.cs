@@ -86,6 +86,47 @@ namespace KScript.Syntax.Markup
             }
         }
 
+        /// <summary>
+        /// KS6010 in the parameters of a named function: <c>fn add($a, $b)</c> declares <c>a</c> and <c>b</c>, so they are
+        /// written bare, as a lambda's are. Spans are positions in the file.
+        /// </summary>
+        public static IEnumerable<OldSpelling> InParameters(MarkupElement fn)
+        {
+            if (fn == null || ElementInfo.BareName(fn.Name) != "fn" || fn.GetAttribute("params")?.Value is not DecodedText list)
+            {
+                yield break;
+            }
+            string text = list.Value;
+            int depth = 0;
+            bool atStart = true;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\'' || c == '"')
+                {
+                    int close = text.IndexOf(c, i + 1);
+                    if (close < 0) yield break;
+                    i = close;
+                    atStart = false;
+                }
+                else if (c == '(' || c == '[' || c == '{') depth++;
+                else if (c == ')' || c == ']' || c == '}') depth--;
+                else if (c == ',' && depth == 0) atStart = true;
+                else if (atStart && c == '$' && i + 1 < text.Length && Lexer.IsIdentStart(text[i + 1]))
+                {
+                    int end = i + 1;
+                    while (end < text.Length && Lexer.IsIdentChar(text[end])) end++;
+                    string name = text.Substring(i + 1, end - i - 1);
+                    yield return new OldSpelling(list.ToSource(new TextSpan(i, end - i)), DiagnosticCodes.BareDeclaration,
+                        $"Declare the parameter as {name}: a name is declared without $, and read with it (fn double({name}) => ${name} * 2).",
+                        $"Change to {name}", new TextChange(list.ToSource(new TextSpan(i, 1)), string.Empty));
+                    atStart = false;
+                    i = end - 1;
+                }
+                else if (!char.IsWhiteSpace(c)) atStart = false;
+            }
+        }
+
         public static IEnumerable<OldSpelling> InQuotedTemplate(Template template, string text)
         {
             foreach (TemplateSegment part in template.Expressions.Where(part => part.Kind == TemplateSegmentKind.Reference && part.Expression.Success))

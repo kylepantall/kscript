@@ -402,6 +402,9 @@ namespace KScript.Runtime
             if (module.IsCode && BareName(info.Name) == "model" && OldSpellings.ModelOptionLines(e, module.Source.Text, info.GetAttribute) is { Lines.Count: > 0 } lines)
                 throw Located(new KScriptException(OldSpellings.ModelOptionsInBrackets(e.GetAttributeValue("name")?.Trim(), lines.Options), "Syntax"), module, lines.Lines[0].NameSpan.Start);
 
+            if (module.IsCode && OldSpellings.InParameters(e).FirstOrDefault() is OldSpelling parameter)
+                throw Located(new KScriptException(parameter.Message, "Syntax"), module, parameter.Span.Start);
+
             foreach (MarkupAttribute a in e.Attributes)
             {
                 AttributeInfo spec = info.GetAttribute(a.Name);

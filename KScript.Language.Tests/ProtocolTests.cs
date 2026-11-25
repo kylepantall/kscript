@@ -731,10 +731,10 @@ namespace KScript.Language.Tests
         {
             Initialize();
             const string uri = "untitled:Untitled-1";
-            OpenAs("kscript-code", "name = 'Joan'\necho \"Hello $nmae\"\n", uri);
+            OpenAs("kscript-code", "name = 'Joan'\necho \"Hello { $nmae }\"\n", uri);
             JsonObject d = Assert.Single(Diagnostics(uri), x => x["code"].GetValue<string>() == DiagnosticCodes.UndefinedVariable).AsObject();
             Assert.Contains("Did you mean $name", d["message"].GetValue<string>());
-            JsonArray items = Request("textDocument/completion", At(1, 14, uri))["result"]["items"].AsArray();
+            JsonArray items = Request("textDocument/completion", At(1, 18, uri))["result"]["items"].AsArray();
             Assert.Contains(items, i => i["label"].GetValue<string>().TrimStart('$') == "name");
         }
 

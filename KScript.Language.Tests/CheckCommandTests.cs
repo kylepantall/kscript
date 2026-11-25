@@ -27,6 +27,15 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AFileThatIsNotAScriptOrAPageIsRefused()
+        {
+            // Running it says the same: only .kscript and .ks.xml files are scripts, whatever a file holds.
+            (int code, string output) = Run(false, Write("old.orig", "echo 'hi'\n"));
+            Assert.Equal(2, code);
+            Assert.Contains("old.orig is not a script or a page: scripts end in .kscript, or .ks.xml for the XML form, and pages in .html or .md.", output);
+        }
+
+        [Fact]
         public void CleanFilesPass()
         {
             Write("ok.ks.xml", "<kscript><echo>hi</echo></kscript>");

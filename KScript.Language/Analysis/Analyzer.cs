@@ -1597,6 +1597,14 @@ namespace KScript.Language.Analysis
         {
             // Index and member parts of the target ($x[$i].total = ...) are ordinary expressions.
             ExprNode t = assign.Target;
+            // $repo.stras = 3: a record takes only its type's fields, when it is set as when it is read.
+            if (t is MemberNode set)
+            {
+                TypeShape record = set.Target is IdentifierNode named
+                    ? scope.Lookup(named.Name, region.Source.ToSource(named.Span).Start)?.Shape
+                    : Infer(set.Target, region);
+                if (record != null) CheckRecordField(record, set, region);
+            }
             while (t is MemberNode || t is IndexNode)
             {
                 if (t is IndexNode ix)

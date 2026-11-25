@@ -290,7 +290,7 @@ namespace KScript.LanguageServer
                     ["full"] = true,
                 },
             },
-            ["serverInfo"] = new JsonObject { ["name"] = "kscript-lsp", ["version"] = typeof(KScriptLanguageServer).Assembly.GetName().Version?.ToString() },
+            ["serverInfo"] = new JsonObject { ["name"] = "kscript-lsp", ["version"] = ServerVersion() },
         };
 
         #region Documents
@@ -585,6 +585,16 @@ namespace KScript.LanguageServer
             return highlights;
         }
 
+        /// <summary>The version of the kscript that runs the server, as kscript --version prints it (0.1.0), not this library's own.</summary>
+        internal static string ServerVersion()
+        {
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetEntryAssembly() ?? typeof(KScriptLanguageServer).Assembly;
+            string version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(assembly)?.InformationalVersion
+                ?? assembly.GetName().Version?.ToString(3);
+            int build = version?.IndexOf('+') ?? -1;
+            return build >= 0 ? version.Substring(0, build) : version;
+        }
+
         private JsonNode PrepareRename(JsonNode p)
         {
             DocumentAnalysis a = Analysis(p, out _);
@@ -604,7 +614,18 @@ namespace KScript.LanguageServer
             {
                 throw new LspException(ErrorCodes.RequestFailed, result.Error);
             }
-            return new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, result.Changes) } };
+            JsonObject changes = new JsonObject { [doc.Uri] = Edits(a.Source, result.Changes) };
+            string newName = result.Changes.FirstOrDefault()?.NewText;
+            foreach (IGrouping<string, SourceLocation> file in result.OtherFiles.GroupBy(o => Workspace.PathToUri(o.Path)))
+            {
+                JsonArray edits = new JsonArray();
+                foreach (SourceLocation at in file)
+                {
+                    edits.Add((JsonNode)new JsonObject { ["range"] = new JsonObject { ["start"] = Position(at.Start), ["end"] = Position(at.End) }, ["newText"] = newName });
+                }
+                changes[file.Key] = edits;
+            }
+            return new JsonObject { ["changes"] = changes };
         }
 
         private JsonNode FoldingRanges(JsonNode p)

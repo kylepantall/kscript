@@ -565,7 +565,11 @@ namespace KScript
             if (args.Length > 0 && args[0] == "check")
             {
                 if (args.Contains("--print-config"))
-                    return KScript.LanguageServer.CheckCommand.PrintConfig(args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
+                {
+                    // --output takes a value (text or json), which is not the path.
+                    string[] rest = args.Skip(1).Where((a, i) => i == 0 || args[i] != "--output").ToArray();
+                    return KScript.LanguageServer.CheckCommand.PrintConfig(rest.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
+                }
                 string format = "text";
                 bool warningsAsErrors = false, fix = false;
                 var paths = new List<string>();
