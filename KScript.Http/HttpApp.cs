@@ -34,6 +34,11 @@ namespace KScript.Http
         private RouteTable cached;
         private DateTime[] stamps;
         private readonly Dictionary<string, (DateTime Start, int Count)> throttle = new Dictionary<string, (DateTime, int)>(StringComparer.Ordinal);
+        private DateTime throttlePruned;
+        private double longestThrottle;
+
+        /// <summary>How many throttle counts are kept. Tests read it.</summary>
+        internal int ThrottleEntries { get { lock (throttle) return throttle.Count; } }
 
         public HttpApp(string siteRoot, ProjectConfig project = null, TextWriter log = null)
         {
@@ -658,6 +663,14 @@ namespace KScript.Http
             lock (throttle)
             {
                 DateTime now = Clock();
+                // Counts whose window ended are dropped now and then, so one entry per visitor doesn't stay forever.
+                longestThrottle = Math.Max(longestThrottle, seconds);
+                if ((now - throttlePruned).TotalSeconds >= 60 || now < throttlePruned)
+                {
+                    throttlePruned = now;
+                    foreach (string old in throttle.Where(e => (now - e.Value.Start).TotalSeconds >= longestThrottle).Select(e => e.Key).ToList())
+                        throttle.Remove(old);
+                }
                 if (!throttle.TryGetValue(key, out var entry) || (now - entry.Start).TotalSeconds >= seconds) entry = (now, 0);
                 entry.Count++;
                 throttle[key] = entry;

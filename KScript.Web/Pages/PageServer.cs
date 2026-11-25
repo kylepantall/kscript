@@ -113,7 +113,9 @@ namespace KScript.Pages
 
         public PageRoute Resolve(string urlPath) => Resolve(urlPath, IsRoutedPath);
 
-        public PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath)
+        public PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath) => Resolve(urlPath, isRoutedPath, localePrefix: true);
+
+        private PageRoute Resolve(string urlPath, Func<string, bool> isRoutedPath, bool localePrefix)
         {
             string path = Uri.UnescapeDataString((urlPath ?? "/").Split('?')[0]).Replace('\\', '/');
             var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -122,9 +124,10 @@ namespace KScript.Pages
             if (IsHidden(segments, relative)) return NotFound();
 
             // /fr/about is the about page in French when locales/fr.json (or .yaml, or a locales/fr folder) exists.
-            if (segments.Count > 0 && IsLocalePrefix(segments[0]))
+            // Only the first part of the path is a locale: /fr/fr/about is not another address of the page.
+            if (localePrefix && segments.Count > 0 && IsLocalePrefix(segments[0]))
             {
-                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)), isRoutedPath);
+                PageRoute inner = Resolve("/" + string.Join("/", segments.Skip(1)), isRoutedPath, localePrefix: false);
                 return new PageRoute { Kind = inner.Kind, File = inner.File, Params = inner.Params, Locale = segments[0] };
             }
 

@@ -443,4 +443,41 @@ public sealed class ServeRequestTests
     }
 
     #endregion
+
+    #region Locale prefixes and throttle counts
+
+    [Fact]
+    public void A_locale_prefix_is_read_once()
+    {
+        using var site = new TempSite(("about.html", "<h1>About</h1>"), ("locales/fr.json", "{}"), ("locales/en.json", "{}"));
+        var pages = new PageSite(site.Root);
+        PageRoute french = pages.Resolve("/fr/about");
+        Assert.Equal(PageRoute.RouteKind.Page, french.Kind);
+        Assert.Equal("fr", french.Locale);
+        Assert.Equal(PageRoute.RouteKind.NotFound, pages.Resolve("/fr/fr/about").Kind);
+        Assert.Equal(PageRoute.RouteKind.NotFound, pages.Resolve("/fr/en/about").Kind);
+    }
+
+    [Fact]
+    public void Throttle_counts_are_dropped_once_their_window_has_passed()
+    {
+        using var site = new TempSite(("routes.kscript", "import KScript.Http\nRoutes {\n Get(path: /hi) { return 'hi' }\n}"));
+        DateTime now = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var app = new HttpApp(site.Root) { Clock = () => now };
+        for (int i = 0; i < 50; i++) Assert.True(app.Throttle("visitor " + i, 2, 30, out _, out _));
+        Assert.Equal(50, app.ThrottleEntries);
+
+        // Inside the window a count still limits its visitor.
+        now = now.AddSeconds(20);
+        Assert.True(app.Throttle("visitor 0", 2, 30, out _, out _));
+        Assert.False(app.Throttle("visitor 0", 2, 30, out _, out double wait));
+        Assert.Equal(10, wait);
+
+        now = now.AddSeconds(120);
+        Assert.True(app.Throttle("someone new", 2, 30, out int left, out _));
+        Assert.Equal(1, left);
+        Assert.Equal(1, app.ThrottleEntries);
+    }
+
+    #endregion
 }
