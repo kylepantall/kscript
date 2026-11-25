@@ -17,12 +17,16 @@ namespace KScript.Net
             {
                 if (!Uri.TryCreate(c.Str(0), UriKind.Absolute, out Uri root) || root.Scheme is not ("http" or "https"))
                     throw c.Error("base_url must be an HTTP or HTTPS URL.", "Argument");
+                // A path is added to the base URL, so https://api.example.com/v1 and 'users' make .../v1/users.
+                Uri folder = root.AbsolutePath.EndsWith('/') ? root : new UriBuilder(root) { Path = root.AbsolutePath + "/", Query = string.Empty, Fragment = string.Empty }.Uri;
                 var defaults = c.Arg(1) == null ? new Dictionary<string, object>() : new Dictionary<string, object>(c.Map(1));
                 return new NativeFunction("http_client", call =>
                 {
-                    string path = call.Str(0);
-                    if (!Uri.TryCreate(root, path, out Uri url) || url.Scheme != root.Scheme || url.Authority != root.Authority)
-                        throw call.Error("A client path must keep the base URL's origin.", "Argument");
+                    string path = call.Str(0).TrimStart('/');
+                    Uri url = root;
+                    if (path.Length > 0 && (!Uri.TryCreate(folder, path, out url) || url.Scheme != root.Scheme || url.Authority != root.Authority
+                        || !url.AbsolutePath.StartsWith(folder.AbsolutePath, StringComparison.Ordinal)))
+                        throw call.Error($"A client path must stay under the base URL {folder.AbsoluteUri}.", "Argument");
                     var options = new Dictionary<string, object>(defaults);
                     if (call.Arg(1, "options") is object supplied)
                     {

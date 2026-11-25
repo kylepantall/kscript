@@ -10,6 +10,9 @@ public sealed class TestServer : IDisposable
     private readonly HttpListener listener = new HttpListener();
     private readonly Task loop;
 
+    /// <summary>A cookie every answer sets, for tests of what a client sends back.</summary>
+    public string SetCookie { get; set; }
+
     public TestServer(Func<HttpListenerRequest, string, (int Status, string Body, string ContentType)> handler)
     {
         Port = FreePort();
@@ -38,6 +41,7 @@ public sealed class TestServer : IDisposable
                         var (status, text, type) = handler(ctx.Request, body);
                         ctx.Response.StatusCode = status;
                         if (type != null) ctx.Response.ContentType = type;
+                        if (SetCookie != null) ctx.Response.Headers.Add("Set-Cookie", SetCookie);
                         byte[] bytes = Encoding.UTF8.GetBytes(text ?? string.Empty);
                         ctx.Response.OutputStream.Write(bytes);
                         ctx.Response.Close();
