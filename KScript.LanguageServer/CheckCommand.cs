@@ -137,7 +137,7 @@ namespace KScript.LanguageServer
                     errors += config.Errors.Count;
                     foreach (string problem in config.Errors)
                     {
-                        report?.Problems.Add(new System.Text.Json.Nodes.JsonObject
+                        report?.Problems.Add((System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
                         {
                             ["file"] = config.FilePath, ["line"] = 1, ["column"] = 1, ["endLine"] = 1, ["endColumn"] = 1,
                             ["severity"] = "error", ["code"] = "", ["message"] = problem, ["fixes"] = new System.Text.Json.Nodes.JsonArray(),

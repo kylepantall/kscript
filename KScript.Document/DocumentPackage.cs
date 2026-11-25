@@ -208,9 +208,9 @@ namespace KScript.Documents
 
             p.Examples(
                 ("document->save", "@document('# Notes')->save('notes', as: pdf)"),
-                ("document->find", "echo @document('# Notes')->find('Notes')"),
-                ("document->replace", "echo @document('# Notes')->replace('Notes', 'Outline')->markdown()"),
-                ("document->insert", "echo @document('# Notes')->insert(' and ideas')->markdown()"),
+                ("document->find", "@document('# Notes')->find('Notes')"),
+                ("document->replace", "@document('# Notes')->replace('Notes', 'Outline')->markdown()"),
+                ("document->insert", "@document('# Notes')->insert(' and ideas')->markdown()"),
                 ("document->pages", "<echo>{ $doc->pages() } pages</echo>"),
                 ("document->markdown", "<echo>{ $doc->markdown() }</echo>"),
                 ("document->latex", "<do>@write_text('paper.tex', $doc->latex())</do>"),

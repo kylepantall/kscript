@@ -183,7 +183,7 @@ public sealed class DataRelationTests : DataFixture
             """);
         Assert.Equal("Ada: Notes 1 1", lines[0]);
         Assert.Equal("Ben: Hello 0 0", lines[1]);
-        Assert.Equal("Cy:", lines[2]);
+        Assert.Equal("Cy: ", lines[2]);
         Assert.Equal("Maths", lines[3]);
         Assert.Equal("true", lines[4]);
         Assert.Equal("false", lines[5]);

@@ -198,6 +198,8 @@ namespace KScript.Runtime
             var values = new List<string>();
             string Hold(string value)
             {
+                // A value with nothing in it leaves no gap to keep: the spaces around it are trimmed like any others.
+                if (string.IsNullOrEmpty(value)) return string.Empty;
                 values.Add(value);
                 return $"{Open}{values.Count - 1}{Close}";
             }
@@ -209,6 +211,8 @@ namespace KScript.Runtime
             };
             string laid = Tidy(interpreter.Interpolate(content, scope, module, bareReferences: true, escapeHeld, value => Hold(format(value)), literals));
             if (values.Count == 0) return laid;
+            // The whole text is never ends in a line break, as element text never did; what the values hold
+            // otherwise (their indentation, their spaces, their blank lines) stays as it is.
             var text = new System.Text.StringBuilder(laid.Length + 16);
             for (int i = 0; i < laid.Length; i++)
             {
@@ -220,7 +224,7 @@ namespace KScript.Runtime
                 }
                 else text.Append(laid[i]);
             }
-            return text.ToString();
+            return text.ToString().TrimEnd('\r', '\n');
         }
 
         // Private-use characters that stand for a value while the text around it is tidied.

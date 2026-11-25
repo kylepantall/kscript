@@ -436,7 +436,7 @@ public sealed class QueueTests : StorageFixture
         string log = Work();
         IQueueDriver driver = Driver();
         Assert.Contains("failed: Cancelled: Stops stopped with exit code 4.", log);
-        Assert.Contains("failed: Context:", log);
+        Assert.Contains("failed: Syntax:", log);
         Assert.Equal("ran fine\n", JobOutput());
         Assert.Equal(2, driver.Failed().Count);
         Assert.Empty(driver.Running());

@@ -22,7 +22,7 @@ A map, or a list of maps, on its own in `echo` prints as indented JSON, coloured
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 
-`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written. Quoted text after `echo` is printed as written too, with its spaces: `echo "  - { $item }"` prints the two spaces. In XML, the text between `<echo>` and `</echo>` is trimmed and loses the indentation its lines share, and the values filled into it are left alone.
+`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written. Quoted text after `echo` is printed as written too, with its spaces: `echo "  - { $item }"` prints the two spaces. In XML, the text between `<echo>` and `</echo>` is trimmed and loses the indentation its lines share, and the values filled into it are left alone, except that an empty value leaves no stray space behind and the text never ends in a line break.
 
 ```kscript
 greeting = "Hello { $name }, you have { $count * 2 } points."

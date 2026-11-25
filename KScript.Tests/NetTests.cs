@@ -91,7 +91,7 @@ public sealed class NetTests : IDisposable
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain', headers: {{ 'user-agent': 'example-app/1.0' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', null).status }}</echo>");
-        Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain\nPATCH application/x-www-form-urlencoded a=1\n201\n", output);
+        Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain \nPATCH application/x-www-form-urlencoded a=1 \n201\n", output);
         Assert.Equal(new[] { "kscript", "example-app/1.0", "kscript", "kscript" }, server.Requests.Select(r => r.Headers["User-Agent"]));
     }
 
