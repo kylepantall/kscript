@@ -522,6 +522,7 @@ public sealed class CompileTests : IDisposable
         RuntimeCache = Path.Combine(dir, "cache"),
         Handler = releases ?? new FakeReleases { Respond = _ => new HttpResponseMessage(HttpStatusCode.NotFound) },
         Codesign = null,
+        DevelopmentBuild = false,
     };
 
     private (int Code, string Out, string Err) Compile(CompileEnvironment env, params string[] args)
@@ -686,6 +687,24 @@ public sealed class CompileTests : IDisposable
         Assert.True(File.Exists(Path.Combine(dir, "p6-script", "dist", "linux-x64", "run")));
 
         Assert.Contains("can't be used as a program name", Compile(Env(current: runtime), Path.Combine(dir, "p6"), "--name", "///").Err);
+
+        // A wrong command line is exit code 2; a build that could not finish is 1.
+        Assert.Equal(ExitCodes.Usage, Compile(Env(current: runtime), "missing.kscript").Code);
+        Assert.Equal(ExitCodes.Usage, Compile(Env(current: runtime), "--target", "amiga", importer).Code);
+        Assert.Equal(ExitCodes.Usage, Compile(Env(current: runtime), Path.Combine(dir, "p6"), "--name", "///").Code);
+        Assert.Equal(ExitCodes.Usage, Compile(Env(current: runtime), Path.Combine(dir, "p6"), "--to", "js").Code);
+        Assert.Equal(ExitCodes.Failed, Compile(Env(current: runtime), importer).Code);
+        string which = Compile(Env(current: runtime), Path.Combine(dir, "empty")).Err;
+        Assert.Contains("\"main\": \"app.kscript\"", which);
+
+        // A project whose routes are in routes/ (as kscript make project --template api writes them) is a site.
+        Write("api/kscript.json", """{ "name": "api" }""");
+        Write("api/routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: /health) {\n    return { ok: true }\n  }\n}\n");
+        Assert.True(CompileCommand.LooksLikeSite(Path.Combine(dir, "api"), KScript.Projects.ProjectConfig.FindAndLoad(Path.Combine(dir, "api"))));
+        Assert.False(CompileCommand.LooksLikeSite(Path.Combine(dir, "empty"), null));
+        var api = Compile(Env(current: runtime), Path.Combine(dir, "api"));
+        Assert.True(api.Code == 0, api.Err);
+        Assert.Contains("web site", api.Out);
         Assert.Equal("Name", CompileCommand.SafeName(" Na:me "));
     }
 
@@ -762,6 +781,10 @@ public sealed class CompileTests : IDisposable
         dev.Version = "0.0.0";
         Assert.Contains("development build", Compile(dev, script, "--target", "mac-arm64").Err);
         dev.Version = "0.4.0-dev.1";
+        Assert.Contains("development build", Compile(dev, script, "--target", "mac-arm64").Err);
+        // A kscript built from the repository carries a release's version number, but is not that release.
+        dev.Version = "0.4.0";
+        dev.DevelopmentBuild = true;
         Assert.Contains("development build", Compile(dev, script, "--target", "mac-arm64").Err);
     }
 
