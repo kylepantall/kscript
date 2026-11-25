@@ -1577,6 +1577,29 @@ namespace KScript.Language.Analysis
                 }
                 else
                 {
+                    if (attr != null && requireEffect && region.Parse.Nodes.Count == 1 && node is VariableNode toggled)
+                    {
+                        // A handler that is one value: on_click: $open flips a bool, on_click: $save calls a function or method.
+                        TextSpan name = VariableNameSpan(toggled, region);
+                        Symbol variable = scope.Lookup(toggled.Name, name.Start);
+                        Symbol called = scope.Lookup(toggled.Name, int.MaxValue, includeMethods: true);
+                        if (called?.Kind != SymbolKind.Function && scope.Lookup("this", name.Start)?.Shape is TypeShape self)
+                            self.Methods.TryGetValue(toggled.Name, out called);
+                        if ((variable == null || variable.Kind == SymbolKind.Function) && called?.Kind == SymbolKind.Function)
+                        {
+                            result.References.Add(new SymbolReference(called, name, false, false));
+                            ReportIfDeprecated(called, name);
+                            continue;
+                        }
+                        AnalyzeExpr(node, region, scope, ExprContext.Value);
+                        string type = Infer(node, region).Type;
+                        if (type is KType.Bool)
+                            ReferenceVariable(toggled.Name, name, scope, isWrite: true, mustBeMutable: true, offset: name.Start);
+                        else if (variable != null && type is not (KType.Fn or KType.Any))
+                            Report(name, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
+                                $"A handler that is one value flips a bool or calls a function, and ${toggled.Name} is {type}. Write statements instead, such as {toggled.Name} = ….");
+                        continue;
+                    }
                     if (requireEffect)
                     {
                         AnalyzeExpr(node, region, scope, ExprContext.Value);

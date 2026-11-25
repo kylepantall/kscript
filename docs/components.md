@@ -148,9 +148,41 @@ Number defaults let normal numeric input update the state as a number. For query
 
 For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#reading), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
 
+### Inputs and state with construct
+
+By default a page can set every stored field of a component. Add a `construct` block to list the attributes a page may pass. Every other field is then the component's own state, and passing it from a page is an error.
+
+````kscript
+import KScript.Web
+
+type NoteCard extends Component {
+  construct({
+    title: string,
+    open: bool = false,
+  }) {
+    heading = $title->upper()
+  }
+
+  heading: string
+  clicks: int
+
+  fn render(): Component {
+    return ```html
+    <article>
+      <h3>{$heading}</h3>
+      <button type="button" @on-click($open)>{$open ? 'Hide' : 'Show'}</button>
+      <button type="button" @on-click(clicks += 1)>Clicked {$clicks}</button>
+    </article>
+    ```
+  }
+}
+````
+
+`<note-card title="Shopping" />` works, and `<note-card clicks="{5}" />` is reported by `kscript check`. The block after the list is optional. It runs each time the page builds the component, before saved state is restored, so keep it free of writes. See [constructors](types.md#constructors) for the rules shared with every type.
+
 ## Actions and browser events
 
-Handlers contain KScript statements and can call imported functions. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
+Handlers contain KScript statements and can call imported functions. A handler can also be a single value. A bool field flips, so `@on-click($open)` is the same as `@on-click(open = not $open)`. A function or one of the component's methods is called, so `@on-click($save)` runs `fn save()`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
 
 | Interaction | Attributes |
 | --- | --- |

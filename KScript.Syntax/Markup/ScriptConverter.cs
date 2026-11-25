@@ -811,6 +811,10 @@ namespace KScript.Syntax.Markup
                                 {
                                     WriteElement(method, indent + 1, false);
                                 }
+                                else if (node is MarkupElement { Name: CodeParser.ConstructWord } construct)
+                                {
+                                    WriteConstruct(construct, indent + 1);
+                                }
                             }
                             scopes.Pop();
                             Line(indent, "}");
@@ -995,6 +999,11 @@ namespace KScript.Syntax.Markup
                 {
                     return true;
                 }
+                if (node is MarkupElement { Name: CodeParser.ConstructWord } construct)
+                {
+                    return construct.Attributes.All(a => a.Name == "description")
+                        && construct.ChildElements.Where(c => c.Name == "field").All(f => IsFieldLine(f) && f.GetAttribute("value") == null);
+                }
                 if (!(node is MarkupElement e) || e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)))
                 {
                     return node is MarkupElement fn && fn.Name == "fn";
@@ -1007,6 +1016,39 @@ namespace KScript.Syntax.Markup
                     "fn" => true,
                     _ => false,
                 };
+            }
+
+            /// <summary>
+            /// &lt;construct&gt; is <c>construct({ x: number, y: number = 0 }) { ... }</c>: its fields one per line in the
+            /// braces, then its statements as the block.
+            /// </summary>
+            private void WriteConstruct(MarkupElement construct, int indent)
+            {
+                WriteDoc(construct, indent);
+                int start = sb.Length;
+                Line(indent, CodeParser.ConstructWord + "({");
+                int fields = sb.Length;
+                foreach (MarkupNode node in construct.Children)
+                {
+                    if (node is not MarkupElement { Name: "field" } field) continue;
+                    WriteField(field, indent + 1);
+                    sb.Insert(sb.Length - 1, ',');
+                }
+                string close = "})";
+                // A few short fields fit on the line: construct({ name: string, done: bool = false }).
+                string[] lines = sb.ToString(fields, sb.Length - fields).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToArray();
+                if (lines.Length is > 0 and <= 3 && lines.Sum(l => l.Length) <= 60 && !lines.Any(l => l.StartsWith('/')))
+                {
+                    sb.Length = start;
+                    close = CodeParser.ConstructWord + "({ " + string.Join(" ", lines).TrimEnd(',') + " })";
+                }
+                List<MarkupNode> body = construct.Children.Where(n => n is not MarkupElement { Name: "field" }).ToList();
+                if (body.All(n => n is MarkupText { IsWhitespace: true }))
+                {
+                    Line(indent, close);
+                    return;
+                }
+                WriteBlock(close, construct, indent, chained: false, children: body);
             }
 
             /// <summary>A &lt;field&gt; the one-line form can hold, a comment, or layout.</summary>
@@ -1711,6 +1753,13 @@ namespace KScript.Syntax.Markup
                         break;
                     case "catch":
                         scopes.Declare(e.GetAttributeValue("as"));
+                        break;
+                    case "type":
+                        // A type's methods and its construct block change its fields: field = ... is a <set>.
+                        foreach (MarkupElement field in TypeBody.Fields(e))
+                        {
+                            scopes.Declare(field.GetAttributeValue("name")?.Trim().TrimEnd('?'));
+                        }
                         break;
                 }
                 foreach (MarkupNode node in e.Children)

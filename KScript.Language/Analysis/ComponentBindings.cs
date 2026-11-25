@@ -19,7 +19,7 @@ internal static class ComponentBindings
                 !TemplateContract.IsRequired(declaration.GetAttribute("locked") != null, declaration.GetAttributeValue("locked"));
             if (!classRoot || !ComponentScript.IsComponentType(declaration) || s.Name == "this") return false;
             if (!analysis.DeclaredTypes.TryGetValue(declaration, out var instance) || !instance.Fields.ContainsKey(s.Name)) return false;
-            return !declaration.ChildElements.Any(field => field.Name == "field" && field.GetAttribute("value") != null &&
+            return !TypeBody.Fields(declaration).Any(field => field.GetAttribute("value") != null &&
                 field.GetAttributeValue("name")?.TrimEnd('?') == s.Name);
         });
     }

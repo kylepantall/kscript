@@ -211,6 +211,9 @@ namespace KScript.Language.Analysis
         internal string DeclaredType { get; }
         private bool Optional { get; }
 
+        /// <summary>The type has a construct block that doesn't list this field: a caller can't pass it.</summary>
+        public bool OwnState { get; init; }
+
         internal string ValueType
         {
             get

@@ -215,7 +215,7 @@ namespace KScript.Language.Analysis
                     yield return (name.TrimEnd('?').TrimEnd(), type, eq >= 0 || name.EndsWith("?", StringComparison.Ordinal) || type.EndsWith("?", StringComparison.Ordinal));
                 }
             }
-            foreach (MarkupElement field in e.ChildElements.Where(c => IsKScriptElementName(c, "field")))
+            foreach (MarkupElement field in TypeBody.Inputs(e))
             {
                 string name = field.GetAttributeValue("name")?.Trim();
                 string type = field.GetAttributeValue("type")?.Trim();
@@ -343,7 +343,7 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            foreach (MarkupElement field in e.ChildElements.Where(c => IsKScriptElementName(c, "field")))
+            foreach (MarkupElement field in TypeBody.Fields(e))
             {
                 MarkupAttribute nameAttr = field.GetAttribute("name");
                 string name = nameAttr?.ValueText?.Trim().TrimEnd('?').TrimEnd();
@@ -357,7 +357,8 @@ namespace KScript.Language.Analysis
                 string detail = from != null ? $"Read from {from}." : field.GetAttribute("value") != null ? "Worked out from the other fields." : null;
                 description = description != null && detail != null ? description + " " + detail : description ?? detail;
                 bool optional = nameAttr.ValueText.TrimEnd().EndsWith('?') || IsYes(field.GetAttributeValue("optional")) || field.GetAttribute("default") != null;
-                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional);
+                bool own = field.GetAttribute("value") == null && !TypeBody.IsInput(field);
+                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional) { OwnState = own };
             }
         }
 
@@ -462,15 +463,29 @@ namespace KScript.Language.Analysis
                 if (!IsModelMixin(e)) CheckDrift(e);
             }
             bool refined = instance?.RefinementBase != null;
-            foreach (MarkupElement child in e.ChildElements)
+            bool constructed = false;
+            foreach (MarkupElement child in e.ChildElements.SelectMany(c => c.Name == CodeParser.ConstructWord ? c.ChildElements.Where(f => f.Name == "field").Prepend(c) : new[] { c }))
             {
                 if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn") || IsKScriptElementName(child, "catch"))
                 {
                     continue;
                 }
+                if (child.Name == CodeParser.ConstructWord && IsKScriptElementName(e, "type") && !refined)
+                {
+                    if (constructed)
+                        Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"{e.GetAttributeValue("name")?.Trim()} has two construct blocks. Keep one.");
+                    constructed = true;
+                    continue;
+                }
                 if (!IsKScriptElementName(child, "field"))
                 {
-                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <construct>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
+                    continue;
+                }
+                if (child.Parent != e && child.GetAttribute("value") != null)
+                {
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
+                        $"construct lists what a caller may pass, so '{child.GetAttributeValue("name")?.Trim()}' can't be worked out with =>. Declare it below construct.");
                     continue;
                 }
                 if (refined)

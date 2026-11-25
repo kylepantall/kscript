@@ -137,6 +137,45 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>
+        /// Runs an event handler. A handler is statements (<c>count += 1</c>) or one variable: a bool flips
+        /// (<c>on_click: $open</c>) and a function is called (<c>on_click: $toggle</c>).
+        /// </summary>
+        public void RunHandler(DecodedText text, Scope scope, Module module)
+        {
+            ParseResult parsed = GetParse(module, text, ParseMode.Statements);
+            if (parsed.Nodes.Count == 1 && parsed.Nodes[0] is VariableNode variable)
+            {
+                if (!scope.TryGet(variable.Name, out object value))
+                {
+                    // on_click: $save names a method of the component the handler belongs to.
+                    if (scope.TryGet("this", out object self) && self is Record record
+                        && record.Type.OwnMethods.TryGetValue(variable.Name, out MarkupElement method))
+                    {
+                        RecordType owner = record.Type.MethodOwner(variable.Name, method);
+                        Scope methodScope = CatchClauses.BindReceiver(owner.Closure, record, recordFields: true);
+                        Call(DeclareFunction(method, methodScope, owner.Module, record.Type.Catches, record), Array.Empty<object>(), null, scope, module);
+                        return;
+                    }
+                    ExecuteStatements(text, scope, module, declare: false);
+                    return;
+                }
+                if (value is bool flag)
+                {
+                    scope.Assign(variable.Name, !flag);
+                    return;
+                }
+                if (value is ICallable function)
+                {
+                    Call(function, Array.Empty<object>(), null, scope, module);
+                    return;
+                }
+                throw Fail(variable, new EvalContext(module, text),
+                    $"A handler that is one value flips a bool or calls a function, and ${variable.Name} is {Values.Describe(value)}. Write statements instead, such as {variable.Name} = ….", "Type");
+            }
+            ExecuteStatements(text, scope, module, declare: false);
+        }
+
         /// <summary>Replaces <c>{ expr }</c> (and, in element text, bare <c>$name</c>) in text. <paramref name="escape"/> is applied to inserted values, except <c>{! raw }</c>.</summary>
         public string Interpolate(DecodedText text, Scope scope, Module module, bool bareReferences, Func<string, string> escape = null) =>
             Interpolate(text, scope, module, bareReferences, escape, Values.ToStr);

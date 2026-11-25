@@ -157,6 +157,20 @@ namespace KScript.Language.Features
                 items.Add(BodyRuleItem(rule, replace, "0"));
             }
             items.Add(BodyFnItem(replace));
+            if (!refined && TypeBody.Constructor(type) == null)
+            {
+                items.Add(new CompletionItem
+                {
+                    Label = CodeParser.ConstructWord,
+                    Kind = CompletionKind.Keyword,
+                    Detail = "constructor",
+                    Documentation = Catalog.GetElement(CodeParser.ConstructWord)?.Description,
+                    InsertText = "construct({\n  ${1:name}: ${2:string},\n}) {\n  $0\n}",
+                    IsSnippet = true,
+                    ReplaceSpan = replace,
+                    SortText = "1construct",
+                });
+            }
             return items;
         }
 

@@ -37,7 +37,7 @@ Window(
   }
 
   Row(gap: 8, wrap) {
-    Button(variant: primary, width: 80, on_click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
+    Button(variant: primary, width: 80, on_click: $playing) "{ $playing ? 'Pause' : 'Play' }"
     Button(on_click: { world = @advance($world, 1); playing = false }) "Step"
     Button(on_click: { world = @advance($world, 10) }) "+10"
     Button(on_click: { world = @advance($world, 50) }) "+50"

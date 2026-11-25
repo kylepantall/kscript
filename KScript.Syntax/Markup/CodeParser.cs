@@ -142,7 +142,11 @@ namespace KScript.Syntax.Markup
                     continue;
                 }
 
-                if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
+                if (fields && parent.Name == "type" && ConstructAhead())
+                {
+                    ParseConstruct(parent);
+                }
+                else if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
                 {
                     // A method of the type: fn width(unit: Unit) => ...
                     int fnStart = pos;
@@ -1177,6 +1181,85 @@ namespace KScript.Syntax.Markup
             Finish(e, start);
         }
 
+        /// <summary>True at <c>construct(</c>, the start of a type's constructor.</summary>
+        private bool ConstructAhead()
+        {
+            if (!Lookahead(ConstructWord)) return false;
+            int p = pos + ConstructWord.Length;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            return p < text.Length && text[p] == '(';
+        }
+
+        public const string ConstructWord = "construct";
+
+        /// <summary>
+        /// <c>construct({ note: Note, open: bool = false }) { ... }</c>: a &lt;construct&gt; in a type. Its &lt;field&gt;s are
+        /// what a caller may pass, and the optional block runs once for each value made.
+        /// </summary>
+        private void ParseConstruct(MarkupElement parent)
+        {
+            int start = pos;
+            string doc = TakeDoc();
+            MarkupElement e = Begin(parent, ConstructWord, start);
+            SkipSpaces();
+            int open = pos++;
+            SkipTrivia(newlines: true);
+            if (Peek(0) != '{')
+            {
+                Error(new TextSpan(pos, 0), DiagnosticCodes.MarkupSyntax, "List what a caller may pass in braces: construct({ name: string, done: bool = false }).");
+            }
+            else
+            {
+                int brace = pos++;
+                while (true)
+                {
+                    commentTarget = e;
+                    SkipTrivia(newlines: true);
+                    if (pos >= text.Length)
+                    {
+                        Error(new TextSpan(brace, 1), DiagnosticCodes.UnclosedElement, "This { is missing its closing }.");
+                        break;
+                    }
+                    if (text[pos] == '}')
+                    {
+                        pos++;
+                        break;
+                    }
+                    if (text[pos] is ',' or ';')
+                    {
+                        pos++;
+                        continue;
+                    }
+                    ParseField(e, Stop.Rule);
+                }
+                SkipTrivia(newlines: true);
+            }
+            if (Peek(0) == ')')
+            {
+                pos++;
+            }
+            else
+            {
+                Error(new TextSpan(open, 1), DiagnosticCodes.MarkupSyntax, "This ( is missing its closing ).");
+            }
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            int save = pos;
+            SkipSpaces();
+            if (Peek(0) == '{')
+            {
+                ParseBlock(e);
+            }
+            else
+            {
+                pos = save;
+                e.StartTagSpan = TextSpan.FromBounds(start, pos);
+            }
+            Finish(e, start);
+        }
+
         private void ParseDeclarationOptions(MarkupElement declaration)
         {
             int nameEnd = pos;
@@ -1302,7 +1385,7 @@ namespace KScript.Syntax.Markup
         /// One line of a type: <c>name: string</c>, <c>avatar?: string</c>, <c>stars: int from stargazers_count</c>,
         /// <c>tags: string[] = []</c> or <c>label: string => $name + '!'</c>. Becomes a &lt;field&gt;.
         /// </summary>
-        private void ParseField(MarkupElement parent)
+        private void ParseField(MarkupElement parent, Stop stop = Stop.Line)
         {
             int start = pos;
             string doc = TakeDoc();
@@ -1366,12 +1449,12 @@ namespace KScript.Syntax.Markup
             if (Lookahead("=>"))
             {
                 pos += 2;
-                AddExpressionAttribute(e, "value", Stop.Line);
+                AddExpressionAttribute(e, "value", stop);
             }
             else if (Peek(0) == '=')
             {
                 pos++;
-                AddExpressionAttribute(e, "default", Stop.Line);
+                AddExpressionAttribute(e, "default", stop);
             }
             if (doc != null)
             {

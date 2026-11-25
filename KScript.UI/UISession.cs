@@ -94,7 +94,7 @@ namespace KScript.UI
             {
                 Scope scope = h.Scope.Child();
                 scope.Declare("event", evt ?? new Dictionary<string, object>());
-                Interpreter.ExecuteStatements(h.Statements, scope, h.Module, declare: false);
+                Interpreter.RunHandler(h.Statements, scope, h.Module);
             }
             catch (KScriptException ex)
             {

@@ -18,7 +18,7 @@ namespace KScript.Language.Analysis
             {
                 var type = ComponentScript.FindType(document, ComponentScript.Tag(path));
                 if (type == null) yield break;
-                foreach (var field in type.ChildElements.Where(ComponentScript.IsStoredField))
+                foreach (var field in TypeBody.Inputs(type))
                 {
                     string name = field.GetAttributeValue("name")?.Trim();
                     if (string.IsNullOrEmpty(name)) continue;
@@ -34,6 +34,15 @@ namespace KScript.Language.Analysis
                 if (TemplateContract.IsPropName(name))
                     yield return (name, TemplateContract.IsRequired(declaration.GetAttribute("required") != null, declaration.GetAttributeValue("required")));
             }
+        }
+
+        /// <summary>The fields a script component keeps to itself: those its construct block doesn't list.</summary>
+        internal static IEnumerable<string> OwnState(IFileSystem files, string path)
+        {
+            if (path == null || !ScriptFiles.IsScript(path) || files.ReadText(path) is not string text) return Array.Empty<string>();
+            var type = ComponentScript.FindType(MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(path), path), ComponentScript.Tag(path));
+            return TypeBody.Fields(type).Where(f => f.GetAttribute("value") == null && !TypeBody.IsInput(f))
+                .Select(f => f.GetAttributeValue("name")?.Trim().TrimEnd('?')).Where(n => !string.IsNullOrEmpty(n)).ToList();
         }
 
         private static readonly string[] SiteMarkers = { "kscript.json", "_layout.html", "_components", "_layouts" };
@@ -139,6 +148,12 @@ namespace KScript.Language.Analysis
             if (template == null) return;
             var passed = new Dictionary<string, MarkupAttribute>(StringComparer.Ordinal);
             foreach (MarkupAttribute attribute in caller.Attributes) passed.TryAdd(TemplateContract.VariableName(attribute.Name), attribute);
+            foreach (string own in TemplateContracts.OwnState(files, template))
+            {
+                if (passed.TryGetValue(own, out MarkupAttribute set))
+                    Report(set.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.UnknownParameter,
+                        $"'{set.Name}' is the component's own state and can't be passed in. Its construct block lists what it takes.");
+            }
             foreach ((string name, bool required) in TemplateContracts.Read(files, template).Distinct())
             {
                 if (!required) continue;

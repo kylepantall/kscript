@@ -151,8 +151,16 @@ namespace KScript.Runtime
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names."),
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
-                MustBeInside = new[] { "type", "error", "model", "job" },
+                MustBeInside = new[] { "type", "error", "model", "job", "construct" },
             }, run => throw run.Error($"<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
+
+            p.Element(new ElementInfo("construct", "A type's constructor. Its fields are what a caller may pass, as `Point(x: 1)` or as a component's attributes, and every other field of the type is the value's own state. The statements run once when a value is made, with the fields as variables they can set. In a .kscript file: `construct({ x: number, y: number = 0 }) { ... }`.",
+                ContentKind.Statements,
+                new A("description", K.Text, "What the constructor does, shown on hover."))
+            {
+                MustBeInside = new[] { "type" },
+                Example = "<type name=\"Point\">\n  <construct>\n    <field name=\"x\" type=\"number\" />\n    <field name=\"y\" type=\"number\" default=\"0\" />\n    <set name=\"sum\" value=\"$x + $y\" />\n  </construct>\n  <field name=\"sum\" type=\"number\" />\n</type>\n<echo>{ Point(x: 3, y: 4).sum }</echo>",
+            }, run => throw run.Error($"<construct> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("validate", "A rule a <type> checks: the test must be true. In a type made from one other type, the value is `$value`. In a type with fields, each field is a variable (`$end > $start`). Every rule that fails is reported, with its message.", ContentKind.Empty,
                 new A("test", K.Expression, "What must be true: `$value % 5 == 0`, `$end > $start`.", true),

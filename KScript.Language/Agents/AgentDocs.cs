@@ -318,7 +318,7 @@ namespace KScript.Language.Agents
         {
             MarkupElement type = s.DeclaringElement;
             var fields = new List<string>();
-            foreach (MarkupElement field in type.ChildElements.Where(f => f.Name == "field"))
+            foreach (MarkupElement field in TypeBody.Fields(type))
             {
                 string name = field.GetAttributeValue("name")?.Trim();
                 if (string.IsNullOrEmpty(name)) continue;

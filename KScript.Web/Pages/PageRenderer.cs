@@ -1115,7 +1115,7 @@ namespace KScript.Pages
                     ctx.Live.Event["files"] = ctx.Live.Files ?? new Dictionary<string, object>();
                     handlerScope.Declare("event", ctx.Live.Event);
                     ctx.InLiveAction = true;
-                    try { ctx.Runtime.Execute(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module, declare: false); }
+                    try { ctx.Runtime.RunHandler(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module); }
                     finally { ctx.InLiveAction = false; }
                     // A list or nested map can be changed in place inside an action without assigning its field.
                     if (instance != null)

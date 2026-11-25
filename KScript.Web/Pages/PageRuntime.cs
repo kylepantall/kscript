@@ -208,6 +208,13 @@ namespace KScript.Pages
                 return null;
             });
 
+        public void RunHandler(string handler, Scope scope, Module module) =>
+            Run(module, () =>
+            {
+                Interpreter.RunHandler(Text(module, 2, handler), scope, module);
+                return null;
+            });
+
         public string Interpolate(string text, Scope scope, Module module, Func<string, string> escape) =>
             (string)Run(module, () => Interpreter.Interpolate(Text(module, 3, text), scope, module, bareReferences: false, escape));
 

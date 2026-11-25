@@ -191,7 +191,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void TypeBlocksSuggestTheirRules()
         {
-            Assert.Equal(new[] { "pattern", "parse", "validate", "fn" }, Labels("type Note {\n  p‸\n  title: string\n}\n"));
+            Assert.Equal(new[] { "pattern", "parse", "validate", "fn", "construct" }, Labels("type Note {\n  p‸\n  title: string\n}\n"));
             List<CompletionItem> refined = Complete("type Age with [int] {\n  min: 0\n  ‸\n}\n");
             Assert.Equal(new[] { "max", "pattern", "one_of", "not", "validate", "normalize", "fn" }, refined.Select(i => i.Label));
             Assert.Equal("one_of: [$1]", refined.Single(i => i.Label == "one_of").InsertText);
@@ -205,7 +205,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void InheritedTypesOfferMembersOfTheirResolvedKind()
         {
-            Assert.Equal(new[] { "pattern", "parse", "validate", "fn" },
+            Assert.Equal(new[] { "pattern", "parse", "validate", "fn", "construct" },
                 Labels("type Base { title: string }\ntype Note with [Base] {\n  ‸\n}"));
             var refined = Labels("type Key with [string] {}\ntype LoginKey with [Key] {\n  ‸\n}");
             Assert.Contains("normalize", refined);

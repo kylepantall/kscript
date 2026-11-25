@@ -318,14 +318,14 @@ public class TypedJsonTests
     [InlineData("<type name=\"T\" fields=\"1a\" />", "'1a' can't be a field name")]
     [InlineData("<type name=\"T\"><field name=\" ? \" /></type>", "A field needs a name")]
     [InlineData("<type name=\"T\" fields=\"a: [x]\" />", "'[x]' isn't a type for the field 'a'")]
-    [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <echo>.")]
+    [InlineData("<type name=\"T\"><echo>x</echo></type>", "<type> can only hold <field>, <construct>, <validate>, <normalize> and <fn> elements, not <echo>.")]
     [InlineData("<type name=\"T\"><field type=\"int\" /></type>", "<field> needs a name")]
     [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", "from=\"a..b\" on the field 'a' isn't a path")]
     [InlineData("<type name=\"T\"><field name=\"a\" optional=\"maybe\" /></type>", "optional=\"maybe\" should be true or false.")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", "it can't also have from or default")]
     [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" default=\"2\" /></type>", "it can't also have from or default")]
-    [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error>, <model> or <job>.")]
-    [InlineData("<type name=\"T\"><if test=\"yes\"><field name=\"a\" /></if></type>", "<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <if>.")]
+    [InlineData("<field name=\"a\" />", "<field> must be inside <type>, <error>, <model>, <job> or <construct>.")]
+    [InlineData("<type name=\"T\"><if test=\"yes\"><field name=\"a\" /></if></type>", "<type> can only hold <field>, <construct>, <validate>, <normalize> and <fn> elements, not <if>.")]
     public void DeclarationMistakesAreExplained(string body, string expected)
     {
         Assert.Contains(expected, Fails(body).Message);
