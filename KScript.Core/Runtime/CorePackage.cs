@@ -340,6 +340,8 @@ namespace KScript.Runtime
                     throw new ReturnSignal(new ComponentTemplate(html, run.Scope, run.Module, origin));
                 if (ComponentScript.StyleBlock(fn, origin) is { Error: null } style)
                     throw new ReturnSignal(new ComponentStyle(style.Value, style.Language, run.Module));
+                if (ComponentSource.From(fn, origin, run.Scope, run.Module) is ComponentSource source)
+                    throw new ReturnSignal(source);
                 throw new ReturnSignal(run.Eval("value", null));
             });
 

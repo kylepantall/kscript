@@ -305,6 +305,7 @@ namespace KScript.Runtime
                     return new ComponentTemplate(html, scope, Module, origin);
                 if (ComponentScript.StyleBlock(Element, origin) is { Error: null } style)
                     return new ComponentStyle(style.Value, style.Language, Module);
+                if (ComponentSource.From(Element, origin, scope, Module) is ComponentSource source) return source;
                 return interpreter.Evaluate(ValueExpression, scope, ValueContext);
             }
 

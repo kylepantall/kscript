@@ -95,6 +95,61 @@ namespace KScript.Language.Tests
                 Messages(Check("rule.kscript", "import KScript.UI\nimport \"components/empty.kscript\"\n\nWindow(title: \"R\") {\n  Gapper(size: 2)\n}\n")));
         }
 
+        private const string Parts = """
+            import KScript.Document
+
+            type Finding extends Component {
+              construct({ title: string, count: int })
+
+              fn render() => ```md
+                # {$title}
+
+                We saw **{$count}** of them, and \( x^{2} \) holds.
+                ```
+            }
+
+            type Method extends Component {
+              construct({ name: string })
+
+              fn render() {
+                note = "50% & more"
+                return ```latex
+                  \section{Method: {$name}}
+                  We used \textbf{$name} with { $note } and $x^{2}$ {as written}, {$open and {@name(.
+                  ```
+              }
+            }
+
+
+            """;
+
+        [Fact]
+        public void A_render_that_returns_markdown_or_latex_draws_in_a_document()
+        {
+            const string document = "Document(into: doc) {\n  Finding(title: 'Gliders', count: 3)\n  Method(name: 'counting')\n}\necho $doc->markdown()\n";
+            // The values in both blocks are read, so $note counts as used and nothing is unknown.
+            Assert.Equal(string.Empty, Messages(Check("report.kscript", Parts + document)));
+            Assert.Contains("KS3006 Finding has no render for the terminal.", Messages(Check("report.kscript", Parts + "Finding(title: 'Gliders', count: 3)\n")));
+
+            string wrong = Messages(Check("report.kscript", Parts.Replace("{$count}", "{$cuont}").Replace("{ $note }", "{ $nite }") + document));
+            Assert.Contains("$cuont is not defined", wrong);
+            Assert.Contains("$nite is not defined", wrong);
+            Assert.Contains("KS6003 The variable $note is never used.", wrong);
+
+            // A block of another kind doesn't show where it draws.
+            Assert.Contains("Finding's render doesn't show where it draws", Messages(Check("report.kscript", Parts.Replace("```md", "```yaml") + document)));
+        }
+
+        [Fact]
+        public void Only_a_group_that_holds_one_value_is_a_value_in_latex()
+        {
+            var latex = DecodedText.Plain("\\textbf{$name} {  @today() } x^{2} {$a$} {$map[{a: 1}]} {$open {@", 10);
+            var values = ComponentScript.LatexValues(latex).ToList();
+            Assert.Equal(new[] { "$name", "  @today() ", "$map[{a: 1}]" }, values.Select(v => v.Value.Value));
+            Assert.Equal(('{', '}'), (latex.Value[values[0].Open], latex.Value[values[0].Close]));
+            Assert.Equal(10 + values[0].Open + 1, values[0].Value.SourceSpan.Start);
+        }
+
         [Fact]
         public void A_component_drawn_where_it_has_no_render_is_reported()
         {
@@ -120,8 +175,8 @@ namespace KScript.Language.Tests
             const string page = "import KScript.Web\n\ntype Hello extends Component {\n  name: string\n\n  fn render() {\n    return ```html\n    <p>Hello, {$name} {$nope}</p>\n    ```\n  }\n\n  override fn style() => ```css\n  p { color: teal; }\n  ```\n}\n";
             Assert.Contains("nope", Messages(Check("hello.kscript", page)));
             Assert.Equal(string.Empty, Messages(Check("hello.kscript", page.Replace(" {$nope}", ""))));
-            // Another block doesn't show a place yet, and a component with no render at all still needs one.
-            Assert.Contains("doesn't show where it draws", Messages(Check("md.kscript", "type Md extends Component {\n  fn render() => ```md\n  # Hi\n  ```\n}\n")));
+            // A block that is neither a page nor a document doesn't show a place, and a component with no render at all still needs one.
+            Assert.Contains("doesn't show where it draws", Messages(Check("yaml.kscript", "type Yaml extends Component {\n  fn render() => ```yaml\n  a: 1\n  ```\n}\n")));
             Assert.Contains("must implement fn render(): Component to extend Component", Messages(Check("none.kscript", "type None extends Component {\n  name: string\n}\n")));
         }
 

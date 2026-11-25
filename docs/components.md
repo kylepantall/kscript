@@ -234,6 +234,7 @@ A component isn't tied to pages. Every place it can be drawn has its own `render
 | A returned `html` block | A page |
 | [KScript.UI](desktop.md) elements such as `Column`, `Text` and `Button` | A window |
 | `echo` or [KScript.Terminal](language.md#terminal-output) elements | The terminal |
+| [KScript.Document](documents.md) elements such as `Section` and `Paragraph`, or a returned `md` or `latex` block | [A document](#components-in-documents) |
 
 A component has at most one `render` for each place. The fields, `construct` block and methods are shared by all of them.
 
@@ -293,6 +294,72 @@ Window(title: "Notes", width: 420, height: 320) {
 - When a `render` holds only other components, `if`, `for` or `slot`, its content doesn't show where it draws. Name the place: `fn render(window)`, `fn render(terminal)` or `fn render(document)`.
 
 In XML the place is the `surface` attribute, `<fn name="render" surface="terminal">`, and a component is an element named after its type, `<NoteCard title="Milk" />`.
+
+## Components in documents
+
+A component can be a part of a [document](documents.md): a finding, a method, a signature block. Its `render` holds document elements, or returns the part written in Markdown or LaTeX.
+
+````kscript
+import KScript.Document
+
+type Panel extends Component {
+  construct({ heading: string })
+
+  fn render() {
+    Section(title: "{$heading}") {
+      slot
+    }
+  }
+}
+
+type Finding extends Component {
+  construct({ title: string, count: int })
+
+  fn render() => ```md
+    ## {$title}
+
+    We saw **{$count}** of them in \( 10^{3} \) generations.
+    ```
+}
+
+type Method extends Component {
+  construct({ name: string, share: string })
+
+  fn render() => ```latex
+    \subsection{Method: {$name}}
+    We used \textbf{$name} on {$share} of the runs.
+    \begin{equation}
+      N(t) = N_0 e^{rt}
+    \end{equation}
+    ```
+}
+
+Document(title: "Gliders", into: report) {
+  Panel(heading: "Results") {
+    Finding(title: "Gliders", count: 3)
+    Method(name: "counting", share: "50%")
+  }
+}
+
+echo $report->markdown()
+````
+
+- Inside `Document`, a component draws with its document `render`. What it adds goes where it is written, so a heading in a part that sits inside a `Section` becomes a subsection.
+- `slot` works in a `render` that holds elements. A block is all text, so it has nowhere to put the caller's content.
+- A document is drawn once, so a component in it keeps no state between draws.
+- In a `md` block, `{ }` holds a value, as it does in a `Paragraph`. Maths is written `\( x^{2} \)` and `\[ x^{2} \]`, and keeps its braces.
+- In a `latex` block the braces are LaTeX's. A group that holds only a value, such as `{$name}` or `{@today()}`, is filled in and keeps its braces, so `\textbf{$name}` is the name in bold. The value is escaped, so a `%`, `&` or `_` in it is shown as text.
+- A `latex` block reads the LaTeX a part is usually written in:
+
+| LaTeX | What it reads |
+| --- | --- |
+| Structure | `\section`, `\subsection`, `\subsubsection` (with `*` for no number) and `\label` |
+| Text | `\textbf`, `\textit`, `\emph`, `\texttt`, `\underline`, `\href`, `\url`, `\footnote`, `\cite`, `\ref`, `\\`, `~`, ` `` ` and `''`, `--` and `---`, and `%` comments |
+| Maths | `$...$`, `\( \)`, `\[ \]`, `$$ $$`, and the `equation`, `equation*`, `displaymath`, `align` and `align*` environments |
+| Blocks | `itemize`, `enumerate`, `quote`, `quotation`, `center`, `verbatim` and `figure` (with `\includegraphics`, `\caption` and `\label`) |
+| Layout | `\newpage`, `\clearpage`, `\tableofcontents`, `\hrule`, `\smallskip`, `\medskip`, `\bigskip` and `\par` |
+
+A command it doesn't read is an error that names it, so nothing is left out without a word. Write that part with document elements instead.
 
 ## Actions and browser events
 

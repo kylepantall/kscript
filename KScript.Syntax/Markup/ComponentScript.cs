@@ -64,8 +64,8 @@ namespace KScript.Syntax.Markup
 
         /// <summary>
         /// The surface a component's <c>render</c> draws, or null when its content doesn't show one. It is named
-        /// (<c>fn render(window)</c>), or read from the content: an <c>html</c> block is a page, and otherwise the
-        /// first element that belongs to a surface decides (<c>Column</c> a window, <c>echo</c> the terminal).
+        /// (<c>fn render(window)</c>), or read from the content: an <c>html</c> block is a page, a <c>md</c> or
+        /// <c>latex</c> block is a document, and otherwise the first element that belongs to a surface decides (<c>Column</c> a window, <c>echo</c> the terminal).
         /// <paramref name="packageOf"/> gives the package an element belongs to.
         /// </summary>
         public static string SurfaceOf(MarkupElement render, Func<string, string> packageOf)
@@ -74,7 +74,8 @@ namespace KScript.Syntax.Markup
             if (render.GetAttributeValue("returns")?.Trim() == Contract) return Page;
             var value = render.GetAttribute("value")?.Value
                 ?? render.ChildElements.LastOrDefault(e => e.Name == "return")?.GetAttribute("value")?.Value;
-            if (value != null && LeadingBlock(value) is StringBlock block) return block.Language == "html" ? Page : null;
+            if (value != null && LeadingBlock(value) is StringBlock block)
+                return block.Language == "html" ? Page : IsSource(block) ? Document : null;
             foreach (MarkupElement e in Within(render))
             {
                 if (e.Name == "echo") return Terminal;
@@ -141,6 +142,43 @@ namespace KScript.Syntax.Markup
 
         public static StringBlock StyleBlock(MarkupElement function, DecodedText value) =>
             ReturnBlock(function, value, StyleContract) is { Language: "css" or "ks.css" } style ? style : null;
+
+        /// <summary>
+        /// The Markdown or LaTeX block a component's <c>render</c> returns: what it adds to a document. Null for
+        /// anything else.
+        /// </summary>
+        public static StringBlock SourceBlock(MarkupElement function, DecodedText value) =>
+            value != null && IsRender(function) && function.GetAttribute("surface") == null && function.GetAttribute("returns") == null
+                && LeadingBlock(value) is StringBlock block && IsSource(block) ? block : null;
+
+        /// <summary>True for a block named md, markdown, latex or tex.</summary>
+        private static bool IsSource(StringBlock block) =>
+            block.Language != null && StringBlock.ValueType(block.Tag) is KType.Markdown or KType.Latex;
+
+        /// <summary>A block's text, with each character mapped back to the file <paramref name="value"/> came from.</summary>
+        public static DecodedText BlockText(StringBlock block, DecodedText value) =>
+            new DecodedText(block.Value, block.Map.Select(value.ToSource).ToArray());
+
+        /// <summary>
+        /// The values written in a LaTeX block. Its braces are LaTeX's, so only a group that holds one value
+        /// (<c>{$title}</c>, <c>{@today()}</c>) is one: where the group opens and closes, and the value inside.
+        /// </summary>
+        public static IEnumerable<(int Open, int Close, DecodedText Value)> LatexValues(DecodedText latex)
+        {
+            string text = latex.Value;
+            for (int open = text.IndexOf('{'); open >= 0; open = text.IndexOf('{', open + 1))
+            {
+                int start = open + 1;
+                while (start < text.Length && text[start] == ' ') start++;
+                if (start + 1 >= text.Length || text[start] is not ('$' or '@') || !(char.IsLetter(text[start + 1]) || text[start + 1] == '_')) continue;
+                int close = start;
+                for (int depth = 0; close < text.Length && (text[close] != '}' || depth-- > 0); close++)
+                    if (text[close] == '{') depth++;
+                if (close == text.Length || !ExpressionParser.ParseExpression(text[(open + 1)..close]).Success) continue;
+                yield return (open, close, new DecodedText(text[(open + 1)..close], Enumerable.Range(open + 1, close - open).Select(latex.ToSource).ToArray()));
+                open = close;
+            }
+        }
 
         private static StringBlock ReturnBlock(MarkupElement function, DecodedText value, string contract)
         {

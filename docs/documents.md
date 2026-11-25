@@ -291,6 +291,10 @@ Document(title: "From Markdown", to: "notes.pdf") {
 
 In Markdown files, `$x$` and `$$ ... $$` are maths too. In text inside a script, use `\( \)` and `\[ \]`, since `$` is a variable there.
 
+## Parts as components
+
+A part you use in several documents, such as a finding, a method or a signature block, can be a [component](components.md#components-in-documents). Its `render` holds document elements, or returns the part as a `md` or `latex` block, and a document draws it by name: `Finding(title: "Gliders", count: 3)`.
+
 ## Letters and invoices
 
 `Letter` lays out a letter around the paragraphs inside it. In addresses, `\n` starts a new line:

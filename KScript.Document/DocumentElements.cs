@@ -28,6 +28,30 @@ namespace KScript.Documents
         [ThreadStatic]
         private static Builder current;
 
+        /// <summary>
+        /// A document draws the components written in it. A component's render adds blocks with the elements it
+        /// holds, or returns Markdown or LaTeX that is read into blocks here.
+        /// </summary>
+        internal sealed class Surface : RenderSurface
+        {
+            public override string Name => KScript.Syntax.Markup.ComponentScript.Document;
+
+            public override bool Active => current != null;
+
+            // A document is drawn once, so a component in it has nothing to keep.
+            public override Record Instance(ElementRun run, object id, Func<Record, Record> make) => make(null);
+
+            public override void Returned(ElementRun run, object value)
+            {
+                if (value is not ComponentSource source) return;
+                current.Target.AddRange(Located(run, () =>
+                {
+                    string text = source.Fill(run.Interpreter, Export.LatexText.Escape);
+                    return source.Latex ? LatexBlocks.Parse(text) : MarkdownBlocks.Parse(text, dollarMaths: false);
+                }));
+            }
+        }
+
         private static Builder Current(ElementRun run) =>
             current ?? throw run.Error($"{run.Element.Name} only works inside a Document block.", null, "Syntax");
 

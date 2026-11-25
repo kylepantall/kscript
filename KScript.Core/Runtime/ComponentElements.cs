@@ -21,6 +21,14 @@ namespace KScript.Runtime
         /// lasts: it calls <paramref name="make"/> with the one it drew last time (or null) and keeps the result.
         /// </summary>
         public abstract Record Instance(ElementRun run, object id, Func<Record, Record> make);
+
+        /// <summary>
+        /// Takes what a component's render returned, for a surface a render can return content for (a document
+        /// takes Markdown and LaTeX). Most renders draw with elements and return nothing.
+        /// </summary>
+        public virtual void Returned(ElementRun run, object value)
+        {
+        }
     }
 
     /// <summary>
@@ -118,7 +126,8 @@ namespace KScript.Runtime
             slots.Push(run);
             try
             {
-                run.Interpreter.Call(method, Array.Empty<object>(), scope: run.Scope, module: run.Module);
+                object returned = run.Interpreter.Call(method, Array.Empty<object>(), scope: run.Scope, module: run.Module);
+                host?.Returned(run, returned);
             }
             finally
             {

@@ -35,6 +35,8 @@ namespace KScript.Documents
 
         protected override void Register(PackageBuilder p)
         {
+            ComponentElements.AddSurface(new DocumentElements.Surface());
+
             var style = new List<A>
             {
                 new A("template", K.Enum, "The look: plain (the default), paper, report, letter or invoice.", false, "plain", "paper", "report", "letter", "invoice"),

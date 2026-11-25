@@ -1274,6 +1274,11 @@ namespace KScript.Language.Analysis
                     return;
                 }
                 if (ComponentScript.StyleBlock(fn, attr.Value) is { Error: null }) return;
+                if (ComponentScript.SourceBlock(fn, attr.Value) is { Error: null } part)
+                {
+                    AnalyzeComponentSource(part, attr, scope);
+                    return;
+                }
             }
             switch (a.Kind)
             {
@@ -1726,6 +1731,19 @@ namespace KScript.Language.Analysis
             inComponentHtml = true;
             try { WalkChildren(fragment.Children, scope, markupMode: true); }
             finally { inComponentHtml = false; }
+        }
+
+        /// <summary>Checks the values in the Markdown or LaTeX a component's render returns for a document.</summary>
+        private void AnalyzeComponentSource(StringBlock block, MarkupAttribute attribute, Scope scope)
+        {
+            DecodedText text = ComponentScript.BlockText(block, attribute.Value);
+            if (StringBlock.ValueType(block.Tag) != KType.Latex)
+            {
+                AnalyzeTemplate(text, scope, attribute.Owner, attribute, allowBare: false, TextLiterals.Maths);
+                return;
+            }
+            foreach ((_, _, DecodedText value) in ComponentScript.LatexValues(text))
+                AnalyzeExpressionRegion(value, RegionKind.Expression, scope, attribute.Owner, attribute);
         }
 
         private void AnalyzeFn(MarkupElement e, Scope outer, bool markupMode)
