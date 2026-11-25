@@ -272,7 +272,7 @@ namespace KScript
         string[] TakeEnvironment(string[] args)
         {
             var rest = new List<string>();
-            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test" || args[0] == "css");
+            bool anywhere = args.Length > 0 && (args[0] == "serve" || args[0] == "test" || args[0] == "css" || args[0] == "worker" || args[0] == "queue");
             bool before = true;
             for (int i = 0; i < args.Length; i++)
             {
