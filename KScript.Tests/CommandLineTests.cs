@@ -298,6 +298,17 @@ public sealed class CommandLineTests : IDisposable
         Assert.Contains("--port needs a number", Kscript("serve", "--port", "x").Err);
         Assert.Contains("--port needs a number", Kscript("serve", "-p").Err);
         Assert.Contains("--host needs a value", Kscript("serve", "--host").Err);
+        foreach (string number in new[] { "-1", "65536", "99999" })
+        {
+            var wrong = Kscript("serve", "--port", number);
+            Assert.Equal(2, wrong.Code);
+            Assert.Contains($"{number} isn't a port. Use a number from 1 to 65535", wrong.Err);
+            Assert.DoesNotContain("Serving", wrong.Out);
+        }
+        var nowhere = Kscript("serve", "--host", "not a host");
+        Assert.Equal(2, nowhere.Code);
+        Assert.Contains("'not a host' isn't an address", nowhere.Err);
+        Assert.DoesNotContain("Serving", nowhere.Out);
         Assert.Equal(2, Kscript("serve", Path.Combine(dir, "missing")).Code);
 
         Write("site/kscript.json", "{ nope");
@@ -312,6 +323,8 @@ public sealed class CommandLineTests : IDisposable
         var busy = Kscript("serve", Path.Combine(dir, "site"));
         Assert.Equal(1, busy.Code);
         Assert.Contains("Could not start the server", busy.Err);
+        // It never started, so it must not say it is serving.
+        Assert.DoesNotContain("Serving", busy.Out);
         Assert.Contains("unknown setting 'bogus'", busy.Err);
     }
 

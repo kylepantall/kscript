@@ -380,17 +380,18 @@ namespace KScript.Pages
             });
 
             string url = host == "localhost" ? $"http://localhost:{port}" : $"http://{host}:{port}";
-            if (onStarted == null && cli != null)
-            {
-                cli.NewLine();
-                cli.Info($"Serving [{site.Root}] on [{url}].");
-                cli.NewLine();
-                cli.Comment("  Press Ctrl+C to stop the server");
-                cli.NewLine();
-            }
             try
             {
                 await app.StartAsync(stop);
+                // Only once the port is taken: a server that could not start never says it is serving.
+                if (onStarted == null && cli != null)
+                {
+                    cli.NewLine();
+                    cli.Info($"Serving [{site.Root}] on [{url}].");
+                    cli.NewLine();
+                    cli.Comment("  Press Ctrl+C to stop the server");
+                    cli.NewLine();
+                }
                 onStarted?.Invoke(url);
                 await app.WaitForShutdownAsync(stop);
             }
