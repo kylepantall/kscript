@@ -11,6 +11,20 @@ namespace KScript.Documents.Text
     /// </summary>
     public static class InlineParser
     {
+        /// <summary>
+        /// True for an address a document may link to: http, https, mailto, or one with no scheme (another file, or
+        /// #a-place). Text often comes from data, so javascript:, data: and the like are never made into links.
+        /// </summary>
+        public static bool IsLinkTarget(string url)
+        {
+            url = (url ?? string.Empty).Trim();
+            if (url.Length == 0) return false;
+            int colon = url.IndexOf(':');
+            if (colon < 0 || url.IndexOfAny(new[] { '/', '?', '#' }) is int stop && stop >= 0 && stop < colon) return true;
+            string scheme = url.Substring(0, colon).ToLowerInvariant();
+            return scheme is "http" or "https" or "mailto";
+        }
+
         /// <param name="dollarMaths">Also read $maths$, as Markdown files do. Script text uses \( \), since $ starts a variable there.</param>
         public static List<Inline> Parse(string text, bool keepLines = false, bool dollarMaths = false)
         {
@@ -259,6 +273,20 @@ namespace KScript.Documents.Text
                 return true;
             }
 
+            /// <summary>The ) that closes a link's address: brackets inside it pair up, as in .../Life_(game).</summary>
+            private static int LinkEnd(string text, int from)
+            {
+                int depth = 0;
+                for (int i = from; i < text.Length; i++)
+                {
+                    char c = text[i];
+                    if (c == '\n') return -1;
+                    if (c == '(') depth++;
+                    else if (c == ')' && depth-- == 0) return i;
+                }
+                return -1;
+            }
+
             private bool Bracketed(List<Inline> items)
             {
                 int end = Bracket(pos);
@@ -288,10 +316,13 @@ namespace KScript.Documents.Text
                 }
                 if (At(end + 1) == '(')
                 {
-                    int close = text.IndexOf(')', end + 2);
+                    int close = LinkEnd(text, end + 2);
                     if (close < 0) return false;
+                    string url = text.Substring(end + 2, close - end - 2).Trim();
+                    // Anything but a web address, an email or a place in the document stays as the text it is.
+                    if (!IsLinkTarget(url)) return false;
                     Flush(items);
-                    var link = new LinkInline { Url = text.Substring(end + 2, close - end - 2).Trim() };
+                    var link = new LinkInline { Url = url };
                     link.Children.AddRange(Merge(Parse(inside, false, dollarMaths)));
                     items.Add(link);
                     pos = close + 1;

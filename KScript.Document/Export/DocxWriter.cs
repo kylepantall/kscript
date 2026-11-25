@@ -55,7 +55,7 @@ namespace KScript.Documents.Export
 
         private DocumentStyle S => doc.Style;
 
-        private static string E(string s) => SecurityElement.Escape(s ?? string.Empty);
+        private static string E(string s) => SecurityElement.Escape(XmlChars.Clean(s));
 
         private static int Twips(double pt) => (int)Math.Round(pt * 20);
 

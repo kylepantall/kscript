@@ -24,7 +24,7 @@ namespace KScript.Documents.Export
 
         public static string Write(Document doc) => new HtmlWriter(doc).Build();
 
-        private static string H(string s) => WebUtility.HtmlEncode(s ?? string.Empty);
+        private static string H(string s) => WebUtility.HtmlEncode(XmlChars.Clean(s));
 
         private DocumentStyle S => doc.Style;
 

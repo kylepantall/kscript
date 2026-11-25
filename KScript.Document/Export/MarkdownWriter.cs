@@ -26,17 +26,17 @@ namespace KScript.Documents.Export
         {
             if (doc.Style.ShowTitle && doc.Title != null)
             {
-                sb.Append("# ").Append(doc.Title).Append("\n\n");
-                if (doc.Subtitle != null) sb.Append("*").Append(doc.Subtitle).Append("*\n\n");
-                if (doc.Authors.Count > 0) sb.Append(string.Join(", ", doc.Authors.Select(a => a.Affiliation != null ? $"{a.Name} ({a.Affiliation})" : a.Name))).Append("\n\n");
-                if (doc.Date != null) sb.Append(doc.Date).Append("\n\n");
+                sb.Append("# ").Append(EscapeText(doc.Title)).Append("\n\n");
+                if (doc.Subtitle != null) sb.Append("*").Append(EscapeText(doc.Subtitle)).Append("*\n\n");
+                if (doc.Authors.Count > 0) sb.Append(string.Join(", ", doc.Authors.Select(a => EscapeText(a.Affiliation != null ? $"{a.Name} ({a.Affiliation})" : a.Name)))).Append("\n\n");
+                if (doc.Date != null) sb.Append(EscapeText(doc.Date)).Append("\n\n");
             }
             if (doc.Abstract.Count > 0)
             {
                 sb.Append("**Abstract.** ");
                 Blocks(doc.Abstract, string.Empty);
             }
-            if (doc.Keywords.Count > 0) sb.Append("**Keywords:** ").Append(string.Join(", ", doc.Keywords)).Append("\n\n");
+            if (doc.Keywords.Count > 0) sb.Append("**Keywords:** ").Append(EscapeText(string.Join(", ", doc.Keywords))).Append("\n\n");
             Blocks(doc.Blocks, string.Empty);
             if (resolved.Footnotes.Count > 0)
             {
@@ -91,6 +91,8 @@ namespace KScript.Documents.Export
                     break;
                 case Table t:
                 {
+                    // A table with no rows (a query that found nothing) has nothing to show.
+                    if (t.Rows.Count == 0) break;
                     if (t.Caption != null) Line(indent, $"**Table {t.Number}:** {Inlines(t.Caption)}\n");
                     int columns = t.ColumnCount;
                     List<TableRow> rows = t.Rows;
@@ -100,7 +102,8 @@ namespace KScript.Documents.Export
                         var cells = new List<string>();
                         foreach (TableCell c in row.Cells)
                         {
-                            string text = Inlines(c.Inlines).Replace("|", "\\|").Replace("\n", " ");
+                            // Text already has its | escaped; code and maths don't.
+                            string text = UnescapedPipe.Replace(Inlines(c.Inlines), "\\|").Replace("\n", " ");
                             if (c.Bold) text = "**" + text + "**";
                             cells.Add(text);
                             for (int s = 1; s < c.Span; s++) cells.Add(string.Empty);
@@ -130,14 +133,24 @@ namespace KScript.Documents.Export
                     sb.Append('\n');
                     break;
                 case CodeBlock c:
-                    Line(indent, "```" + (c.Language ?? string.Empty));
+                {
+                    // A fence longer than any run of backticks in the code, so the code can't end it.
+                    int longest = 0, run = 0;
+                    foreach (char ch in c.Text)
+                    {
+                        run = ch == '`' ? run + 1 : 0;
+                        longest = Math.Max(longest, run);
+                    }
+                    string fence = new string('`', Math.Max(3, longest + 1));
+                    Line(indent, fence + (c.Language ?? string.Empty).Replace('`', ' ').Replace('\n', ' ').Trim());
                     foreach (string line in c.Text.Split('\n')) Line(indent, line);
-                    Line(indent, "```");
+                    Line(indent, fence);
                     sb.Append('\n');
                     break;
+                }
                 case Quote q:
                     Blocks(q.Blocks, indent + "> ");
-                    if (q.Attribution != null) Line(indent + "> ", "\u2014 " + q.Attribution);
+                    if (q.Attribution != null) Line(indent + "> ", "\u2014 " + EscapeText(q.Attribution));
                     sb.Append('\n');
                     break;
                 case PageBreak:
@@ -148,7 +161,7 @@ namespace KScript.Documents.Export
                     sb.Append('\n');
                     break;
                 case Contents c:
-                    sb.Append("**").Append(c.Title).Append("**\n\n");
+                    sb.Append("**").Append(EscapeText(c.Title)).Append("**\n\n");
                     foreach (Section s in resolved.Sections.Where(x => x.Level <= c.Depth))
                     {
                         sb.Append(new string(' ', (s.Level - 1) * 2)).Append("- ");
@@ -159,7 +172,7 @@ namespace KScript.Documents.Export
                     break;
                 case Bibliography bib:
                     if (resolved.Cited.Count == 0) break;
-                    sb.Append(new string('#', 1 + HeadingOffset)).Append(' ').Append(bib.Title).Append("\n\n");
+                    sb.Append(new string('#', 1 + HeadingOffset)).Append(' ').Append(EscapeText(bib.Title)).Append("\n\n");
                     foreach (Source s in resolved.Cited)
                     {
                         string entry = Inlines(BibTex.Format(s, doc.Style.Citations));
@@ -169,6 +182,8 @@ namespace KScript.Documents.Export
                     break;
             }
         }
+
+        private static readonly System.Text.RegularExpressions.Regex UnescapedPipe = new System.Text.RegularExpressions.Regex(@"(?<!\\)\|", System.Text.RegularExpressions.RegexOptions.Compiled);
 
         private static string EscapeText(string text)
         {
