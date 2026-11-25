@@ -170,7 +170,7 @@ repo = ```<Repo>
   words `lt`, `le`, `gt`, `ge`, `eq` and `ne` are the XML spellings: `kscript convert` writes the symbols, and a
   word left in a `.kscript` file is reported (KS6012) with a fix.
 - A name is declared bare and read with `$`: `total = 0`, `total += 1`, `for item in $list`, `fn double(n)`,
-  `fn(n) => $n * 2`. Writing `$total = 0` or `fn($n)` is reported (KS6010) with a fix.
+  `fn(n) => $n * 2`. Writing `$total = 0`, `fn double($n)` or `fn($n)` is reported (KS6010) with a fix.
 - The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. `import` goes at that top
   level, not inside another block.
 - A package is named only in `import KScript.UI`. A statement is never written with the `KScript.` prefix: write

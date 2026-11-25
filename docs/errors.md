@@ -334,7 +334,7 @@ The KS6xxx codes come in two kinds.
 
 ## KS6010
 
-**A name declared with `$`.** An error in a `.kscript` file, and a warning in XML. `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
+**A name declared with `$`.** An error in a `.kscript` file, and a warning in XML. `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, `fn(n) => $n * 2`, not `fn($n) => $n * 2`, and `fn double(n) => $n * 2`, not `fn double($n)`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
 
 ## KS6011
 

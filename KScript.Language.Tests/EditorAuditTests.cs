@@ -237,5 +237,25 @@ namespace KScript.Language.Tests
         }
 
         #endregion
+
+        #region Checks
+
+        [Fact]
+        public void ANamedFunctionDeclaresItsParametersBare()
+        {
+            DocumentAnalysis a = Check(Lines("fn add($a: number, b: number = [1, 2]->count(), $c = 1) => $a + $b + $c", "echo @add(1, 2)"));
+            List<Diagnostic> found = a.Diagnostics.Where(d => d.Code == DiagnosticCodes.BareDeclaration).OrderBy(d => d.Span.Start).ToList();
+            Assert.Equal(new[] { "$a", "$c" }, found.Select(d => a.Source[d.Span]));
+            Assert.All(found, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
+            Assert.Contains("Declare the parameter as a", found[0].Message);
+            string once = AnalyzerTests.Apply(a.Source.Text, found[1].Fixes.Single().Changes);
+            Assert.StartsWith("fn add($a: number, b: number = [1, 2]->count(), c = 1) =>", once);
+
+            (string fixedText, int count) = Fixer.Apply(a.Source.Text, At("fix.kscript"), null);
+            Assert.Equal(2, count);
+            Assert.StartsWith("fn add(a: number, b: number = [1, 2]->count(), c = 1) =>", fixedText);
+        }
+
+        #endregion
     }
 }
