@@ -307,10 +307,20 @@ namespace KScript.Language.Features
         /// well as this one, and its declaration. Anything else gives this document's references, as
         /// <see cref="GetReferences"/> does. Locations in this document have no path.
         /// </summary>
-        public List<SourceLocation> GetProjectReferences(DocumentAnalysis analysis, int offset, bool includeDeclaration)
+        public List<SourceLocation> GetProjectReferences(DocumentAnalysis analysis, int offset, bool includeDeclaration) =>
+            ProjectReferences(analysis, offset, includeDeclaration, everyName: false);
+
+        /// <summary>
+        /// The same search, for a rename when <paramref name="everyName"/> is set: every place the name is written, so
+        /// also where another file imports it by name (<c>import show_login from "..."</c>), and never a literal that
+        /// only has the type's value.
+        /// </summary>
+        private List<SourceLocation> ProjectReferences(DocumentAnalysis analysis, int offset, bool includeDeclaration, bool everyName)
         {
-            List<SourceLocation> local = GetReferences(analysis, offset, includeDeclaration).Select(r => new SourceLocation(null, r.Span)).ToList();
             SymbolReference at = analysis.ReferenceAt(offset);
+            List<SourceLocation> local = at == null ? new List<SourceLocation>() : analysis.ReferencesTo(at.Symbol)
+                .Where(r => (includeDeclaration || !r.IsDeclaration) && !(everyName && r.IsPatternLiteral))
+                .OrderBy(r => r.Span.Start).Select(r => new SourceLocation(null, r.Span)).ToList();
             if (at == null || analysis.Path == null || at.Symbol.Kind is not (SymbolKind.Function or SymbolKind.Constant) || at.Symbol.ExtensionOf != null)
             {
                 return local;
@@ -324,7 +334,8 @@ namespace KScript.Language.Features
             }
 
             IEnumerable<SymbolReference> Matches(DocumentAnalysis doc, string path) =>
-                doc.References.Where(r => (!r.IsDeclaration || (includeDeclaration && path == target))
+                doc.References.Where(r => (!r.IsDeclaration || (includeDeclaration && (everyName || path == target)))
+                    && !(everyName && r.IsPatternLiteral)
                     && r.Symbol.Kind == s.Kind && r.Symbol.ProjectUseName == s.ProjectUseName && DefinitionPath(doc, r.Symbol) == target);
 
             List<SourceLocation> found = Matches(analysis, self).Select(r => new SourceLocation(null, r.Span)).ToList();
@@ -393,10 +404,18 @@ namespace KScript.Language.Features
                 return new RenameResult { Error = $"'{name}' is already used here." };
             }
 
+            // A function, constant or type that other files use is renamed in all of them, or the project would stop working.
             RenameResult result = new RenameResult();
-            foreach (SymbolReference r in analysis.ReferencesTo(at.Symbol).Where(r => !r.IsPatternLiteral))
+            foreach (SourceLocation location in ProjectReferences(analysis, offset, includeDeclaration: true, everyName: true))
             {
-                result.Changes.Add(new TextChange(r.Span, name));
+                if (location.Path == null)
+                {
+                    if (!result.Changes.Any(c => c.Span.Equals(location.Span))) result.Changes.Add(new TextChange(location.Span, name));
+                }
+                else if (!result.OtherFiles.Any(o => o.Path == location.Path && o.Start.Equals(location.Start)))
+                {
+                    result.OtherFiles.Add(location);
+                }
             }
             return result;
         }

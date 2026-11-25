@@ -21,6 +21,9 @@ namespace KScript.Language.Analysis
         // Variables a control or input is bound to (bind="draft"): written, but read too.
         private readonly HashSet<Symbol> boundVariables = new HashSet<Symbol>();
 
+        // Variables that 'single-quoted text' names ('Hello $name'): KS2005 says the text isn't filled in, so the variable isn't unused too.
+        private readonly HashSet<Symbol> mentionedInText = new HashSet<Symbol>();
+
         private static readonly string[] ResourceActions = { "index", "store", "show", "update", "destroy" };
 
         // Uses of each symbol (references that are not its declaration).
@@ -105,7 +108,7 @@ namespace KScript.Language.Analysis
 
         /// <summary>True if anything reads the symbol (or a symbol declared at the same place). A function calling itself doesn't count.</summary>
         private bool IsRead(Symbol symbol) =>
-            SameDeclaration(symbol).Any(s => boundVariables.Contains(s) || uses[s].Any(r => !r.IsWrite && !(s.Kind == SymbolKind.Function && s.DeclaringElement.Span.Contains(r.Span.Start))));
+            SameDeclaration(symbol).Any(s => boundVariables.Contains(s) || mentionedInText.Contains(s) || uses[s].Any(r => !r.IsWrite && !(s.Kind == SymbolKind.Function && s.DeclaringElement.Span.Contains(r.Span.Start))));
 
         private IEnumerable<Symbol> SameDeclaration(Symbol symbol) =>
             symbol.DeclarationSpan.Length > 0 ? declarations[(symbol.Name, symbol.DeclarationSpan)] : new[] { symbol };

@@ -73,7 +73,10 @@ function and constant the file declares (`Symbol.Members`, each with `Alias` set
 and `accounts.limit` are references to those symbols, so completion after `@accounts.` lists them with their signatures
 and docs, hover shows them, go to definition opens the imported file, and calls through the alias have their arguments
 checked. A name the file doesn't have is KS4005. `textDocument/references` on a function or constant other scripts
-import also searches the rest of the project (`LanguageService.GetProjectReferences`). A package alias
+import also searches the rest of the project (`LanguageService.GetProjectReferences`), and `textDocument/rename`
+on one renames it in every file that uses or imports it, so the project keeps working. A type's name is a reference
+wherever it is written, in a parameter, field or variable's type as well as in code, so renaming the type follows all
+of them. Text in single quotes is never a reference: `'Hello $name'` only mentions the name. A package alias
 (`import KScript.Math as math`) completes and hovers its package's commands.
 
 Where the type of a value is known (`tz: timezone = ‸`, a typed parameter, a named argument), completion lists the

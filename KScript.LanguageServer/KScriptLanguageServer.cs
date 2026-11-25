@@ -604,7 +604,18 @@ namespace KScript.LanguageServer
             {
                 throw new LspException(ErrorCodes.RequestFailed, result.Error);
             }
-            return new JsonObject { ["changes"] = new JsonObject { [doc.Uri] = Edits(a.Source, result.Changes) } };
+            JsonObject changes = new JsonObject { [doc.Uri] = Edits(a.Source, result.Changes) };
+            string newName = result.Changes.FirstOrDefault()?.NewText;
+            foreach (IGrouping<string, SourceLocation> file in result.OtherFiles.GroupBy(o => Workspace.PathToUri(o.Path)))
+            {
+                JsonArray edits = new JsonArray();
+                foreach (SourceLocation at in file)
+                {
+                    edits.Add((JsonNode)new JsonObject { ["range"] = new JsonObject { ["start"] = Position(at.Start), ["end"] = Position(at.End) }, ["newText"] = newName });
+                }
+                changes[file.Key] = edits;
+            }
+            return new JsonObject { ["changes"] = changes };
         }
 
         private JsonNode FoldingRanges(JsonNode p)
