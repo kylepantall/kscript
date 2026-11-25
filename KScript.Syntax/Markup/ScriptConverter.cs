@@ -701,15 +701,16 @@ namespace KScript.Syntax.Markup
                             WriteBlock("extend " + extended.Trim(), e, indent, chained);
                             return;
                         }
-                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional") && Attr("name") != null
-                        && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override")))):
+                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional", "surface") && Attr("name") != null
+                        && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override"))))
+                        && (Attr("surface") == null || (Attr("params") == null && ComponentScript.IsRender(e) && ComponentScript.Surfaces.Contains(Attr("surface").Trim()))):
                         {
                             if (!chained)
                             {
                                 WriteDoc(e, indent);
                             }
                             string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim()
-                                + (Attr("optional") != null ? "?" : "") + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
+                                + (Attr("optional") != null ? "?" : "") + "(" + (Attr("surface")?.Trim() ?? Attr("params")?.Trim() ?? string.Empty) + ")";
                             if (Attr("returns") is string returns) header += ": " + returns.Trim();
                             if (Attr("signature") != null)
                             {
@@ -1388,6 +1389,12 @@ namespace KScript.Syntax.Markup
                         if (info?.IsName == true && IsSafeBare(trimmed))
                         {
                             return trimmed;
+                        }
+                        // An argument the element doesn't list (a component's input) that is one { value } is that value.
+                        if (info == null && trimmed.Length > 2 && trimmed[0] == '{' && trimmed.IndexOf('}') == trimmed.Length - 1
+                            && trimmed.Substring(1, trimmed.Length - 2).Trim() is { Length: > 0 } lone && lone[0] is '$' or '@' && IsSafeBare(lone))
+                        {
+                            return lone;
                         }
                         return IsNumber(trimmed) ? trimmed : Quote(value);
                     default:

@@ -731,6 +731,8 @@ namespace KScript.Language.Analysis
                 CheckTemplateInputs(e, ResolvePath(e.GetAttributeValue("path")));
             if (Kind != DocumentKind.Script && info.Name == "prop" && e.Parent != null)
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, "Declare props at the top level of the layout or component.");
+            if (Kind == DocumentKind.Script && info.Name == ComponentScript.SlotElement && !e.Ancestors().Any(ComponentScript.IsRender))
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, Wording.Prose(ComponentScript.SlotOutsideRender));
             ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
             if (info.Name == "guard" && !GuardLeaves(e))
@@ -959,6 +961,11 @@ namespace KScript.Language.Analysis
 
             if (!markupMode)
             {
+                if (ComponentDrawnBy(e) is MarkupElement drawn)
+                {
+                    WalkComponentElement(e, drawn, scope, inner);
+                    return;
+                }
                 ReportUnknownElement(e);
 
                 // Keep going inside, but don't pile up knock-on errors: a retired <def id="x"> still declares $x,

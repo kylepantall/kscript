@@ -18,14 +18,7 @@ namespace KScript.Language.Analysis
             {
                 var type = ComponentScript.FindType(document, ComponentScript.Tag(path));
                 if (type == null) yield break;
-                foreach (var field in TypeBody.Inputs(type))
-                {
-                    string name = field.GetAttributeValue("name")?.Trim();
-                    if (string.IsNullOrEmpty(name)) continue;
-                    bool optional = name.EndsWith('?') || field.GetAttribute("optional") != null || field.GetAttribute("default") != null ||
-                        TemplateContract.HasImplicitFieldDefault(KScript.Runtime.TypeRef.Parse(field.GetAttributeValue("type")));
-                    yield return (name.TrimEnd('?').Replace('_', '-'), !optional);
-                }
+                foreach ((string name, bool required) in Inputs(type)) yield return (name.Replace('_', '-'), required);
                 yield break;
             }
             foreach (MarkupElement declaration in Declarations(document))
@@ -33,6 +26,19 @@ namespace KScript.Language.Analysis
                 string name = declaration.GetAttributeValue("name");
                 if (TemplateContract.IsPropName(name))
                     yield return (name, TemplateContract.IsRequired(declaration.GetAttribute("required") != null, declaration.GetAttributeValue("required")));
+            }
+        }
+
+        /// <summary>What a component type takes from whoever draws it: each input's field name, and whether it must be passed.</summary>
+        internal static IEnumerable<(string Name, bool Required)> Inputs(MarkupElement type)
+        {
+            foreach (var field in TypeBody.Inputs(type))
+            {
+                string name = field.GetAttributeValue("name")?.Trim();
+                if (string.IsNullOrEmpty(name)) continue;
+                bool optional = name.EndsWith('?') || field.GetAttribute("optional") != null || field.GetAttribute("default") != null ||
+                    TemplateContract.HasImplicitFieldDefault(KScript.Runtime.TypeRef.Parse(field.GetAttributeValue("type")));
+                yield return (name.TrimEnd('?'), !optional);
             }
         }
 

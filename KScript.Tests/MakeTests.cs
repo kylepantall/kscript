@@ -132,7 +132,7 @@ public class ScaffolderTests
         Assert.Contains("<hero title=\"…\" sub-title=\"…\" />", output);
         string source = Read(site, "_components/hero.kscript");
         Assert.Contains("type Hero extends Component", source);
-        Assert.Contains("fn render(): Component", source);
+        Assert.Contains("fn render() {", source);
         Assert.Contains("<p>{$.sub_title}</p>", source);
 
         // A one-word component works as <hero>, not only hyphenated names.

@@ -591,10 +591,37 @@ namespace KScript.Language.Analysis
             foreach (var signature in signatures)
             {
                 shape.Methods.TryGetValue(signature.Name, out Symbol method);
-                if (signature.Problem(method?.DeclaringElement) is string problem)
-                    Report(method?.DeclaringElement?.NameSpan ?? span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                MarkupElement implementation = method?.DeclaringElement;
+                if (contract == ComponentScript.Contract && signature == KScript.Runtime.MethodSignature.Render)
+                {
+                    // A component has one render for each place it is drawn; any of them makes it a component.
+                    if (!CheckRenders(type, shape.Name, out implementation)) continue;
+                }
+                if (signature.Problem(implementation) is string problem)
+                    Report(implementation?.NameSpan ?? span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"{shape.Name} must {problem} to extend {contract}.");
             }
+        }
+
+        /// <summary>
+        /// Checks a component's render methods: each shows or names where it draws, and no two draw the same place.
+        /// Gives the page's render, and false when the component only draws elsewhere, so it needs none for a page.
+        /// </summary>
+        private bool CheckRenders(MarkupElement type, string name, out MarkupElement page)
+        {
+            page = null;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (MarkupElement render in type.ChildElements.Where(ComponentScript.IsRender))
+            {
+                string surface = ComponentScript.SurfaceOf(render, element => catalog.GetElement(element)?.Package);
+                if (surface == null)
+                    Report(render.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, ComponentScript.NameTheSurface(name));
+                else if (!seen.Add(surface))
+                    Report(render.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, ComponentScript.TwoRenders(name, surface));
+                else if (surface == ComponentScript.Page)
+                    page = render;
+            }
+            return page != null || !type.ChildElements.Any(ComponentScript.IsRender);
         }
 
         private void DeclareImplicit(Scope scope, string name, TypeShape shape, string description, MarkupElement e, TextSpan? declaration = null)
@@ -803,9 +830,13 @@ namespace KScript.Language.Analysis
             if (TypeNamed(text, offset) == null)
             {
                 IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());
+                if (NestedElsewhere(name) is { Length: > 0 } nested)
+                {
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{name}'.{nested}");
+                    return false;
+                }
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                    NestedElsewhere(name) is { Length: > 0 } nested ? $"Unknown type '{name}'.{nested}"
-                    : $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
+                    $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
                     SuggestFix(span, name, known, n => n));
                 return false;
             }

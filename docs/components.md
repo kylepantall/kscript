@@ -12,7 +12,7 @@ import KScript.Web
 type ClickCounter extends Component {
   count: int = 0
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <button type="button" @on-click(count += 1)>Count is {$count}</button>
     ```
@@ -36,18 +36,18 @@ An explicit `<live>` block lets you choose the root element with `as`, defer ren
 
 ## Component styles
 
-A component can implement the optional `fn style(): ComponentStyle` method to keep its stylesheet beside its
-`render(): Component` method. The renderer validates the HTML returned by `render()` as a KScript page fragment.
+A component can implement the optional `fn style()` method to keep its stylesheet beside its
+`render()` method. The renderer validates the HTML returned by `render()` as a KScript page fragment.
 
 ````kscript
 type Badge extends Component {
   label: string
 
-  fn render(): Component => ```html
+  fn render() => ```html
   <span class="note-badge">{$label}</span>
   ```
 
-  override fn style(): ComponentStyle => ```css
+  override fn style() => ```css
   .note-badge {
     padding: 0.25rem;
   }
@@ -69,7 +69,7 @@ import KScript.Web
 type HelloCard extends Component {
   name: string
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <p>Hello, {$name}!</p>
     ```
@@ -82,7 +82,7 @@ Add `<hello-card name="Sam" />` to `index.html` to render **Hello, Sam!**. Use k
 | Part | How it works |
 | --- | --- |
 | Discovery | KScript resolves `<item-card />` to a component such as `_components/item-card.kscript` or `_components/item-card.html`. |
-| Class contract | A script component extends `Component` from `KScript.Web` and defines `fn render(): Component`. |
+| Class contract | A script component extends `Component` and defines `fn render()`. The `html` block it returns shows that it draws a page, so the method needs no return type. |
 | Inputs | The caller can initialize stored fields using attributes. A field initializer supplies a default. Simple field types also have built-in initial values. |
 | Render-time values | HTML can read a field as `$title` or `$.title`. Computed fields and component methods can prepare display values. |
 | Children | Put `<slot />` in the template to render the caller's child markup. |
@@ -112,7 +112,7 @@ type NoteEditor extends Component {
   descriptions: string[]
   color: color = 'yellow'
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <label>Title <input @bind('title') @bind-on('blur')></label>
     <label><input type="checkbox" @bind('done')> Done</label>
@@ -166,7 +166,7 @@ type NoteCard extends Component {
   heading: string
   clicks: int
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <article>
       <h3>{$heading}</h3>
@@ -209,7 +209,7 @@ type CommentThread extends Component {
     draft = Draft({ })
   }
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <section>
       <p>{Comment->where(post_id: $post_id)->count()} comments, {$order} first</p>
@@ -224,6 +224,75 @@ type CommentThread extends Component {
 A declaration inside a component belongs to that file. The component's fields and methods use it by name, and no other file can, even one that imports the component. When a second file needs it, move it to its own file (`types/draft.kscript`, `models/comment.kscript`) and import it in both. `kscript check` says so when a file names a type that is inside a component it imports.
 
 Only a component can hold declarations this way. A nested declaration doesn't see the component's fields, and it doesn't count as a second type in the file, so the [one type per file](projects.md#where-files-go-the-recommended-layout) rule still holds. `kscript db diff` and `kscript db status` read the models inside components along with the models folder.
+
+## Components in windows and the terminal
+
+A component isn't tied to pages. Every place it can be drawn has its own `render`, and the content of each shows which one it is.
+
+| What `render` holds | Where it draws |
+| --- | --- |
+| A returned `html` block | A page |
+| [KScript.UI](desktop.md) elements such as `Column`, `Text` and `Button` | A window |
+| `echo` or [KScript.Terminal](language.md#terminal-output) elements | The terminal |
+
+A component has at most one `render` for each place. The fields, `construct` block and methods are shared by all of them.
+
+```kscript
+import KScript.UI
+
+type NoteCard extends Component {
+  construct({ title: string, body: string = '' })
+
+  open: bool
+
+  fn render() {
+    Box(padding: 8, border: "#334155") {
+      Row(gap: 8) {
+        Text(weight: bold) "{$title}"
+        Button(on_click: $open) "{ $open ? 'Hide' : 'Show' }"
+      }
+      if $open {
+        Text(wrap) "{$body}"
+        slot
+      }
+    }
+  }
+
+  fn render(terminal) {
+    echo "* {$title}: {$body}"
+    slot
+  }
+}
+```
+
+A script draws a component by writing it as a statement, with its inputs as arguments. Import the component's file first.
+
+```kscript
+import KScript.UI
+import "components/note-card.kscript"
+
+Window(title: "Notes", width: 420, height: 320) {
+  notes = [
+    { title: 'Milk', body: 'Two pints' },
+    { title: 'Eggs', body: 'Six, free range' },
+  ]
+
+  for note in $notes {
+    NoteCard(title: $note.title, body: $note.body, id: $note.title) {
+      Text(color: "#94a3b8") "From the shopping list"
+    }
+  }
+}
+```
+
+- Inside `Window`, the component draws with its window `render`. Written on its own in a script, it draws with its terminal `render`. `kscript check` reports a component drawn where it has no `render`.
+- `slot` in a `render` draws what the caller wrote inside the component.
+- In a window each component keeps its own state between draws, so `$open` above belongs to one card. What the caller passes follows the caller on every draw, and every other field stays as the component left it.
+- Components drawn in a loop are told apart by their turn. Pass `id:` to keep a component's state with its item when the list changes order or loses items.
+- A component that is no longer drawn is gone. It starts fresh if it is drawn again.
+- When a `render` holds only other components, `if`, `for` or `slot`, its content doesn't show where it draws. Name the place: `fn render(window)`, `fn render(terminal)` or `fn render(document)`.
+
+In XML the place is the `surface` attribute, `<fn name="render" surface="terminal">`, and a component is an element named after its type, `<NoteCard title="Milk" />`.
 
 ## Actions and browser events
 

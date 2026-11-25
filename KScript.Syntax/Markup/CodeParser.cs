@@ -985,7 +985,9 @@ namespace KScript.Syntax.Markup
                 }
                 if (end > s)
                 {
-                    AddRawAttribute(e, "params", TextSpan.FromBounds(s, end));
+                    // fn render(window): a component's render names where it draws, in place of parameters.
+                    bool surface = ComponentScript.IsRender(e) && ComponentScript.Surfaces.Contains(text.Substring(s, end - s));
+                    AddRawAttribute(e, surface ? "surface" : "params", TextSpan.FromBounds(s, end));
                 }
             }
             if (doc != null)

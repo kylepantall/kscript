@@ -314,6 +314,7 @@ namespace KScript.Runtime
                 new A("returns", K.Text, "The declared return type."),
                 new A("signature", K.Text, "Declares a method signature without an implementation."),
                 new A("optional", K.Text, "The method may be omitted by a type implementing this signature."),
+                new A("surface", K.Enum, "For a component's render: where it draws, when its content doesn't show it.", false, ComponentScript.Surfaces.ToArray()),
                 new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
@@ -324,6 +325,8 @@ namespace KScript.Runtime
                 if (!run.Scope.HasOwn(run.VariableName("name"))) run.Interpreter.DeclareFunction(run.Element, run.Scope, run.Module);
                 return null;
             });
+
+            p.Element(ComponentElements.SlotInfo, ComponentElements.Slot);
 
             p.Element(new ElementInfo("return", "Ends the function with a value.", ContentKind.Empty,
                 new A("value", K.Expression, "The result. Without it the function returns null."))

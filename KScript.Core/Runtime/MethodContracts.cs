@@ -40,7 +40,7 @@ namespace KScript.Runtime
         };
 
         public static MethodSignature From(MarkupElement fn) => new(fn.GetAttributeValue("name")?.Trim(),
-            fn.GetAttributeValue("returns")?.Trim(), Parameter.ParseList(fn.GetAttributeValue("params"), out _),
+ComponentScript.Returns(fn), Parameter.ParseList(fn.GetAttributeValue("params"), out _),
             fn.GetAttribute("optional") != null);
 
         public string Display => $"fn {Name}({string.Join(", ", Parameters.Select(p => p.Type == null ? p.Name : p.Name + ": " + p.Type))})"

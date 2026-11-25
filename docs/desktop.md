@@ -24,6 +24,7 @@ Window(title: "Counter", width: 320, height: 200) {
 - `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
 - `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
+- A [component](components.md#components-in-windows-and-the-terminal) with a window `render` is drawn by writing it as a statement: `NoteCard(title: "Milk")`. Each one keeps its own state.
 - `Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
 
 | Element | What it is |

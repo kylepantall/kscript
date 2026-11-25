@@ -44,8 +44,21 @@ namespace KScript.UI
         private static readonly A Bind = new A("bind", K.VariableReference, "The variable it shows and changes. Declare it with <let> directly inside <KScript.Window>.", true);
         private static readonly A OnChange = new A("on_change", K.Statements, "Runs after the person changes the value ($event.value), e.g. on_change=\"saved = false\".");
 
+        /// <summary>A window draws the components written in it, and keeps each one between draws.</summary>
+        private sealed class WindowSurface : RenderSurface
+        {
+            public override string Name => KScript.Syntax.Markup.ComponentScript.Window;
+
+            public override bool Active => UISession.CurrentParent != null;
+
+            public override Record Instance(ElementRun run, object id, Func<Record, Record> make) =>
+                UISession.Current.Component(run.Element, id, make);
+        }
+
         protected override void Register(PackageBuilder p)
         {
+            ComponentElements.AddSurface(new WindowSurface());
+
             p.Element(new ElementInfo("Window", "Opens a desktop window. Its direct <let>, <fn> and <import> children run once and hold its state; the rest is the layout, drawn again after every on-* handler. The script continues when the window is closed.", ContentKind.Statements,
                 new A("title", K.Template, "The title bar text."),
                 new A("width", K.Expression, "Starting width in pixels (default 800)."),

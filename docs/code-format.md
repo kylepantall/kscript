@@ -82,7 +82,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `normalize: $value->lower()` (in a type) | `<normalize value="$value->lower()" />` |
 | `fn area() => $w * $h` (in a type) | `<fn name="area" value="$w * $h" />` inside the `<type>` |
 
-A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does. A type's block can also hold rule lines (`min:`, `max:`, `pattern:`, `one_of:`, `not:`, `parse:`, `validate:` and `normalize:`), `fn` methods and one `construct({ fields }) { statements }` block, whose fields are what a caller may pass. A line such as `max: int` is still a field: a rule's value is a value, not a type. See [Types and validation](types.md) for the rules.
+A field line in a `type` block is `name[?][: type] [from path] [= default | => value]`; quote the path if it has spaces. See [Field lines](language.md#field-lines) for what each part does. A type's block can also hold rule lines (`min:`, `max:`, `pattern:`, `one_of:`, `not:`, `parse:`, `validate:` and `normalize:`), `fn` methods and one `construct({ fields }) { statements }` block, whose fields are what a caller may pass. A component's `render` may name where it draws in place of parameters (`fn render(window)`), which is `surface="window"` on the `<fn>`, and a component is drawn by a statement named after it (`NoteCard(title: "Milk")`, `<NoteCard title="Milk" />`). A line such as `max: int` is still a field: a rule's value is a value, not a type. See [Types and validation](types.md) for the rules.
 
 Any other name is an element: `name(attribute: value, ...) "text" { children }`, each part optional.
 

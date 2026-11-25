@@ -918,6 +918,8 @@ public sealed class DocsTests
                         || Regex.IsMatch(d.Message, "^Unknown type '[A-Z]"))) continue;
                     // Jobs and other types made by calling them (SendWelcome(user_id: 7)) come from those files too.
                     if (d.Code == DiagnosticCodes.UnknownCommand && Regex.IsMatch(d.Message, "^Unknown function '[A-Z]")) continue;
+                    // A component drawn as a statement (NoteCard(title: "Milk")) comes from a file the example imports.
+                    if (d.Code == DiagnosticCodes.UnknownElement && Regex.IsMatch(d.Message, "^Unknown statement '[A-Z]") && body.Contains("import \"")) continue;
                     if (d.Code == DiagnosticCodes.UnknownCommand && Regex.Match(d.Message, @"Unknown command @(\w+)\.") is { Success: true } unknown && AssumedFunctions.Contains(unknown.Groups[1].Value)) continue;
                     int line = example.Line + 2 + body.AsSpan(0, Math.Min(d.Span.Start, body.Length)).Count('\n') - (wrap ? 1 : 0);
                     problems.Add($"{file}:{line}: {d.Code} {d.Message}");

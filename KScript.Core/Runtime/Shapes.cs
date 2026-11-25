@@ -399,6 +399,9 @@ namespace KScript.Runtime
 
         public bool HasConstructor => Constructors.Count > 0;
 
+        /// <summary>True for a type that extends Component, or joins one that does.</summary>
+        public bool IsComponent { get; internal set; }
+
         /// <summary>Inherited record methods evaluate their bodies, defaults and catches in the defining module.</summary>
         internal RecordType MethodOwner(string name, MarkupElement declaration)
         {
@@ -942,8 +945,12 @@ namespace KScript.Runtime
                     : run.Scope.TryGet(contract, out object target) && target is RecordType parent && parent.Signatures.Count > 0
                         ? parent.Signatures.Values
                         : throw run.Error($"'{contract}' does not declare method signatures. Declare it before {name} or import its file.", "extends", "Type");
+                type.IsComponent = contract == ComponentScript.Contract;
                 foreach (var signature in signatures)
                 {
+                    // Any render makes a component: one for a window or the terminal stands in for the page's.
+                    if (type.IsComponent && signature == MethodSignature.Render && !type.OwnMethods.ContainsKey(signature.Name)
+                        && type.OwnMethods.Keys.Any(k => k.StartsWith(ComponentScript.RenderMethod + "(", StringComparison.Ordinal))) continue;
                     if (signature.Problem(type.OwnMethods.GetValueOrDefault(signature.Name)) is string problem)
                         throw run.Error($"{name} must {problem} to extend {contract}.", "extends", "Type");
                 }
@@ -998,6 +1005,16 @@ namespace KScript.Runtime
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
                     if (string.IsNullOrEmpty(method)) throw run.Error($"A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
                     if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
+                    if (ComponentScript.IsRender(e))
+                    {
+                        // A component has one render for each place it is drawn; its content shows which.
+                        string surface = ComponentScript.SurfaceOf(e, element => run.Module.Elements.TryGetValue(element, out ElementDefinition d) ? d.Package?.Name : null)
+                            ?? throw run.Error(ComponentScript.NameTheSurface(name), null, "Syntax");
+                        if (!seen.Add("fn " + ComponentScript.RenderKey(surface)))
+                            throw run.Error(ComponentScript.TwoRenders(name, surface), null, "Syntax");
+                        type.OwnMethods[ComponentScript.RenderKey(surface)] = e;
+                        continue;
+                    }
                     if (!seen.Add("fn " + method))
                         throw run.Error($"{name} declares the method '{method}' twice.", null, "Syntax");
                     if (e.GetAttribute("signature") != null)
@@ -1601,17 +1618,23 @@ namespace KScript.Runtime
             return mapper.Problems.Count == 0 ? converted : item;
         }
 
-        /// <summary>The value a field of a constructed type starts with when nothing gives it one.</summary>
-        private static object Initial(TypeRef type)
+        /// <summary>
+        /// What makes the value a field starts with when nothing gives it one (0, '', false, an empty list or map, or
+        /// null for an optional field), or null when its type has no such value. Each call of the result makes a new
+        /// value, so two records never share a list. The one rule for a type's own state and a component's fields.
+        /// </summary>
+        internal static Func<object> Initializer(TypeRef type)
         {
-            if (type.ListDepth > 0) return new List<object>();
+            if (type == null) return null;
+            if (type.Optional) return () => null;
+            if (type.ListDepth > 0) return () => new List<object>();
             return (type.IsBuiltIn ? type.Name : null) switch
             {
-                "int" or "float" or "number" => 0d,
-                "string" or "text" => string.Empty,
-                "bool" => false,
-                "list" => new List<object>(),
-                "map" => new Dictionary<string, object>(StringComparer.Ordinal),
+                "int" or "float" or "number" => () => 0d,
+                "string" or "text" => () => string.Empty,
+                "bool" => () => false,
+                "list" => () => new List<object>(),
+                "map" => () => new Dictionary<string, object>(StringComparer.Ordinal),
                 _ => null,
             };
         }
@@ -1671,7 +1694,7 @@ namespace KScript.Runtime
                 if (own && !found && !f.HasDefault)
                 {
                     // Until construct sets it, a field of the value's own starts empty: 0, '', false, [] or null.
-                    record[f.Name] = f.Optional ? null : Initial(f.Type);
+                    record[f.Name] = f.Optional ? null : Initializer(f.Type)?.Invoke();
                     continue;
                 }
                 if (raw == null && f.HasDefault)

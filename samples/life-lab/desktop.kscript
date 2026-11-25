@@ -3,6 +3,7 @@
 // the terminal and browser versions use.
 import KScript.UI
 import "lib/life.kscript"
+import "components/stat.kscript"
 
 Window(
   title: "Life Lab",
@@ -87,18 +88,11 @@ Window(
 
   Row(gap: 24, wrap) {
     s = @summary($world)
-    for stat in [
-      ['Generation', $s.generation],
-      ['Alive', $s.population + ' (' + $s.density + '%)'],
-      ['Born', $s.births],
-      ['Died', $s.deaths],
-      ['Status', $s.status]
-    ] {
-      Column(gap: 2) {
-        Text(size: 11, color: "#64748b") "{ $stat[0]->upper() }"
-        Text(size: 16, weight: bold, color: "#e2e8f0") "{ $stat[1] }"
-      }
-    }
+    Stat(label: 'Generation', value: $s.generation)
+    Stat(label: 'Alive', value: $s.population + ' (' + $s.density + '%)')
+    Stat(label: 'Born', value: $s.births)
+    Stat(label: 'Died', value: $s.deaths)
+    Stat(label: 'Status', value: $s.status)
   }
 
   Text(size: 12, color: "#64748b") "Also runs in a terminal (kscript \

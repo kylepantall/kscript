@@ -164,6 +164,8 @@ namespace KScript.Pages
                 record.BoundFields = definition.State;
                 var scope = page.Globals.Child();
                 scope.Declare("component", record);
+                if (!definition.Type.OwnMethods.ContainsKey(ComponentScript.RenderMethod))
+                    throw new PageException(ComponentScript.NoRenderFor(definition.Type.Name, ComponentScript.Page));
                 var template = Interpreter.EvaluateText(Text(page, 0, "$component->render()"), scope, page)
                     as ComponentTemplate ?? throw new PageException($"{definition.Type.Name}->render() must return a Component.");
                 if (definition.Type.OwnMethods.ContainsKey("style"))

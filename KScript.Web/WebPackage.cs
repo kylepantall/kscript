@@ -69,11 +69,6 @@ namespace KScript.Web
                 Context = ElementContext.Page,
                 Example = "<prop name=\"title\" required />",
             });
-            Page(p, new ElementInfo("slot", "In a layout or component: where the page's (or caller's) content goes.", ContentKind.Empty,
-                new A("name", K.Text, "A named slot."))
-            {
-                Context = ElementContext.Page,
-            });
             Page(p, new ElementInfo("respond", "Ends the request with this response.", ContentKind.Template,
                 new A("status", K.Expression, "The HTTP status code."),
                 new A("json", K.Expression, "Send this value as JSON."),
