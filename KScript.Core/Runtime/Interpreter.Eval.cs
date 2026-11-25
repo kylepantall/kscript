@@ -237,6 +237,9 @@ namespace KScript.Runtime
             if (node is BinaryNode or MemberNode && CompoundLiteral(node, scope, ctx) is Func<object> compound) return compound();
             switch (node)
             {
+                case LiteralNode { FenceTag: not null } fence:
+                    return new FencedFile(fence.FenceTag, fence.Value);
+
                 case LiteralNode lit:
                     return lit.Kind switch
                     {

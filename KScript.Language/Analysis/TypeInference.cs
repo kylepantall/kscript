@@ -92,7 +92,7 @@ namespace KScript.Language.Analysis
                     return new TypeShape(lit.Kind switch
                     {
                         LiteralKind.Number => KType.Number,
-                        LiteralKind.String => KType.String,
+                        LiteralKind.String => StringBlock.ValueType(lit.FenceTag),
                         LiteralKind.Bool => KType.Bool,
                         LiteralKind.Regex => KType.Regex,
                         LiteralKind.Email => KType.Email,
@@ -491,6 +491,7 @@ namespace KScript.Language.Analysis
             {
                 "int" or "float" or "number" => new TypeShape(KType.Number) { Declared = depth == 0 },
                 "string" => new TypeShape(KType.String) { Declared = depth == 0 },
+                KType.Markdown or KType.Latex or KType.FormattedFile or KType.Document => new TypeShape(t.ToLowerInvariant()) { Declared = depth == 0 },
                 "bool" => new TypeShape(KType.Bool) { Declared = depth == 0 },
                 "list" => new TypeShape(KType.List),
                 "map" => new TypeShape(KType.Map),

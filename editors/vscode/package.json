@@ -115,6 +115,7 @@
           "meta.embedded.block.html": "html",
           "meta.embedded.block.json": "json",
           "meta.embedded.block.css": "css",
+          "meta.embedded.block.powershell": "powershell",
           "meta.embedded.block.javascript": "javascript",
           "meta.embedded.block.markdown": "markdown",
           "meta.embedded.block.latex": "latex",

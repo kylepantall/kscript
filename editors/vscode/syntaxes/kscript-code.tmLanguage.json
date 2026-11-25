@@ -605,6 +605,30 @@
           ]
         },
         {
+          "begin": "(`{3,})[ \\t]*(ps1)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.powershell",
+          "patterns": [
+            {
+              "include": "source.powershell"
+            }
+          ]
+        },
+        {
           "begin": "(`{3,})[ \\t]*(js|javascript)[ \\t]*$",
           "end": "^[ \\t]*(\\1)(?!`)",
           "beginCaptures": {
@@ -629,7 +653,7 @@
           ]
         },
         {
-          "begin": "(`{3,})[ \\t]*(md|markdown)[ \\t]*$",
+          "begin": "(`{3,})[ \\t]*((?:md|markdown)?)[ \\t]*$",
           "end": "^[ \\t]*(\\1)(?!`)",
           "beginCaptures": {
             "1": {
