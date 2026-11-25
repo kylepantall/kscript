@@ -750,6 +750,24 @@ public sealed class DataQueryTests : DataFixture
     }
 
     [Fact]
+    public void ChangingRowsRefusesALimitRatherThanChangingEveryRow()
+    {
+        foreach (string change in new[] { "update(active: false)", "delete()", "force_delete()", "increment(age)", "decrement(age)" })
+        {
+            KScriptException ex = Fails(Users + $"User->order_by(name)->limit(1)->{change}\n");
+            Assert.Equal("Argument", ex.Type);
+            Assert.Contains("can't follow ->limit() or ->offset()", ex.Message);
+        }
+        Assert.Equal("Argument", Fails(Users + "User->offset(1)->delete()\n").Type);
+        // The way the message gives: read the keys, then change those rows.
+        Assert.Equal(new[] { "1", "2" }, Lines(Users + """
+            first = User->order_by(name)->limit(1)
+            echo User->where(id: $first->pluck(id))->delete()
+            echo User->count()
+            """));
+    }
+
+    [Fact]
     public void NullsCompareInAQueryAsTheyDoInAScript()
     {
         Assert.Equal(new[] { "Cy", "Ada, Ben", "Ada, Cy", "Ada, Cy", "Ben, Cy", "Cy" }, Lines(Users + """
@@ -776,6 +794,49 @@ public sealed class DataQueryTests : DataFixture
             echo "{$far.page} {$far.items->count()} {$far.has_more}"
             past = User->paginate(2, 3)
             echo "{$past.page} {$past.items->count()} {$past.has_more}"
+            """));
+    }
+
+    [Fact]
+    public void NumbersInAQueryAreNotCutToWholeNumbers()
+    {
+        Assert.Equal(new[] { "Ben", "Ben", "", "", "Ada", "ModelNotFound" }, Lines(Users + """
+            echo User->where(fn(u) => $u.age / 2 == 8.5)->pluck(name)
+            echo User->where(fn(u) => $u.age < 17.5)->pluck(name)
+            echo User->find(1.5)
+            echo User->find('abc')
+            echo User->find('1').name
+            try {
+              User->find_or_fail('abc')
+            } catch err {
+              echo $err.type
+            }
+            """));
+        KScriptException ex = Fails(Users + "User->where(name: 'Ada')->increment(age, 0.5)\n");
+        Assert.Equal("Argument", ex.Type);
+        Assert.Contains("whole numbers", ex.Message);
+    }
+
+    [Fact]
+    public void ARelationNameIsItsColumnWhereverAColumnIsNamed()
+    {
+        Assert.Equal(new[] { "1", "2, 2", "2" }, Lines("""
+            model Writer {
+              name: string
+            }
+            model Story {
+              title: string
+              writer: Writer
+            }
+            $db->create_table(Writer)
+            $db->create_table(Story)
+            ada = Writer->create(name: 'Ada')
+            ben = Writer->create(name: 'Ben')
+            Story->create(title: 'One', writer: $ada)
+            Story->create(title: 'Two', writer: $ben)
+            echo Story->where(title: 'One')->update(writer: $ben)
+            echo Story->order_by(id)->pluck(writer)
+            echo Story->where(writer: $ben)->count()
             """));
     }
 }

@@ -343,6 +343,8 @@ namespace KScript.Data
                     SqlExpr l = Expr(b.Left);
                     SqlExpr r = Expr(b.Right);
                     bool text = b.Operator == "+" && (IsText(l) || IsText(r));
+                    // 3 / 2 is 1.5, as it is in a script: databases divide two whole numbers into a whole number.
+                    if (b.Operator == "/") l = new SqlBinary("*", l, new SqlRaw("1.0"));
                     return new SqlBinary(text ? "||" : b.Operator, l, r);
                 }
                 default:
