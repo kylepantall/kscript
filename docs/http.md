@@ -320,6 +320,7 @@ Group(middleware: auth) {
 
 `kscript serve` sends `Server: kscript` on HTTP responses. To set your own value for a route, use `->with_header('Server', 'my-app')`.
 
+- `@response($answer)` given a response returns it as it is, with its status; `@response($answer, status: 410)` changes the status.
 - Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 

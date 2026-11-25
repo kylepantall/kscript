@@ -41,6 +41,30 @@ public sealed class ServeRequestTests
 
     private const string Counter = """<live id="counter"><state name="n" value="0"/><b>{$n}</b><button on-click="n += 1">Add</button></live>""";
 
+    #region An answer's own status
+
+    [Fact]
+    public void Wrapping_an_answer_keeps_its_status_unless_one_is_given()
+    {
+        using var site = new TempSite(("routes.kscript", """
+            import KScript.Http
+            Routes {
+              Get(path: /wrapped) { return @response(@response('gone', status: 404)) }
+              Get(path: /moved) { return @response(@redirect('/new')) }
+              Get(path: /restated) { return @response(@response('gone', status: 404), status: 410) }
+              Get(path: /plain) { return @response('hi') }
+            }
+            """));
+        var app = new HttpApp(site.Root);
+        PageResult Get(string path) => app.Handle(new Dictionary<string, object> { ["method"] = "GET", ["path"] = path });
+        Assert.Equal(404, Get("/wrapped").Status);
+        Assert.Equal((302, "/new"), (Get("/moved").Status, Get("/moved").Headers["Location"]));
+        Assert.Equal(410, Get("/restated").Status);
+        Assert.Equal(200, Get("/plain").Status);
+    }
+
+    #endregion
+
     #region Errors in production
 
     [Fact]
