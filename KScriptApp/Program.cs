@@ -88,7 +88,7 @@ namespace KScript
             int? docsPort = null;
             bool withWorker = false;
             bool? withDocker = null;
-            bool migrate = Environment.GetEnvironmentVariable(DockerServe.MigrateSetting) == "1";
+            bool migrate = watch && Environment.GetEnvironmentVariable(DockerServe.MigrateSetting) == "1";
             bool liveReload = Environment.GetEnvironmentVariable(DockerServe.ReloadSetting) != "0";
 
             for (int i = 0; i < args.Length; i++)
@@ -125,6 +125,11 @@ namespace KScript
                         liveReload = false;
                         break;
                     case "--migrate":
+                        if (!watch)
+                        {
+                            Error.WriteLine("Apply migrations with kscript db migrate before starting a compiled site.");
+                            return ExitCodes.Usage;
+                        }
                         migrate = true;
                         break;
                     case "--docker":
@@ -207,8 +212,7 @@ namespace KScript
 
             if (migrate)
             {
-                int code = KScript.Databases.DbCommand.Run(new[] { "migrate", "--force" }, Out, Error,
-                    workingDirectory: root, environment: environment, startup: true);
+                int code = RunStartupMigrations(root, environment);
                 if (code != ExitCodes.Ok) return code;
             }
 
@@ -276,6 +280,12 @@ namespace KScript
         /// Starts the docs for kscript serve --with-docs. A method of its own, so serving a compiled site (whose program
         /// leaves KScript.Docs out) never loads that assembly.
         /// </summary>
+        // Compiled sites do not bundle KScript.Cli. The server can run without resolving it.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        int RunStartupMigrations(string root, string environment) =>
+            KScript.Databases.DbCommand.Run(new[] { "migrate", "--force" }, Out, Error,
+                workingDirectory: root, environment: environment, startup: true);
+
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         System.Threading.Tasks.Task ServeDocs(string folder, KScript.Projects.ProjectConfig project, int? docsPort, int sitePort, System.Threading.CancellationToken stop) =>
             KScript.Docs.DocsCommand.ServeProjectAsync(folder, project, docsPort, sitePort, Out, Error, stop);
