@@ -165,7 +165,7 @@ namespace KScript.Documents.Maths
             return sb.ToString();
         }
 
-        private static string E(string s) => SecurityElement.Escape(s);
+        private static string E(string s) => SecurityElement.Escape(KScript.Documents.Text.XmlChars.Clean(s));
 
         private static void Row(MathNode node, StringBuilder sb)
         {
@@ -303,7 +303,7 @@ namespace KScript.Documents.Maths
 
         private static List<MathNode> Flatten(MathNode node) => node is MathRow row ? row.Items : new List<MathNode> { node };
 
-        private static string E(string s) => SecurityElement.Escape(s);
+        private static string E(string s) => SecurityElement.Escape(KScript.Documents.Text.XmlChars.Clean(s));
 
         /// <param name="normal">Ordinary text (\\text), set in the paragraph's font rather than as maths.</param>
         private static void Run(string text, StringBuilder sb, bool upright = false, bool bold = false, bool normal = false)

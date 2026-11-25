@@ -12,6 +12,16 @@ namespace KScript.Language.Tests
         private static DocumentAnalysis Analyze(string text, string file) => Service.Analyze(text, Path.Combine(Path.GetTempPath(), file));
 
         [Fact]
+        public void ATextArgumentsFixedWordsAreWrittenBare()
+        {
+            // paper: takes a4, letter... or any size in quotes, so its own words need no quotes, as an enum's don't.
+            const string bare = "import KScript.Document\n\nDocument(to: \"a.pdf\", paper: letter) {\n}\n";
+            Assert.DoesNotContain(Analyze(bare, "a.kscript").Diagnostics, d => d.Code == DiagnosticCodes.QuoteText || d.Severity == DiagnosticSeverity.Error);
+            Diagnostic other = Analyze(bare.Replace("paper: letter", "paper: huge"), "a.kscript").Diagnostics.Single(d => d.Code == DiagnosticCodes.QuoteText);
+            Assert.Contains("paper: \"huge\"", other.Message);
+        }
+
+        [Fact]
         public void MissingImportsSuggestTheKscriptWay()
         {
             const string text = "// tests\nimport KScript.Math\n\ndescribe(name: \"x\") {\n}\n";

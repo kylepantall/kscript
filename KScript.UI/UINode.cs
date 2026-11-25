@@ -50,7 +50,7 @@ namespace KScript.UI
         public override string ToString() => Text != null ? $"<{Type}>{Text}</{Type}>" : $"<{Type}>";
     }
 
-    /// <summary>Statements from an on-* attribute, with the scope they were written in (so loop variables are there).</summary>
+    /// <summary>Statements from an on_* attribute, with the scope they were written in (so loop variables are there).</summary>
     public sealed class UIHandler
     {
         internal UIHandler(DecodedText statements, Scope scope, Module module)

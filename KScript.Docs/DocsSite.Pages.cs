@@ -69,7 +69,7 @@ namespace KScript.Docs
                 if (c.Name == "make")
                     sb.Append("<p class=\"hint\">Every type it makes, with its options: <a href=\"/cli/make\">kscript make commands</a>.</p>");
                 if (c.Guide != null && Guides.FirstOrDefault(g => g.Slug == c.Guide) is Guide guide)
-                    sb.Append($"<p class=\"hint\">More in <a href=\"/guide/{guide.Slug}\">{Html.H(guide.NavTitle)}</a>.</p>");
+                    sb.Append($"<p class=\"hint\">More in <a href=\"{Html.H(LinkTarget(guide.File, string.Empty, includeInstallGuide))}\">{Html.H(guide.NavTitle)}</a>.</p>");
                 sb.Append("</section>");
                 page.Toc.Add((2, id, title));
                 Search.Add(new SearchEntry { Title = c.Name == "run" ? "kscript <script>" : "kscript " + c.Name, Url = "/cli#" + id, Section = "Command line", Kind = "cli", Text = c.Summary });

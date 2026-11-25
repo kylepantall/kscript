@@ -156,7 +156,7 @@ namespace KScript.IO
             {
                 string path = PathOf(c.Need(0), c);
                 var map = new Dictionary<string, object>();
-                foreach (var pair in DotEnv.Parse(File.ReadAllText(path), Environment.GetEnvironmentVariable, System.IO.Path.GetFileName(path))) map[pair.Key] = pair.Value;
+                foreach (var pair in DotEnv.Parse(File.ReadAllText(path), c.Host.EnvironmentVariable, System.IO.Path.GetFileName(path))) map[pair.Key] = pair.Value;
                 return map;
             });
             p.Command("write_text", "path, text", "Writes text to a file, replacing it. Folders are created as needed.", KType.Null, c => Write(c, c.Str(1), append: false));

@@ -580,14 +580,17 @@ namespace KScript.Runtime
             return ex;
         }
 
+        /// <summary>The path in .NET's "Could not find a part of the path '...'".</summary>
+        private static readonly System.Text.RegularExpressions.Regex MissingFolderPath = new System.Text.RegularExpressions.Regex(@"'(.+)'", System.Text.RegularExpressions.RegexOptions.Compiled);
+
         /// <summary>Turns .NET exceptions from file, network and conversion code into KScript errors with a type a script can catch.</summary>
         internal static KScriptException Wrap(Exception ex) => ex switch
         {
             KScriptException k => k,
             // Sorting wraps a comparison's error ("Passwords can't be compared ..."): the error itself is the one to show.
             InvalidOperationException { InnerException: KScriptException inner } => inner,
-            FileNotFoundException f => new KScriptException(f.Message, "FileNotFound", f),
-            DirectoryNotFoundException d => new KScriptException(d.Message, "FileNotFound", d),
+            FileNotFoundException f => new KScriptException(f.FileName is { Length: > 0 } file ? $"There is no file at '{file}'." : f.Message, "FileNotFound", f),
+            DirectoryNotFoundException d => new KScriptException(MissingFolderPath.Match(d.Message) is { Success: true } part ? $"There is no file at '{part.Groups[1].Value}': a folder in that path doesn't exist." : d.Message, "FileNotFound", d),
             UnauthorizedAccessException u => new KScriptException(u.Message, "Access", u),
             IOException io => new KScriptException(io.Message, "IO", io),
             HttpRequestException h => new KScriptException(h.Message, "Network", h),

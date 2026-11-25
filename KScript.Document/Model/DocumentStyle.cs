@@ -112,8 +112,15 @@ namespace KScript.Documents
                     HeadingFont = Units.Family(value);
                     break;
                 case "size":
-                    FontSize = Units.Length(value);
-                    if (FontSize < 4 || FontSize > 72) throw new KScriptException($"size: {value} is too {(FontSize < 4 ? "small" : "big")} for body text. Use a size from 4pt to 72pt, such as 11.", "Argument");
+                    try
+                    {
+                        FontSize = Units.Length(value);
+                    }
+                    catch (KScriptException)
+                    {
+                        throw new KScriptException($"size: '{value}' isn't a text size. Use a number of points from 4 to 72, such as 11.", "Argument");
+                    }
+                    if (FontSize < 4 || FontSize > 72) throw new KScriptException($"size: {value} is too {(FontSize < 4 ? "small" : "big")} for body text. Use a number of points from 4 to 72, such as 11.", "Argument");
                     break;
                 case "line_height":
                     LineHeight = Units.Number(value, name);
@@ -227,7 +234,7 @@ namespace KScript.Documents
                     // Reported below with the paper names.
                 }
             }
-            throw new KScriptException($"paper: '{name}' isn't a paper size. Use a4, a3, a5, b5, letter, legal, or a size such as 15cm x 20cm.", "Argument");
+            throw new KScriptException($"paper: '{name}' isn't a paper size. Use a4, a3, a5, b5, letter, legal, or a size such as '15cm x 20cm'.", "Argument");
         }
 
         public static FontFamily Family(string name) => name.ToLowerInvariant() switch

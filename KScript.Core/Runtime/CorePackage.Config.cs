@@ -70,7 +70,7 @@ namespace KScript.Runtime
             p.Command("parse_env", "text", "Parses .env text (NAME=value lines) into a map. ${NAME} uses earlier lines or the environment.", KType.Map, c =>
             {
                 var map = new Dictionary<string, object>();
-                foreach (var pair in DotEnv.Parse(c.Str(0), Environment.GetEnvironmentVariable)) map[pair.Key] = pair.Value;
+                foreach (var pair in DotEnv.Parse(c.Str(0), c.Host.EnvironmentVariable)) map[pair.Key] = pair.Value;
                 return map;
             }, "@parse_env('PORT=8080').PORT");
         }
