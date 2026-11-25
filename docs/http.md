@@ -315,6 +315,7 @@ Group(middleware: auth) {
 `$request` (or a controller's `request` parameter) is a map with these keys:
 
 - `method` (upper case), `path`, `url` (path and query), `query`, `form`, `json`, `input`, `body` (the raw text).
+- A value in `query` or `form` is text. A name sent more than once (`?tag=a&tag=b`) is a list of texts, so no value is lost. A typed field says which you want: `tags: string[]` takes the name sent once or many times and is always a list, while `tag: string` answers `422` when it is sent twice.
 - `headers`, with lower-case names, and `cookies`.
 - `params` (the path parameters), `ip` and `route` (the route's name).
 

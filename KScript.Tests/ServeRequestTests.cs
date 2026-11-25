@@ -143,6 +143,60 @@ public sealed class ServeRequestTests
 
     #endregion
 
+    #region Names sent more than once, and the body of a form
+
+    [Fact]
+    public async Task A_name_sent_twice_is_a_list_and_a_form_keeps_its_body()
+    {
+        using var site = new TempSite(
+            ("show.html", """<respond json="{ query: $request.query, form: $request.form, body: $request.body }" />"""),
+            ("controllers/c.kscript", """
+                import KScript.Http
+
+                type Search {
+                  q: string
+                  tags?: string[]
+                }
+
+                fn search(query: Search) => $query
+                fn save(form: Search) => $form
+                """),
+            ("routes.kscript", """
+                import KScript.Http
+                import "controllers/c.kscript" as c
+
+                Routes {
+                  Get(path: /api/search, to: @c.search)
+                  Post(path: /api/save, to: @c.save)
+                }
+                """));
+        await Serve(site, async http =>
+        {
+            using var shown = System.Text.Json.JsonDocument.Parse(await http.GetStringAsync("/show?tag=a&tag=b&one=1"));
+            var query = shown.RootElement.GetProperty("query");
+            Assert.Equal(new[] { "a", "b" }, query.GetProperty("tag").EnumerateArray().Select(t => t.GetString()));
+            Assert.Equal("1", query.GetProperty("one").GetString());
+
+            using var posted = await http.PostAsync("/show", new StringContent("tag=a&tag=b&name=Ada+L", Encoding.UTF8, "application/x-www-form-urlencoded"));
+            using var form = System.Text.Json.JsonDocument.Parse(await posted.Content.ReadAsStringAsync());
+            Assert.Equal(new[] { "a", "b" }, form.RootElement.GetProperty("form").GetProperty("tag").EnumerateArray().Select(t => t.GetString()));
+            Assert.Equal("Ada L", form.RootElement.GetProperty("form").GetProperty("name").GetString());
+            Assert.Equal("tag=a&tag=b&name=Ada+L", form.RootElement.GetProperty("body").GetString());
+
+            // A list field takes the name sent once or many times.
+            Assert.Equal("{\"q\":\"x\",\"tags\":[\"a\",\"b\"]}", await http.GetStringAsync("/api/search?q=x&tags=a&tags=b"));
+            Assert.Equal("{\"q\":\"x\",\"tags\":[\"a\"]}", await http.GetStringAsync("/api/search?q=x&tags=a"));
+            using var saved = await http.PostAsync("/api/save", new StringContent("q=x&tags=a&tags=b", Encoding.UTF8, "application/x-www-form-urlencoded"));
+            Assert.Equal("{\"q\":\"x\",\"tags\":[\"a\",\"b\"]}", await saved.Content.ReadAsStringAsync());
+
+            // Text can't be a list: the second q is a mistake, said as one.
+            using var twice = await http.GetAsync("/api/search?q=x&q=y");
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, twice.StatusCode);
+        });
+    }
+
+    #endregion
+
     #region Numbers a request sends
 
     [Fact]

@@ -690,16 +690,24 @@ namespace KScript.Pages
 
         private static async Task<Dictionary<string, object>> BuildRequestAsync(HttpRequest request, string readBody)
         {
-            var query = request.Query.ToDictionary(q => q.Key, q => (object)q.Value.ToString());
+            var query = request.Query.ToDictionary(q => q.Key, q => RequestValue(q.Value));
             var headers = request.Headers.ToDictionary(h => h.Key.ToLowerInvariant(), h => (object)h.Value.ToString());
             var cookies = request.Cookies.ToDictionary(c => c.Key, c => (object)c.Value);
             var form = new Dictionary<string, object>();
             string body = readBody ?? string.Empty;
 
-            if (readBody == null && request.HasFormContentType)
+            if (readBody == null && request.HasFormContentType && !IsUrlEncodedForm(request))
             {
                 var f = await request.ReadFormAsync();
-                foreach (var kv in f) form[kv.Key] = kv.Value.ToString();
+                foreach (var kv in f) form[kv.Key] = RequestValue(kv.Value);
+            }
+            else if (readBody == null && request.HasFormContentType)
+            {
+                // An ordinary form post: $request.body keeps the text as sent, and the fields are read from it.
+                using var reader = new StreamReader(request.Body, Encoding.UTF8);
+                body = await reader.ReadToEndAsync();
+                using var fields = new Microsoft.AspNetCore.WebUtilities.FormReader(body);
+                foreach (var kv in await fields.ReadFormAsync(request.HttpContext.RequestAborted)) form[kv.Key] = RequestValue(kv.Value);
             }
             else if (readBody == null && (request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding") ||
                      request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true))
@@ -725,6 +733,14 @@ namespace KScript.Pages
             LiveActionStream.Bind(request, built);
             return built;
         }
+
+        private static bool IsUrlEncodedForm(HttpRequest request) =>
+            System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type) &&
+            string.Equals(type.MediaType, "application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>A query or form value: text, or a list of texts when the name was sent more than once (?tag=a&amp;tag=b).</summary>
+        internal static object RequestValue(Microsoft.Extensions.Primitives.StringValues values) =>
+            values.Count > 1 ? values.Select(v => (object)(v ?? string.Empty)).ToList() : values.ToString();
 
         /// <summary>
         /// The page for an error: the KScript error (<c>file:line: Type: message</c>), never a .NET stack trace unless
