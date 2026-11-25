@@ -238,6 +238,9 @@ namespace KScript.Data
         /// <summary>The transaction each running script has open on this database, if any.</summary>
         private readonly ConditionalWeakTable<Interpreter, TransactionState> transactions = new ConditionalWeakTable<Interpreter, TransactionState>();
 
+        /// <summary>The transaction of the test each test file's host is running, if it has used this database.</summary>
+        private readonly ConditionalWeakTable<KScriptHost, TransactionState> testTransactions = new ConditionalWeakTable<KScriptHost, TransactionState>();
+
         private Database(DatabaseSettings settings) => Settings = settings;
 
         public DatabaseSettings Settings { get; }
@@ -252,7 +255,9 @@ namespace KScript.Data
             if (host != null && (name == null || name == DatabaseSettings.DefaultName))
             {
                 if (host.MemoryDatabase) return ForSandbox(host);
-                if (host.TestFile != null && ForTest(host, folder) is Database test) return test;
+                // A route a test calls with @api() runs on a host of its own, and reads the test file's database.
+                KScriptHost tested = host.TestFile != null ? host : AppFolders.TestHost;
+                if (tested?.TestFile != null && ForTest(tested, folder) is Database test) return test;
             }
             DatabaseSettings settings = DatabaseSettings.Resolve(host, folder, name);
             return Open.GetOrAdd(settings.Dialect.Name + "|" + settings.ConnectionString, _ => new Database(settings));
@@ -614,26 +619,36 @@ namespace KScript.Data
         /// </summary>
         private TransactionState BeginTest(Interpreter interpreter)
         {
+            // A route the test calls with @api() runs on a host of its own: it works in the test's transaction, so
+            // each sees the other's rows and both are undone together.
             KScriptHost host = interpreter?.Host;
+            if (host != null && !host.TestRunning && host.TestFile == null) host = AppFolders.TestHost;
             if (host == null || !host.TestRunning) return null;
-            DbConnection connection = Connect();
-            var state = new TransactionState { Connection = connection, Test = true };
-            state.Transaction = connection.BeginTransaction();
-            transactions.AddOrUpdate(interpreter, state);
-            host.AfterTest.Add(() =>
+            lock (testTransactions)
             {
-                transactions.Remove(interpreter);
-                try
+                if (testTransactions.TryGetValue(host, out TransactionState running)) return running;
+                DbConnection connection = Connect();
+                var state = new TransactionState { Connection = connection, Test = true };
+                state.Transaction = connection.BeginTransaction();
+                testTransactions.Add(host, state);
+                Interpreter first = interpreter;
+                transactions.AddOrUpdate(first, state);
+                host.AfterTest.Add(() =>
                 {
-                    state.Transaction.Rollback();
-                }
-                finally
-                {
-                    state.Transaction.Dispose();
-                    connection.Dispose();
-                }
-            });
-            return state;
+                    lock (testTransactions) testTransactions.Remove(host);
+                    transactions.Remove(first);
+                    try
+                    {
+                        state.Transaction.Rollback();
+                    }
+                    finally
+                    {
+                        state.Transaction.Dispose();
+                        connection.Dispose();
+                    }
+                });
+                return state;
+            }
         }
 
         #region Test databases
