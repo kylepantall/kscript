@@ -70,7 +70,7 @@ public sealed class CommandLineTests : IDisposable
     public void Usage_version_and_unknown_options()
     {
         var none = Kscript();
-        Assert.Equal(2, none.Code);
+        Assert.Equal(0, none.Code);
         Assert.Contains("kscript <command> [options] [arguments]", none.Out);
         foreach (string help in new[] { "--help", "-h", "help", "-?", "/?" })
         {

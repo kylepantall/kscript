@@ -200,7 +200,11 @@ namespace KScript.Syntax.Text
         /// The languages a block can name: the ones editors highlight inside a .kscript file, and <c>text</c> for plain
         /// text. Any other word after the fence is an error, so a typo such as <c>```textc</c> is caught.
         /// </summary>
-        public static IReadOnlyList<string> Languages { get; } = new[] { "text", "sql", "html", "css", "js", "javascript", "json", "md", "markdown", "latex", "tex", "yaml", "yml", "xml" };
+        public static IReadOnlyList<string> Languages { get; } = new[]
+        {
+            "text", "sql", "html", "css", "js", "javascript", "json", "md", "markdown", "latex", "tex", "yaml", "yml", "xml",
+            "string", "kscript", "scss", "ks.css", "ks.scss", "ts", "typescript", "jsonc",
+        };
 
         private static int Distance(string a, string b)
         {

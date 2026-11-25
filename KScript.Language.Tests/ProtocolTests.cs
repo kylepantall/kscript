@@ -587,6 +587,23 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void FormatsHtmlInsideAComponentReturnFence()
+        {
+            Initialize();
+            const string uri = "file:///work/card.kscript";
+            const string text = "fn render(): Component => ```html\n <div>\n<p>Card</p>\n </div>\n```\n";
+            Open(text, uri);
+            JsonArray edits = Request("textDocument/formatting", Doc(uri))["result"].AsArray();
+            JsonObject edit = Assert.Single(edits).AsObject();
+            var source = new Syntax.Text.SourceText(text);
+            int start = source.GetOffset(edit["range"]["start"]["line"].GetValue<int>(), edit["range"]["start"]["character"].GetValue<int>());
+            int end = source.GetOffset(edit["range"]["end"]["line"].GetValue<int>(), edit["range"]["end"]["character"].GetValue<int>());
+            string formatted = text[..start] + edit["newText"].GetValue<string>() + text[end..];
+
+            Assert.Equal("fn render(): Component => ```html\n<div>\n  <p>Card</p>\n</div>\n```\n", formatted);
+        }
+
+        [Fact]
         public void TheAgentNotesAreNeverChecked()
         {
             Initialize();

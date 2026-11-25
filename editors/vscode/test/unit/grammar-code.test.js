@@ -258,6 +258,27 @@ test('``` blocks: text, a language or a <Type>, closed by a fence of their own',
   assert.match(scopeOf(tokens, 'z'), /variable\.other\.assignment\.kscript/);
 });
 
+test('fenced source uses the grammar of each tagged language', async () => {
+  const tokens = tokenize(await load(), [
+    'sample = ```kscript',
+    '  count = 1',
+    '  ```',
+    'theme = ```ks.css',
+    '  .card { color: red; }',
+    '  ```',
+    'sass = ```scss',
+    '  $accent: red;',
+    '  ```',
+    'script = ```typescript',
+    '  const amount = 1;',
+    '  ```',
+  ].join('\n'));
+  assert.match(scopeOf(tokens, 'count'), /meta\.embedded\.block\.kscript.*variable\.other\.assignment\.kscript/);
+  assert.match(scopeOf(tokens, '.card { color: red; }'), /meta\.embedded\.block\.kscript-css/);
+  assert.match(scopeOf(tokens, '$accent: red;'), /meta\.embedded\.block\.scss/);
+  assert.match(scopeOf(tokens, 'const amount = 1;'), /meta\.embedded\.block\.typescript/);
+});
+
 test('only the operators the language has are coloured as operators', async () => {
   const tokens = tokenize(await load(), [
     'count += 1',

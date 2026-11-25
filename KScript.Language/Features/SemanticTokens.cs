@@ -21,7 +21,7 @@ namespace KScript.Language.Features
         private static void AddTypeNameTokens(DocumentAnalysis analysis, List<SemanticToken> tokens)
         {
             HashSet<string> declared = new HashSet<string>(analysis.Symbols.Where(s => s.EnumValues != null || s.Shape?.Type == KType.Type).Select(s => s.Name), StringComparer.Ordinal);
-            bool IsType(string name) => BuiltInTypeNames.Contains(name) || declared.Contains(name) || name == ComponentScript.Contract;
+            bool IsType(string name) => BuiltInTypeNames.Contains(name) || declared.Contains(name) || name is ComponentScript.Contract or ComponentScript.StyleContract;
             HashSet<string> errors = analysis.Symbols.Where(s => s.Shape?.Type == KType.ErrorType).Select(s => s.Name)
                 .Concat(KScript.Runtime.ErrorTypes.BuiltIn.Keys).ToHashSet(StringComparer.Ordinal);
             bool code = analysis.Markup.Syntax == SourceSyntax.Code;

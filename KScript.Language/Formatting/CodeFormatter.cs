@@ -87,8 +87,10 @@ namespace KScript.Language.Formatting
             {
                 string formatted = Run(lf, options, full, rules);
                 if (Tamper != null) formatted = Tamper(formatted);
-                if (CodeMeaning.Same(original, CodeParser.Parse(formatted), out where))
+                MarkupDocument candidate = CodeParser.Parse(formatted);
+                if (CodeMeaning.Same(original, candidate, out where))
                 {
+                    formatted = FormatComponentHtml(candidate, options, rules);
                     return new FormatResult { Text = bom + (eol == "\n" ? formatted : formatted.Replace("\n", eol)) };
                 }
             }
@@ -126,6 +128,62 @@ namespace KScript.Language.Formatting
                 }
             }
             return text;
+        }
+
+        /// <summary>Component return fences are page fragments. Format them after checking the surrounding script.</summary>
+        private static string FormatComponentHtml(MarkupDocument document, FormatOptions options, DocumentRules rules)
+        {
+            string text = document.Source.Text;
+            if (!text.Contains("```", StringComparison.Ordinal)) return text;
+
+            Scan scan = null;
+            var edits = new List<(TextSpan Span, string Replacement)>();
+            foreach (var (value, block) in ComponentHtmlBlocks(document))
+            {
+                scan ??= Read(text);
+                if (scan.Verbatim[value.ToSource(block.Start)]) continue;
+
+                FormatResult fragment = Formatter.Format(block.Value, DocumentKind.Page, options, rules);
+                if (!fragment.Succeeded) continue;
+                string html = fragment.Text.Replace("\r\n", "\n").TrimEnd('\n');
+                if (html == block.Value) continue;
+
+                TextSpan content = value.ToSource(TextSpan.FromBounds(block.ContentStart, block.ContentEnd));
+                int closing = content.End;
+                while (text[closing] is ' ' or '\t') closing++;
+                string margin = text[content.End..closing];
+                // The closing fence removes this margin on every line, including lines inside raw HTML elements.
+                string replacement = html.Length == 0 ? string.Empty : string.Concat(
+                    html.Split('\n').Select(line => (line.Length == 0 ? string.Empty : margin + line) + "\n"));
+                edits.Add((content, replacement));
+            }
+            if (edits.Count == 0) return text;
+
+            var result = new StringBuilder(text);
+            foreach (var (span, replacement) in edits.OrderByDescending(edit => edit.Span.Start))
+                result.Remove(span.Start, span.Length).Insert(span.Start, replacement);
+            return result.ToString();
+        }
+
+        /// <summary>Tagged strings that an editor can pass to their own language formatters.</summary>
+        public static IEnumerable<StringBlock> EmbeddableFences(string text)
+        {
+            Scan scan = Read(text);
+            var componentHtml = ComponentHtmlBlocks(CodeParser.Parse(text))
+                .Select(entry => entry.Value.ToSource(entry.Block.Start)).ToHashSet();
+            return scan.Blocks.Where(block => block.Error == null
+                && !scan.Verbatim[block.Start] && !componentHtml.Contains(block.Start)
+                && (block.TypeName != null || block.Language is not (null or "text" or "string")));
+        }
+
+        internal static IEnumerable<(DecodedText Value, StringBlock Block)> ComponentHtmlBlocks(MarkupDocument document)
+        {
+            foreach (MarkupElement element in document.DescendantElements().Where(e => e.Name is "fn" or "return"))
+            {
+                DecodedText value = element.GetAttribute("value")?.Value;
+                MarkupElement function = element.Name == "fn" ? element : element.Ancestors().FirstOrDefault(e => e.Name == "fn");
+                if (ComponentScript.HtmlBlock(function, value) is { Error: null } block) yield return (value, block);
+            }
         }
 
         #region Scanning

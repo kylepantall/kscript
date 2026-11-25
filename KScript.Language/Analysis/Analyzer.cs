@@ -1259,6 +1259,7 @@ namespace KScript.Language.Analysis
                     AnalyzeComponentHtml(block, attr.Value, scope);
                     return;
                 }
+                if (ComponentScript.StyleBlock(fn, attr.Value) is { Error: null }) return;
             }
             switch (a.Kind)
             {
@@ -1733,7 +1734,7 @@ namespace KScript.Language.Analysis
             CheckIdentifier(e.GetAttribute("name")?.Value);
             if (e.GetAttribute("optional") is { Value: not null } optional && e.GetAttribute("signature") == null)
                 Report(optional.Value.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "Only a method signature can be optional.");
-            if (e.GetAttribute("returns") is { Value: not null } returns && returns.ValueText.Trim() != ComponentScript.Contract)
+            if (e.GetAttribute("returns") is { Value: not null } returns && returns.ValueText.Trim() is not (ComponentScript.Contract or ComponentScript.StyleContract))
                 CheckTypeText(returns.ValueText.Trim(), TrimmedSpan(returns.Value), returns.Value.SourceSpan.Start, scope: body);
 
             bool hasBody = e.Children.Any(c => c is MarkupElement { Name: not "catch" } || (c is MarkupText t && !t.IsWhitespace));

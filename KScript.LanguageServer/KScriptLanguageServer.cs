@@ -223,6 +223,7 @@ namespace KScript.LanguageServer
                 case "textDocument/inlayHint": return InlayHints(p);
                 case "textDocument/foldingRange": return FoldingRanges(p);
                 case "kscript/manifestOptions": return ManifestOptions(p);
+                case "kscript/formatWithFences": return Formatting(p, includeFences: true);
                 case "kscript/blocks": return Blocks(p);
                 case "kscript/tests": return Tests(p);
                 case "textDocument/codeLens": return CodeLenses(p);
@@ -278,6 +279,7 @@ namespace KScript.LanguageServer
                 ["inlayHintProvider"] = new JsonObject { ["resolveProvider"] = false },
                 ["foldingRangeProvider"] = true,
                 ["documentFormattingProvider"] = true,
+                ["experimental"] = new JsonObject { ["kscriptFormatWithFences"] = true },
                 ["semanticTokensProvider"] = new JsonObject
                 {
                     ["legend"] = new JsonObject

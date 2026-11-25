@@ -111,6 +111,8 @@ Lines are only broken, never joined, so a short line you split on purpose stays 
 
 Text in quotes, `/* */` comments, enum values and the arms of a match used as a value (`label = match $n { 1 => 'one', _ => 'many' }`) are kept as they are, apart from the long-line wrapping above. The arms of a match statement are laid out as statements: each arm keeps its line (`1, 2 => echo "low"`), and an arm's `{ }` block is opened up like any other block. After formatting, `kscript fmt` reads the file again and checks that it is the same program, statement for statement; if it isn't, the file is left alone with an error (please report it).
 
+HTML fences returned from a function declared as `Component` use the page formatter. This indents nested markup and wraps long tags, with the same whitespace rules as an HTML page. Fences used as string values keep their contents.
+
 ### XML scripts and pages
 
 - Elements are indented by how deeply they're nested, and each statement in a script goes on its own line.

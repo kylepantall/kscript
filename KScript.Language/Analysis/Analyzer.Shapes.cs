@@ -551,7 +551,7 @@ namespace KScript.Language.Analysis
             }
             IEnumerable<KScript.Runtime.MethodSignature> signatures;
             if (contract == ComponentScript.Contract)
-                signatures = new[] { KScript.Runtime.MethodSignature.Render };
+                signatures = KScript.Runtime.MethodSignature.Component;
             else if (result.RootScope.Lookup(contract, type.Span.Start) is Symbol symbol && symbol.Shape.Instance?.Signatures is { Count: > 0 } declared)
             {
                 result.References.Add(new SymbolReference(symbol, span, false, false));

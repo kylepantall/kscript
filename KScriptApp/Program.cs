@@ -603,7 +603,7 @@ namespace KScript
             if (args.Length == 0)
             {
                 PrintUsage(Out);
-                return ExitCodes.Usage;
+                return ExitCodes.Ok;
             }
 
             if (args[0] == "serve")

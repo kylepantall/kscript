@@ -15,7 +15,7 @@ namespace KScript.LanguageServer
         /// point and the project's kscript.json "format" section wins, so the result matches <c>kscript fmt</c>.
         /// A document with markup errors (or a Markdown page) gets no edits.
         /// </summary>
-        private JsonNode Formatting(JsonNode p)
+        private JsonNode Formatting(JsonNode p, bool includeFences = false)
         {
             OpenDocument doc = Document(p);
             if (doc == null)
@@ -29,7 +29,7 @@ namespace KScript.LanguageServer
             KScript.Projects.ProjectConfig project = ProjectFor(doc.Path);
             if (project != null && (!project.Format.Enabled || project.IsFormatExcluded(doc.Path)))
             {
-                return new JsonArray();
+                return includeFences ? null : new JsonArray();
             }
             DocumentRules rules = DocumentRules.ForProject(project?.Directory, workspace);
             FormatOptions options = FormatOptions.From(project, tabSize, insertSpaces, rules);
@@ -43,7 +43,32 @@ namespace KScript.LanguageServer
                 {
                     Log($"{doc.Path ?? doc.Uri}: {result.Error}");
                 }
-                return new JsonArray();
+                return includeFences ? null : new JsonArray();
+            }
+
+            if (includeFences)
+            {
+                var fences = new JsonArray();
+                if (code)
+                {
+                    foreach (StringBlock block in CodeFormatter.EmbeddableFences(result.Text))
+                    {
+                        int marginEnd = block.ContentEnd;
+                        while (result.Text[marginEnd] is ' ' or '\t') marginEnd++;
+                        int openingEnd = block.Start;
+                        while (result.Text[openingEnd] == '`') openingEnd++;
+                        fences.Add(new JsonObject
+                        {
+                            ["language"] = block.Language ?? "json",
+                            ["text"] = block.Value,
+                            ["start"] = block.ContentStart,
+                            ["end"] = block.ContentEnd,
+                            ["indent"] = result.Text[block.ContentEnd..marginEnd],
+                            ["length"] = openingEnd - block.Start,
+                        });
+                    }
+                }
+                return new JsonObject { ["text"] = result.Text, ["version"] = doc.Version, ["fences"] = fences };
             }
 
             TextChange change = MinimalChange(doc.Text, result.Text);

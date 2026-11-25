@@ -1,6 +1,6 @@
 {
   "scopeName": "kscript.styles.injection",
-  "injectionSelector": "L:source.kscript-css -comment -string, L:source.kscript-scss -comment -string",
+  "injectionSelector": "L:source.kscript-css -comment -string, L:source.kscript-scss -comment -string, L:meta.embedded.block.kscript-css -comment -string, L:meta.embedded.block.kscript-scss -comment -string",
   "patterns": [
     { "include": "source.kscript#tag-shorthand" },
     { "include": "kscript.pages.injection#page-command" },

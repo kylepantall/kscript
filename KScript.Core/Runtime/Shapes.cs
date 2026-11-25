@@ -923,7 +923,7 @@ namespace KScript.Runtime
             if (run.Raw("extends")?.Trim() is string contract)
             {
                 IEnumerable<MethodSignature> signatures = contract == ComponentScript.Contract
-                    ? new[] { MethodSignature.Render }
+                    ? MethodSignature.Component
                     : run.Scope.TryGet(contract, out object target) && target is RecordType parent && parent.Signatures.Count > 0
                         ? parent.Signatures.Values
                         : throw run.Error($"'{contract}' does not declare method signatures. Declare it before {name} or import its file.", "extends", "Type");

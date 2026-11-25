@@ -386,6 +386,84 @@ async function componentAndFieldCompletions(folder) {
   assert.ok(variables.includes('count') && !variables.includes('label'), 'an inferred numeric field offers numeric variables');
 }
 
+async function highlightsFencedLanguages(folder) {
+  const fence = "```";
+  const cases = [
+    ['string', 'literal text', [['literal text', /string\.unquoted\.block\.kscript/]]],
+    ['html', '<article>Card</article>', [['article', /entity\.name\.tag\.html/]]],
+    ['xml', '<book isbn="42" />', [['book', /entity\.name\.tag\.localname\.xml/], ['isbn', /attribute-name.*xml/]]],
+    ['latex', '\\section{Title}', [['section', /support\.function\.section\.latex/]]],
+    ['kscript', 'count = 1', [['count', /variable\.other\.assignment\.kscript/]]],
+    ['css', '.card { color: red; }', [['color', /property-name\.css/]]],
+    ['scss', '$accent: red;', [['$accent', /variable\.scss/]]],
+    ['ks.css', '.card { padding: {@rem(24)}; }', [
+      ['padding', /property-name\.css/], ['@rem', /entity\.name\.function\.kscript/],
+    ]],
+    ['ks.scss', '$space: 1rem; .card { margin: {$extra}; }', [
+      ['$space', /variable\.scss/], ['$extra', /variable\.other\.kscript/],
+    ]],
+  ];
+  const source = cases.map(([tag, body], i) =>
+    ['sample_' + i + ' = ' + fence + tag, '  ' + body, '  ' + fence].join('\n')).join('\n');
+  const file = path.join(folder, 'highlight-fences.kscript');
+  fs.writeFileSync(file, source + '\n');
+  const doc = await vscode.workspace.openTextDocument(file);
+  await vscode.window.showTextDocument(doc);
+  const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', doc.uri);
+  for (const [tag, , expectations] of cases) {
+    for (const [text, scope] of expectations) {
+      assert.ok(tokens.some(token => token.c.trim() === text && scope.test(token.t)),
+        tag + ' fence should highlight ' + JSON.stringify(text) + ' with ' + scope + '\n' + JSON.stringify(tokens.filter(token => token.c.includes(text))));
+    }
+  }
+  await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+}
+
+async function formatsWholeFilesWithFences() {
+  const fence = "```";
+  const before = [
+    'count=1',
+    '// kscript-fmt: off',
+    'raw = ' + fence + 'css', '  .raw{color:blue;}', '  ' + fence,
+    '// kscript-fmt: on',
+    'style = ' + fence + 'css', '  .card{color:red;}', '  ' + fence,
+    'guide = ' + fence + 'markdown', '  #  Title', '  ' + fence,
+    'example = ' + fence + 'kscript', '  value=1', '  ' + fence,
+    'plain = ' + fence + 'string', '  preserve   spaces', '  ' + fence,
+    'equation = ' + fence + 'latex', '  \\section{Math}', '  ' + fence,
+    '',
+  ].join('\n');
+  const doc = await vscode.workspace.openTextDocument({ language: 'kscript-code', content: before });
+  const editor = await vscode.window.showTextDocument(doc);
+  editor.options = { tabSize: 2, insertSpaces: true };
+  const formatter = vscode.languages.registerDocumentFormattingEditProvider(
+    { language: 'markdown', scheme: 'kscript-fence' },
+    {
+      provideDocumentFormattingEdits(document) {
+        if (!document.getText().startsWith('#  ')) return [];
+        return [vscode.TextEdit.replace(new vscode.Range(0, 0, 0, 3), '# ')];
+      },
+    },
+  );
+  try {
+    await vscode.commands.executeCommand('editor.action.formatDocument');
+    const after = doc.getText();
+    assert.match(after, /^count = 1\n/);
+    assert.match(after, /\.card \{\n\s+color: red;\n\s*\}/);
+    assert.match(after, /\.raw\{color:blue;\}/);
+    assert.match(after, /# Title\n/);
+    assert.match(after, /value = 1\n/);
+    assert.match(after, /preserve   spaces\n/);
+    assert.match(after, /\\section\{Math\}\n/);
+    assert.strictEqual(vscode.window.activeTextEditor.document, doc);
+    await vscode.commands.executeCommand('editor.action.formatDocument');
+    assert.strictEqual(doc.getText(), after);
+  } finally {
+    formatter.dispose();
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+  }
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const doc = await vscode.workspace.openTextDocument(path.join(folder, 'hello.ks.xml'));
@@ -423,6 +501,9 @@ async function run() {
   assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', doc.uri), 1, 'the typo fails Check This File');
   const correct = await vscode.workspace.openTextDocument(path.join(folder, 'writes.kscript'));
   assert.strictEqual(await vscode.commands.executeCommand('kscript.checkFile', correct.uri), 0, 'a valid file passes');
+
+  await highlightsFencedLanguages(folder);
+  await formatsWholeFilesWithFences();
 
   // .html pages keep VS Code's HTML language and grammar; KScript only adds { } expressions on top.
   const page = await vscode.workspace.openTextDocument(path.join(folder, 'page.html'));

@@ -725,6 +725,150 @@
           ]
         },
         {
+          "begin": "(`{3,})[ \\t]*(kscript)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.kscript",
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        },
+        {
+          "begin": "(`{3,})[ \\t]*(scss)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.scss",
+          "patterns": [
+            {
+              "include": "source.css.scss"
+            }
+          ]
+        },
+        {
+          "begin": "(`{3,})[ \\t]*(ks\\.css)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.kscript-css",
+          "patterns": [
+            {
+              "include": "source.kscript-css"
+            }
+          ]
+        },
+        {
+          "begin": "(`{3,})[ \\t]*(ks\\.scss)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.kscript-scss",
+          "patterns": [
+            {
+              "include": "source.kscript-scss"
+            }
+          ]
+        },
+        {
+          "begin": "(`{3,})[ \\t]*(ts|typescript)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.typescript",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
+        },
+        {
+          "begin": "(`{3,})[ \\t]*(jsonc)[ \\t]*$",
+          "end": "^[ \\t]*(\\1)(?!`)",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.begin.kscript"
+            },
+            "2": {
+              "name": "entity.name.tag.language.kscript"
+            }
+          },
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.definition.string.end.kscript"
+            }
+          },
+          "name": "meta.block.fenced.kscript",
+          "contentName": "meta.embedded.block.jsonc",
+          "patterns": [
+            {
+              "include": "source.json.comments"
+            }
+          ]
+        },
+        {
           "begin": "(`{3,})[ \\t]*(<[ \\t]*[A-Za-z_][\\w.-]*[ \\t]*>)[ \\t]*$",
           "end": "^[ \\t]*(\\1)(?!`)",
           "beginCaptures": {

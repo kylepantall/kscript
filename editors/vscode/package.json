@@ -96,7 +96,7 @@
       {
         "scopeName": "kscript.styles.injection",
         "path": "./syntaxes/kscript-styles.injection.json",
-        "injectTo": ["source.kscript-css", "source.kscript-scss"],
+        "injectTo": ["source.kscript-css", "source.kscript-scss", "source.kscript-code"],
         "embeddedLanguages": {
           "meta.embedded.expression.kscript": "kscript"
         }
@@ -119,7 +119,14 @@
           "meta.embedded.block.markdown": "markdown",
           "meta.embedded.block.latex": "latex",
           "meta.embedded.block.yaml": "yaml",
-          "meta.embedded.block.xml": "xml"
+          "meta.embedded.block.xml": "xml",
+          "meta.embedded.block.kscript": "kscript-code",
+          "meta.embedded.block.scss": "scss",
+          "meta.embedded.block.kscript-css": "kscript-css",
+          "meta.embedded.block.kscript-scss": "kscript-scss",
+          "meta.embedded.block.typescript": "typescript",
+          "meta.embedded.block.jsonc": "jsonc",
+          "meta.embedded.expression.kscript": "kscript"
         }
       },
       {

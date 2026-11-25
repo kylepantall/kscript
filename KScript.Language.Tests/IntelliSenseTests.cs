@@ -476,6 +476,25 @@ namespace KScript.Language.Tests
             Assert.Contains(tokens, t => t.Type == SemanticTokenType.Type && t.Span.Start == baseStart);
         }
 
+        [Theory]
+        [InlineData("css", true)]
+        [InlineData("ks.css", true)]
+        [InlineData("html", false)]
+        [InlineData("scss", false)]
+        public void Component_style_hooks_require_a_stylesheet_that_can_be_served(string tag, bool valid)
+        {
+            string source = "import KScript.Web\ntype Badge extends Component {\n"
+                + "  fn render(): Component => ```html\n  <span>Badge</span>\n  ```\n"
+                + $"  override fn style(): ComponentStyle => ```{tag}\n  .badge {{ color: red; }}\n  ```\n}}\n";
+            var analysis = Service.Analyze(source, Path.Combine(Site, "_components", "badge.kscript"));
+
+            if (valid)
+                Assert.Empty(analysis.Errors);
+            else
+                Assert.Contains(analysis.Errors, d => d.Code == DiagnosticCodes.InvalidAttributeValue
+                    && d.Message.ToString().Contains("Returning a ComponentStyle", StringComparison.Ordinal));
+        }
+
         [Fact]
         public void ClassComponentCompletesPropsOnItsTagAndFieldsInsideTheFence()
         {

@@ -287,7 +287,7 @@ namespace KScript.Pages
         }
 
         private static string RenderSource(string text, int firstLine, RenderState state, Scope scope, ComponentCall component = null,
-            IReadOnlySet<string> classFields = null)
+            IReadOnlySet<string> classFields = null, string css = null)
         {
             List<PageNode> nodes;
             try
@@ -332,18 +332,25 @@ namespace KScript.Pages
 
             var sb = new StringBuilder();
             var explicitRoot = nodes.OfType<PageElement>().FirstOrDefault();
+            PageText style = string.IsNullOrWhiteSpace(css) ? null : new PageText { Raw = true, Text = "<style>" + css + "</style>" };
             if (component != null && classFields?.Count > 0 && explicitRoot?.Name == "live" &&
                 nodes.All(n => n == explicitRoot || n is PageText t && string.IsNullOrWhiteSpace(t.Text)))
             {
+                if (style != null) explicitRoot.Children.Insert(0, style);
                 RenderLive(explicitRoot, scope, sb, state, component.LiveId ?? (explicitRoot.HasAttr("id") ? null : ComponentLiveId(component, state.Ctx)), classFields);
             }
             else if (component != null && (component.LiveId != null || UsesLiveFeatures(nodes, state.Ctx)))
             {
                 var live = new PageElement { Name = "live", Line = firstLine };
+                if (style != null) live.Children.Add(style);
                 live.Children.AddRange(nodes);
                 RenderLive(live, scope, sb, state, ComponentLiveId(component, state.Ctx), classFields);
             }
-            else RenderNodes(nodes, scope, sb, state);
+            else
+            {
+                if (style != null) sb.Append(style.Text);
+                RenderNodes(nodes, scope, sb, state);
+            }
             return sb.ToString();
         }
 
@@ -682,13 +689,13 @@ namespace KScript.Pages
                 {
                     if (state.Ctx.IncludeDepth > 32)
                         throw new PageException($"Components are nested more than 32 deep (at {path}). Does one include itself?");
-                    var component = state.Ctx.Runtime.RenderComponent(state.Ctx, path, el.Name, inputs, out var classFields);
+                    var component = state.Ctx.Runtime.RenderComponent(state.Ctx, path, el.Name, inputs, out var classFields, out string css);
                     var componentState = NewState(state.Ctx, path, body.ToString(), false);
                     componentState.Module = component.Module;
                     var templateScope = component.Scope.Child();
                     if (!templateScope.TryGet("request", out object request) || request == null)
                         templateScope.Declare("request", state.Ctx.Request);
-                    AppendIndented(sb, RenderSource(component.Html, component.FirstLine, componentState, templateScope, call, classFields), state);
+                    AppendIndented(sb, RenderSource(component.Html, component.FirstLine, componentState, templateScope, call, classFields, css), state);
                 }
                 finally
                 {

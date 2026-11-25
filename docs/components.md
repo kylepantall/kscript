@@ -34,6 +34,31 @@ The click handler makes each counter live. Each instance gets its own root and k
 
 An explicit `<live>` block lets you choose the root element with `as`, defer rendering, or make only a portion of a component live. Use explicit blocks for interactive markup directly in a page. Plain display components render without loading the live runtime.
 
+## Component styles
+
+A component can implement the optional `fn style(): ComponentStyle` method to keep its stylesheet beside its
+`render(): Component` method. The renderer validates the HTML returned by `render()` as a KScript page fragment.
+
+````kscript
+type Badge extends Component {
+  label: string
+
+  fn render(): Component => ```html
+  <span class="note-badge">{$label}</span>
+  ```
+
+  override fn style(): ComponentStyle => ```css
+  .note-badge {
+    padding: 0.25rem;
+  }
+  ```
+}
+````
+
+Use `css` for browser-ready CSS or `ks.css` to run it through [KScript.Style](stylesheets.md). In `ks.css`, `$vars`
+holds the component fields. Rules follow normal CSS selector scope, so use a class specific to the component.
+SCSS fences can be edited in the editor. Sass compilation uses the existing [stylesheet build](stylesheets.md).
+
 ## Component inputs, rendering and slots
 
 Give a component typed inputs by defining a KScript type. Save this as `_components/hello-card.kscript`.

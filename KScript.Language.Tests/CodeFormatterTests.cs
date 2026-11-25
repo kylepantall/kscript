@@ -1,5 +1,8 @@
+using System.Text;
+
 using KScript.Language.Formatting;
 using KScript.Syntax.Markup;
+using KScript.Syntax.Text;
 
 namespace KScript.Language.Tests
 {
@@ -22,8 +25,32 @@ namespace KScript.Language.Tests
 
         private static void AssertSame(string before, string after)
         {
-            bool same = CodeMeaning.Same(CodeParser.Parse(before.TrimStart('﻿')), CodeParser.Parse(after), out string difference);
+            MarkupDocument original = CodeParser.Parse(before.TrimStart('﻿'));
+            MarkupDocument formatted = CodeParser.Parse(after);
+            if (CodeMeaning.Same(original, formatted, out string difference)) return;
+
+            var oldBlocks = CodeFormatter.ComponentHtmlBlocks(original).ToList();
+            var newBlocks = CodeFormatter.ComponentHtmlBlocks(formatted).ToList();
+            Assert.Equal(oldBlocks.Count, newBlocks.Count);
+            for (int i = 0; i < oldBlocks.Count; i++)
+            {
+                string oldHtml = oldBlocks[i].Block.Value, newHtml = newBlocks[i].Block.Value;
+                if (oldHtml != newHtml) FormatterTests.AssertSameMeaning(oldHtml, newHtml, DocumentKind.Page);
+            }
+
+            bool same = CodeMeaning.Same(WithoutHtml(original, oldBlocks), WithoutHtml(formatted, newBlocks), out difference);
             Assert.True(same, difference);
+        }
+
+        private static MarkupDocument WithoutHtml(MarkupDocument document, List<(DecodedText Value, StringBlock Block)> blocks)
+        {
+            var source = new StringBuilder(document.Source.Text);
+            foreach (var (value, block) in blocks.OrderByDescending(item => item.Value.ToSource(item.Block.ContentStart)))
+            {
+                TextSpan content = value.ToSource(TextSpan.FromBounds(block.ContentStart, block.ContentEnd));
+                source.Remove(content.Start, content.Length);
+            }
+            return CodeParser.Parse(source.ToString());
         }
 
         private static string Lines(params string[] lines) => string.Join("\n", lines) + "\n";
@@ -33,6 +60,61 @@ namespace KScript.Language.Tests
             FormatOptions o = new FormatOptions();
             off(o);
             return o;
+        }
+
+        [Fact]
+        public void FormatsComponentFencesAndPreservesRawContent()
+        {
+            string input = Lines(
+                "fn render(): Component {",
+                "  return ```html",
+                "      <div>",
+                "      <p>Hello <strong>there</strong>!</p>",
+                "      <textarea> one  ",
+                "   two</textarea>",
+                "      </div>",
+                "  ```",
+                "}");
+            string expected = Lines(
+                "fn render(): Component {",
+                "  return ```html",
+                "  <div>",
+                "    <p>Hello <strong>there</strong>!</p>",
+                "    <textarea> one  ",
+                "   two</textarea>",
+                "  </div>",
+                "  ```",
+                "}");
+
+            FormatResult result = Formatter.Format(input, "component.kscript");
+            Assert.True(result.Succeeded, result.Error);
+            Assert.Equal(expected, result.Text);
+            Assert.Equal(expected, Formatter.Format(expected, "component.kscript").Text);
+            AssertSame(input, result.Text);
+        }
+
+        [Fact]
+        public void FormatDirectivesAndLiteralFencesKeepTheirContents()
+        {
+            string source = Lines(
+                "fn literal(): string => ```html",
+                "  <div>",
+                "<p>Literal</p>",
+                "  </div>",
+                "```",
+                "",
+                "// kscript-fmt-ignore",
+                "fn ignored(): Component => ```html",
+                " <div>",
+                "<p>Verbatim</p>",
+                " </div>",
+                "```",
+                "",
+                "fn incomplete(): Component => ```html",
+                "<div",
+                "```");
+
+            Assert.Equal(source, Fmt(source));
         }
 
         [Fact]
