@@ -37,6 +37,8 @@ A `{ }` in double quotes always holds an expression, whatever it opens with: a v
 
 `+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
+When comparing a number with a string using `<`, `<=`, `>` or `>=`, KScript compares numerically if the string can be parsed as a number. If parsing fails, the comparison returns `false`.
+
 Use `expression as Type` for a checked conversion, for example `$text as int`. The target can also be a declared record, enum or refinement type. [Checked conversions](types.md#checked-conversions-with-as)
 
 ## Control flow

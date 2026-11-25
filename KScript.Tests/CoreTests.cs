@@ -115,6 +115,29 @@ public class CoreTests
         Assert.Equal("few\n", RunBody("<let name=\"n\" value=\"3\" />" + body));
         Assert.Equal("big\n", RunBody("<let name=\"n\" value=\"12\" />" + body));
         Assert.Equal("other\n", RunBody("<let name=\"n\" value=\"5\" />" + body));
+        Assert.Equal("other\n", RunBody("<let name=\"n\" value=\"'other'\" />" + body));
+        Assert.Equal("other\n", RunBody("<let name=\"n\" value=\"'!other'\" />" + body));
+    }
+
+    [Theory]
+    [InlineData("<")]
+    [InlineData("<=")]
+    [InlineData(">")]
+    [InlineData(">=")]
+    public void NumbersAndNonNumericStringsAreUnordered(string op)
+    {
+        Assert.Equal("false", Eval($"'other' {op} 9"));
+        Assert.Equal("false", Eval($"9 {op} 'other'"));
+    }
+
+    [Theory]
+    [InlineData("'12' > 9")]
+    [InlineData("9 < '12'")]
+    [InlineData("'12' > '9'")]
+    [InlineData("'other' > '9'")]
+    public void NumericStringsAndTextKeepTheirOrdering(string expression)
+    {
+        Assert.Equal("true", Eval(expression));
     }
 
     [Fact]

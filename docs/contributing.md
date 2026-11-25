@@ -108,6 +108,8 @@ The first text says why and the second is what to use instead, as written in a s
 
 The guides in `docs/` and the README are written by hand, so a test keeps them honest: `DocsTests.Every_example_in_the_guides_and_readme_matches_the_code` checks every `kscript` and `xml` example with the analyzer. It fails if an example uses an element, attribute, command, method or parameter that no longer exists, passes the wrong number of arguments, or uses something deprecated.
 
+The docs tests run every playground example in each format the site offers. Add a case to `DocsTests.Runnable_reference_examples_produce_the_expected_output` when an example demonstrates a specific result readers should be able to verify.
+
 ## The rules the engine enforces
 
 The naming and shape rules are not only tests: the engine applies them as a package registers. They live in one class, `Conventions` (`KScript.Core/Runtime/Conventions.cs`), as lists of names and one small check per rule. `PackageBuilder` (`p.Element`, `p.Command`, `p.Method`, `p.Field`, `p.Variable`, `p.EchoFormat`, `p.LogProvider`, `p.NativeType`) asks it about every registration and throws a `ConventionException` for one that breaks a rule, so the package doesn't load:

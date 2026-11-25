@@ -271,7 +271,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("match", "Compares one value against several cases. Inside, `$it` is the value.", ContentKind.Statements,
                 new A("value", K.Expression, "The value to compare.", true))
             {
-                Example = "<let name=\"choice\" value=\"3\" />\n<match $choice>\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
+                Example = "<let name=\"choice\" value=\"'other'\" />\n<match $choice>\n  <case is=\"1\"><echo>One</echo></case>\n  <case is=\"2, 3\"><echo>Two or three</echo></case>\n  <case when=\"$choice gt 9\"><echo>Big</echo></case>\n  <default><echo>Unknown</echo></default>\n</match>",
             }, Match);
 
             p.Element(new ElementInfo("case", "A branch of <match>: runs when the value equals one of `is`, or when `when` is true (with both, the value must match and `when` must be true). In a .kscript file a branch is an arm: `1, 2 => ...`, `_ when $n > 9 => ...`.", ContentKind.Statements,
