@@ -34,7 +34,7 @@ public class ComponentFieldTests
     private static TempSite Site(string source = Source) => new(("_components/note-editor.kscript", source));
 
     private static ComponentTemplate Mount(PageContext ctx, Dictionary<string, object> props) =>
-        ctx.Runtime.RenderComponent(ctx, "_components/note-editor.kscript", "note-editor", props, out _);
+        ctx.Runtime.RenderComponent(ctx, "_components/note-editor.kscript", "note-editor", props, out _, out _);
 
     [Fact]
     public void Each_instance_has_its_own_typed_defaults_and_supplied_props()
@@ -78,6 +78,35 @@ public class ComponentFieldTests
         string html = site.Render("index.html").Body;
         Assert.Contains("<p> 0 3 #ffff00</p>", html);
         Assert.DoesNotContain("data-ks-live", html);
+    }
+
+    [Theory]
+    [InlineData("css", ".note-editor { color: blue; }", "blue")]
+    [InlineData("ks.css", ".note-editor { color: {$vars.color}; }", "#008000")]
+    public void A_component_can_supply_its_own_styles(string tag, string stylesheet, string color)
+    {
+        string hook = $"  override fn style(): ComponentStyle => ```{tag}\n  {stylesheet}\n  ```\n\n";
+        using var site = Site(Source.Replace("  fn render()", hook + "  fn render()"));
+        site.Write("index.html", "<note-editor color=\"green\" />");
+
+        Assert.Contains($"<style>.note-editor {{ color: {color}; }}</style>", site.Render("index.html").Body);
+    }
+
+    [Theory]
+    [InlineData("scss", ".note-editor { color: blue; }", "CSS or KScript CSS fence")]
+    [InlineData("css", "/* </StYlE> */", "closing HTML style tag")]
+    public void Component_styles_reject_unsupported_or_unsafe_content(string tag, string stylesheet, string expected)
+    {
+        string hook = $"  fn style(): ComponentStyle => ```{tag}\n  {stylesheet}\n  ```\n\n";
+        using var site = Site(Source.Replace("  fn render()", hook + "  fn render()"));
+        Assert.Contains(expected, Assert.Throws<PageException>(() => Mount(new PageContext(site.Root), new())).Message);
+    }
+
+    [Fact]
+    public void Malformed_component_markup_is_checked_when_returned()
+    {
+        using var site = Site(Source.Replace("<p>{$label} {$count} {$revision} {$color}</p>", "<div id=\"unclosed"));
+        Assert.Contains("closing", Assert.Throws<PageException>(() => Mount(new PageContext(site.Root), new())).Message);
     }
 
     [Fact]

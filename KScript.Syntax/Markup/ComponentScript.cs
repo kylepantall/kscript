@@ -6,6 +6,7 @@ namespace KScript.Syntax.Markup
     public static class ComponentScript
     {
         public const string Contract = "Component";
+        public const string StyleContract = "ComponentStyle";
 
         public static bool IsComponentType(MarkupElement type) =>
             type?.Name == "type" && type.GetAttributeValue("extends") == Contract;
@@ -44,14 +45,20 @@ namespace KScript.Syntax.Markup
                         || string.Equals(e.GetAttributeValue("name"), name + Contract, StringComparison.OrdinalIgnoreCase)));
         }
 
-        public static StringBlock HtmlBlock(MarkupElement function, DecodedText value)
+        public static StringBlock HtmlBlock(MarkupElement function, DecodedText value) =>
+            ReturnBlock(function, value, Contract) is { Language: "html" } html ? html : null;
+
+        public static StringBlock StyleBlock(MarkupElement function, DecodedText value) =>
+            ReturnBlock(function, value, StyleContract) is { Language: "css" or "ks.css" } style ? style : null;
+
+        private static StringBlock ReturnBlock(MarkupElement function, DecodedText value, string contract)
         {
-            if (function?.GetAttributeValue("returns")?.Trim() != Contract || value == null) return null;
+            if (function?.GetAttributeValue("returns")?.Trim() != contract || value == null) return null;
             string text = value.Value;
             int start = 0;
             while (start < text.Length && char.IsWhiteSpace(text[start])) start++;
             var block = StringBlock.Read(text, start);
-            return block?.Language == "html" && string.IsNullOrWhiteSpace(text[block.End..]) ? block : null;
+            return block != null && string.IsNullOrWhiteSpace(text[block.End..]) ? block : null;
         }
     }
 }

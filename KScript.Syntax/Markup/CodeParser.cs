@@ -150,6 +150,10 @@ namespace KScript.Syntax.Markup
                     pos += 2;
                     ParseFn(parent, fnStart, fnDoc);
                 }
+                else if (fields && ComponentScript.IsComponentType(parent) && Lookahead("override") && StartsOverride())
+                {
+                    ParseFn(parent, pos, TakeDoc(), isOverride: true);
+                }
                 else if (fields && RuleLineAhead() is string rule)
                 {
                     ParseRule(parent, rule);

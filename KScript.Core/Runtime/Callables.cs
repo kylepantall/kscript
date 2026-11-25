@@ -225,6 +225,8 @@ namespace KScript.Runtime
             if (type == null) return value;
             if (type == ComponentScript.Contract)
                 return value is ComponentTemplate ? value : throw new KScriptException($"{Name} must return a fenced HTML Component.", "Type");
+            if (type == ComponentScript.StyleContract)
+                return value is ComponentStyle ? value : throw new KScriptException($"{Name} must return a CSS or KScript CSS fence (css or ks.css).", "Type");
             return Shapes.Convert(Module.Interpreter, value, type, $"The result of {Name}()", Closure, Module);
         }
 
@@ -299,10 +301,11 @@ namespace KScript.Runtime
             if (ValueExpression != null)
             {
                 var origin = Element.GetAttribute("value").Value;
-                var block = ComponentScript.HtmlBlock(Element, origin);
-                return block is { Error: null }
-                    ? new ComponentTemplate(block, scope, Module, origin)
-                    : interpreter.Evaluate(ValueExpression, scope, ValueContext);
+                if (ComponentScript.HtmlBlock(Element, origin) is { Error: null } html)
+                    return new ComponentTemplate(html, scope, Module, origin);
+                if (ComponentScript.StyleBlock(Element, origin) is { Error: null } style)
+                    return new ComponentStyle(style.Value, style.Language, Module);
+                return interpreter.Evaluate(ValueExpression, scope, ValueContext);
             }
 
             interpreter.ExecuteNodes(body, scope, Module);

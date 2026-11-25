@@ -186,11 +186,14 @@ namespace KScript.Language.Analysis
                     if (declared == ComponentScript.Contract && shape.Type != KType.Any && shape.Type != ComponentScript.Contract)
                         Report(region.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                             "Returning a Component requires a fenced HTML block or a function that returns one.");
+                    if (declared == ComponentScript.StyleContract && shape.Type != KType.Any && shape.Type != ComponentScript.StyleContract)
+                        Report(region.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                            "Returning a ComponentStyle requires a CSS or KScript CSS fence (css or ks.css).");
                     shapes.Add(shape);
                 }
             }
 
-            TypeShape returned = declared == ComponentScript.Contract ? new TypeShape(ComponentScript.Contract)
+            TypeShape returned = declared is ComponentScript.Contract or ComponentScript.StyleContract ? new TypeShape(declared)
                 : (declared != null ? TypeNamed(declared, fn.Span.Start) : null) ?? Unify(shapes);
             // A recursive function's own call gives nothing; keep what the last pass found rather than forgetting it.
             if (typeFallbacks != null || returned.Type != KType.Any || symbol.ReturnShape.Type == KType.Any)

@@ -136,10 +136,11 @@ namespace KScript.Pages
         private readonly Dictionary<string, (RecordType Type, IReadOnlySet<string> State)> components = new(StringComparer.Ordinal);
 
         internal ComponentTemplate RenderComponent(PageContext ctx, string path, string tag, Dictionary<string, object> props,
-            out IReadOnlySet<string> liveFields)
+            out IReadOnlySet<string> liveFields, out string css)
         {
             string full = ctx.ResolveSitePath(path, "component");
             Module page = ModuleFor(path, full);
+            string stylesheet = null;
             var rendered = (ComponentTemplate)Run(page, () =>
             {
                 if (!components.TryGetValue(full, out var definition))
@@ -163,10 +164,26 @@ namespace KScript.Pages
                 record.BoundFields = definition.State;
                 var scope = page.Globals.Child();
                 scope.Declare("component", record);
-                return Interpreter.EvaluateText(Text(page, 0, "$component->render()"), scope, page)
+                var template = Interpreter.EvaluateText(Text(page, 0, "$component->render()"), scope, page)
                     as ComponentTemplate ?? throw new PageException($"{definition.Type.Name}->render() must return a Component.");
+                if (definition.Type.OwnMethods.ContainsKey("style"))
+                {
+                    var style = (ComponentStyle)Interpreter.EvaluateText(Text(page, 0, "$component->style()"), scope, page);
+                    stylesheet = style.Language == "css" ? style.Text : Style.Stylesheets.CompileText(
+                        style.Text, Path.ChangeExtension(style.Module.Path, ".ks.css"), record, host =>
+                        {
+                            host.FileRoot = ctx.SiteRoot;
+                            host.FileRootName = "the site folder";
+                            host.CanWriteFiles = false;
+                            ctx.StartupConfig?.CopyTo(host);
+                        });
+                    if (stylesheet.Contains("</style", StringComparison.OrdinalIgnoreCase))
+                        throw new PageException($"{definition.Type.Name}->style() contains a closing HTML style tag.");
+                }
+                return template;
             });
             liveFields = components[full].State;
+            css = stylesheet;
             return rendered;
         }
 

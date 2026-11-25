@@ -376,8 +376,8 @@ namespace KScript.Language.Features
             {
                 Label = language,
                 Kind = CompletionKind.Keyword,
-                Detail = language == "text" ? "plain text" : "language",
-                Documentation = language == "text" ? "Plain text, with no highlighting." : $"Highlights the block as {language}. It changes nothing at run time.",
+                Detail = language is "text" or "string" ? "plain text" : "language",
+                Documentation = language is "text" or "string" ? "Plain text, with no highlighting." : $"Highlights the block as {language}. It changes nothing at run time.",
                 ReplaceSpan = replace,
                 SortText = i.ToString("D2"),
             }).ToList();

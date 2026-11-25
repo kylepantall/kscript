@@ -13,6 +13,7 @@ const { registerCommands } = require('./src/commands');
 const { registerTestExplorer } = require('./src/testing');
 const { registerManifestCompletion } = require('./src/manifest');
 const { registerDocsMcp } = require('./src/mcp');
+const { fenceScheme, embeddedFormatting } = require('./src/embedded-formatting');
 
 const INSTALL_URL = 'https://github.com/kylepantall/kscript#install-no-net-needed';
 
@@ -22,6 +23,7 @@ let restarting = false;
 let warnedOlder;
 let status;
 let output;
+let formatEmbeddedDocument;
 
 function config() {
   return vscode.workspace.getConfiguration('kscript');
@@ -85,6 +87,7 @@ async function startClient(context) {
   const documentSelector = [
     { scheme: 'file', language: 'kscript' }, { scheme: 'untitled', language: 'kscript' },
     { scheme: 'file', language: 'kscript-code' }, { scheme: 'untitled', language: 'kscript-code' },
+    { scheme: fenceScheme, language: 'kscript-code' },
   ];
   if (await pagesEnabled()) {
     // Pages served by `kscript serve`: HTML and Markdown with KScript elements inline.
@@ -94,6 +97,12 @@ async function startClient(context) {
   client = new LanguageClient('kscript', 'KScript', serverOptions, {
     documentSelector,
     outputChannel: output,
+    middleware: {
+      provideDocumentFormattingEdits: formatEmbeddedDocument,
+      handleDiagnostics(uri, diagnostics, next) {
+        if (uri.scheme !== fenceScheme) next(uri, diagnostics);
+      },
+    },
     // The server only offers the Run and Run test lenses to an editor that says it can run them.
     // docsCommand lets a hover end with an "Open docs" link, which only this command may run.
     initializationOptions: { codeLens: config().get('codeLens.enabled', true), docsCommand: 'kscript.openDocs' },
@@ -196,6 +205,7 @@ async function activate(context) {
   registerTestExplorer(vscode, context, kscript, () => client);
   registerManifestCompletion(vscode, context, () => client?.state === State.Running ? client : null);
   registerDocsMcp(vscode, context);
+  formatEmbeddedDocument = embeddedFormatting(vscode, context, () => client);
 
   await startClient(context);
 }

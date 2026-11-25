@@ -323,10 +323,12 @@ namespace KScript.Runtime
             }, run =>
             {
                 var fn = run.Element.Ancestors().FirstOrDefault(e => e.Name == "fn");
-                var block = ComponentScript.HtmlBlock(fn, run.Element.GetAttribute("value")?.Value);
-                throw new ReturnSignal(block is { Error: null }
-                    ? new ComponentTemplate(block, run.Scope, run.Module, run.Element.GetAttribute("value").Value)
-                    : run.Eval("value", null));
+                var origin = run.Element.GetAttribute("value")?.Value;
+                if (ComponentScript.HtmlBlock(fn, origin) is { Error: null } html)
+                    throw new ReturnSignal(new ComponentTemplate(html, run.Scope, run.Module, origin));
+                if (ComponentScript.StyleBlock(fn, origin) is { Error: null } style)
+                    throw new ReturnSignal(new ComponentStyle(style.Value, style.Language, run.Module));
+                throw new ReturnSignal(run.Eval("value", null));
             });
 
             p.Element(new ElementInfo("call", "Calls a function for its effect, optionally keeping the result.", ContentKind.Empty,
