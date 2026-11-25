@@ -290,7 +290,7 @@ namespace KScript.LanguageServer
                     ["full"] = true,
                 },
             },
-            ["serverInfo"] = new JsonObject { ["name"] = "kscript-lsp", ["version"] = typeof(KScriptLanguageServer).Assembly.GetName().Version?.ToString() },
+            ["serverInfo"] = new JsonObject { ["name"] = "kscript-lsp", ["version"] = ServerVersion() },
         };
 
         #region Documents
@@ -583,6 +583,16 @@ namespace KScript.LanguageServer
                 highlights.Add((JsonNode)new JsonObject { ["range"] = Range(a.Source, r.Span), ["kind"] = r.IsWrite ? 3 : 2 });
             }
             return highlights;
+        }
+
+        /// <summary>The version of the kscript that runs the server, as kscript --version prints it (0.1.0), not this library's own.</summary>
+        internal static string ServerVersion()
+        {
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetEntryAssembly() ?? typeof(KScriptLanguageServer).Assembly;
+            string version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(assembly)?.InformationalVersion
+                ?? assembly.GetName().Version?.ToString(3);
+            int build = version?.IndexOf('+') ?? -1;
+            return build >= 0 ? version.Substring(0, build) : version;
         }
 
         private JsonNode PrepareRename(JsonNode p)

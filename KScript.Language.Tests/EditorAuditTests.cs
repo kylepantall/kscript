@@ -275,5 +275,18 @@ namespace KScript.Language.Tests
         }
 
         #endregion
+
+        #region The server
+
+        [Fact]
+        public void TheServerReportsTheVersionOfKscriptNotOfItsLibrary()
+        {
+            string version = KScript.LanguageServer.KScriptLanguageServer.ServerVersion();
+            Assert.False(string.IsNullOrEmpty(version));
+            Assert.DoesNotContain('+', version);
+            Assert.NotEqual(typeof(KScript.LanguageServer.KScriptLanguageServer).Assembly.GetName().Version?.ToString(), version);
+        }
+
+        #endregion
     }
 }
