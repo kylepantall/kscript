@@ -45,6 +45,28 @@ public sealed class MigrationTests : DataFixture
         return error + output;
     }
 
+    [Fact]
+    public void StartupSkipsEmptyProjectsAndRunsPendingMigrationsInTheSelectedEnvironment()
+    {
+        int RunStartup() => DbCommand.Run(new[] { "migrate", "--force" }, TextWriter.Null, TextWriter.Null,
+            Project, environment: "production", startup: true);
+        Assert.Equal(0, RunStartup());
+        FileOf("database/migrations/2026_01_01_000000_startup.kscript", """
+            import KScript.Data
+            Migration {
+              CreateTable(name: 'startup') { Field(name: 'name', type: string) }
+            }
+            """);
+        Assert.Equal(0, RunStartup());
+        Assert.Equal(0, RunStartup());
+        Assert.Contains("2026_01_01_000000_startup", Ok("status"));
+        FileOf("database/migrations/2026_01_02_000000_bad.kscript", """
+            import KScript.Data
+            Migration { DropTable(name: 'does_not_exist') }
+            """);
+        Assert.Equal(1, RunStartup());
+    }
+
     private string[] Migrations() =>
         Directory.Exists(Path.Combine(Project, "database", "migrations"))
             ? Directory.GetFiles(Path.Combine(Project, "database", "migrations")).Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal).ToArray()

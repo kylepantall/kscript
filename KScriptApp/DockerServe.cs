@@ -15,8 +15,18 @@ namespace KScript;
 internal static class DockerServe
 {
     internal const string ContainerMarker = "KSCRIPT_SERVE_IN_DOCKER";
+    internal const string MigrateSetting = "KSCRIPT_SERVE_MIGRATE";
     internal const string ReloadSetting = "KSCRIPT_LIVE_RELOAD";
     private static readonly string[] ComposeFiles = { "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml" };
+
+    internal static bool IsContainer(string marker) => marker == "1";
+
+    internal static bool ShouldLaunch(string root, DockerServeSettings settings, bool? requested, string environment, bool auto)
+    {
+        if (requested.HasValue) return requested.Value;
+        if (string.Equals(environment, "production", StringComparison.OrdinalIgnoreCase)) return false;
+        return settings.Enabled ?? (auto && File.Exists(ComposeFile(root, settings)));
+    }
 
     internal static ProcessStartInfo CreateStartInfo(string root, DockerServeSettings settings, string containerName, string environment, bool liveReload = true)
     {
@@ -27,7 +37,7 @@ internal static class DockerServe
             throw new ProjectConfigException("serve.docker.mount needs an absolute container path, such as /app, or null.");
 
         var start = new ProcessStartInfo("docker") { WorkingDirectory = root, UseShellExecute = false };
-        foreach (string arg in new[] { "compose", "--file", file, "run", "--rm", "--service-ports", "--name", containerName, "--env", ContainerMarker + "=1" })
+        foreach (string arg in new[] { "compose", "--file", file, "run", "--rm", "--service-ports", "--name", containerName, "--env", ContainerMarker + "=1", "--env", MigrateSetting + "=1" })
             start.ArgumentList.Add(arg);
         if (settings.Build) start.ArgumentList.Add("--build");
         if (settings.Mount != null)
@@ -50,11 +60,14 @@ internal static class DockerServe
         return start;
     }
 
-    private static string FindComposeFile(string root, DockerServeSettings settings)
-    {
-        string file = settings.ComposeFile == null
+    private static string ComposeFile(string root, DockerServeSettings settings) =>
+        settings.ComposeFile == null
             ? ComposeFiles.Select(name => Path.Combine(root, name)).FirstOrDefault(File.Exists)
             : Path.GetFullPath(settings.ComposeFile, root);
+
+    private static string FindComposeFile(string root, DockerServeSettings settings)
+    {
+        string file = ComposeFile(root, settings);
         if (file == null || !File.Exists(file))
             throw new ProjectConfigException(file == null
                 ? "Docker needs a Compose file in the project. Run kscript make docker to add one."
@@ -152,13 +165,13 @@ internal static class DockerServe
         }
     }
 
-    internal static int Run(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop, bool liveReload = true)
+    internal static int Run(string root, DockerServeSettings settings, TextWriter error, CancellationToken stop, bool liveReload = true, string environment = null)
     {
         if (stop.IsCancellationRequested) return 0;
         string name = "kscript-serve-" + Guid.NewGuid().ToString("N");
         try
         {
-            var start = CreateStartInfo(root, settings, name, Environment.GetEnvironmentVariable("KSCRIPT_ENV"), liveReload);
+            var start = CreateStartInfo(root, settings, name, environment, liveReload);
             if (settings.Mount != null)
             {
                 int prepared = PrepareVolumeMounts(root, settings, error, stop);

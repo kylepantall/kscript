@@ -53,12 +53,17 @@ namespace KScript.Http
         }
 
         /// <summary>A strong ETag for some text: a quoted hash. <paramref name="weak"/> gives W/"...".</summary>
-        public static string Tag(string text, bool weak = false)
+        public static string Tag(string text, bool weak = false) => Tag(Encoding.UTF8.GetBytes(text ?? string.Empty), weak);
+
+        private static string Tag(byte[] bytes, bool weak)
         {
-            string hash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(text ?? string.Empty)))
+            string hash = Convert.ToBase64String(SHA256.HashData(bytes))
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_').Substring(0, 27);
             return (weak ? "W/" : string.Empty) + "\"" + hash + "\"";
         }
+
+        public static string Tag(HttpResponse response, bool weak) =>
+            response.BodyBytes is byte[] bytes ? Tag(bytes, weak) : Tag(response.Body, weak);
 
         /// <summary>The ETag for a value from a script: text as it is, anything else as JSON.</summary>
         public static string TagFor(object value, bool weak) => Tag(value is string s ? s : Values.ToJson(value), weak);
@@ -91,7 +96,7 @@ namespace KScript.Http
             };
             HttpResponse response = next();
             if (!IsRead(request) || response.Status != 200) return response;
-            if (!response.Headers.ContainsKey("ETag")) response.Headers["ETag"] = Tag(response.Body, weak);
+            if (!response.Headers.ContainsKey("ETag")) response.Headers["ETag"] = Tag(response, weak);
             return Matches(BuiltInMiddleware.Header(request, "if-none-match"), Values.ToStr(response.Headers["ETag"])) ? NotModified(response) : response;
         }
 
@@ -115,7 +120,11 @@ namespace KScript.Http
             string key = Values.ToStr(request["url"]);
             if (store.TryGet(key, out object kept, out _) && kept is Dictionary<string, object> saved)
             {
-                var hit = new HttpResponse((int)(double)saved["status"], (string)saved["body"], (string)saved["type"]);
+                var hit = new HttpResponse((int)(double)saved["status"], (string)saved["body"], (string)saved["type"])
+                {
+                    BodyBytes = saved.TryGetValue("body_bytes", out object bytes) && bytes is string encoded
+                        ? Convert.FromBase64String(encoded) : null,
+                };
                 foreach (var h in (Dictionary<string, object>)saved["headers"]) hit.Headers[h.Key] = h.Value;
                 hit.Headers["X-Cache"] = "HIT";
                 return Matches(BuiltInMiddleware.Header(request, "if-none-match"), hit.Headers.TryGetValue("ETag", out object tag) ? Values.ToStr(tag) : null) ? NotModified(hit) : hit;
@@ -129,6 +138,7 @@ namespace KScript.Http
                 {
                     ["status"] = (double)response.Status,
                     ["body"] = response.Body,
+                    ["body_bytes"] = response.BodyBytes is byte[] bytes ? Convert.ToBase64String(bytes) : null,
                     ["type"] = response.ContentType,
                     ["headers"] = response.Headers.ToDictionary(h => h.Key, h => (object)Values.ToStr(h.Value)),
                 }, CacheStore.Clock().AddSeconds(seconds));

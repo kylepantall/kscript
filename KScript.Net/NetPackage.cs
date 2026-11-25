@@ -328,7 +328,7 @@ namespace KScript.Net
             if (response == null)
                 throw c.Error($"@api('{url}') asks this app for a path, but this script isn't in a project with routes. Give a full http:// address instead.", "Network");
             return new ResponseValue(url, response.Status, response.Reason, response.Body,
-                new Dictionary<string, object>(response.Headers, StringComparer.OrdinalIgnoreCase));
+                new Dictionary<string, object>(response.Headers, StringComparer.OrdinalIgnoreCase), response.BodyBytes);
         }
     }
 

@@ -114,9 +114,9 @@ The app runs as an unprivileged user with a read-only application directory. Com
 
 ### Running the development site in Docker
 
-Run `kscript serve --docker` to start the app service from your Compose file. It bind-mounts the project read-only at `/app` and defaults to the development environment. Open the site and edit pages, styles, or route files locally. The browser reloads when the container sees the edits. Use `--no-reload` to refresh manually. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.
+Run `kscript serve` in a local project with a Compose file to start its app service. Use `--no-docker` to serve on the host. It bind-mounts the project read-only at `/app` and defaults to the development environment. Open the site and edit pages, styles, or route files locally. The browser reloads when the container sees the edits. Use `--no-reload` to refresh manually. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.
 
-Add this to `kscript.json` to use Docker whenever you run `kscript serve`.
+Use `serve.docker` in `kscript.json` to configure local Docker serving.
 
 ```json
 {
@@ -131,9 +131,11 @@ Add this to `kscript.json` to use Docker whenever you run `kscript serve`.
 }
 ```
 
-`"docker": true` uses those defaults. Set `enabled: false` to keep the settings and opt in with `--docker`, or use `--no-docker` for a local run. Set `mount` to the app directory in a custom image. Set `mount: null` to serve the files baked into the image, or `build: false` to reuse an existing image. Use `kscript serve --docker --env test` to select test settings. Compose controls the published ports and the service command. Ctrl+C stops the development app container. Its dependencies can remain running, and `docker compose down` stops them.
+`"docker": "auto"` detects a Compose file during local serving and is the default. Set `"docker": true` to require Compose locally or `"docker": false` to require `--docker`. With the object form, use `enabled: "auto"` for detection with custom settings. Host-specific options such as `--port` select the host in auto mode. Set `mount` to the app directory in a custom image. Set `mount: null` to serve the files baked into the image, or `build: false` to reuse an existing image. Use `kscript serve --docker --env test` to select test settings. Compose controls the published ports and the service command. Ctrl+C stops the development app container. Its dependencies can remain running, and `docker compose down` stops them.
 
 Use `COMPOSE_PROJECT_NAME=myapp-test kscript serve --docker --env test` to put test services and their Compose-managed volumes in a separate project. Use a separate host port in the test Compose file if both sites run at once.
+
+The generated Dockerfiles and `kscript serve --docker` apply pending migrations to the container's configured database before serving. Startup stops if a migration fails. To apply migrations manually, run `docker compose exec app kscript db migrate --force` when the service is running, or `docker compose run --rm app kscript db migrate --force` before startup. Inside Docker, live reload still watches the mounted source. Run `kscript agents` on the host to refresh generated guidance.
 
 `docker compose up --build` serves the source copied into the generated image. For a custom image that invokes `kscript serve` directly, set `KSCRIPT_SERVE_IN_DOCKER=1` inside the container so it starts the web server.
 

@@ -356,11 +356,13 @@ namespace KScript.Pages
                         http.Response.Headers.Server = KScript.Runtime.HttpIdentity.Product;
                         foreach (var h in result.Headers) http.Response.Headers[h.Key] = h.Value;
                         foreach (string cookie in result.Cookies) http.Response.Headers.Append("Set-Cookie", cookie);
-                        if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0))
+                        if (result.Status != 304 && !(result.Status >= 300 && result.Status < 400 && result.Body.Length == 0 && result.BodyBytes == null))
                         {
                             http.Response.ContentType = result.ContentType;
                             if (result.FilePath != null)
                                 await http.Response.SendFileAsync(result.FilePath);
+                            else if (result.BodyBytes is byte[] bytes)
+                                await http.Response.Body.WriteAsync(bytes, http.RequestAborted);
                             else
                                 await http.Response.WriteAsync(result.Body, Encoding.UTF8);
                         }

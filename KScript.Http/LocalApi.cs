@@ -51,7 +51,7 @@ namespace KScript.Http
             };
             foreach (var kv in result.Headers) headers[kv.Key] = kv.Value;
             if (result.Cookies.Count > 0) headers["Set-Cookie"] = string.Join(", ", result.Cookies);
-            return new LocalResponse { Status = result.Status, Reason = ReasonFor(result.Status), Body = result.Body ?? string.Empty, Headers = headers };
+            return new LocalResponse { Status = result.Status, Reason = ReasonFor(result.Status), Body = result.Body ?? string.Empty, BodyBytes = result.BodyBytes, Headers = headers };
         }
 
         /// <summary>The app of the project around <paramref name="folder"/>, or null when it has no routes.</summary>

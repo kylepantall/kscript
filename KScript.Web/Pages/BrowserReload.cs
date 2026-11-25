@@ -132,7 +132,7 @@ namespace KScript.Pages
 
         internal static void Inject(PageResult result, HttpRequest request, string revision)
         {
-            if (!HttpMethods.IsGet(request.Method) || result.FilePath != null || result.Body.Length == 0 ||
+            if (!HttpMethods.IsGet(request.Method) || result.FilePath != null || result.BodyBytes != null || result.Body.Length == 0 ||
                 result.Status < 200 || result.Status is >= 300 and < 400 || result.Status is 204 or 205 ||
                 !string.Equals(result.ContentType?.Split(';', 2)[0].Trim(), "text/html", StringComparison.OrdinalIgnoreCase) ||
                 result.Headers.ContainsKey("Content-Encoding") || result.Headers.ContainsKey("Content-Disposition"))

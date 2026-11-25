@@ -23,6 +23,17 @@ namespace KScript.Language.Tests
             return result.Text;
         }
 
+        [Fact]
+        public void RegexFormattingPreservesQuantifiersAndLiteralSpaces()
+        {
+            const string source = "pattern=/^[a-f0-9]{8}[ ]{2}$/i\nquotient=(8 / 2) / 2\n";
+            string formatted = Fmt(source);
+            Assert.Contains("/^[a-f0-9]{8}[ ]{2}$/i", formatted);
+            Assert.Contains("(8 / 2) / 2", formatted);
+            Assert.False(CodeMeaning.Same(CodeParser.Parse(source),
+                CodeParser.Parse(source.Replace("{8}", "{ 8 }")), out _));
+        }
+
         private static void AssertSame(string before, string after)
         {
             MarkupDocument original = CodeParser.Parse(before.TrimStart('﻿'));

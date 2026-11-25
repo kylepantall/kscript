@@ -229,6 +229,73 @@ public class HttpCoverageTests
     }
 
     [Fact]
+    public void ARouteConstraintBlockMatchesOnlyValidParameters()
+    {
+        using var site = new TempSite(("routes.kscript", """
+            import KScript.Http
+            Routes {
+              Group(prefix: /people/{id}) {
+                Get(path: /profile, where: { id: int }) { return 'valid' }
+              }
+            }
+            """));
+        var app = App(site);
+        Assert.Equal("valid", Send(app, "GET", "/people/42/profile").Body);
+        Assert.Null(Send(app, "GET", "/people/invalid/profile"));
+    }
+
+    [Fact]
+    public async Task BinaryResponsesPreserveTheirBytesThroughRoutingCachingAndTheLocalApi()
+    {
+        using var site = new TempSite(("kscript.json", """{"name":"binary-response"}"""), ("routes/api.kscript", """
+            import KScript.Http
+            import KScript.IO
+            Routes {
+              Get(path: "/file", middleware: [cache_response:1m], etag: true) {
+                return @response(@read_bytes('file.bin'), type: 'image/png')
+              }
+              Get(path: "/default") { return @response('AP+AQQ==' as base64) }
+            }
+            """));
+        byte[] bytes = { 0, 255, 128, 65 };
+        File.WriteAllBytes(Path.Combine(site.Root, "file.bin"), bytes);
+        var project = ProjectConfig.Load(Path.Combine(site.Root, "kscript.json"));
+        var app = new HttpApp(project.SiteRoot, project);
+        var first = Send(app, "GET", "/api/file");
+        Assert.True(first.Status == 200, first.Body);
+        Assert.Equal("image/png", first.ContentType);
+        Assert.Equal(bytes, first.BodyBytes);
+        Assert.NotEmpty(first.Headers["ETag"]);
+        var cached = Send(app, "GET", "/api/file");
+        Assert.Equal("HIT", cached.Headers["X-Cache"]);
+        Assert.Equal(bytes, cached.BodyBytes);
+        Assert.Null(Send(app, "HEAD", "/api/file").BodyBytes);
+        Assert.Equal("application/octet-stream", Send(app, "GET", "/api/default").ContentType);
+
+        var output = new StringWriter();
+        new Interpreter(KScriptHost.ForText(output)).RunText(
+            "import KScript.Net\necho @api('/api/file').bytes", Path.Combine(site.Root, "client.kscript"));
+        Assert.Equal(Convert.ToBase64String(bytes), output.ToString().Trim());
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var started = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<int> server = HttpServer.RunAsync(project.SiteRoot, project, TestServer.FreePort(), "127.0.0.1", TextWriter.Null, stop.Token,
+            started: address => started.TrySetResult(address));
+        try
+        {
+            using var client = new HttpClient();
+            using var reply = await client.GetAsync(await started.Task.WaitAsync(stop.Token) + "/api/file", stop.Token);
+            Assert.Equal("image/png", reply.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(bytes, await reply.Content.ReadAsByteArrayAsync(stop.Token));
+        }
+        finally
+        {
+            stop.Cancel();
+            await server;
+        }
+    }
+
+    [Fact]
     public async Task RequestsFromTheServerGoToTheRoutes()
     {
         static DefaultHttpContext Request(string method, string path)
