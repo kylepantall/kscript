@@ -1095,6 +1095,15 @@ namespace KScript.Pages
                     if (!stateNames.Contains(path[0]) || locked.Contains(path[0]) ||
                         !TryBinding(liveScope, path, out object old, out var owner)) continue;
                     bool typed = classFields?.Contains(path[0]) == true;
+                    // A form control sends text, a number, true/false, or a list of those (a multi-select, checkboxes).
+                    // Untyped state takes nothing else from the browser, so a posted map can't replace a value.
+                    static bool Plain(object v) => v is null or string or double or bool;
+                    if (!typed && !Plain(kv.Value) && !(kv.Value is List<object> items && items.All(Plain)))
+                        throw new PageResponseSignal(new PageResult
+                        {
+                            Status = 422, ContentType = "text/plain; charset=utf-8",
+                            Body = $"The value sent for {kv.Key} isn't one a form control sends: text, a number, true or false, or a list of those.",
+                        });
                     object next = !typed && kv.Value is string text && old is double && Values.TryNumber(text, out double number) ? number : kv.Value;
                     try
                     {

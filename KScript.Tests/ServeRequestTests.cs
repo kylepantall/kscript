@@ -102,6 +102,34 @@ public sealed class ServeRequestTests
 
     #endregion
 
+    #region What a live block takes from the browser
+
+    [Fact]
+    public async Task A_live_block_takes_only_what_a_form_control_sends_for_untyped_state()
+    {
+        using var site = new TempSite(("index.html", """
+            <live id="search"><state name="q" value="''" /><input bind="q"><p>q={$q}</p></live>
+            """));
+        await Serve(site, async http =>
+        {
+            string html = await http.GetStringAsync("/");
+            http.DefaultRequestHeaders.Add("X-KScript-Live", Attribute(html, "data-ks-route"));
+            string state = Attribute(html, "data-ks-state");
+
+            using var typed = await http.PostAsJsonAsync("/", new { block = "search", handler = -1, state, binds = new { q = "tea" } });
+            Assert.Contains("q=tea", await typed.Content.ReadAsStringAsync());
+
+            using var map = await http.PostAsJsonAsync("/", new { block = "search", handler = -1, state, binds = new { q = new { admin = true } } });
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, map.StatusCode);
+            Assert.Contains("isn't one a form control sends", await map.Content.ReadAsStringAsync());
+
+            using var nested = await http.PostAsJsonAsync("/", new { block = "search", handler = -1, state, binds = new { q = new object[] { "a", new { b = 1 } } } });
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, nested.StatusCode);
+        });
+    }
+
+    #endregion
+
     #region Statuses and headers that can't be sent
 
     [Fact]
