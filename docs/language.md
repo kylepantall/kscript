@@ -340,6 +340,8 @@ On a list, `contains(value)`, `index_of(value)`, `remove(value)` and `count_of(v
 | `'   '` | `false` | `true` |
 | `'hello'` | `false` | `false` |
 
+A number is always written in plain digits, never with an exponent: `echo 10 ** 20` prints `100000000000000000000` and `echo 0.1 ** 20` prints `0.00000000000000000001`. A whole number keeps every digit up to 9007199254740992 (16 digits), so a long id prints as it was read, and a fraction shows 15 significant digits, so `0.1 + 0.2` prints `0.3`.
+
 A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
 
 ```kscript
@@ -772,7 +774,7 @@ import slugify from "lib/strings.kscript"
 
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
+| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, header, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@random_bytes(16, format: 'hex')` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
 | `KScript.Net` | Sends HTTP requests with `@api(url, options: { method, headers, body, timeout })`. The response has `.status`, `.is_ok`, `.text`, `->json()` and `->check()`. Also provides `@download(url, to)` and `@query_string`. A path such as `'/api/notes'` asks the project's own routes. See [Calling your own API](http.md#calling-your-own-api). |

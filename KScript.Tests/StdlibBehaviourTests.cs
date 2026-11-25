@@ -127,4 +127,35 @@ public class StdlibBehaviourTests
     [InlineData("table(rows: [{ a: 1 }], align: ['middle'])", "isn't a column alignment")]
     public void The_terminal_table_says_how_to_write_what_it_no_longer_reads(string statement, string expected) =>
         Assert.Contains(expected, Fails("import KScript.Terminal\n" + statement));
+
+    [Theory]
+    [InlineData("1234567890123457", "1234567890123457")]
+    [InlineData("9007199254740991", "9007199254740991")]
+    [InlineData("-1234567890123457", "-1234567890123457")]
+    [InlineData("10 ** 15", "1000000000000000")]
+    [InlineData("10 ** 20", "100000000000000000000")]
+    [InlineData("2 ** 60", "1152921504606847000")]
+    [InlineData("0.1 ** 20", "0.00000000000000000001")]
+    [InlineData("-0.000001234", "-0.000001234")]
+    [InlineData("1.5 * 10 ** -7", "0.00000015")]
+    [InlineData("0.1 + 0.2", "0.3")]
+    [InlineData("1 / 3", "0.333333333333333")]
+    [InlineData("1234.5", "1234.5")]
+    [InlineData("42", "42")]
+    [InlineData("-0.5", "-0.5")]
+    public void A_number_is_written_in_plain_digits_whatever_its_size(string expression, string expected)
+    {
+        Assert.Equal(expected, Code($"echo {expression}"));
+        Assert.Equal($"n={expected}", Code($"echo \"n={{ {expression} }}\""));
+        Assert.Equal(expected, Code($"n = {expression}\necho $n->to_string()"));
+        // JSON may use an exponent, but it holds the same number: reading it back prints the same digits.
+        Assert.Equal(expected, Code($"n = {expression}\necho [$n]->to_json()->json()[0]"));
+        Assert.Equal("true", Code($"n = {expression}\necho \"{{ [$n]->to_json()->json()[0] == $n }}\""));
+    }
+
+    [Fact]
+    public void A_whole_number_keeps_every_digit_in_json()
+    {
+        Assert.Equal("{\"id\":1234567890123457} 1234567890123457", Code("echo \"{ { id: 1234567890123457 }->to_json() } { '{\\\"id\\\": 1234567890123457}'->json().id }\""));
+    }
 }
