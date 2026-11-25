@@ -76,6 +76,30 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AComponentsRenderAndStyleAreCalledByThePage()
+        {
+            const string badge = """
+                import KScript.Web
+
+                type Badge extends Component {
+                  label: string
+
+                  fn render(): Component => ```html
+                  <span class="note-badge">{$label}</span>
+                  ```
+
+                  override fn style(): ComponentStyle => ```css
+                  .note-badge { padding: 0.25rem; }
+                  ```
+
+                  fn helper() => 1
+                }
+                """;
+            DocumentAnalysis a = Analyzer.Analyze(badge, "_components/badge.kscript");
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && (d.Message.Contains("style") || d.Message.Contains("render")));
+        }
+
+        [Fact]
         public void RemovingAFunctionTakesItsDocComment()
         {
             const string code = "/// Says hi.\n/// @param who Someone.\nfn hello(who) {\n  echo \"Hi $who\"\n}\nfn main() => 1\necho @main()";
