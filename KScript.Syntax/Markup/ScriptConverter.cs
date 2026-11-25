@@ -815,6 +815,10 @@ namespace KScript.Syntax.Markup
                                 {
                                     WriteConstruct(construct, indent + 1);
                                 }
+                                else if (node is MarkupElement nested && ComponentScript.IsNestedDeclaration(nested))
+                                {
+                                    WriteElement(nested, indent + 1, false);
+                                }
                             }
                             scopes.Pop();
                             Line(indent, "}");
@@ -998,6 +1002,11 @@ namespace KScript.Syntax.Markup
                 if (node is MarkupElement { Name: "catch" } || IsFieldLine(node))
                 {
                     return true;
+                }
+                if (node is MarkupElement nested && ComponentScript.IsNestedDeclaration(nested))
+                {
+                    // A component's own type, model, enum or error is written the way it is at the top of a file.
+                    return nested.Name is "type" or "model" ? nested.Children.All(IsTypeLine) : !nested.ChildElements.Any(c => c.Name != "field");
                 }
                 if (node is MarkupElement { Name: CodeParser.ConstructWord } construct)
                 {

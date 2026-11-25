@@ -401,7 +401,7 @@ namespace KScript.Language.Analysis
                 {
                     // A capitalised word reads as a type, model, enum, error or job: one that isn't declared or imported here.
                     Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UndefinedVariable,
-                        $"No type named {id.Name} is declared or imported here. Text needs quotes ('{id.Name}').", fixes);
+                        $"No type named {id.Name} is declared or imported here." + (NestedElsewhere(id.Name) is { Length: > 0 } nested ? nested : $" Text needs quotes ('{id.Name}')."), fixes);
                     return;
                 }
                 hint = $" Variables start with $ ($" + id.Name + "), and text needs quotes ('" + id.Name + "').";
@@ -638,7 +638,7 @@ namespace KScript.Language.Analysis
                     }
                     else
                     {
-                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, $"Unknown function '{id.Name}'. Declare it with {FnHint(id.Name)}.");
+                        Report(span, DiagnosticSeverity.Error, DiagnosticCodes.UnknownCommand, NestedElsewhere(id.Name) is { Length: > 0 } nested ? $"No type named {id.Name} is declared or imported here.{nested}" : $"Unknown function '{id.Name}'. Declare it with {FnHint(id.Name)}.");
                     }
                     return;
                 }

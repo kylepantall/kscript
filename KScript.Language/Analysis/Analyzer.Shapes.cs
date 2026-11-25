@@ -477,6 +477,13 @@ namespace KScript.Language.Analysis
                     constructed = true;
                     continue;
                 }
+                // A component may keep the types only it uses beside its fields.
+                if (ComponentScript.IsNestedDeclaration(child)) continue;
+                if (ComponentScript.NestedDeclarations.Contains(child.Name) && child.Parent == e)
+                {
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, ComponentScript.NestedOnlyInComponent(child));
+                    continue;
+                }
                 if (!IsKScriptElementName(child, "field"))
                 {
                     Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <construct>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
@@ -540,7 +547,9 @@ namespace KScript.Language.Analysis
                 DeclareImplicit(parseScope, "match", new TypeShape(KType.Map), "The pattern's match: { text, index, groups, captures }.", e);
                 AnalyzeExpressionRegion(parse.Value, RegionKind.Expression, parseScope, e, parse);
             }
-            WalkChildren(e.Children, typeScope, markupMode);
+            // Nested declarations stand beside the component, so they don't see its fields.
+            WalkChildren(e.Children.Where(c => c is MarkupElement m && ComponentScript.IsNestedDeclaration(m)).ToList(), inner, markupMode);
+            WalkChildren(e.Children.Where(c => !(c is MarkupElement m && ComponentScript.IsNestedDeclaration(m))).ToList(), typeScope, markupMode);
             if (e.ChildElements.Any(c => c.Name == "catch"))
             {
                 // A type handler can supply the result of any call to one of these methods.
@@ -795,7 +804,8 @@ namespace KScript.Language.Analysis
             {
                 IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                    $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
+                    NestedElsewhere(name) is { Length: > 0 } nested ? $"Unknown type '{name}'.{nested}"
+                    : $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
                     SuggestFix(span, name, known, n => n));
                 return false;
             }

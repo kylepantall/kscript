@@ -180,6 +180,51 @@ type NoteCard extends Component {
 
 `<note-card title="Shopping" />` works, and `<note-card clicks="{5}" />` is reported by `kscript check`. The block after the list is optional. It runs each time the page builds the component, before saved state is restored, so keep it free of writes. See [constructors](types.md#constructors) for the rules shared with every type.
 
+### Types that belong to a component
+
+A type, enum, error or model that only one component uses can live inside that component's block. The component file then holds everything it needs.
+
+````kscript
+import KScript.Web
+import KScript.Data
+
+type CommentThread extends Component {
+  model Comment(timestamps) {
+    post_id: int
+    body: string(min: 1, max: 2000)
+  }
+
+  type Draft {
+    body: string = ''
+  }
+
+  enum Order { newest, oldest }
+
+  construct({ post_id: int, order: Order = 'newest' })
+
+  draft: Draft = Draft({ })
+
+  fn add() {
+    Comment->create(post_id: $post_id, body: $draft.body)
+    draft = Draft({ })
+  }
+
+  fn render(): Component {
+    return ```html
+    <section>
+      <p>{Comment->where(post_id: $post_id)->count()} comments, {$order} first</p>
+      <input @bind('draft.body')>
+      <button type="button" @on-click($add)>Add</button>
+    </section>
+    ```
+  }
+}
+````
+
+A declaration inside a component belongs to that file. The component's fields and methods use it by name, and no other file can, even one that imports the component. When a second file needs it, move it to its own file (`types/draft.kscript`, `models/comment.kscript`) and import it in both. `kscript check` says so when a file names a type that is inside a component it imports.
+
+Only a component can hold declarations this way. A nested declaration doesn't see the component's fields, and it doesn't count as a second type in the file, so the [one type per file](projects.md#where-files-go-the-recommended-layout) rule still holds. `kscript db diff` and `kscript db status` read the models inside components along with the models folder.
+
 ## Actions and browser events
 
 Handlers contain KScript statements and can call imported functions. A handler can also be a single value. A bool field flips, so `@on-click($open)` is the same as `@on-click(open = not $open)`. A function or one of the component's methods is called, so `@on-click($save)` runs `fn save()`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.

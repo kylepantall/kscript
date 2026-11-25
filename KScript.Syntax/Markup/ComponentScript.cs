@@ -11,7 +11,16 @@ namespace KScript.Syntax.Markup
         public static bool IsComponentType(MarkupElement type) =>
             type?.Name == "type" && type.GetAttributeValue("extends") == Contract;
 
-        public static bool IsStoredField(MarkupElement field) => field?.Name == "field" && field.GetAttribute("value") == null;
+        /// <summary>The declarations a component may keep inside its own block, for the types only it uses.</summary>
+        public static IReadOnlyList<string> NestedDeclarations { get; } = new[] { "type", "model", "enum", "error" };
+
+        /// <summary>True for a type, model, enum or error declared inside a component.</summary>
+        public static bool IsNestedDeclaration(MarkupElement e) =>
+            e != null && NestedDeclarations.Contains(e.Name) && IsComponentType(e.Parent);
+
+        /// <summary>The message for a declaration nested in a type that is not a component.</summary>
+        public static string NestedOnlyInComponent(MarkupElement nested) =>
+            $"Only a component can hold its own types, so {nested.Name} {nested.GetAttributeValue("name")?.Trim()} can't sit inside {nested.Parent.Name} {nested.Parent.GetAttributeValue("name")?.Trim()}. Give it its own file.";
 
         public static IReadOnlyList<string> Extensions { get; } = new[] { ScriptFiles.Code, ScriptFiles.Xml, ".html", ".md" };
 

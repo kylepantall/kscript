@@ -62,10 +62,13 @@ namespace KScript.Language.Analysis
         /// in types/sku.kscript) reads raw values and checks literals in the files that import it, as it does in its own file.
         /// The bases it is built on are found in the imported files too.
         /// </summary>
-        private MarkupElement ImportedTypeElement(string name)
+        private MarkupElement ImportedTypeElement(string name) =>
+            ImportedDocuments().Select(doc => TypeElementIn(doc, name)).FirstOrDefault(found => found != null);
+
+        private IEnumerable<MarkupDocument> ImportedDocuments()
         {
             importedMarkup ??= new Dictionary<string, MarkupDocument>(StringComparer.Ordinal);
-            foreach (string path in result.Symbols.Where(s => s.SourcePath != null).Select(s => s.SourcePath).Distinct())
+            foreach (string path in result.Symbols.Where(s => s.SourcePath != null).Select(s => s.SourcePath).Distinct().ToList())
             {
                 if (!importedMarkup.TryGetValue(path, out MarkupDocument doc))
                 {
@@ -73,13 +76,20 @@ namespace KScript.Language.Analysis
                     doc = text == null ? null : MarkupParser.Parse(new SourceText(text), MarkupParser.KindFromPath(path), path);
                     importedMarkup[path] = doc;
                 }
-                MarkupElement found = doc == null ? null : TypeElementIn(doc, name);
-                if (found != null)
-                {
-                    return found;
-                }
+                if (doc != null) yield return doc;
             }
-            return null;
+        }
+
+        /// <summary>
+        /// Why a name is unknown here when an imported component declares it inside its own block: such a
+        /// declaration belongs to the component's file. Empty when no imported component holds the name.
+        /// </summary>
+        private string NestedElsewhere(string name)
+        {
+            MarkupElement nested = ImportedDocuments().SelectMany(doc => doc.DescendantElements())
+                .FirstOrDefault(e => ComponentScript.IsNestedDeclaration(e) && e.GetAttributeValue("name")?.Trim() == name);
+            return nested == null ? string.Empty
+                : $" {name} is declared inside the component {nested.Parent.GetAttributeValue("name")?.Trim()}, so only that file can use it. To share it, move it to its own file and import that.";
         }
 
         /// <summary>

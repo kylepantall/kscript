@@ -880,6 +880,10 @@ namespace KScript.Runtime
                     throw run.Error("Method signatures and extends require a record type.", "extends", "Type");
                 return DeclareRefined(run, name, with[0]);
             }
+            // A component's own types, enums, errors and models are declared first, beside it: its fields and
+            // methods name them, and the rest of the file can too. Only top-level declarations are exported.
+            List<MarkupNode> nested = run.ChildElements.Where(ComponentScript.IsNestedDeclaration).Cast<MarkupNode>().ToList();
+            if (nested.Count > 0) run.Interpreter.ExecuteNodes(nested, run.Scope, run.Module);
             foreach (string b in with)
             {
                 string baseName = TypeRef.Parse(b).Name;
@@ -973,7 +977,8 @@ namespace KScript.Runtime
             var own = new TypeRules();
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (rulesAndMethods && (e.Name == "catch" || own.TryAddChild(e, run, allowNormalize: false))) continue;
+                if (rulesAndMethods && (e.Name == "catch" || ComponentScript.IsNestedDeclaration(e) || own.TryAddChild(e, run, allowNormalize: false))) continue;
+                if (ComponentScript.NestedDeclarations.Contains(e.Name)) throw run.Error(ComponentScript.NestedOnlyInComponent(e), null, "Syntax");
                 if (rulesAndMethods && e.Name == CodeParser.ConstructWord)
                 {
                     if (type.Constructors.Any(c => c.Owner == type)) throw run.Error($"{name} has two construct blocks. Keep one.", null, "Syntax");

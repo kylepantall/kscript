@@ -116,6 +116,33 @@ public sealed class MigrationTests : DataFixture
     }
 
     [Fact]
+    public void DiffReadsAModelKeptInsideAComponent()
+    {
+        FileOf("_components/comment-thread.kscript", """
+            import KScript.Web
+            import KScript.Data
+
+            type CommentThread extends Component {
+              model Comment(timestamps) {
+                body: string(max: 2000)
+              }
+
+              fn render(): Component {
+                return ```html
+                <p>{Comment->count()}</p>
+                ```
+              }
+            }
+            """.ReplaceLineEndings("\n"));
+        // A component with no model of its own is not run to look for one.
+        FileOf("_components/plain.kscript", "import KScript.Web\n\ntype Plain extends Component {\n  fn render(): Component {\n    return ```html\n    <p></p>\n    ```\n  }\n}\nthrow 'not run'\n");
+        Assert.Contains("create_comments.kscript, with 1 step.", Ok("diff"));
+        Assert.Contains("Field(name: 'body', type: string, max: 2000)", Migration("create_comments"));
+        Ok("migrate");
+        Assert.Contains("Nothing to write", Ok("diff"));
+    }
+
+    [Fact]
     public void DiffWritesTheTablesTheModelsWantAndMigrateMakesThem()
     {
         Models();

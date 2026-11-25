@@ -37,7 +37,7 @@ namespace KScript.Data.Migrations
             var migrator = new Migrator(project.Directory, KScriptHost.ForText(new StringWriter()), project);
             List<string> migrations = Migrator.Scripts(migrator.MigrationsFolder);
             if (migrations.Count == 0) return None;
-            List<string> files = migrations.Concat(Migrator.Scripts(migrator.ModelsFolder)).Append(project.FilePath).ToList();
+            List<string> files = migrations.Concat(migrator.ModelScripts()).Append(project.FilePath).ToList();
             string stamp = string.Join("\n", files.Select(f => f + "|" + File.GetLastWriteTimeUtc(f).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (Cache.TryGetValue(project.Directory, out var known) && known.Stamp == stamp) return known.Models;
 

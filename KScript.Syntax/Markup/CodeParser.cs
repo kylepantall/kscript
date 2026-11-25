@@ -146,6 +146,18 @@ namespace KScript.Syntax.Markup
                 {
                     ParseConstruct(parent);
                 }
+                else if (fields && (parent.Name is "type" or "model") && NestedDeclarationAhead() is string nested)
+                {
+                    // A component keeps the types only it uses inside its own block: type Draft { }, enum Order { }.
+                    int nestedStart = pos;
+                    string nestedDoc = TakeDoc();
+                    switch (nested)
+                    {
+                        case "enum": ParseEnum(parent, nestedStart, nestedDoc); break;
+                        case "error": ParseError(parent, nestedStart, nestedDoc); break;
+                        default: ParseType(parent, nestedStart, nestedDoc, nested); break;
+                    }
+                }
                 else if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
                 {
                     // A method of the type: fn width(unit: Unit) => ...
@@ -1180,6 +1192,10 @@ namespace KScript.Syntax.Markup
             ParseHandlers(e);
             Finish(e, start);
         }
+
+        /// <summary>The keyword of a declaration a component may hold (<c>type Draft</c>, <c>model Comment</c>), or null.</summary>
+        private string NestedDeclarationAhead() =>
+            ComponentScript.NestedDeclarations.FirstOrDefault(word => Lookahead(word) && StartsDeclaration(word.Length));
 
         /// <summary>True at <c>construct(</c>, the start of a type's constructor.</summary>
         private bool ConstructAhead()

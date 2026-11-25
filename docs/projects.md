@@ -465,7 +465,7 @@ model Order {
 }
 ```
 
-The generators and project templates all work this way, and in a project `kscript check` warns (KS6008) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it.
+The generators and project templates all work this way, and in a project `kscript check` warns (KS6008) about a file that declares a second type, saying where to move it. A script outside a project, run on its own, can keep its types with it. A [component](components.md#types-that-belong-to-a-component) can hold the types, enums, errors and models that only it uses inside its own block.
 
 Two things are found without an import. Native types in `natives/` work in every script (they are part of the language, like `email`). And a model's field can name another model in the models folder (`paths.models`) without importing it, because two models that link to each other (`author: User` in one, `posts: Post[]` in the other) would otherwise import each other, and circular imports aren't allowed. That lookup is only for the types of model fields: a controller or script that uses `User` still imports `models/user.kscript`.
 

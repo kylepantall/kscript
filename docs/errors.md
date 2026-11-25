@@ -326,7 +326,7 @@ The KS6xxx codes come in two kinds.
 
 ## KS6008
 
-**A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. See [One type per file](projects.md#where-files-go-the-recommended-layout).
+**A second type in one file.** In a project, each type, model, enum and error type goes in its own file (`types/`, `models/`, `errors/`, or `requests/` for request bodies) and is imported where it is used. The message names the file to move it to. A [component](components.md#types-that-belong-to-a-component) may keep the types only it uses inside its own block. See [One type per file](projects.md#where-files-go-the-recommended-layout).
 
 ## KS6009
 
