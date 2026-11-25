@@ -546,7 +546,8 @@ namespace KScript.Language.Features
 
         private List<CompletionItem> AttributeValueCompletions(DocumentAnalysis analysis, Cursor cursor)
         {
-            ElementInfo info = Catalog.GetElement(cursor.TagElement.Name);
+            // <KScript.Document> is Document from the package that has it.
+            ElementInfo info = Catalog.GetElement(cursor.TagElement.Name) ?? Catalog.GetElement(ElementInfo.BareName(cursor.TagElement.Name));
             AttributeInfo a = info?.GetAttribute(cursor.Attribute.Name);
             DecodedText value = cursor.Attribute.Value;
             int index = value.FromSource(cursor.Offset);
@@ -626,6 +627,12 @@ namespace KScript.Language.Features
                     {
                         // <let type="duration" value="‸">: the values a native type offers.
                         return typed.Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: false)).ToList();
+                    }
+                    if (cursor.Region == null && a.Kind == AttributeKind.Template && a.Options.Count > 0)
+                    {
+                        // Text with fixed words of its own (paper: a4, letter... or any size in quotes) offers those words first.
+                        return a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) })
+                            .Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: true)).ToList();
                     }
                     return cursor.Region != null ? null : ExpressionStartCompletions(analysis, cursor.Offset, replace, a.Kind == AttributeKind.Template);
 

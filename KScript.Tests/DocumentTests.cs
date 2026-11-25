@@ -426,7 +426,9 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", template: poster) {\n}", "template")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", paper: huge) {\n}", "paper")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", margin: \"\") {\n}", "margin")]
-    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", size: \"big\") {\n}", "size: 'big' isn't a length")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", size: \"big\") {\n}", "size: 'big' isn't a text size")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Section(title: \"1\") {\n    Section(title: \"2\") {\n      Section(title: \"3\") {\n        Section(title: \"4\") {\n          Section(title: \"5\") {\n            Section(title: \"6\") {\n              Section(title: \"7\") {\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}", "Sections go 6 levels deep at most")]
+    [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[@nobody]\"\n}", "Source(id: \"nobody\", ...)")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", accent: \"#zz\") {\n}", "accent: '#zz' isn't a colour")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[#nowhere]\"\n}", "nowhere")]
     [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\") {\n  Paragraph \"[@nobody]\"\n}", "nobody")]
@@ -454,6 +456,52 @@ Document(title: ""Values"", to: [""{ $name }.docx""]) {
         FileOf("text.png", "not an image");
         KScriptException e = Fails(code);
         Assert.Contains(message, e.Message);
+    }
+
+    [Fact]
+    public void A_setting_is_named_once_in_its_error()
+    {
+        foreach (var (setting, said) in new[] { ("size: 0", "size: 0 is too small"), ("paper: \"a9\"", "paper: 'a9' isn't a paper size"), ("accent: \"#zz\"", "accent: '#zz' isn't a colour") })
+        {
+            string message = Fails($"Document(to: \"a.pdf\", {setting}) {{\n}}").Message;
+            Assert.StartsWith(said, message);
+        }
+    }
+
+    [Fact]
+    public void Ids_and_the_code_language_are_text_like_any_other()
+    {
+        Run(@"
+chapters = ['One', 'Two']
+lang = 'python'
+key = 'gardner1970'
+Document(title: ""Loop"", to: ['loop.md', 'loop.html']) {
+  for chapter at i in $chapters {
+    Section(title: $chapter, id: ""ch-{ $i }"") {
+      Paragraph ""This is Section [#ch-{ $i }], citing [@gardner1970].""
+    }
+  }
+  Code(language: $lang) ""print(1)""
+  Bibliography {
+    Source(id: $key, author: ""Martin Gardner"", title: ""Mathematical Games"", year: 1970)
+  }
+}
+");
+        string md = Read("loop.md");
+        Assert.Contains("## 1 One {#ch-0}", md);
+        Assert.Contains("## 2 Two {#ch-1}", md);
+        Assert.Contains("This is Section [2](#ch-1)", md);
+        Assert.Contains("```python\nprint(1)\n```", md);
+        Assert.Contains("class=\"language-python\"", Read("loop.html"));
+        Assert.Contains("id=\"ref-gardner1970\"", Read("loop.html"));
+    }
+
+    [Fact]
+    public void Paper_takes_its_fixed_words_bare()
+    {
+        Run("Document(title: \"L\", paper: letter, to: \"letter.tex\") {\n  Paragraph \"x\"\n}\nDocument(title: \"C\", paper: '10cm x 20cm', to: \"custom.tex\") {\n  Paragraph \"x\"\n}");
+        Assert.Contains("paperwidth=612pt,paperheight=792pt", Read("letter.tex"));
+        Assert.Contains("paperwidth=283.465pt", Read("custom.tex"));
     }
 
     [Fact]

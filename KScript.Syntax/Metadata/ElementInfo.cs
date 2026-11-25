@@ -105,6 +105,9 @@ namespace KScript.Metadata
         /// <summary>True if attributes other than the listed ones are allowed (they become variables, as in <c>&lt;layout&gt;</c>).</summary>
         public bool AllowsExtraAttributes { get; init; }
 
+        /// <summary>What those other attributes do, to finish "Other attributes ...": most become variables, a source's are its fields.</summary>
+        public string ExtraAttributesDo { get; init; } = "become variables";
+
         /// <summary>The type of the variable its declare-variable attribute (into:) makes, when not text.</summary>
         public string DeclaresType { get; init; }
 

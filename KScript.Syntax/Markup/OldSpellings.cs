@@ -179,6 +179,11 @@ namespace KScript.Syntax.Markup
                 // A path is a value of its own, quoted or not: path: /people/{id}.
                 yield break;
             }
+            if (attr.Quote == '\0' && CodeArguments.IsText(a.Kind) && a.Options.Contains(text, StringComparer.Ordinal))
+            {
+                // One of the argument's own fixed words is written bare, as an enum's are: paper: a4.
+                yield break;
+            }
             if (attr.Quote == '\0' && CodeArguments.IsText(a.Kind) && !a.IsName && !attr.CodeValue && !attr.QuotedValue && !IsPlainValue(text))
             {
                 string quoted = ScriptConverter.Quote(text);

@@ -185,7 +185,7 @@ namespace KScript.Http
                     var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
                     if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
                     return table.Url(name, values);
-                }, "<a href=\"{@route('people.show', id: $p.id)}\">");
+                }, "<a href=\"{ @route('people.show', id: $p.id) }\">{ $p.name }</a>");
 
             RouteCatalog.Register(p);
 
