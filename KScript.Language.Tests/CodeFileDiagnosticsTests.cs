@@ -64,5 +64,27 @@ namespace KScript.Language.Tests
             // A parameter without a type may be anything, so text methods are fine on it.
             Assert.DoesNotContain(Analyze("fn f(x) => $x->trim()\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
         }
+
+        [Fact]
+        public void AMatchUsedAsAValueKnowsIt()
+        {
+            Assert.DoesNotContain(Analyze("fn size(x) => match $x { _ when $it > 9 => 'big', _ => 'small' }\necho @size(3)\n", "a.kscript").Diagnostics,
+                x => x.Severity == DiagnosticSeverity.Error);
+        }
+
+        [Fact]
+        public void ChainedComparisonsAreReported()
+        {
+            Diagnostic d = Analyze("n = 5\necho 1 < $n < 10\n", "a.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Contains("Comparisons can't be chained", d.Message);
+            Assert.DoesNotContain(Analyze("n = 5\necho 1 < $n and $n < 10\necho (1 < $n) == true\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+        }
+
+        [Fact]
+        public void ContinueInsideAFunctionIsReportedLikeTheRuntime()
+        {
+            // The runtime agrees: break and continue stop at the function they are in.
+            Assert.Contains(Analyze("fn f() {\n  continue\n}\nfor i in 0..2 {\n  @f()\n}\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.MisplacedElement);
+        }
     }
 }
