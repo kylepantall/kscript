@@ -155,7 +155,7 @@ namespace KScript.Language.Tests
             Assert.Equal(1, project.Tests);
             Assert.Equal(2, project.Pages);
             Assert.Equal(new[] { "lib/tasks.kscript", "lib/use.kscript", "script.ks.xml" }, project.Scripts);
-            Assert.Equal(new[] { "KScript.Core", "KScript.IO", "KScript.Math" }, project.Packages);
+            Assert.Equal(new[] { "KScript.Core", "KScript.IO", "KScript.Math", "KScript.Web" }, project.Packages);
             Assert.DoesNotContain(project.Symbols, s => s.Name is "_private" or "hidden" or "inner" or "skipped" or "skipped2");
 
             AgentSymbol add = project.Symbols.Single(s => s.Name == "add_task");
@@ -303,6 +303,40 @@ namespace KScript.Language.Tests
             Assert.Contains("Use `kscript make css` for `.ks.css` and link its `.css` URL", xml);
             Assert.Contains("Use `.ks.scss` when the project builds Sass", xml);
             Assert.Contains("`.ks.xml`", xml);
+        }
+
+        [Fact]
+        public void AgentsGuideProjectsToTheirWebFeatures()
+        {
+            Write("kscript.json", """
+                { "name": "board", "packages": ["KScript.Http", "KScript.Auth", "KScript.Storage"] }
+                """);
+            Write("index.html", "<p>Board</p>");
+            var notes = AgentDocs.Render(AgentDocs.Read(dir));
+            string agents = notes["AGENTS.md"];
+            Assert.Contains("## Choose a feature for the task", agents);
+            Assert.Contains("`@on-click`, `@on-submit` and `@bind`", agents);
+            Assert.Contains("components.md#client-side-extensions", agents);
+            Assert.Contains("`kscript make route --api`", agents);
+            Assert.Contains("`@is_signed_in()` and `@user()`", agents);
+            Assert.Contains("`KScript.Storage` and `@storage()`", agents);
+
+            string web = notes[".kscript/agents/packages/KScript.Web.md"];
+            Assert.Contains("type Counter extends Component", web);
+            Assert.Contains("fn render(): Component", web);
+            Assert.Contains("override fn style(): ComponentStyle", web);
+            Assert.Contains("@live-action('save')", web);
+            Assert.Contains("`@on-drop`", web);
+            foreach (string method in new[] { "directive", "action", "call", "on" })
+                Assert.Contains($"KScriptLive.{method}(", web);
+
+            File.Delete(Path.Combine(dir, "index.html"));
+            Write("kscript.json", """{ "name": "board", "packages": ["KScript.Storage"] }""");
+            notes = AgentDocs.Render(AgentDocs.Read(dir));
+            Assert.Contains("`@storage()`", notes["AGENTS.md"]);
+            Assert.DoesNotContain("`@is_signed_in()`", notes["AGENTS.md"]);
+            Assert.DoesNotContain("Clicks, forms and in-place updates", notes["AGENTS.md"]);
+            Assert.DoesNotContain(".kscript/agents/packages/KScript.Web.md", notes.Keys);
         }
 
         [Fact]
