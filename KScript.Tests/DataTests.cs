@@ -818,6 +818,30 @@ public sealed class DataQueryTests : DataFixture
     }
 
     [Fact]
+    public void AChangeInsideAMapOrListFieldIsSaved()
+    {
+        Assert.Equal(new[] { "false", "true", "red", "false", "true", "blue" }, Lines("""
+            model Page {
+              title: string
+              meta: map = {}
+            }
+            $db->create_table(Page)
+            page = Page->create(title: 'Home')
+            echo $page->is_dirty()
+            page.meta.color = 'red'
+            echo $page->is_dirty(meta)
+            $page->save()
+            echo Page->find($page.id).meta.color
+            read = Page->find($page.id)
+            echo $read->is_dirty()
+            read.meta.color = 'blue'
+            echo $read->is_dirty()
+            $read->save()
+            echo Page->find($page.id).meta.color
+            """));
+    }
+
+    [Fact]
     public void ARelationNameIsItsColumnWhereverAColumnIsNamed()
     {
         Assert.Equal(new[] { "1", "2, 2", "2" }, Lines("""

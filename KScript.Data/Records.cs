@@ -38,7 +38,7 @@ namespace KScript.Data
                     object value = Rows.FromDb(raw, c, call.Interpreter);
                     if (c.Kind == ColumnKind.Json && value is Dictionary<string, object> or List<object>) value = Typed(call, model, f, value);
                     record[f.Name] = value;
-                    state.Original[f.Name] = value;
+                    state.Original[f.Name] = Kept(value);
                 }
                 else
                 {
@@ -198,9 +198,23 @@ namespace KScript.Data
         {
             var state = State(record) ?? new RecordState();
             state.Exists = true;
-            state.Original = record.Where(kv => record.Type.Field(kv.Key) is FieldDefinition f && !f.Computed).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            // Only columns are compared later; a loaded relation (which may lead back to this record) is kept as it is.
+            ModelInfo model = ModelInfo.Of(record);
+            state.Original = record.Where(kv => record.Type.Field(kv.Key) is FieldDefinition f && !f.Computed)
+                .ToDictionary(kv => kv.Key, kv => model?.Column(kv.Key) != null ? Kept(kv.Value) : kv.Value, StringComparer.Ordinal);
             record.Tag = state;
         }
+
+        /// <summary>
+        /// A stored value as it is kept to compare with later: a copy of a list or map, so a change made inside the
+        /// record's own (<c>post.meta.color = 'red'</c>) is seen as a change and saved.
+        /// </summary>
+        private static object Kept(object value) => value switch
+        {
+            List<object> list => list.Select(Kept).ToList(),
+            Dictionary<string, object> map => map.ToDictionary(kv => kv.Key, kv => Kept(kv.Value), StringComparer.Ordinal),
+            _ => value,
+        };
 
         /// <summary>The fields whose values differ from the stored ones.</summary>
         public static List<string> Dirty(ModelInfo model, Record record)
