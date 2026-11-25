@@ -1311,7 +1311,10 @@ namespace KScript.Runtime
             if (type.Description != null) schema["description"] = type.Description;
             schema["properties"] = properties;
             if (required.Count > 0) schema["required"] = required;
-            schema["additionalProperties"] = type.Extra == ExtraKeys.Keep;
+            // For structured output (#/$defs/) the schema is strict. An OpenAPI document describes what the server
+            // does with a body: other fields are refused only under extra: error; by default they are left out, which
+            // "additionalProperties": false would wrongly call invalid.
+            if (refBase == "#/$defs/" || type.Extra != ExtraKeys.Drop) schema["additionalProperties"] = type.Extra == ExtraKeys.Keep;
             (type.Tag as IRecordKind)?.DescribeSchema(type, schema);
             return schema;
         }

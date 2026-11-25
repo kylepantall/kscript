@@ -380,12 +380,12 @@ The document is OpenAPI 3.1. Each part comes from the code:
 | path parameters | the controller's typed parameter (`id: int` is an integer), else the `where` rule (`int`, `number`, `uuid`, or a `pattern` for `slug`, `alpha` and regular expressions). |
 | query parameters | `query: Search`: each field of the type is a query parameter, required unless it is optional. |
 | request body | `json: NewPerson` or `body: NewPerson` as `application/json`, `form: T` as a form, `input: T` as either. |
-| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. |
-| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. Errors share the `Error` schema. |
+| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. Without `@returns`, an API route's answer is JSON of any shape and a page route's has no declared body. |
+| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. API routes' errors share the `Error` schema; a page route's errors are `text/html`. |
 | summary, description | the controller's `///` doc comment (the first line is the summary, the rest the description), or one on the route itself. `@param id ...` describes a parameter. |
 | deprecated | `@deprecated` in the doc comment. |
 | security | the `auth` middleware, as a bearer token scheme. Every middleware is also listed under `x-middleware`. |
-| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. |
+| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. Fields a type doesn't name are left out of the record without an error, so a schema only says `additionalProperties: false` for `type T(extra: error)` (which answers `422`), and `true` for `extra: keep`. |
 | tags | the controller's import name (`people` for `people.show`). |
 | info | `http.openapi.title` and `version`, else the project's `name` and `app.version`. |
 

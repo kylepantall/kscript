@@ -181,6 +181,78 @@ public class OpenApiTests
     }
 
     [Fact]
+    public void TheDocumentSaysWhatTheServerDoes()
+    {
+        using var site = new TempSite(
+            ("controllers/things.kscript", """
+                import KScript.Http
+
+                type Loose {
+                  name: string
+                }
+
+                type Strict(extra: error) {
+                  name: string
+                }
+
+                type Open(extra: keep) {
+                  name: string
+                }
+
+                fn loose(json: Loose) => $json
+                fn strict(json: Strict) => $json
+                fn open(json: Open) => $json
+                fn find(id: int) => 'thing'
+                """),
+            ("api.kscript", """
+                import KScript.Http
+                import "controllers/things.kscript" as things
+
+                Routes {
+                  Post(path: /loose, to: @things.loose)
+                  Post(path: /strict, to: @things.strict)
+                  Post(path: /open, to: @things.open)
+                }
+                """),
+            ("routes.kscript", """
+                import KScript.Http
+                import "controllers/things.kscript" as things
+
+                Routes {
+                  Get(path: /plain) { return 'hi' }
+                  Get(path: /things/{id}, to: @things.find)
+                }
+                """));
+        JsonElement doc = Document(site, """{ "http": { "openapi": { "routes": "all" } } }""");
+
+        // Fields a type doesn't name are left out by default, refused under extra: error and kept under extra: keep.
+        JsonElement schemas = doc.GetProperty("components").GetProperty("schemas");
+        Assert.False(schemas.GetProperty("Loose").TryGetProperty("additionalProperties", out _));
+        Assert.False(schemas.GetProperty("Strict").GetProperty("additionalProperties").GetBoolean());
+        Assert.True(schemas.GetProperty("Open").GetProperty("additionalProperties").GetBoolean());
+        var app = new HttpApp(site.Root);
+        KScript.Pages.PageResult Post(string path) => app.Handle(new Dictionary<string, object>
+        {
+            ["method"] = "POST", ["path"] = path, ["body"] = "{\"name\":\"a\",\"other\":1}",
+            ["headers"] = new Dictionary<string, object> { ["content-type"] = "application/json" },
+        });
+        Assert.Equal((200, "{\"name\":\"a\"}"), (Post("/api/loose").Status, Post("/api/loose").Body));
+        Assert.Equal(422, Post("/api/strict").Status);
+        Assert.Equal((200, "{\"name\":\"a\",\"other\":1}"), (Post("/api/open").Status, Post("/api/open").Body));
+
+        // A page route answers text or HTML, and its errors are HTML pages: only API routes promise JSON.
+        JsonElement plain = Op(doc, "/plain", "get").GetProperty("responses").GetProperty("200");
+        Assert.False(plain.TryGetProperty("content", out _));
+        JsonElement missing = Op(doc, "/things/{id}", "get").GetProperty("responses").GetProperty("404");
+        Assert.True(missing.GetProperty("content").TryGetProperty("text/html", out _));
+        Assert.False(missing.GetProperty("content").TryGetProperty("application/json", out _));
+        Assert.StartsWith("text/html", app.Handle(new Dictionary<string, object> { ["method"] = "GET", ["path"] = "/things/x" }).ContentType);
+        JsonElement apiError = Op(doc, "/api/loose", "post").GetProperty("responses").GetProperty("422");
+        Assert.True(apiError.GetProperty("content").TryGetProperty("application/json", out _));
+        Assert.True(Op(doc, "/api/loose", "post").GetProperty("responses").GetProperty("200").GetProperty("content").TryGetProperty("application/json", out _));
+    }
+
+    [Fact]
     public void KscriptJsonSetsTheInfoAndWhichRoutes()
     {
         using var site = Site();
