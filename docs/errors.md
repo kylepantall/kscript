@@ -360,7 +360,7 @@ Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name:
 
 ## KS6018
 
-**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name.
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name. The check reads arguments written with their name: a time given without it (`wait(5)`) or as a key of a map (`options: { timeout: 30 }`) is not flagged, and is still seconds.
 
 ## KS6019
 

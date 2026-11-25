@@ -38,7 +38,7 @@ standard, build it on top of KScript's, and share it between projects. Each proj
 The correctness checks (KS1xxx to KS5xxx: unknown elements, undefined variables, wrong argument counts and so on) are
 always on at their built-in severity. A standard can change them, but it doesn't have to list them. Style rules
 (KS6001 to KS6005, KS6007, KS6008, KS6013 and KS6018) are opinions, so they are only on when a standard turns them
-on. The old spellings (KS6006, KS6009 to KS6012 and KS6014) are not opinions: in a `.kscript` file each is an error
+on. The old spellings (KS6006, KS6009 to KS6012, KS6014 and KS6019) are not opinions: in a `.kscript` file each is an error
 the engine itself refuses to run, and no standard or `lint.rules` entry changes that
 (see [Style](errors.md#style)). That means:
 

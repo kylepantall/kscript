@@ -55,7 +55,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `const config = { retries: 3 }` | `<const name="config" value="…" />` |
 | `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
-| `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
+| `echo "Hello, { $name }"` | `<echo>Hello, { $name }</echo>` |
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
 | `if a { } elif b { } else { }` | `<if test>`, `<elif test>`, `<else>` |
 | `for item in $list { }`, `for key, value in $map { }` | `<for each in>` |
@@ -89,7 +89,7 @@ Any other name is an element: `name(attribute: value, ...) "text" { children }`,
 ```
 input(into: old_dir) "Move files from: "
 Row(gap: 8, wrap) {
-  Button(variant: primary, on_click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
+  Button(variant: primary, on_click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
 }
 ```
 
@@ -257,8 +257,8 @@ Test files can be written in this format: `name.test.kscript` files get KScript.
 ```
 import "../lib/strings.kscript"
 
-describe(name: slugify) {
-  test(name: joins words with dashes) {
+describe(name: 'slugify') {
+  test(name: 'joins words with dashes') {
     expect(value: @slugify('Hello World'), equals: 'hello-world')
   }
 }
