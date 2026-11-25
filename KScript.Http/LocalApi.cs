@@ -16,6 +16,8 @@ namespace KScript.Http
         private static readonly ConcurrentDictionary<string, (DateTime Stamp, HttpApp App)> Apps =
             new ConcurrentDictionary<string, (DateTime, HttpApp)>(StringComparer.Ordinal);
 
+        private const string TestAppsKey = "KScript.Http.TestApps";
+
         private static readonly ConcurrentDictionary<string, HttpApp> Serving = new ConcurrentDictionary<string, HttpApp>(StringComparer.Ordinal);
 
         /// <summary>Makes KScript.Net's local requests come here. Safe to call more than once.</summary>
@@ -55,23 +57,39 @@ namespace KScript.Http
         /// <summary>The app of the project around <paramref name="folder"/>, or null when it has no routes.</summary>
         internal static HttpApp AppFor(string folder, bool includePages = false)
         {
+            KScriptHost testHost = AppFolders.TestHost;
             string file = ProjectConfig.Find(folder);
             if (file == null)
             {
                 if (!includePages) return null;
-                for (DirectoryInfo dir = new DirectoryInfo(folder); dir != null; dir = dir.Parent)
-                    if (Serving.TryGetValue(dir.FullName, out HttpApp running)) return running;
+                if (testHost == null)
+                    for (DirectoryInfo dir = new DirectoryInfo(folder); dir != null; dir = dir.Parent)
+                        if (Serving.TryGetValue(dir.FullName, out HttpApp running)) return running;
                 return new HttpApp(folder);
             }
             ProjectConfig project = ProjectConfig.Load(file);
-            if (Serving.TryGetValue(project.SiteRoot, out HttpApp serving)) return serving;
+            if (testHost == null && Serving.TryGetValue(project.SiteRoot, out HttpApp serving)) return serving;
+            var apps = testHost == null ? Apps : TestApps(testHost);
             DateTime stamp = File.GetLastWriteTimeUtc(file);
-            if (!Apps.TryGetValue(file, out var cached) || cached.Stamp != stamp)
+            if (!apps.TryGetValue(file, out var cached) || cached.Stamp != stamp)
             {
                 cached = (stamp, new HttpApp(project.SiteRoot, project));
-                Apps[file] = cached;
+                apps[file] = cached;
             }
             return includePages || cached.App.HasRoutes ? cached.App : null;
+        }
+
+        private static ConcurrentDictionary<string, (DateTime Stamp, HttpApp App)> TestApps(KScriptHost host)
+        {
+            lock (host.Items)
+            {
+                if (!host.Items.TryGetValue(TestAppsKey, out object cached))
+                {
+                    cached = new ConcurrentDictionary<string, (DateTime Stamp, HttpApp App)>(StringComparer.Ordinal);
+                    host.Items[TestAppsKey] = cached;
+                }
+                return (ConcurrentDictionary<string, (DateTime Stamp, HttpApp App)>)cached;
+            }
         }
 
         /// <summary>Sends on who is asking: the cookies and Authorization header, unless the call gave its own.</summary>

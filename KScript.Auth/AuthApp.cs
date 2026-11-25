@@ -137,6 +137,8 @@ namespace KScript.Auth
         /// <summary>The time now. Tests replace it.</summary>
         internal static Func<DateTime> Clock = () => DateTime.UtcNow;
 
+        private const string TestAppsKey = "KScript.Auth.TestApps";
+
         private readonly Dictionary<string, (DateTime Start, int Count)> failures = new Dictionary<string, (DateTime, int)>(StringComparer.Ordinal);
 
         private DateTime lastAttemptCleanup;
@@ -148,7 +150,7 @@ namespace KScript.Auth
             Settings = settings;
             var (data, state) = StorageFolders(root, name, settings);
             Users = settings.Users != null
-                ? new ModelRecordStore(ModelStore.Load(KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"))
+                ? new ModelRecordStore(ModelStore.Load(AppFolders.TestHost ?? KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"))
                 : new FileRecordStore(Path.Combine(data, "users"));
             Sessions = settings.Sessions == "memory" ? new MemoryRecordStore() : new FileRecordStore(Path.Combine(state, "sessions"));
             Tokens = new FileRecordStore(Path.Combine(state, "tokens"));
@@ -159,7 +161,7 @@ namespace KScript.Auth
         /// <summary>The actual locations of the application's auth data and session state.</summary>
         public static (string Data, string State) StorageFolders(string root, string name, AuthSettings settings)
         {
-            string own = settings.Folder == null ? null : AppFolders.ProjectDataPath(root, settings.Folder);
+            string own = AppFolders.TestHost == null && settings.Folder != null ? AppFolders.ProjectDataPath(root, settings.Folder) : null;
             return (own ?? Path.Combine(AppFolders.Folder(name, "data"), "auth"),
                 own ?? Path.Combine(AppFolders.Folder(name, "state"), "auth"));
         }
@@ -183,7 +185,21 @@ namespace KScript.Auth
         {
             string full = Path.GetFullPath(root);
             string key = full + "\n" + Values.ToJson(Describe(settings));
-            return Apps.GetOrAdd(key, _ => new AuthApp(full, AppFolders.CleanName(AppFolders.AppNameFor(full, null)), settings));
+            AuthApp Create() => new AuthApp(full, AppFolders.CleanName(AppFolders.AppNameFor(full, null)), settings);
+            if (AppFolders.TestHost is not KScriptHost host) return Apps.GetOrAdd(key, _ => Create());
+
+            // The file's commands and local requests must use the same stores, without retaining them in Apps.
+            lock (host.Items)
+            {
+                if (!host.Items.TryGetValue(TestAppsKey, out object cached))
+                {
+                    cached = new Dictionary<string, AuthApp>(StringComparer.Ordinal);
+                    host.Items[TestAppsKey] = cached;
+                }
+                var apps = (Dictionary<string, AuthApp>)cached;
+                if (!apps.TryGetValue(key, out AuthApp app)) apps[key] = app = Create();
+                return app;
+            }
         }
 
         /// <summary>The app for a folder, with the settings in the nearest kscript.json (or the defaults).</summary>
