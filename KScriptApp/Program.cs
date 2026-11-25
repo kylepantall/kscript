@@ -223,7 +223,7 @@ namespace KScript
             {
                 if (watch) WatchOutputs(project?.Directory ?? Path.GetFullPath(folder ?? "."), watching.Token);
                 return KScript.Http.HttpServer.RunAsync(folder ?? ".", project, port ?? 8080, host ?? "localhost", Out, Cancellation,
-                    liveReload: watch && liveReload && !production).GetAwaiter().GetResult();
+                    liveReload: watch && liveReload && !production, production: production).GetAwaiter().GetResult();
             }
             catch (DirectoryNotFoundException ex)
             {

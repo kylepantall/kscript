@@ -271,6 +271,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
+                if (PageSite.HideErrorDetails) Log?.WriteLine("  error: " + (ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message));
                 return ErrorPage(ex);
             }
 
@@ -455,7 +456,7 @@ namespace KScript.Http
         private HttpResponse Failure(RequestContext ctx, string message)
         {
             Log?.WriteLine("  error: " + message);
-            return ctx.ErrorResponse(500, message);
+            return ctx.ErrorResponse(500, PageSite.HideErrorDetails ? PageServer.HiddenErrorMessage : message);
         }
 
         /// <summary>A JSON body is read into <c>$request.json</c>; <c>$request.input</c> holds the query, form and JSON fields together.</summary>
@@ -643,8 +644,8 @@ namespace KScript.Http
             return result;
         }
 
-        private static PageResult ErrorPage(KScriptException ex) =>
-            PageServer.ErrorPage(new PageException(ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message));
+        private PageResult ErrorPage(KScriptException ex) =>
+            PageServer.ErrorPage(new PageException(ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), !PageSite.HideErrorDetails);
 
         internal bool Throttle(string key, int limit, double seconds, out int remaining, out double retryAfter)
         {

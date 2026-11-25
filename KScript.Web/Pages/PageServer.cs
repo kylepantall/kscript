@@ -342,7 +342,7 @@ namespace KScript.Pages
                 }
                 catch (Exception ex)
                 {
-                    result = ErrorPage(ex);
+                    result = ErrorPage(ex, !site.HideErrorDetails);
                     if (log != null) KScript.Runtime.ErrorReport.Write(log, $"{http.Request.Method} {http.Request.Path} failed.", ex);
                 }
 
@@ -448,6 +448,7 @@ namespace KScript.Pages
                     catch (KScript.Runtime.KScriptException ex)
                     {
                         // The browser ignores a broken stylesheet, so the error goes into it as a comment too.
+                        if (site.HideErrorDetails) throw;
                         return new PageResult { Status = 500, ContentType = "text/css; charset=utf-8", Body = $"/* {KScript.Runtime.ErrorReport.Format(ex).Replace("*/", "* /")} */" };
                     }
                 }
@@ -516,7 +517,7 @@ namespace KScript.Pages
             }
             catch (PageException ex)
             {
-                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = KScript.Runtime.ErrorReport.Format(ex) };
+                return new PageResult { Status = 500, ContentType = "text/plain; charset=utf-8", Body = site.HideErrorDetails ? HiddenErrorMessage : KScript.Runtime.ErrorReport.Format(ex) };
             }
         }
 
@@ -649,8 +650,24 @@ namespace KScript.Pages
         /// The page for an error: the KScript error (<c>file:line: Type: message</c>), never a .NET stack trace unless
         /// kscript runs with --debug or KSCRIPT_DEBUG.
         /// </summary>
-        public static PageResult ErrorPage(Exception ex)
+        public static PageResult ErrorPage(Exception ex) => ErrorPage(ex, details: true);
+
+        /// <summary>What a visitor is told about an error in production; the details are in the server log.</summary>
+        public const string HiddenErrorMessage = "Something went wrong on our side. Please try again later.";
+
+        /// <summary>
+        /// The page for an error. Without <paramref name="details"/> (the production environment) the visitor gets a
+        /// plain 500 page; the error's message, file and line are for the server log.
+        /// </summary>
+        public static PageResult ErrorPage(Exception ex, bool details)
         {
+            if (!details)
+                return new PageResult
+                {
+                    Status = 500,
+                    Body = "<!doctype html><meta charset=\"utf-8\"><title>500 Internal Server Error</title>" +
+                           $"<h1>500 Internal Server Error</h1><p>{HiddenErrorMessage}</p>",
+                };
             string text = KScript.Runtime.ErrorReport.Format(ex);
             return new PageResult
             {
