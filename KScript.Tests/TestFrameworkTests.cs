@@ -254,6 +254,34 @@ public class TestFrameworkTests
     }
 
     [Fact]
+    public void ATestThatRunsOutOfTimeFailsWhateverItsBodyCaught()
+    {
+        // The stop that ends a slow test is not an error the test was waiting for.
+        TestFileResult file = RunTests("""
+            <test name="expects an error" timeout="0.2s"><expect_error><while test="true"><do>@assert(true)</do></while></expect_error></test>
+            <test name="catches it" timeout="0.2s"><try><while test="true"><do>@assert(true)</do></while><catch /></try></test>
+            <test name="next one still runs"><do>@assert(true)</do></test>
+            """);
+        Assert.Null(file.Error);
+        foreach (TestResult slow in file.Tests.Take(2))
+        {
+            Assert.Equal(TestOutcome.Failed, slow.Outcome);
+            Assert.StartsWith("Timed out: the test ran for more than 0.2 seconds.", slow.Message);
+        }
+        Assert.Equal(TestOutcome.Passed, file.Tests[2].Outcome);
+    }
+
+    [Fact]
+    public void ACodeTestFileIsToldAboutTimeoutAndExitInItsOwnWords()
+    {
+        using var site = new TempSite(("a.test.kscript", "test(name: 'slow', timeout: 0.2) {\n  while true {\n    @assert(true)\n  }\n}\ntest(name: 'leaves') {\n  exit 2\n}\n"));
+        TestFileResult file = TestRunner.RunFile(Path.Combine(site.Root, "a.test.kscript"), new TestRunSettings { BaseDirectory = site.Root });
+        Assert.Null(file.Error);
+        Assert.Equal("Timed out: the test ran for more than 0.2 seconds. Set timeout: ... on the test, test.timeout in kscript.json, or --timeout.", file.Tests[0].Message);
+        Assert.StartsWith("The test called exit (code 2).", file.Tests[1].Message);
+    }
+
+    [Fact]
     public void AFileThatDoesNotLoadIsReported()
     {
         TestFileResult file = RunTests("<test name=\"t\"><nope /></test>");
