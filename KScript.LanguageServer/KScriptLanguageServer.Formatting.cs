@@ -57,7 +57,7 @@ namespace KScript.LanguageServer
                         while (result.Text[marginEnd] is ' ' or '\t') marginEnd++;
                         int openingEnd = block.Start;
                         while (result.Text[openingEnd] == '`') openingEnd++;
-                        fences.Add(new JsonObject
+                        fences.Add((JsonNode)new JsonObject
                         {
                             ["language"] = block.Language ?? "json",
                             ["text"] = block.Value,
