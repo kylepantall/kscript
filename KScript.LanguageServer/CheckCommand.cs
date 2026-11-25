@@ -83,6 +83,11 @@ namespace KScript.LanguageServer
                     }
                     else if (File.Exists(path))
                     {
+                        if (!IsScriptName(path) && !IsPageName(path))
+                        {
+                            output.WriteLine($"{path} is not a script or a page: scripts end in {KScript.Syntax.Markup.ScriptFiles.Code}, or {KScript.Syntax.Markup.ScriptFiles.Xml} for the XML form, and pages in .html or .md.");
+                            return 2;
+                        }
                         files.Add((path, true));
                     }
                     else
@@ -382,6 +387,9 @@ namespace KScript.LanguageServer
             SiteMarkers.Any(m => Directory.Exists(Path.Combine(folder, m)) || File.Exists(Path.Combine(folder, m)));
 
         private static bool IsScriptName(string f) => KScript.Syntax.Markup.ScriptFiles.IsScript(f);
+
+        private static bool IsPageName(string f) =>
+            f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
 
         private static System.Text.Json.Nodes.JsonObject Also(this System.Text.Json.Nodes.JsonObject o, Action<System.Text.Json.Nodes.JsonObject> set)
         {

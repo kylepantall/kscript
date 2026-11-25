@@ -716,6 +716,12 @@ namespace KScript.Language.Tests
             Assert.Contains("Unknown option --nope", Run("--nope").Output);
             Assert.Contains("file not found", Run(Path.Combine(dir, "missing.ks.xml")).Output);
             Assert.Contains("No KScript files found", Run(dir).Output);
+            Assert.Contains("Scripts are .kscript or .ks.xml files; .html pages", Run(dir).Output);
+            // A named file that is neither a script nor a page is refused, as running it is.
+            (int refused, string why) = Run(Write("old.orig", Messy));
+            Assert.Equal(2, refused);
+            Assert.Contains("old.orig is not a script or a page", why);
+            File.Delete(Path.Combine(dir, "old.orig"));
 
             string md = Write("notes.md", "# Hi  \n");
             Assert.Matches(@"notes\.md \.+ Markdown pages are not reformatted SKIPPED", Run(md).Output);

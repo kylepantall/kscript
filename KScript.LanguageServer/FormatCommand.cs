@@ -29,7 +29,7 @@ namespace KScript.LanguageServer
                     case "--help":
                     case "-h":
                         output.WriteLine("Usage: kscript fmt [file-or-folder]... [--check]");
-                        output.WriteLine("  Tidies .ks.xml, .ks and .xml scripts and kscript serve .html pages. With no path, formats the current project.");
+                        output.WriteLine("  Tidies .kscript and .ks.xml scripts and kscript serve .html pages. With no path, formats the current project.");
                         output.WriteLine("  --check   Change nothing; list the files that aren't formatted and exit 1 if there are any (for CI).");
                         return 0;
                     default:
@@ -66,6 +66,11 @@ namespace KScript.LanguageServer
                     }
                     else if (File.Exists(path))
                     {
+                        if (!IsScriptName(path) && !IsPageName(path))
+                        {
+                            output.WriteLine($"{path} is not a script or a page: scripts end in {KScript.Syntax.Markup.ScriptFiles.Code}, or {KScript.Syntax.Markup.ScriptFiles.Xml} for the XML form, and pages in .html or .md.");
+                            return 2;
+                        }
                         files.Add(path);
                     }
                     else
@@ -84,7 +89,7 @@ namespace KScript.LanguageServer
             files = files.DistinctBy(f => Path.GetFullPath(f)).OrderBy(f => f, StringComparer.Ordinal).ToList();
             if (files.Count == 0)
             {
-                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files<kscript>; " +
+                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files; " +
                                  ".html pages are formatted in folders with _layout.html, _components/, _layouts/ or kscript.json.");
                 return 2;
             }
@@ -229,5 +234,8 @@ namespace KScript.LanguageServer
         private static readonly string[] SiteMarkers = { "_components", "_layouts", "_layout.html", ProjectConfig.FileName };
 
         private static bool IsScriptName(string f) => KScript.Syntax.Markup.ScriptFiles.IsScript(f);
+
+        private static bool IsPageName(string f) =>
+            f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
     }
 }
