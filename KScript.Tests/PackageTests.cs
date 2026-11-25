@@ -192,6 +192,28 @@ public class PackageTests
     }
 
     [Fact]
+    public void MathRefusesNumbersItCannotHoldExactly()
+    {
+        Assert.Equal("NaN 6 12 0", Eval("[@sign(@sqrt(-1)), @gcd(12, 18), @lcm(4, 6), @lcm(0, 5)]->join(' ')", "KScript.Math"));
+        Assert.Contains("@gcd() works with whole numbers up to 9007199254740992", Fails("<echo>{ @gcd(-9223372036854775808, 1) }</echo>", "KScript.Math").Message);
+        Assert.Contains("@random() works with whole numbers up to 9007199254740992", Fails("<echo>{ @random(1, 9223372036854775807) }</echo>", "KScript.Math").Message);
+        KScriptException large = Fails("<echo>{ @lcm(4000000000, 3000000007) }</echo>", "KScript.Math");
+        Assert.Equal("Math", large.Type);
+        Assert.Contains("too large to hold exactly", large.Message);
+    }
+
+    [Fact]
+    public void ASeedBelongsToItsOwnRun()
+    {
+        // One run's seed leaves the next run's numbers alone: eight rolls of a million never repeat by chance.
+        const string rolls = "<echo>{ [1, 2, 3, 4, 5, 6, 7, 8]->map(fn(i) => @random(1, 1000000))->join(' ') }</echo>";
+        string seeded = RunBody("<do>@random_seed(7)</do>" + rolls, "", "KScript.Math");
+        Assert.Equal(seeded, RunBody("<do>@random_seed(7)</do>" + rolls, "", "KScript.Math"));
+        Assert.NotEqual(seeded, RunBody(rolls, "", "KScript.Math"));
+        Assert.Equal("3", Eval("@shuffle([1, 2, 3])->count()", "KScript.Math"));
+    }
+
+    [Fact]
     public void RandomIsRepeatableWithASeed()
     {
         string a = RunBody("<do>@random_seed(7)</do><echo>{ @random(low: 1, high: 100) } { @random(low: 1, high: 100) }</echo>", "", "KScript.Math");
