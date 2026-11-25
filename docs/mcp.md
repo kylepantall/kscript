@@ -31,7 +31,7 @@ Every page is also a resource, such as `kscript://docs/guide/language` or `kscri
 
 Examples come in your project's syntax: `make.syntax` in `kscript.json`, or `.kscript` outside a project. `--syntax` picks one for every call, and a tool call can ask for the other. The project is the folder the assistant starts the server in; `--dir` names another.
 
-Nothing the server does changes your files. `check_code` and `format_code` read a file only when the assistant passes its path, and `run_code` runs in an empty temporary folder with no network.
+Nothing the server does changes your files. `check_code` and `format_code` read a file only when the assistant passes its path, and only a script or page (`.kscript`, `.ks.xml`, `.html`, `.md`) inside the project folder. `run_code` runs in an empty temporary folder with no network and without your environment variables.
 
 ## Setting it up
 

@@ -46,12 +46,13 @@ namespace KScript.Docs.Mcp
             if (Site.Find(w) is DocPage page && page.Path != "/404" && page.Path != "/playground") return page.Path;
 
             string bare = w.Trim('/');
+            if (string.Equals(bare, "variables", StringComparison.OrdinalIgnoreCase)) return "/reference/variables";
             if (DocsSite.Guides.FirstOrDefault(g => string.Equals(g.Slug, bare, StringComparison.OrdinalIgnoreCase) || string.Equals(g.File, bare, StringComparison.OrdinalIgnoreCase)) is DocsSite.Guide guide)
                 return "/guide/" + guide.Slug;
             if (Catalog.FindPackage(bare) is string package) return PackagePath(package);
             string type = Regex.Replace(bare, @"\s*methods?$", string.Empty, RegexOptions.IgnoreCase);
             if (Catalog.MemberTypes.FirstOrDefault(t => string.Equals(t, type, StringComparison.OrdinalIgnoreCase)) is string known)
-                return "/reference/methods/" + known;
+                return DocsSite.TypeSlug(known);
             return null;
         }
 
@@ -73,8 +74,8 @@ namespace KScript.Docs.Mcp
             if (path == "/reference/variables") return Variables(Catalog.BuiltInVariables.Keys);
             if (path.StartsWith("/reference/methods/", StringComparison.Ordinal))
             {
-                string type = path.Substring("/reference/methods/".Length);
-                if (!Catalog.MemberTypes.Contains(type, StringComparer.Ordinal)) return null;
+                string type = Catalog.MemberTypes.FirstOrDefault(t => DocsSite.TypeSlug(t) == path);
+                if (type == null) return null;
                 var methods = Site.ReferenceMethods(type).OrderBy(m => m.Name, StringComparer.Ordinal).ToList();
                 var fields = Catalog.FieldsOf(type);
                 var sb = new StringBuilder($"# {type} fields and methods\n\nA field is a plain fact, read with a dot and no brackets (`$value.name`). A method takes arguments or does work: call it with `->` (`$value->name(arguments)`), or pipe the value in with `|>`.\n");
@@ -159,7 +160,7 @@ namespace KScript.Docs.Mcp
                 sb.Append($"- [{p.Key}]({UriOf(PackagePath(p.Key))}): {p.Value}\n");
             sb.Append("\n## Methods by type\n\n");
             foreach (string type in Catalog.MemberTypes.OrderBy(t => t, StringComparer.Ordinal))
-                sb.Append($"- [{type}]({UriOf("/reference/methods/" + type)}): {Catalog.FieldsOf(type).Count} fields, {Site.ReferenceMethods(type).Count()} methods\n");
+                sb.Append($"- [{type}]({UriOf(DocsSite.TypeSlug(type))}): {Catalog.FieldsOf(type).Count} fields, {Site.ReferenceMethods(type).Count()} methods\n");
             sb.Append($"\n`{ImportLine("KScript.IO", format)}` imports a package; KScript.Core is always there.\n");
             return sb.ToString();
         }
@@ -252,7 +253,7 @@ namespace KScript.Docs.Mcp
             if (e.MustBeInside?.Count > 0) facts.Add($"Goes inside {string.Join(" or ", e.MustBeInside.Select(x => $"<{x}>"))}.");
             if (e.MustFollow?.Count > 0) facts.Add($"Follows {string.Join(" or ", e.MustFollow.Select(x => $"<{x}>"))}.");
             if (e.IsLoop) facts.Add("A loop: <break /> and <continue /> work inside.");
-            if (e.AllowsExtraAttributes) facts.Add("Other attributes become variables.");
+            if (e.AllowsExtraAttributes) facts.Add($"Other attributes {e.ExtraAttributesDo}.");
             sb.Append('\n').Append(string.Join(" ", facts)).Append('\n');
             AppendOptions(sb, e.Attributes);
             if (e.Example != null) sb.Append(Example(e.Example, format));

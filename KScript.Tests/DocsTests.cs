@@ -162,6 +162,97 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_catalog_example_converts_and_passes_check_in_both_formats()
+    {
+        var catalog = LanguageCatalog.Default;
+        var examples = new List<(string Key, string Example, string Package, bool Element)>();
+        // Page elements are HTML, checked as pages by the catalog's own tests.
+        foreach (ElementInfo e in catalog.Elements.Where(e => e.Example != null && e.Context != ElementContext.Page))
+            examples.Add(("<" + e.Name + ">", e.Example, e.Package, true));
+        foreach (CallableInfo c in catalog.Commands.Concat(catalog.Methods).Where(c => c.Example != null))
+            examples.Add((c.Kind == CallableKind.Method ? c.ReceiverType + "->" + c.Name : "@" + c.Name, c.Example, c.Package, false));
+
+        // Examples are fragments, so they may use variables and functions from around them. Everything else must be valid.
+        // That goes for a package the script around them imports, and for the function a <return> is in, too.
+        string[] contextual = { DiagnosticCodes.UndefinedVariable, DiagnosticCodes.SetUndeclared, DiagnosticCodes.UndefinedFunction, DiagnosticCodes.UnknownCommand, DiagnosticCodes.MissingImport };
+        bool Wrong(Diagnostic d) => d.Severity == DiagnosticSeverity.Error && !contextual.Contains(d.Code)
+            && !(d.Code == DiagnosticCodes.MisplacedElement && d.Message.Contains("return", StringComparison.Ordinal));
+        var problems = new List<string>();
+        foreach (var (key, example, package, element) in examples)
+        {
+            bool xmlExample = example.TrimStart().StartsWith("<", StringComparison.Ordinal);
+            // KScript.Style's command examples are stylesheet text (.ks.css), not scripts.
+            if (package == "KScript.Style" && !xmlExample) continue;
+            if (element && !xmlExample)
+            {
+                problems.Add($"{key}: an element's example is XML (the docs turn it into .kscript), but this one isn't:\n{example}");
+                continue;
+            }
+            string code = DocsSite.ExampleScript(example);
+            string import = package == null || package == "KScript.Core" || code.Contains("<import", StringComparison.Ordinal) ? string.Empty : $"<import package=\"{package}\" />\n";
+            string xml = Playground.IsWholeScript(code) ? code : "<kscript>\n" + import + code + "\n</kscript>";
+            var checkedXml = KScript.Language.Analysis.Analyzer.Analyze(xml, Path.Combine(Path.GetTempPath(), "example.ks.xml"));
+            var wrong = checkedXml.Diagnostics.Where(d => Wrong(d) || d.Code == DiagnosticCodes.StrayText).ToList();
+            if (!element && wrong.Any(d => d.Code == DiagnosticCodes.UnknownElement))
+            {
+                // A command for pages shows itself in a piece of a page, which is HTML and has no .kscript form.
+                wrong = KScript.Language.Analysis.Analyzer.Analyze(example, Path.Combine(Path.GetTempPath(), "example.html")).Diagnostics.Where(Wrong).ToList();
+                if (wrong.Count > 0) problems.Add($"{key} (page): {string.Join("; ", wrong.Select(d => d.Code + " " + d.Message))}\n{example}");
+                continue;
+            }
+            if (wrong.Count > 0)
+            {
+                problems.Add($"{key} (XML): {string.Join("; ", wrong.Select(d => d.Code + " " + d.Message))}\n{example}");
+                continue;
+            }
+            string converted = Playground.Convert(xml, "kscript");
+            if (converted == null)
+            {
+                problems.Add($"{key}: the example doesn't convert to .kscript:\n{example}");
+                continue;
+            }
+            var checkedCode = KScript.Language.Analysis.Analyzer.Analyze(converted, Path.Combine(Path.GetTempPath(), "example.kscript"));
+            wrong = checkedCode.Diagnostics.Where(Wrong).ToList();
+            if (wrong.Count > 0) problems.Add($"{key} (.kscript): {string.Join("; ", wrong.Select(d => d.Code + " " + d.Message))}\n{converted}");
+        }
+        Assert.True(problems.Count == 0, $"{problems.Count} catalog examples have problems:\n\n" + string.Join("\n\n", problems));
+    }
+
+    [Fact]
+    public void An_element_says_what_its_other_options_do()
+    {
+        // <layout>'s become variables in the layout; a <Source>'s are the fields of its entry.
+        string source = Site.Value.Find("/reference/document").Body;
+        Assert.Contains("Other options are more fields of the source, such as journal", source);
+        Assert.DoesNotContain("Other options become variables", source);
+        Assert.Contains("Other options become variables", Site.Value.Find("/reference/web").Body);
+        var docs = new KScript.Docs.Mcp.DocsMarkdown(Site.Value);
+        Assert.Contains("Other attributes are more fields of the source", docs.Element(LanguageCatalog.Default.GetElement("Source"), "xml"));
+    }
+
+    [Fact]
+    public void Every_page_has_an_address_the_site_serves()
+    {
+        // The site's route takes letters, digits, / _ and - (DocsSite.RoutesFile), so money[] is at money-list.
+        foreach (DocPage page in Site.Value.Pages)
+            Assert.Matches("^/[A-Za-z0-9/_-]*$", page.Path);
+        Assert.NotNull(Site.Value.Find("/reference/methods/money-list"));
+        Assert.Contains("href=\"/reference/methods/money-list\"", Site.Value.Render(Site.Value.Find("/reference")));
+    }
+
+    [Fact]
+    public void The_command_line_page_links_only_to_guides_the_site_has()
+    {
+        // kscript docs leaves the install guide out (you have kscript already), so its hint goes to GitHub.
+        DocsSite local = DocsSite.Build(includeInstallGuide: false);
+        string cli = local.Find("/cli").Body;
+        Assert.Null(local.Find("/guide/install"));
+        Assert.DoesNotContain("href=\"/guide/install\"", cli);
+        Assert.Contains($"href=\"{DocsSite.Repository}/blob/master/docs/install.md\"", cli);
+        Assert.Contains("href=\"/guide/install\"", Site.Value.Find("/cli").Body);
+    }
+
+    [Fact]
     public void Examples_that_are_only_shown_or_take_input_name_real_entries()
     {
         var catalog = LanguageCatalog.Default;
@@ -451,7 +542,7 @@ public sealed class DocsTests
     public void Type_references_link_inherited_methods_to_their_definitions(string type, string definingType, string method)
     {
         DocsSite site = Site.Value;
-        string path = "/reference/methods/" + type;
+        string path = DocsSite.TypeSlug(type);
         string definition = "/reference/methods/" + definingType + "#m-" + method;
         string html = site.Find(path).Body;
         Assert.Contains($"Methods from {definingType}", html);
@@ -1080,4 +1171,29 @@ public sealed class DocsTests
     }
 
     #endregion
+
+    [Fact]
+    public void Examples_cannot_read_the_environment_and_errors_are_in_plain_words()
+    {
+        Environment.SetEnvironmentVariable("KSCRIPT_DOCS_TEST_SECRET", "hunter2");
+        try
+        {
+            PlaygroundResult env = Playground.Run("echo \"{ $env->count() } { @env('KSCRIPT_DOCS_TEST_SECRET', 'hidden') }\"\necho @parse_env('A=${KSCRIPT_DOCS_TEST_SECRET}').A == 'hunter2'", "kscript");
+            Assert.Null(env.Error);
+            Assert.Equal("0 hidden\nfalse\n", env.Output);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_DOCS_TEST_SECRET", null);
+        }
+
+        // A missing file or folder is said in KScript's words, not .NET's.
+        PlaygroundResult missing = Playground.Run("import KScript.IO\necho @read_text('no/such/file.txt')", "kscript");
+        Assert.Contains("FileNotFound: There is no file at 'no/such/file.txt'", missing.Error);
+        Assert.DoesNotContain("Could not find", missing.Error);
+
+        // The hint names the kind of file the example is written as.
+        Assert.Contains("Save the example as a .kscript file", Playground.Run("import KScript.Net", "kscript").Error);
+        Assert.Contains("Save the example as a .ks.xml file", Playground.Run("<import package=\"KScript.Net\" />", "xml").Error);
+    }
 }

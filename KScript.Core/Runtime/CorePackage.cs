@@ -863,7 +863,7 @@ namespace KScript.Runtime
                 object fallback = c.Arg(1);
                 if (c.Host.EnvironmentOverrides?.TryGetValue(name, out string overridden) == true)
                     return overridden ?? fallback;
-                return Environment.GetEnvironmentVariable(name)
+                return c.Host.EnvironmentVariable(name)
                     ?? (c.Host.ConfigEnvironment?.TryGetValue(name, out string configured) == true ? configured : null)
                     ?? fallback;
             });
@@ -885,7 +885,8 @@ namespace KScript.Runtime
                 var map = new Dictionary<string, object>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
                 if (i.Host.ConfigEnvironment != null)
                     foreach (var entry in i.Host.ConfigEnvironment) map[entry.Key] = entry.Value;
-                foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
+                if (!i.Host.HideEnvironment)
+                    foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
                 if (i.Host.EnvironmentOverrides != null)
                     foreach (var entry in i.Host.EnvironmentOverrides)
                     {

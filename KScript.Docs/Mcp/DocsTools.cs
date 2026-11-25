@@ -54,18 +54,18 @@ namespace KScript.Docs.Mcp
                     ListMakeCommands),
                 new Tool("check_code", "Check KScript code",
                     "Check a script or page without running it, the way kscript check and the editor do (with the project's lint rules): syntax errors, unknown names, wrong arguments, style warnings.",
-                    Schema(("code", "string", "The code to check (XML or .kscript). Give code or path.", false), ("path", "string", "A file to check instead, relative to the server's folder.", false), FormatParameter),
+                    Schema(("code", "string", "The code to check (XML or .kscript). Give code or path.", false), ("path", "string", "A script or page to check instead, inside the server's folder.", false), FormatParameter),
                     CheckCode),
                 new Tool("format_code", "Format KScript code",
                     "Format scripts (XML or .kscript) and .html pages the way kscript fmt does (with the project's format settings). Returns the formatted code; nothing is written.",
-                    Schema(("code", "string", "The code to format. Give code or path.", false), ("path", "string", "A file to format instead, relative to the server's folder.", false), FormatParameter),
+                    Schema(("code", "string", "The code to format. Give code or path.", false), ("path", "string", "A script or page to format instead, inside the server's folder.", false), FormatParameter),
                     FormatCode),
                 new Tool("convert_code", "Convert between XML and .kscript",
                     "Convert a script between the XML format (.ks.xml) and the .kscript format, the way kscript convert does.",
                     Schema(("code", "string", "The script to convert.", true), ("to", "string", "kscript or xml (default: the other format).", false)),
                     ConvertCode),
                 new Tool("run_code", "Run KScript code in a sandbox",
-                    "Run a script in the docs sandbox and return what it printed: KScript.Core, Terminal, Math, IO, Markdown and Style only, an empty temporary folder, no network, 5 seconds.",
+                    "Run a script in the docs sandbox and return what it printed: KScript.Core, Terminal, Math, IO, Markdown, Style and Data (a database in memory) only, an empty temporary folder, no network, no environment variables, 5 seconds.",
                     Schema(("code", "string", "The script to run.", true), ("input", "string", "What <input> and other prompts read, one answer per line.", false), FormatParameter),
                     RunCode),
             };
@@ -107,6 +107,16 @@ namespace KScript.Docs.Mcp
             DocsCommand.NormalizeFormat(Text(args, "format")) ?? (code.TrimStart().StartsWith("<", StringComparison.Ordinal) ? "xml" : "kscript");
 
         private string FullPath(string path) => Path.GetFullPath(Path.Combine(WorkingDirectory, path));
+
+        /// <summary>True for a script or page inside the server's folder: the only files check_code and format_code read.</summary>
+        internal bool IsProjectSource(string fullPath)
+        {
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(WorkingDirectory)) + Path.DirectorySeparatorChar;
+            StringComparison compare = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (!fullPath.StartsWith(root, compare)) return false;
+            return KScript.Syntax.Markup.ScriptFiles.IsScript(fullPath)
+                || new[] { ".html", ".htm", ".md" }.Any(e => fullPath.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+        }
 
         private ProjectConfig ConfigFor(string folder)
         {
@@ -251,8 +261,9 @@ namespace KScript.Docs.Mcp
             }
 
             if (found.Count > 0) return new ToolResult(string.Join("\n---\n\n", found));
+            // A name that is only punctuation (<, @, ->) leaves no words to search for.
             ToolResult suggestions = SearchDocs(new JsonObject { ["query"] = name.Trim('<', '>', '/', '@', '$').Replace('_', ' '), ["limit"] = 5 });
-            return new ToolResult($"KScript has nothing called '{name}'.\n\n" + (suggestions.Text.StartsWith("Nothing", StringComparison.Ordinal) ? string.Empty : "Close matches:\n" + suggestions.Text), true);
+            return new ToolResult($"KScript has nothing called '{name}'." + (suggestions.IsError || suggestions.Text.StartsWith("Nothing", StringComparison.Ordinal) ? string.Empty : "\n\nClose matches:\n" + suggestions.Text), true);
 
             void AddElement(string element)
             {
@@ -323,6 +334,12 @@ namespace KScript.Docs.Mcp
             if (path != null)
             {
                 path = FullPath(path);
+                if (!IsProjectSource(path))
+                {
+                    // A path is for the project's own code: never a way to read other files on the computer.
+                    error = new ToolResult($"'{Text(args, "path")}' isn't a script or page in the server's folder. Give a .kscript, .ks.xml, .html or .md file inside {WorkingDirectory}, or pass the code itself.", true);
+                    return false;
+                }
                 if (!File.Exists(path))
                 {
                     error = new ToolResult($"There is no file '{Text(args, "path")}'.", true);

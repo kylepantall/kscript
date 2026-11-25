@@ -26,7 +26,8 @@ namespace KScript.Docs
     /// <summary>
     /// Runs the "try it" examples of the docs site. Each run gets a fresh interpreter and its own empty folder, which is
     /// the only place files can be read or written and is deleted afterwards. Only the packages that can't reach
-    /// outside that folder are available (no network, servers, windows or language models), input comes from the page,
+    /// outside that folder are available (no network, servers, windows or language models), the computer's environment
+    /// variables are hidden, input comes from the page,
     /// and a run stops after a few seconds or a few million steps.
     /// </summary>
     public static class Playground
@@ -126,6 +127,7 @@ namespace KScript.Docs
                     FileRoot = folder,
                     FileRootName = "the example's folder",
                     MemoryDatabase = true,
+                    HideEnvironment = true,
                 };
                 var options = new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 300, Timeout = limit, Cancellation = cancel.Token };
                 var interpreter = new Interpreter(host, CreateRegistry(), options);
@@ -134,7 +136,7 @@ namespace KScript.Docs
             catch (KScriptException ex)
             {
                 result.ExitCode = 3;
-                result.Error = Explain(ex.ToString().Replace(path, file).Replace(folder + Path.DirectorySeparatorChar, string.Empty).Replace(folder, "."));
+                result.Error = Explain(ex.ToString().Replace(path, file).Replace(folder + Path.DirectorySeparatorChar, string.Empty).Replace(folder, "."), format);
             }
             catch (OperationCanceledException)
             {
@@ -155,12 +157,12 @@ namespace KScript.Docs
         }
 
         /// <summary>Says why a package can't be imported here, instead of "isn't installed".</summary>
-        private static string Explain(string error)
+        private static string Explain(string error, string format)
         {
             foreach (var kv in Unavailable)
             {
                 if (error.Contains(kv.Key, StringComparison.OrdinalIgnoreCase) && (error.Contains("isn't installed") || error.Contains("no package") || error.Contains("Unknown package") || error.Contains("Import")))
-                    return error + $"\n\n{kv.Key} {kv.Value}, so it can't run in the docs. Save the example as a .ks.xml file and run it with kscript.";
+                    return error + $"\n\n{kv.Key} {kv.Value}, so it can't run in the docs. Save the example as a {(format == "kscript" ? ".kscript" : ".ks.xml")} file and run it with kscript.";
             }
             return error;
         }
