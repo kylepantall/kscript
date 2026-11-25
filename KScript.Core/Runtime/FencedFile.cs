@@ -49,12 +49,12 @@ namespace KScript.Runtime
                 p.Field(type, "extension", KType.String, "The source file extension without the dot.");
             }
             RegisterMethods(p, KType.FormattedFile);
-            const string example = "script = ```ps1\n  Write-Output 'before'\n  ```\n";
+            const string example = "<let name=\"script\" value=\"```ps1\n  Write-Output 'before'\n  ```\" />\n";
             p.Examples(
-                ("formatted_file->find", example + "echo $script->find('before')"),
-                ("formatted_file->replace", example + "echo $script->replace('before', 'after').text"),
-                ("formatted_file->insert", example + "echo $script->insert('# Example ', at: 0).text"),
-                ("formatted_file->save", example + "$script->save('example.ps1')"));
+                ("formatted_file->find", example + "<echo>{ $script->find('before') }</echo>"),
+                ("formatted_file->replace", example + "<echo>{ $script->replace('before', 'after').text }</echo>"),
+                ("formatted_file->insert", example + "<echo>{ $script->insert('# Example ', at: 0).text }</echo>"),
+                ("formatted_file->save", example + "<do>$script->save('example.ps1')</do>"));
         }
 
         public static void RegisterDocumentMethods(PackageBuilder p)
