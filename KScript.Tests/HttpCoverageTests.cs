@@ -279,7 +279,7 @@ public class HttpCoverageTests
 
         using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var started = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<int> server = HttpServer.RunAsync(project.SiteRoot, project, 0, "127.0.0.1", TextWriter.Null, stop.Token,
+        Task<int> server = HttpServer.RunAsync(project.SiteRoot, project, TestServer.FreePort(), "127.0.0.1", TextWriter.Null, stop.Token,
             started: address => started.TrySetResult(address));
         try
         {
