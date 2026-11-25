@@ -474,7 +474,7 @@ public class MakeProjectTests : IDisposable
         Assert.DoesNotContain("Note:", output);
         string root = Path.Combine(parent.Root, "app");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".kscript/agents/packages/KScript.Http.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_layout.html", "config/config.kscript", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "routes/api.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".kscript/agents/packages/KScript.Http.md", ".kscript/agents/packages/KScript.Web.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_layout.html", "config/config.kscript", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "routes/api.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
         Assert.Contains("kscript serve           serve the site at http://localhost:8080", output);
         Assert.Contains("kscript routes", output);
 
