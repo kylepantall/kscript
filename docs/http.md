@@ -175,6 +175,10 @@ fn show(id: int) {
 
 `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) and `TooManyRequests` (429, with `Retry-After` when the error has a `retry_after` field) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
 
+While you work on a site a `500` shows the error's message, file and line (as JSON on API routes). In the production environment (`kscript serve --env production`, or `KSCRIPT_ENV=production`) the answer is only `Something went wrong on our side. Please try again later.`, and the details go to the server's log. Errors with a status of their own, and `@abort()`, say the same in both.
+
+A request whose body can't be read answers `413` when it is over a size or field limit and `400` when it is cut short or isn't what its `Content-Type` says, as JSON on API paths.
+
 Controllers can read and write files with KScript.IO, but only inside the site folder. Set `"write_files": false` to make them read-only like pages. Anything a controller prints with `echo` goes to the server log.
 
 ## Views

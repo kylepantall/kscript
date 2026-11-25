@@ -578,6 +578,44 @@ namespace KScript.Pages
 
         public static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadPageRequestAsync(HttpRequest request, bool live)
         {
+            try
+            {
+                return await ReadRequestAsync(request, live);
+            }
+            catch (Exception ex) when (BodyProblem(ex) is int status)
+            {
+                return (null, BodyError(status));
+            }
+        }
+
+        /// <summary>
+        /// The status for a request whose body could not be read (too large, too many fields, cut short or not what
+        /// its Content-Type says), or null for any other error. These are the client's mistakes, not the site's.
+        /// </summary>
+        internal static int? BodyProblem(Exception ex) => ex switch
+        {
+            BadHttpRequestException bad => bad.StatusCode,
+            InvalidDataException data => data.Message.Contains("limit", StringComparison.OrdinalIgnoreCase) ? 413 : 400,
+            IOException => 400,
+            _ => null,
+        };
+
+        public static string BodyErrorMessage(int status) =>
+            status == 413 ? "The request is too large." : "The request body could not be read.";
+
+        internal static PageResult BodyError(int status)
+        {
+            string reason = Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status);
+            string message = BodyErrorMessage(status);
+            return new PageResult
+            {
+                Status = status,
+                Body = $"<!doctype html><meta charset=\"utf-8\"><title>{status} {reason}</title><h1>{status} {reason}</h1><p>{message}</p>",
+            };
+        }
+
+        private static async Task<(Dictionary<string, object> Request, PageResult Error)> ReadRequestAsync(HttpRequest request, bool live)
+        {
             if (!live) return (await BuildRequestAsync(request), null);
             if (!System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type))
                 return (null, new PageResult { Status = 415 });
@@ -618,13 +656,9 @@ namespace KScript.Pages
                     ValueLengthLimit = MaxLiveBodyBytes,
                 }).ReadFormAsync(request.HttpContext.RequestAborted);
             }
-            catch (BadHttpRequestException ex)
+            catch (Exception ex) when (BodyProblem(ex) is int status)
             {
-                return (null, new PageResult { Status = ex.StatusCode });
-            }
-            catch (InvalidDataException)
-            {
-                return (null, new PageResult { Status = 400 });
+                return (null, new PageResult { Status = status });
             }
 
             if (form.Count != 1 || !form.TryGetValue("state", out var parts) || parts.Count != 1 || form.Files.Count == 0)

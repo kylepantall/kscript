@@ -100,6 +100,49 @@ public sealed class ServeRequestTests
 
     #endregion
 
+    #region Bodies that can't be read
+
+    [Fact]
+    public async Task A_body_that_cannot_be_read_is_the_clients_mistake()
+    {
+        using var site = new TempSite(
+            ("form.html", "<p>name={$request.form.name ?? 'none'}</p>"),
+            ("api.kscript", "import KScript.Http\nRoutes {\n  Post(path: /items) { return { ok: true } }\n}\n"),
+            ("routes.kscript", "import KScript.Http\nRoutes {\n  Post(path: /save) { return 'saved' }\n}\n"));
+        await Serve(site, async http =>
+        {
+            // More fields than a form may have: 400 with a short page, not a 500 with the server's own error.
+            string many = string.Join("&", Enumerable.Range(0, 3000).Select(i => $"f{i}=1"));
+            using var page = await http.PostAsync("/form", new StringContent(many, Encoding.UTF8, "application/x-www-form-urlencoded"));
+            string pageBody = await page.Content.ReadAsStringAsync();
+            Assert.True((int)page.StatusCode is 400 or 413, pageBody);
+            Assert.DoesNotContain("InvalidDataException", pageBody);
+            Assert.DoesNotContain("KScript error", pageBody);
+
+            using var route = await http.PostAsync("/save", new StringContent(many, Encoding.UTF8, "application/x-www-form-urlencoded"));
+            Assert.True((int)route.StatusCode is 400 or 413);
+
+            using var api = await http.PostAsync("/api/items", new StringContent(many, Encoding.UTF8, "application/x-www-form-urlencoded"));
+            Assert.True((int)api.StatusCode is 400 or 413);
+            Assert.Equal("application/json", api.Content.Headers.ContentType?.MediaType);
+            using var json = System.Text.Json.JsonDocument.Parse(await api.Content.ReadAsStringAsync());
+            Assert.Equal((int)api.StatusCode, json.RootElement.GetProperty("status").GetInt32());
+
+            using var fine = await http.PostAsync("/form", new StringContent("name=Ada", Encoding.UTF8, "application/x-www-form-urlencoded"));
+            Assert.Contains("name=Ada", await fine.Content.ReadAsStringAsync());
+        });
+    }
+
+    [Theory]
+    [InlineData(typeof(InvalidDataException), "Form value count limit 1024 exceeded.", 413)]
+    [InlineData(typeof(InvalidDataException), "Multipart body is malformed.", 400)]
+    [InlineData(typeof(IOException), "Unexpected end of request content.", 400)]
+    [InlineData(typeof(InvalidOperationException), "A bug of our own.", null)]
+    public void Only_errors_from_reading_the_body_are_the_clients(Type error, string message, int? status) =>
+        Assert.Equal(status, PageServer.BodyProblem((Exception)Activator.CreateInstance(error, message)));
+
+    #endregion
+
     #region Numbers a request sends
 
     [Fact]

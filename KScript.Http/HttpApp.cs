@@ -281,6 +281,12 @@ namespace KScript.Http
             if (table.Match(live ? "GET" : request.Method, path) == null && !IsApiPath(path)) return null;
 
             var (map, error) = await PageServer.ReadPageRequestAsync(request, live);
+            // A body that could not be read (too large, cut short): API paths say so in JSON, like their other errors.
+            if (error != null && error.Body.Length > 0 && IsApiPath(path))
+                return ToPage(HttpResponse.Json(new Dictionary<string, object>
+                {
+                    ["error"] = PageServer.BodyErrorMessage(error.Status), ["status"] = (double)error.Status,
+                }, error.Status), request.Method);
             if (error != null) return error;
             map[RouteRequestFields.Ip.Name] = request.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
             return Handle(map);
