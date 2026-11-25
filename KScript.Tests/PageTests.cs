@@ -288,6 +288,20 @@ public class PageRendererTests
     }
 
     [Fact]
+    public void An_error_in_a_page_names_the_line_it_is_on()
+    {
+        using var site = new TempSite(
+            ("page.html", "<h1>a</h1>\n<p>ok</p>\n\n<div>\n  <p>{ $nope.x }</p>\n</div>\n"),
+            ("attr.html", "<h1>a</h1>\n\n<if test=\"$nope gt 1\">\n  <p>x</p>\n</if>\n"));
+        // The line was always 1 (the expression's own first line), wherever in the page the mistake was.
+        KScriptException text = Assert.Throws<PageException>(() => site.Render("page.html")).ToKScriptError();
+        Assert.Equal(("page.html", 5, "Name"), (text.File, text.Line, text.Type));
+        Assert.Contains("$nope is not defined", text.Message);
+        KScriptException attribute = Assert.Throws<PageException>(() => site.Render("attr.html")).ToKScriptError();
+        Assert.Equal(("attr.html", 3), (attribute.File, attribute.Line));
+    }
+
+    [Fact]
     public void Control_elements_on_their_own_lines_leave_tidy_html()
     {
         const string page = "<ul>\n  <for each=\"x\" in=\"['a', 'b']\">\n    <li>{$x}</li>\n  </for>\n</ul>\n";
