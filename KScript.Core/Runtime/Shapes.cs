@@ -1486,6 +1486,12 @@ namespace KScript.Runtime
                     Problem(path, field, SemanticTypes.Mismatch(type.Name, value, reason) + ".");
                     return null;
                 }
+                // Data for an int is a whole number: 12.9 is reported, not cut down to 12.
+                if (string.Equals(type.Name, "int", StringComparison.OrdinalIgnoreCase) && Values.TryNumber(value, out double whole) && whole != Math.Truncate(whole))
+                {
+                    Problem(path, field, $"needs a whole number, but got {Values.Describe(value)}.");
+                    return null;
+                }
                 try
                 {
                     return Values.ConvertTo(value, type.Name, path);

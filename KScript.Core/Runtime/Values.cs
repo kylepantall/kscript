@@ -219,7 +219,8 @@ namespace KScript.Runtime
             switch (Unwrap(value))
             {
                 case double d: number = d; return true;
-                case string s when s.Trim().Length > 0 && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
+                // 'NaN' and 'Infinity' are words, not numbers.
+                case string s when s.Trim().Length > 0 && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && double.IsFinite(parsed):
                     number = parsed; return true;
                 default: number = 0; return false;
             }
@@ -231,7 +232,32 @@ namespace KScript.Runtime
             throw new KScriptException($"{context} needs a number, but got {Describe(value)}.", "Type");
         }
 
-        public static int ToInt(object value, string context) => (int)Math.Truncate(ToNumber(value, context));
+        /// <summary>The whole-number part, kept within what an int holds (a position past either end of any list).</summary>
+        public static int ToInt(object value, string context)
+        {
+            double number = Math.Truncate(ToNumber(value, context));
+            return double.IsNaN(number) ? 0 : (int)Math.Clamp(number, int.MinValue, int.MaxValue);
+        }
+
+        /// <summary>Text as a date. A plain number such as '1.5' is not one.</summary>
+        public static bool TryDate(string text, out DateTime date)
+        {
+            date = default;
+            return !TryNumber(text, out _) && DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out date);
+        }
+
+        /// <summary>Moves a date, or says so when the result is outside the years a date can hold.</summary>
+        public static DateTime ShiftDate(Func<DateTime> shift)
+        {
+            try
+            {
+                return shift();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                throw new KScriptException("That is outside the dates KScript can hold (the years 1 to 9999).", "Argument");
+            }
+        }
 
         /// <summary>yes/no, true/false, on/off and 1/0, as written in attributes like <c>const="yes"</c>.</summary>
         public static bool? ParseBool(string text) => (text ?? string.Empty).Trim().ToLowerInvariant() switch
@@ -296,6 +322,8 @@ namespace KScript.Runtime
             if (a is List<object> || b is List<object> || a is Dictionary<string, object> || b is Dictionary<string, object> || a is ICallable || b is ICallable)
                 return StrictEquals(a, b);
             if ((a is double || b is double) && TryNumber(a, out double x) && TryNumber(b, out double y)) return x == y;
+            // Two dates are equal when they are the same moment: their text leaves the seconds out.
+            if (a is DateTime da && b is DateTime db) return da == db;
             if (a is string sa && b is string sb && TryNumber(sa, out double nx) && TryNumber(sb, out double ny)) return nx == ny;
             return string.Equals(ToStr(a), ToStr(b), StringComparison.Ordinal);
         }
@@ -311,6 +339,9 @@ namespace KScript.Runtime
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (NativeTypeRegistry.TryCompare(a, b, op, out int native)) return native;
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
+            // true < 3 is what 1 < 2 < 3 comes to: a mistake, not a comparison.
+            if (allowUnordered && ((a is bool && b is double) || (a is double && b is bool)))
+                throw new KScriptException($"Can't compare {Describe(a)} with {Describe(b)} using '{op}'.", "Type");
             if (allowUnordered && ((a is double && b is string) || (a is string && b is double))) return null;
             if (a is DateTime da && b is DateTime db) return da.CompareTo(db);
             if (a == null || b == null)
@@ -370,7 +401,7 @@ namespace KScript.Runtime
                     break;
                 case "date":
                     if (value is DateTime) return value;
-                    if (value is string ds && DateTime.TryParse(ds, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dt)) return dt;
+                    if (value is string ds && TryDate(ds, out var dt)) return dt;
                     break;
                 case "email":
                 case "password":

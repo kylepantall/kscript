@@ -217,6 +217,8 @@ namespace KScript.Runtime
                 }
             }
             catch (ReturnSignal r) { return CheckReturn(r.Value); }
+            // A break or continue acts on a loop in this function, never on the caller's.
+            catch (ControlSignal signal) when (signal is BreakSignal or ContinueSignal) { throw Interpreter.OutsideLoop(signal, Module); }
         }
 
         private object CheckReturn(object value)
@@ -402,9 +404,15 @@ namespace KScript.Runtime
 
         public double Num(int i, double fallback) => Has(i) && Arg(i) != null ? Values.ToNumber(Arg(i), $"Argument {i + 1} of {Display}") : fallback;
 
-        public int Int(int i) => (int)Math.Truncate(Num(i));
+        public int Int(int i)
+        {
+            double number = Math.Truncate(Num(i));
+            if (double.IsNaN(number) || number < int.MinValue || number > int.MaxValue)
+                throw Error($"Argument {i + 1} of {Display} is too large: it must be a whole number between {int.MinValue} and {int.MaxValue}, but got {Values.FormatNumber(number)}.", "Argument");
+            return (int)number;
+        }
 
-        public int Int(int i, int fallback) => Has(i) && Arg(i) != null ? (int)Math.Truncate(Num(i)) : fallback;
+        public int Int(int i, int fallback) => Has(i) && Arg(i) != null ? Int(i) : fallback;
 
         public bool Bool(int i, bool fallback = false) => Has(i) ? Values.Truthy(Arg(i)) : fallback;
 

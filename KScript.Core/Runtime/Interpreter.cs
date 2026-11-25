@@ -250,6 +250,8 @@ namespace KScript.Runtime
             if (modulesByPath.TryGetValue(full, out Module cached)) return cached;
             if (!File.Exists(full))
                 throw Located(new KScriptException($"There is no script at {src} (looked for {full}).", "FileNotFound"), from, at);
+            if (!full.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) && !full.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase))
+                throw Located(new KScriptException($"{src} isn't a script, so it can't be imported. A script is a .kscript or .ks.xml file.", "Import"), from, at);
             return Load(full);
         }
 
@@ -677,18 +679,21 @@ namespace KScript.Runtime
             {
                 return exit.Code;
             }
-            catch (BreakSignal)
+            catch (ControlSignal signal) when (signal is BreakSignal or ContinueSignal)
             {
-                throw Located(new KScriptException($"<break/> must be inside a loop (<for> or <while>).", "Syntax"), module, null);
-            }
-            catch (ContinueSignal)
-            {
-                throw Located(new KScriptException($"<continue/> must be inside a loop (<for> or <while>).", "Syntax"), module, null);
+                throw OutsideLoop(signal, module);
             }
             finally
             {
                 Host.FlushLogs();
             }
+        }
+
+        /// <summary>The error for a break or continue that no loop took: a loop's body ends at the function it is in.</summary>
+        internal static KScriptException OutsideLoop(ControlSignal signal, Module module)
+        {
+            string word = signal is BreakSignal ? "break" : "continue";
+            return Located(new KScriptException($"<{word}/> must be inside a loop (<for> or <while>).", "Syntax"), signal.Module ?? module, signal.Offset);
         }
 
         /// <summary>Loads and runs a script file.</summary>
@@ -767,7 +772,9 @@ namespace KScript.Runtime
                     throw new KScriptException(Wording.Of($"{imported.DisplayName} doesn't export '{name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty)
                         + Wording.Of($" Scripts export their top-level <fn> functions, <const> values, <enum>s, <type>s, <error>s, <model>s and <job>s."), "Import");
                 }
-                scope.Declare(name, value);
+                // The same script imported twice (import "a" and import x from "a") gives the same things once.
+                if (scope.TryGet(name, out object existing) && ReferenceEquals(existing, value)) continue;
+                scope.Declare(name, value, isConst: value is not (ICallable or IDeclaredType) && imported.Globals.IsConst(name));
             }
         }
 
@@ -780,22 +787,8 @@ namespace KScript.Runtime
         /// </summary>
         public void ExecuteNodes(IReadOnlyList<MarkupNode> nodes, Scope scope, Module module)
         {
-            foreach (MarkupNode node in nodes)
-            {
-                if (node is MarkupElement fn && IsFunctionDeclaration(module, fn))
-                {
-                    try
-                    {
-                        DeclareFunction(fn, scope, module);
-                    }
-                    catch (KScriptException ex)
-                    {
-                        throw Located(ex, module, fn.Span.Start);
-                    }
-                }
-            }
-
-            // A library can supply the base of a type declared below its import.
+            // Imports come first: a library can supply the base of a type declared below its import, and a function
+            // the script declares itself wins over an imported one of the same name.
             int firstStatement = 0;
             if (module.ScriptImports.Count > 0)
             {
@@ -804,6 +797,24 @@ namespace KScript.Runtime
                     if (nodes[firstStatement] is not MarkupElement import) continue;
                     if (import.Name != "import") break;
                     ExecuteElement(import, scope, module, null);
+                }
+            }
+
+            HashSet<string> functions = null;
+            foreach (MarkupNode node in nodes)
+            {
+                if (node is MarkupElement fn && IsFunctionDeclaration(module, fn))
+                {
+                    try
+                    {
+                        string name = DeclareFunction(fn, scope, module).Name;
+                        if (!(functions ??= new HashSet<string>(StringComparer.Ordinal)).Add(name))
+                            throw new KScriptException($"A function named '{name}' is already declared.", "Syntax");
+                    }
+                    catch (KScriptException ex)
+                    {
+                        throw Located(ex, module, fn.Span.Start);
+                    }
                 }
             }
 

@@ -350,10 +350,10 @@ namespace KScript.Runtime
             p.Field(d, "minute", KType.Number, "The minute.", (t, _) => (double)D(t).Minute);
             p.Field(d, "second", KType.Number, "The second.", (t, _) => (double)D(t).Second);
             p.Field(d, "weekday", KType.String, "The day of the week, such as Monday.", (t, _) => D(t).DayOfWeek.ToString());
-            p.Method(d, "add_days", "days: number", "The date plus a number of days (negative to go back).", d, (t, c) => D(t).AddDays(c.Num(0)));
-            p.Method(d, "add_hours", "hours: number", "The date plus a number of hours.", d, (t, c) => D(t).AddHours(c.Num(0)));
-            p.Method(d, "add_minutes", "minutes: number", "The date plus a number of minutes.", d, (t, c) => D(t).AddMinutes(c.Num(0)));
-            p.Method(d, "add_months", "months: number", "The date plus a number of months.", d, (t, c) => D(t).AddMonths(c.Int(0)));
+            p.Method(d, "add_days", "days: number", "The date plus a number of days (negative to go back).", d, (t, c) => Values.ShiftDate(() => D(t).AddDays(c.Num(0))));
+            p.Method(d, "add_hours", "hours: number", "The date plus a number of hours.", d, (t, c) => Values.ShiftDate(() => D(t).AddHours(c.Num(0))));
+            p.Method(d, "add_minutes", "minutes: number", "The date plus a number of minutes.", d, (t, c) => Values.ShiftDate(() => D(t).AddMinutes(c.Num(0))));
+            p.Method(d, "add_months", "months: number", "The date plus a number of months.", d, (t, c) => Values.ShiftDate(() => D(t).AddMonths(c.Int(0))));
             p.Method(d, "date", "", "The date at midnight.", d, (t, c) => D(t).Date);
             p.Method(d, "iso", "", "The date in ISO 8601 format.", KType.String, (t, c) => D(t).ToString("o", CultureInfo.InvariantCulture));
             p.Method(d, "duration_since", "other: date", "The signed time from other to this date, as a duration. Dates without an offset use local time.", "duration", (t, c) =>
@@ -402,7 +402,9 @@ namespace KScript.Runtime
             p.Method(s, "lines", "", "The lines of the text, as a list.", KType.List, (t, c) => S(t).Replace("\r\n", "\n").Split('\n').Cast<object>().ToList());
             p.Method(s, "chars", "", "The characters, as a list.", KType.List, (t, c) => S(t).Select(ch => (object)ch.ToString()).ToList());
             p.Method(s, "index_of", "text", "Where text first occurs, or -1.", KType.Number, (t, c) => (double)S(t).IndexOf(c.Str(0), StringComparison.Ordinal));
-            p.Method(s, "repeat", "count: number", "The text repeated count times.", s, (t, c) => string.Concat(Enumerable.Repeat(S(t), Math.Max(0, c.Int(0)))));
+            p.Method(s, "repeat", "count: number", "The text repeated count times.", s, (t, c) =>
+                (double)Math.Max(0, c.Int(0)) * S(t).Length > 100_000_000 ? throw c.Error($"Repeating the text {c.Int(0)} times would make it too long.", "Limit")
+                : string.Concat(Enumerable.Repeat(S(t), Math.Max(0, c.Int(0)))));
             p.Method(s, "reverse", "", "The text backwards.", s, (t, c) => { char[] a = S(t).ToCharArray(); Array.Reverse(a); return new string(a); });
             p.Method(s, "first", "", "The first character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(0, 1) : string.Empty);
             p.Method(s, "last", "", "The last character.", s, (t, c) => S(t).Length > 0 ? S(t).Substring(S(t).Length - 1) : string.Empty);
@@ -446,7 +448,7 @@ namespace KScript.Runtime
                     return DateTime.TryParseExact(S(t).Trim(), format, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime exact)
                         ? exact : throw c.Error($"'{S(t)}' isn't a date written {Values.ToStr(c.Arg(0))}.", "Format");
                 }
-                return DateTime.TryParse(S(t), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format");
+                return Values.TryDate(S(t), out DateTime dt) ? dt : throw c.Error($"'{S(t)}' is not a date.", "Format");
             });
             p.Method(s, "to_base64", "url?: bool", "The text encoded as base64. With url: true, it is URL-safe base64 without padding.", "base64", (t, c) =>
             {
