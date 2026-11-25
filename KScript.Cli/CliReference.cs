@@ -129,7 +129,7 @@ namespace KScript
                     O("status", "Which migrations have run, and the changes the models want that no migration makes."),
                     O("fresh", "Drop every table and run every migration again. --seed runs the seeders after."),
                     O("seed [name]", "Run the seeders in database/seeders (or the one named)."),
-                    O("--pretend", "Print the SQL instead of running it (migrate, rollback), or the migration instead of writing it (diff)."),
+                    O("--pretend", "Print the SQL instead of running it (migrate, rollback, fresh: nothing is dropped), or the migration instead of writing it (diff)."),
                     O("--force", "Go ahead in the production environment without asking."),
                     O("--output text|json", "How status prints: text (a table, the default) or json."),
                     O("--syntax kscript|xml", "The syntax diff writes the migration in: .kscript (the default, or make.syntax in kscript.json) or .ks.xml."),

@@ -560,6 +560,7 @@ kscript db rollback           # undoes the last batch
 kscript db rollback --steps 2 # undoes the last two migrations
 kscript db status             # what has run, and what the models want that no migration makes (--output json too)
 kscript db fresh              # drops every table and runs every migration again
+kscript db fresh --pretend    # names the tables it would drop and prints the SQL, and changes nothing
 ```
 
 Each migration runs in a transaction on SQLite and Postgres, so one that fails changes nothing. MySQL and MariaDB commit each change to a table as it is made, so a migration that fails there stops where it failed: the error says how many of its steps ran and stay, and the migration isn't marked as run.
