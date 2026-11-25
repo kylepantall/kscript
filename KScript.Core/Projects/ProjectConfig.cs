@@ -1450,7 +1450,7 @@ namespace KScript.Projects
             }
         }
 
-        /// <summary>A length of time in seconds: a number of seconds, or text such as "90s", "15m", "2h", "30d" or "1w".</summary>
+        /// <summary>A length of time in seconds: a number of seconds, or text such as "500ms", "90s", "15m", "1h30m", "30d" or "1w".</summary>
         private static double? Duration(JsonElement e, string name, ProjectConfig config)
         {
             if (e.ValueKind == JsonValueKind.Number && e.TryGetDouble(out double n) && n > 0) return n;
@@ -1459,15 +1459,12 @@ namespace KScript.Projects
             return null;
         }
 
-        /// <summary>Seconds in text such as "90", "90s", "15m", "2h", "30d" or "1w"; null if it isn't one.</summary>
-        public static double? Seconds(string text)
-        {
-            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(text ?? string.Empty, @"^\s*(\d+(?:\.\d+)?)\s*(s|m|h|d|w)?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!m.Success) return null;
-            double amount = double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-            double seconds = amount * (m.Groups[2].Value.ToLowerInvariant() switch { "m" => 60, "h" => 3600, "d" => 86400, "w" => 604800, _ => 1 });
-            return seconds > 0 ? seconds : null;
-        }
+        /// <summary>
+        /// Seconds in text such as "90", "90s", "500ms", "15m" or "1h30m"; null if it isn't a length of time above 0.
+        /// Read by the same rule as a duration in a script, so the file and the command line accept what scripts do.
+        /// </summary>
+        public static double? Seconds(string text) =>
+            KScript.Runtime.Duration.TrySeconds(text, out double seconds) && seconds > 0 ? seconds : null;
 
         private static bool? Bool(JsonElement e, string name, ProjectConfig config)
         {
