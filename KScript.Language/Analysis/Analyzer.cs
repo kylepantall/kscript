@@ -1058,6 +1058,10 @@ namespace KScript.Language.Analysis
                 {
                     AnalyzePendingDirective(attr, e, scope);
                 }
+                else if (component == null && attr.Name == DragDirective.Attribute && Kind != DocumentKind.Script)
+                {
+                    AnalyzeDragDirective(attr, e, scope);
+                }
                 else if (component == null && attr.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {
                     CheckBinding(e, attr, scope);

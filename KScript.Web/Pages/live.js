@@ -366,13 +366,14 @@
       button: domEvent?.button ?? null,
       pointer_id: domEvent?.pointerId ?? null,
       pointer_type: domEvent?.pointerType ?? null,
-      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData(DRAG_VALUE) || null) : domEvent?.dragValue ?? null,
+      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData?.(DRAG_VALUE) || domEvent.dragValue || null) : null,
     };
     // $event.x and $event.y: where the pointer is in the handler's element, counting its scroll, so a position
     // inside a scrolled board is the same number the board's content is laid out in.
     const local = localPoint(domEvent?.handlerElement, domEvent);
     eventInfo.x = local?.x ?? null;
     eventInfo.y = local?.y ?? null;
+    if (domEvent?.drag) Object.assign(eventInfo, domEvent.drag);
     if (domEvent?.type === "component") {
       eventInfo.name = domEvent.name;
       eventInfo.data = domEvent.data;
@@ -608,6 +609,7 @@
         return;
       }
     }
+    if (type === "pointerdown" && liveDrag.start(e, block)) return;
     if (type === "input" || type === "change") updateDirty(block, lifecycle.get(block)?.baseline);
     if (liveSort.handle(e, block, (container, details) => {
       const handler = Number(container.getAttribute("data-ks-on-sort"));
@@ -678,6 +680,7 @@
   }
 
   EVENTS.forEach(function (type) { document.addEventListener(type, handle, true); });
+  liveDrag.install({ send, handlerArgs, blockOf, setDropClass, hold: liveDom.hold });
 
   function stopComponent(block) {
     const state = lifecycle.get(block);
