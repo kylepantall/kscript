@@ -549,6 +549,7 @@ namespace KScript.Language.Analysis
             }
             if (count < 0) return;
             if (command.Name == Injection.Command && command.Package == "KScript.Core") CheckInject(arguments, region, callSpan);
+            if (command.Package == "KScript.Auth" && KScript.Auth.PolicyRules.Commands.Contains(command.Name)) CheckAbility(arguments, region);
             if (pipedValue != null && command is { Package: "KScript.Http", Name: "route" })
                 CheckRouteName(pipedValue, region);
 

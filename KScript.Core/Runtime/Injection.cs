@@ -58,6 +58,9 @@ namespace KScript.Runtime
             }
         }
 
+        /// <summary>Asks a model's policy about an injected record, <c>@inject(can: read)</c>, and stops when it says no. Set by KScript.Auth.</summary>
+        public static Action<CallContext, string, object> Authorizer { get; set; }
+
         /// <summary>The input a default is being worked out for, with the type that declares it.</summary>
         internal sealed record Input(RecordType Owner, FieldDefinition Field);
 
@@ -96,9 +99,17 @@ namespace KScript.Runtime
             var request = new InjectRequest(call, type, from ?? input?.Field.Name ?? Conventions.ToSnakeCase(type.Name), from != null);
             Source[] all;
             lock (sources) all = sources.ToArray();
+            string can = call.Has(2, "can") ? NameOf(call.Arg(2, "can")) : null;
             foreach (Source source in all)
             {
-                if (source(request, out object record)) return record;
+                if (!source(request, out object record)) continue;
+                if (can != null)
+                {
+                    // KScript.Auth holds the policies; asking for it by name loads it, and with it the check.
+                    call.Interpreter.Packages.Get("KScript.Auth").EnsureRegistered();
+                    Authorizer(call, can, record);
+                }
+                return record;
             }
             throw call.Error(input != null
                 ? $"{input.Owner.Name} needs '{input.Field.Name}': nothing was passed, and there is no route to take a {type.Name} from."

@@ -106,16 +106,21 @@ namespace KScript.Http
                 return next();
             }
 
+            if (mode != "token" && SignIn(ctx, request) is HttpResponse signIn) return signIn;
+            HttpResponse denied = ctx.ErrorResponse(401, token == null ? "Sign in first, or send an Authorization: Bearer token." : "The token isn't right.");
+            denied.Headers["WWW-Authenticate"] = "Bearer";
+            return denied;
+        }
+
+        /// <summary>
+        /// Sends a person in a browser to sign in, to come back here afterwards (@intended()). Null for an API
+        /// route, a request that asks for JSON, or a site with no sign-in page: those get a 401.
+        /// </summary>
+        internal static HttpResponse SignIn(RequestContext ctx, Dictionary<string, object> request)
+        {
             string login = ctx.Settings.Auth.Login;
-            string path = Values.ToStr(request["path"]);
-            if (WantsJson(ctx, request) || mode == "token" || string.IsNullOrEmpty(login) || path == login)
-            {
-                HttpResponse denied = ctx.ErrorResponse(401, token == null ? "Sign in first, or send an Authorization: Bearer token." : "The token isn't right.");
-                denied.Headers["WWW-Authenticate"] = "Bearer";
-                return denied;
-            }
-            // A person in a browser is sent to sign in, and comes back here afterwards (@intended()).
-            if (Values.ToStr(request["method"]) == "GET") auth.RememberIntended(Values.ToStr(request["url"]));
+            if (WantsJson(ctx, request) || string.IsNullOrEmpty(login) || Values.ToStr(request["path"]) == login) return null;
+            if (Values.ToStr(request["method"]) == "GET") ctx.Auth.RememberIntended(Values.ToStr(request["url"]));
             return HttpPackage.Redirect(login, 302);
         }
 

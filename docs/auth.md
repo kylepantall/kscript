@@ -152,6 +152,184 @@ Routes {
 | `guest` | Only people who aren't signed in. Others are redirected home, or get a 403 when they want JSON. |
 | `csrf` | Only requests with the session's CSRF token. Web routes get it on their own (see below). |
 
+## Policies
+
+A policy says who may do what to a model's records. It is one block per model, and each function in it is an ability: it takes the user, then the record, and returns `true` or `false`.
+
+```bash
+kscript make policy Post    # policies/post.kscript
+```
+
+```kscript
+// policies/post.kscript
+import KScript.Auth
+import "../models/post.kscript"
+import "../models/user.kscript"
+
+/// Who may do what to a Post.
+policy for Post {
+  /// An editor may write a new post.
+  fn create(user: User) => $user.role == 'editor'
+
+  /// Anyone may read a published post. Its author may read a draft.
+  fn read(user: User?, post: Post) => $post.published or $user?.id == $post.author_id
+
+  /// Only the author may change or delete a post.
+  fn update(user: User, post: Post) => $user.id == $post.author_id
+  fn delete(user: User, post: Post) => $user.id == $post.author_id
+}
+```
+
+The four usual abilities are `create`, `read`, `update` and `delete`. `create` has no record yet, so it takes the user only. A policy can hold any other ability too, such as `fn publish(user: User, post: Post)`. Policies live in the `policies` folder (or `paths.policies` in `kscript.json`), one file per model, and are found there without an import.
+
+| The user parameter | A guest |
+| --- | --- |
+| `user: User` | Is turned away before the ability runs, and asked to sign in. |
+| `user: User?` | Reaches the ability with `null`, so the ability decides. |
+
+The user is `@user()`: the user type your project keeps (see [Users in a model](#users-in-a-model)), or a map. Write `user: map?` when you have no user type.
+
+### Deciding before every ability
+
+A function called `before` runs first. `true` allows and `false` refuses, whatever the ability says. `null` carries on to the ability.
+
+```kscript
+// policies/post.kscript
+import KScript.Auth
+import "../models/post.kscript"
+import "../models/user.kscript"
+
+policy for Post {
+  fn before(user: User) => $user.role == 'admin' ? true : null
+
+  fn update(user: User, post: Post) => $user.id == $post.author_id
+}
+```
+
+### Asking a policy
+
+| Where | Write | When the answer is no |
+| --- | --- | --- |
+| A page or view | `@can(update, $post)`, `@cannot(update, $post)` | They return `false` and `true`, so the page shows or hides something. |
+| A controller or function | `@authorize(update, $post)` | The request stops with `403`. |
+| A route | `can: update` | The controller doesn't run, and the answer is `403`. |
+| A resource | `model: Post` | Each action asks its own ability. |
+| A component or type | `@inject(can: read)` | The request stops with `403`. |
+
+For an ability with no record, name the model: `@can(create, Post)`.
+
+A page shows a link only to someone who may use it:
+
+```html
+<!-- views/posts/show.html -->
+<import package="KScript.Auth" />
+<import path="../../models/post.kscript" />
+<h1>{@inject(Post, can: read).title}</h1>
+<if test="@can(update, @inject(Post))">
+  <a href="/posts/{@inject(Post).id}/edit">Edit</a>
+</if>
+```
+
+A controller stops with `@authorize()`, which returns the record it was given:
+
+```kscript
+// controllers/posts.kscript
+import KScript.Http
+import KScript.Auth
+import "../models/post.kscript"
+
+fn edit(post: Post) {
+  @authorize(update, $post)
+  return @view('posts/edit', { post: $post })
+}
+
+fn store(json: map) {
+  @authorize(create, Post)
+  return Post->create(title: $json.title, author_id: @user().id)
+}
+```
+
+A route asks before its controller runs. `can:` asks about the one record the controller's typed path parameters name:
+
+```kscript
+// routes/api.kscript
+import KScript.Http
+import KScript.Auth
+import "../models/post.kscript"
+import "../controllers/posts.kscript" as posts
+
+Routes {
+  Put(path: /posts/{post}, to: @posts.update, can: update)
+  Delete(path: /posts/{post}, to: @posts.destroy, can: delete)
+}
+```
+
+A resource with `model:` asks for each of its actions: `show` asks `read`, `store` asks `create`, `update` asks `update` and `destroy` asks `delete`. `index` isn't asked, because a list has no single record.
+
+```kscript
+// routes/api.kscript
+import KScript.Http
+import KScript.Auth
+import "../models/post.kscript"
+import "../controllers/posts.kscript" as posts
+
+Routes {
+  Resource(path: /posts, to: posts, model: Post)
+}
+```
+
+A component that takes the route's record with [`@inject()`](components.md#take-the-routes-record-with-inject) asks as it takes it:
+
+````kscript
+// _components/post-card.kscript
+import KScript.Web
+import "../models/post.kscript"
+
+type PostCard extends Component {
+  construct({ post: Post = @inject(can: read) })
+
+  fn render() => ```html
+    <h2>{$post.title}</h2>
+    ```
+}
+````
+
+### What a refused user gets
+
+| Who | Answer |
+| --- | --- |
+| A signed-in user the policy refuses | `403`, with "You are not allowed to update this Post." |
+| A guest, on an ability that needs a user, in a browser | A redirect to `http.auth.login`, and back afterwards. |
+| The same guest on an API route, or asking for JSON | `401`, with "Sign in first." |
+
+In a script, `@authorize()` throws `Forbidden` or `Unauthorized`, which a `try` can catch.
+
+### Testing a policy
+
+`@acting_as()` sets who is asking until the test ends. Pass `null` for a guest.
+
+```kscript
+// tests/post-policy.test.kscript
+import KScript.Auth
+import KScript.Data
+import "../models/post.kscript"
+import "../models/user.kscript"
+
+test(name: "only the author may update a post") {
+  post = Post->create(title: 'Mine', author_id: 1)
+
+  @acting_as(User(id: 1))
+  expect(value: @can(update, $post), equals: true)
+
+  @acting_as(User(id: 2))
+  expect(value: @can(update, $post), equals: false)
+}
+```
+
+### In the editor
+
+`kscript check` and the editor read the policies folder. An ability the policy doesn't have, `@can(publsh, $post)`, is an error that lists the ones it has. An `@inject()` that takes a record of a model with a policy and asks nothing is a warning ([KS5017](errors.md#ks5017)): write `@inject(can: read)`, or check with `@can()` where the record is used.
+
 ## Forms and CSRF
 
 A web route whose file imports KScript.Auth checks a CSRF token on every POST, PUT, PATCH and DELETE. That stops another site from submitting a form as someone who is signed in. Put the token in each form with `{! @csrf_field() }`:

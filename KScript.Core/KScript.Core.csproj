@@ -19,6 +19,7 @@
     <InternalsVisibleTo Include="KScript.Queue" />
     <InternalsVisibleTo Include="KScript.Language" />
     <InternalsVisibleTo Include="KScript.Data" />
+    <InternalsVisibleTo Include="KScript.Auth" />
   </ItemGroup>
 
   <ItemGroup>

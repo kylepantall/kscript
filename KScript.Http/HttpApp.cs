@@ -431,11 +431,16 @@ namespace KScript.Http
             }
             catch (KScriptException ex) when (ErrorTypes.StatusOf(ex) is int status)
             {
-                return ToPage(ErrorAnswer(ctx, ex, status), method);
+                return ToPage(StatusAnswer(ctx, request, ex, status), method);
             }
             catch (KScriptException ex)
             {
                 return ToPage(Failure(ctx, ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), method);
+            }
+            catch (PageException ex) when (StatusError(ex) is KScriptException inner)
+            {
+                // An error with a status raised while a view was drawn is the client's answer there too.
+                return ToPage(StatusAnswer(ctx, request, inner, ErrorTypes.StatusOf(inner).Value), method);
             }
             catch (PageException ex)
             {
@@ -463,6 +468,24 @@ namespace KScript.Http
             if (status == 401) response.Headers["WWW-Authenticate"] = "Bearer";
             return response;
         }
+
+        /// <summary>The error with a status that a page error wraps, however deep, or null.</summary>
+        private static KScriptException StatusError(Exception ex)
+        {
+            for (Exception e = ex.InnerException; e != null; e = e.InnerException)
+            {
+                if (e is KScriptException inner && ErrorTypes.StatusOf(inner) != null) return inner;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// The answer for an error with a status. A guest a policy turned away is treated as the auth middleware
+        /// treats one: a person in a browser is sent to sign in, and anything else gets the 401.
+        /// </summary>
+        private HttpResponse StatusAnswer(RequestContext ctx, Dictionary<string, object> request, KScriptException ex, int status) =>
+            status == 401 && ex.Message == Policies.SignIn && BuiltInMiddleware.SignIn(ctx, request) is HttpResponse signIn
+                ? signIn : ErrorAnswer(ctx, ex, status);
 
         private HttpResponse Failure(RequestContext ctx, string message)
         {
@@ -574,10 +597,46 @@ namespace KScript.Http
                 Lambda lambda => lambda.Parameters,
                 _ => null,
             };
-            if (wanted == null) return interpreter.Call(route.Controller, new object[] { request });
-            var named = wanted.Where(available.ContainsKey).ToDictionary(n => n, n => available[n], StringComparer.Ordinal);
+            var named = wanted?.Where(available.ContainsKey).ToDictionary(n => n, n => available[n], StringComparer.Ordinal);
             if (route.Controller is UserFunction typed) CheckTypedParameters(ctx, interpreter, typed, named, parameters);
-            return interpreter.Call(route.Controller, Array.Empty<object>(), named);
+            CheckCan(ctx, interpreter, route, parameters);
+            return named == null ? interpreter.Call(route.Controller, new object[] { request }) : interpreter.Call(route.Controller, Array.Empty<object>(), named);
+        }
+
+        /// <summary>
+        /// A route's <c>can:</c>, asked before the controller runs: about the one record its typed path parameters
+        /// name, or for a Resource with a model about the record its key names (the model itself for create).
+        /// </summary>
+        private static void CheckCan(RequestContext ctx, Interpreter interpreter, Route route, Dictionary<string, object> pathParams)
+        {
+            if (route.Can == null) return;
+            var call = new CallContext(interpreter, "authorize", Array.Empty<object>(), scope: route.Scope, module: route.Module);
+            object target;
+            if (route.CanModel != null && route.CanParameter == null)
+            {
+                target = route.CanModel;
+            }
+            else if (route.CanModel != null && ctx.Bound.TryGetValue(route.CanParameter, out Record held) && held.Type.IsA(route.CanModel))
+            {
+                target = held;
+            }
+            else if (route.CanModel != null)
+            {
+                ((IRecordKind)route.CanModel.Tag).TryFind(call, route.CanModel, pathParams[route.CanParameter], out target);
+                ctx.Bound[route.CanParameter] = (Record)target;
+            }
+            else
+            {
+                var records = ctx.Bound.Values.Distinct().ToList();
+                if (records.Count != 1)
+                {
+                    throw new KScriptException(records.Count == 0
+                        ? $"can: {route.Can} needs a model in the route {route.Pattern}: type a path parameter of the controller, such as fn {route.Can}(post: Post)."
+                        : $"can: {route.Can} can't tell which record to ask about: the route {route.Pattern} holds {string.Join(" and ", ctx.Bound.Keys)}. Call @authorize({route.Can}, ...) in the controller for the one you mean.", "Http");
+                }
+                target = records[0];
+            }
+            Policies.Authorize(call, route.Can, target);
         }
 
         /// <summary>

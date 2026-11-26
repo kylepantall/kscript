@@ -32,6 +32,7 @@ namespace KScript.Language.Features
             ["enum"] = "enum ${1:Name} { ${2:a}, ${3:b} }",
             ["error"] = "error ${1:Name} {\n\t$0\n}",
             ["extend"] = "extend ${1:string} {\n\tfn ${2:name}() => $0\n}",
+            ["policy"] = "policy for ${1:Post} {\n\tfn ${2:update}(user: User, ${3:post}: ${1:Post}) => $0\n}",
             ["echo"] = "echo $0",
             ["return"] = "return $0",
             ["throw"] = "throw \"$0\"",

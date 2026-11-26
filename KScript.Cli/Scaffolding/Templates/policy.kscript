@@ -1,0 +1,28 @@
+--- make
+description: A policy in policies/: who may create, read, update and delete a model's records, asked with @can and @authorize
+category: Scripts and data
+usage: <Model>
+example: kscript make policy BlogPost
+example: kscript make policy User
+to: {{ paths.policies }}/{{ kebab }}{{ ext }}
+hint: Fill in each ability, then ask it: @can(update, ${{ snake }}) in a page, @authorize(update, ${{ snake }}) in a controller, or can: update on a route
+---
+import KScript.Auth
+import "../{{ paths.models }}/{{ kebab }}{{ ext }}"
+
+/// Who may do what to a {{ pascal }}. Each ability is given the signed-in user,
+/// or null for a guest, and returns true or false. Type the user with your own
+/// user type (user: User) and a guest is turned away before the ability runs.
+policy for {{ pascal }} {
+  /// Who may make a new one.
+  fn create(user: map?) => $user != null
+
+  /// Who may see this one.
+  fn read(user: map?, {{ record }}: {{ pascal }}) => true
+
+  /// Who may change this one.
+  fn update(user: map?, {{ record }}: {{ pascal }}) => $user != null
+
+  /// Who may delete this one.
+  fn delete(user: map?, {{ record }}: {{ pascal }}) => $user != null
+}

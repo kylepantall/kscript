@@ -845,7 +845,7 @@ namespace KScript.Language.Formatting
             if (head.StartsWith("const ", StringComparison.Ordinal)) head = head.Substring(6).TrimStart();
             if (head.Length == 0 || !(Lexer.IsIdentStart(head[0]) || head[0] == '$')) return false;
             string first = WordAt(head, head[0] == '$' ? 1 : 0);
-            if (first is "if" or "elif" or "while" or "for" or "match" or "case" or "when" or "return" or "echo" or "throw" or "fn" or "import" or "type" or "enum" or "exit" or "extend" or "override")
+            if (first is "if" or "elif" or "while" or "for" or "match" or "case" or "when" or "return" or "echo" or "throw" or "fn" or "import" or "type" or "enum" or "exit" or "extend" or "policy" or "override")
             {
                 return false;
             }

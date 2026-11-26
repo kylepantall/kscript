@@ -39,6 +39,7 @@ public static class CodeStatementHelp
         "enum" => "Declares a set of named values. Write `enum Size { small, large }`.",
         "job" => "Declares a background job. Put its fields and a `fn handle() { ... }` method inside `job SendMessage { ... }`.",
         "extend" => "Adds methods to a type. Write `extend string { fn example() => $this }`.",
+        "policy" => "Says who may do what to a model's records. Write `policy for Post { fn update(user: User, post: Post) => $user.id == $post.author_id }`.",
         "import" => """Imports a package with `import KScript.IO`, or another script with `import "./helpers.kscript"`.""",
         "const" => "Defines a constant. Write `const limit = 10`.",
         "let" or "set" or "do" => "Write an assignment like `total = 10` or a standalone call such as `@save($total)`.",

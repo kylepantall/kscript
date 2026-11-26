@@ -413,6 +413,7 @@ kscript make config staging                           # config/config.staging.ks
 kscript make test checkout                            # tests/checkout.test.kscript
 kscript make error PaymentFailed --status 402 --fields "order: int"   # errors/payment-failed.kscript
 kscript make extension date --methods json,is_weekend # extensions/date.kscript: extend date { fn json() … }
+kscript make policy Post                              # policies/post.kscript: policy for Post { fn update(user, post) … }
 kscript make auth --api                               # sign up, sign in, resets and API tokens (see Sign-in)
 kscript make                                          # list every type
 ```
@@ -446,6 +447,7 @@ my-app/
   lib/             make module, const, cache, storage and logger
   types/           make type, make enum
   models/          make model
+  policies/        make policy: who may create, read, update and delete a model's records
   natives/         make native: types every script gets without an import
   extensions/      make extension: methods every script gets (extend date { … })
   errors/          make error

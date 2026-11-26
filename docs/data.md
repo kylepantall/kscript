@@ -636,6 +636,7 @@ test(name: "the post list loads authors at once") {
 
 - **Routes**: a controller parameter typed as a model, `fn show(post: Post)`, is the record with the key in the path, or a `404` (see [Controllers](http.md)).
 - **Components and types**: an input with the default `@inject()`, `construct({ post: Post = @inject() })`, takes the record the route holds, so a page writes `<post-card />` (see [components](components.md#take-the-routes-record-with-inject)).
+- **Policies**: `policy for Post { fn update(user: User, post: Post) => ... }` says who may create, read, update and delete a model's records. Ask it with `@can(update, $post)`, `@authorize(update, $post)`, `can: update` on a route, or `@inject(can: read)` (see [policies](auth.md#policies)).
 - **OpenAPI**: a model in a route's input or answer is a schema: the key and timestamps are read-only, a relation is only there when it was loaded with `->with()`, and `->paginate()` answers with a page of records.
 - **Sign-in**: `http.auth.users` keeps [KScript.Auth](auth.md#users-in-a-model)'s users in a model, so `@user()` is a record.
 

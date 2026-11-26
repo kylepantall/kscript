@@ -85,14 +85,7 @@ namespace KScript.Http
             else if (ctx.found.TryGetValue((name, request.Type), out Record again)) record = again;
             else
             {
-                try
-                {
-                    record = request.Find(parameters[name]);
-                }
-                catch (KScriptException missing) when (missing.Type == "ModelNotFound")
-                {
-                    throw new HttpAbortSignal(ctx.ErrorResponse(404, missing.Message));
-                }
+                record = request.Find(parameters[name]);
                 ctx.found[(name, request.Type)] = (Record)record;
                 ctx.Bound.TryAdd(name, (Record)record);
             }

@@ -661,6 +661,8 @@ type PostSummary {
 fn stats() => PostSummary()
 ```
 
+`@inject(can: read)` asks the model's [policy](auth.md#policies) as the record is taken: `construct({ post: Post = @inject(can: read) })`.
+
 `PostSummary(post: $other)` still takes what it is given. Where no route is being answered, leaving the input out is an error that names it. See [taking the route's record](components.md#take-the-routes-record-with-inject) for the rules.
 
 A [component](components.md#inputs-and-state-with-construct) uses the same block to separate the attributes a page may set from the state it keeps.

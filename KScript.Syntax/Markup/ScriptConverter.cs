@@ -734,6 +734,16 @@ namespace KScript.Syntax.Markup
                             WriteBlock("extend " + extended.Trim(), e, indent, chained);
                             return;
                         }
+                    case "policy" when Only("for", "description") && Attr("for") is string model && IsName(model.Trim())
+                        && e.Children.All(n => n is MarkupComment || (n is MarkupText t && t.IsWhitespace) || n is MarkupElement { Name: "fn" }):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            WriteBlock("policy for " + model.Trim(), e, indent, chained);
+                            return;
+                        }
                     case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional", "surface", TypeBody.PrivateWord) && Attr("name") != null
                         && (Attr(TypeBody.PrivateWord) == null || (TypeBody.IsPrivate(e) && e.Parent?.Name is "type" or "model"))
                         && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override"))))

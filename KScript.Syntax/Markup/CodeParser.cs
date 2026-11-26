@@ -318,6 +318,7 @@ namespace KScript.Syntax.Markup
                 case "enum" when StartsDeclaration(4): ParseEnum(parent, start, doc); return;
                 case "error" when StartsDeclaration(5): ParseError(parent, start, doc); return;
                 case "job" when StartsDeclaration(3): ParseJob(parent, start, doc); return;
+                case "policy" when StartsPolicy(): ParsePolicy(parent, start, doc); return;
                 case "try": ParseTry(parent, start); return;
                 case "return": ParseOptionalValue(parent, start, "return", "value"); return;
                 case "exit": ParseOptionalValue(parent, start, "exit", "code"); return;
@@ -1072,6 +1073,40 @@ namespace KScript.Syntax.Markup
             MarkupElement e = Begin(parent, "extend", start);
             SkipSpaces();
             AddRawAttribute(e, "type", ReadNameSpan(allowDash: false));
+            if (doc != null)
+            {
+                AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));
+            }
+            ParseBlock(e);
+            Finish(e, start);
+        }
+
+        /// <summary>True at <c>policy for Name</c>, so a variable called policy stays a variable.</summary>
+        private bool StartsPolicy()
+        {
+            int p = pos + 6;
+            int Spaces()
+            {
+                int from = p;
+                while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+                return p - from;
+            }
+            if (Spaces() == 0 || string.CompareOrdinal(text, p, "for", 0, 3) != 0) return false;
+            p += 3;
+            return Spaces() > 0 && p < text.Length && Lexer.IsIdentStart(text[p]);
+        }
+
+        /// <summary>
+        /// <c>policy for Post { fn update(user, post) => ... }</c>: a &lt;policy&gt; whose block holds the abilities
+        /// of one model, each a function of the user and the record.
+        /// </summary>
+        private void ParsePolicy(MarkupElement parent, int start, string doc)
+        {
+            MarkupElement e = Begin(parent, "policy", start);
+            SkipSpaces();
+            pos += 3;
+            SkipSpaces();
+            AddRawAttribute(e, "for", ReadNameSpan(allowDash: false));
             if (doc != null)
             {
                 AddAttribute(e, "description", DecodedText.Plain(doc, pendingDocStart), new TextSpan(e.NameSpan.Start, 0));

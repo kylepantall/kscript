@@ -873,8 +873,8 @@ namespace KScript.Runtime
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
             p.Command("char_of", "code: number", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
-            p.Command("inject", "model?, from?",
-                "The record of a model that the route being answered holds. As the default of an input, post: Post = @inject(), it reads the model from the input's type and takes the route's {post}; from: names another route parameter. On its own it is given the model: @inject(Post). What a caller passes always wins over the default.",
+            p.Command("inject", "model?, from?, can?",
+                "The record of a model that the route being answered holds. As the default of an input, post: Post = @inject(), it reads the model from the input's type and takes the route's {post}; from: names another route parameter. On its own it is given the model: @inject(Post). can: names an ability the model's policy must allow, @inject(can: read), and answers 403 when it doesn't. What a caller passes always wins over the default.",
                 KType.Any, Injection.Inject, "<import package=\"KScript.Data\" /><model name=\"Post\"><field name=\"title\" type=\"string\" /></model><type name=\"PostCard\"><construct><field name=\"post\" type=\"Post\" default=\"@inject()\" /></construct></type>").Info.KeepsBareWords = true;
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
             {

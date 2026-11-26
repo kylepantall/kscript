@@ -23,6 +23,7 @@ namespace KScript.Language.Analysis
             if (model != null)
             {
                 TypeShape shape = Infer(model.Value, region);
+                if (shape.Kind == KType.Model) CheckInjectAsks(ModelNameOf(model.Value, region), arguments, callSpan);
                 if (shape.Kind == KType.Model || shape.Type == KType.Any) return;
                 Report(region.Source.ToSource(model.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
                     shape.Type == KType.Type && shape.Name != null ? Injection.NotModel(shape.Name) : Injection.TakesModel(shape.Display()));
@@ -41,6 +42,10 @@ namespace KScript.Language.Analysis
             {
                 Report(callSpan, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
                     declaration != null ? Injection.NotModel(type) : Injection.InputIsNotModel(name, type));
+            }
+            else
+            {
+                CheckInjectAsks(type.TrimEnd('?'), arguments, callSpan);
             }
         }
     }

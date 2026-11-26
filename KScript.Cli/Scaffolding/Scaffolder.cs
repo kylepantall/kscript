@@ -514,6 +514,8 @@ namespace KScript.Scaffolding
                 ["dir"] = dir,
                 ["kebab"] = kebab,
                 ["snake"] = StubNames.Snake(name),
+                // What a policy calls the record it is asked about: its model's name, or other for a User (the first parameter is user).
+                ["record"] = StubNames.Snake(name) == "user" ? "other" : StubNames.Snake(name),
                 // Migrations are named after when they were made, so they sort in order: 2026_11_22_104500_add_bio.
                 ["timestamp"] = Clock().ToString("yyyy_MM_dd_HHmmss", System.Globalization.CultureInfo.InvariantCulture),
                 ["pascal"] = StubNames.Pascal(name),
@@ -610,6 +612,7 @@ namespace KScript.Scaffolding
             "error" => "PaymentFailed",
             "document" => "annual-report",
             "extension" => "date",
+            "policy" => "BlogPost",
             _ => "Example",
         };
 
@@ -635,7 +638,7 @@ namespace KScript.Scaffolding
         {
             ("Routes and APIs", new[] { "route", "controller", "request", "middleware", "view" }),
             ("Pages and styles", new[] { "page", "markdown", "layout", "component", "partial", "css" }),
-            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "migration", "seeder", "enum", "error", "const", "storage", "cache", "job", "extension" }),
+            ("Scripts and data", new[] { "script", "module", "type", "native", "model", "migration", "seeder", "enum", "error", "const", "storage", "cache", "job", "extension", "policy" }),
             ("Desktop apps", new[] { "window" }),
             ("Documents", new[] { "document" }),
             ("Settings", new[] { "config", "env", "locale", "logger" }),

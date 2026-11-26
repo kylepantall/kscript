@@ -233,6 +233,26 @@ test(name: "a note is saved") {
 }
 ```
 
+### Testing who may do what
+
+`@acting_as()` from [KScript.Auth](auth.md#policies) sets who `@user()`, `@can()` and `@authorize()` ask about, until the test ends. Pass `null` to act as a guest.
+
+```kscript
+import KScript.Auth
+import KScript.Data
+import "../models/post.kscript"
+
+test(name: "only the author may update a post") {
+  post = Post->create(title: 'Mine', author_id: 1)
+
+  @acting_as({ id: 1 })
+  expect(value: @can(update, $post), equals: true)
+
+  @acting_as({ id: 2 })
+  expect(value: @can(update, $post), equals: false)
+}
+```
+
 ## Workflows that exercise several language features
 
 The repository tracks coverage gaps, combination targets and shared CLI, language-server and editor checks in the [language test plan](language-test-plan.md).
