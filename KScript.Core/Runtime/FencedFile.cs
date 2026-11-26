@@ -57,13 +57,17 @@ namespace KScript.Runtime
                 ("formatted_file->save", example + "<do>$source_file->save('example.ps1')</do>"));
         }
 
-        public static void RegisterDocumentMethods(PackageBuilder p)
+        /// <summary>
+        /// KScript.Document's methods on Markdown and LaTeX fences: the edits, and a save that the package gives, which
+        /// renders Markdown as PDF, Word or HTML by the filename's extension.
+        /// </summary>
+        public static void RegisterDocumentMethods(PackageBuilder p, MethodHandler save)
         {
-            RegisterMethods(p, KType.Markdown);
-            RegisterMethods(p, KType.Latex);
+            RegisterMethods(p, KType.Markdown, save);
+            RegisterMethods(p, KType.Latex, save);
         }
 
-        private static void RegisterMethods(PackageBuilder p, string type)
+        private static void RegisterMethods(PackageBuilder p, string type, MethodHandler save = null)
         {
             p.Method(type, "find", "text: string", "The zero-based source offset of the first literal match, or -1.",
                 KType.Number, (value, call) => (double)((FencedFile)value).Find(call.Str(0)));
@@ -72,6 +76,15 @@ namespace KScript.Runtime
             p.Method(type, "insert", "content, at?: int",
                 "Returns a copy with text or source of the same format inserted at a zero-based offset. With no offset, appends.",
                 type, (value, call) => ((FencedFile)value).Insert(call.Arg(0), call.Has(1) ? call.Num(1) : null));
+            if (save != null)
+            {
+                p.Method(type, "save", type == KType.Markdown ? "path: string, as?: pdf|docx|latex|markdown|html" : "path: string, as?: latex",
+                    type == KType.Markdown
+                        ? "Writes the document to a file. The filename extension (or as:) picks the format: .md keeps the source, and .pdf, .docx, .tex or .html renders it. With no extension, .md."
+                        : "Writes the LaTeX source to a file, .tex when the path has no extension. Build a PDF from it with a LaTeX engine.",
+                    KType.Null, save);
+                return;
+            }
             p.Method(type, "save", "path: string",
                 "Writes the source to a file. Adds the fence extension when the path has no extension.", KType.Null, (value, call) =>
                 {

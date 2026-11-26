@@ -1,25 +1,21 @@
 import KScript.Web
 import "../models/profile.kscript"
 
+/// Edits the signed-in user's bio through the edit_profile binding in
+/// routes/web.kscript, which lets an account change only its own profile.
 type ProfileEditor extends Component {
-  record: Profile
+  construct({ record: Profile })
 
-  fn render() {
-    return ```html
-    <live id="profile-{$.record.id}">
-      <state name="automatic" value="false" />
-      <state name="preview" value="false" />
-      <p><label><input type="checkbox" bind="automatic"> Save as I type</label></p>
-      <form
-        model-update="edit_profile"
-        key="{$.record.id}"
-        autosave="{$.automatic}">
-        <p><label>Bio<br><input name="bio" value="{$.record.bio}" maxlength="160"></label></p>
-        <button>Save profile</button>
-      </form>
-      <p><button type="button" on-click="toggle: $.preview">{$.preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
-      <if test="$.preview"><p>Saved bio: {$.record.bio}</p></if>
-    </live>
+  automatic: bool
+  preview: bool
+
+  fn render() => ```html
+    <p><label><input type="checkbox" @bind('automatic')> Save as I type</label></p>
+    <form model-update="edit_profile" key="{$record.id}" autosave="{$automatic}">
+      <p><label>Bio<br><input name="bio" value="{$record.bio}" maxlength="160"></label></p>
+      <button>Save profile</button>
+    </form>
+    <p><button type="button" @on-click(toggle: $preview)>{$preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
+    <if test="$preview"><p>Saved bio: {$record.bio}</p></if>
     ```
-  }
 }

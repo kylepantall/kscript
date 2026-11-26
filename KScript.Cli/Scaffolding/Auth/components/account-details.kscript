@@ -1,0 +1,22 @@
+--- make
+to: {{ paths.components }}/account-details.kscript
+---
+import KScript.Web
+import KScript.Auth
+
+/// Who is signed in, and the button that signs them out.
+type AccountDetails extends Component {
+  fn render() => ```html
+    <let name="user" value="@user()" />
+{{#if passkeys}}
+    <p>Signed in as <strong>{$user.name}</strong></p>
+    <p>Account ID <code>{$user.id}</code></p>
+{{else}}
+    <p>Signed in as <strong>{$user.name ?? $user.email}</strong> ({$user.email}).</p>
+{{/if}}
+    <form method="post" action="/logout">
+      {! @csrf_field() }
+      <button>Sign out</button>
+    </form>
+    ```
+}

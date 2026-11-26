@@ -1,0 +1,26 @@
+import KScript.Web
+import KScript.Auth
+
+/// The signed-in user's passkeys, to add one or remove one. Shows nothing when
+/// the site has no passkeys.
+type PasskeyList extends Component {
+  private fn remove(id: string) {
+    @revoke_passkey($id)
+  }
+
+  fn render() => ```html
+    <if test="@has_passkeys()">
+      <h2>Passkeys</h2>
+      <button type="button" passkey="register" passkey-redirect="/account">Add a passkey</button>
+      <let name="keys" value="@passkeys()" />
+      <ul>
+        <for each="key" in="$keys">
+          <li>
+            Added {$key.created_at}
+            <button type="button" @on-click($this->remove($key.id)) live-confirm="Remove this passkey?">Remove passkey</button>
+          </li>
+        </for>
+      </ul>
+    </if>
+    ```
+}

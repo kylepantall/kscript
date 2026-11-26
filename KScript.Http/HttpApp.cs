@@ -694,7 +694,13 @@ namespace KScript.Http
                 BodyBytes = method == "HEAD" ? null : response.BodyBytes,
                 ContentType = response.ContentType ?? "text/plain; charset=utf-8",
             };
-            foreach (var h in response.Headers) page.Headers[h.Key] = Values.ToStr(h.Value);
+            foreach (var h in response.Headers)
+            {
+                // Set-Cookie goes out once per cookie, so it joins the cookies the session adds.
+                if (string.Equals(h.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+                    page.Cookies.AddRange(Values.Unwrap(h.Value) is List<object> list ? list.Select(Values.ToStr) : new[] { Values.ToStr(h.Value) });
+                else page.Headers[h.Key] = Values.ToStr(h.Value);
+            }
             return page;
         }
 

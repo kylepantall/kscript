@@ -131,4 +131,24 @@ public sealed class DockerServeTests
         Assert.Equal(2, command.Run(new[] { "serve", site.Root, "--port", "9000" }));
         Assert.Contains("Set Docker ports", errors.ToString());
     }
+
+    [Fact]
+    public void A_container_without_storage_folders_on_a_volume_is_warned_about()
+    {
+        var set = new Dictionary<string, string>
+        {
+            ["KSCRIPT_STORAGE_ROOT"] = "/var/lib/kscript/storage",
+            ["KSCRIPT_PROJECT_DATA_ROOT"] = "/var/lib/kscript/project",
+        };
+        Assert.Null(DockerServe.StorageWarning(name => set.GetValueOrDefault(name)));
+
+        string old = DockerServe.StorageWarning(_ => null);
+        Assert.Contains("KSCRIPT_STORAGE_ROOT and KSCRIPT_PROJECT_DATA_ROOT aren't set", old);
+        Assert.Contains("users, sessions and @storage() files", old);
+        Assert.Contains("mount a volume at /var/lib/kscript", old);
+
+        string dataOnly = DockerServe.StorageWarning(name => name == "KSCRIPT_STORAGE_ROOT" ? "/var/lib/kscript/storage" : null);
+        Assert.Contains("KSCRIPT_PROJECT_DATA_ROOT isn't set", dataOnly);
+        Assert.Contains("relative auth and SQLite paths", dataOnly);
+    }
 }

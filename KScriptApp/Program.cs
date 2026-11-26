@@ -173,6 +173,7 @@ namespace KScript
             string root = project?.Directory ?? Path.GetFullPath(folder ?? ".");
             string environment = project?.ConfigOptions(EnvironmentName).Environment ?? EnvironmentName ?? Environment.GetEnvironmentVariable("KSCRIPT_ENV");
             bool inDocker = DockerServe.IsContainer(Environment.GetEnvironmentVariable(DockerServe.ContainerMarker));
+            if (inDocker && DockerServe.StorageWarning(Environment.GetEnvironmentVariable) is string storageWarning) Error.WriteLine(storageWarning);
             bool subfolder = folder != null && project != null && !Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)).Equals(
                 root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
             bool localOptions = port.HasValue || host != null || withDocs.HasValue || docsPort.HasValue || withWorker;

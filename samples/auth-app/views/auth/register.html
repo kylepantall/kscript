@@ -1,17 +1,8 @@
-<import package="KScript.Auth" />
 <layout path="/_layout.html" title="Create an account">
   <h1>Create an account</h1>
-  <if test="$data.problems != null">
-    <ul class="error">
-      <for each="problem" in="$data.problems"><li><if test="$problem.field != null"><strong>{ $problem.field }</strong>: </if>{ $problem.message }</li></for>
-    </ul>
-  </if>
-  <form method="post" action="/register">
-    {! @csrf_field() }
-    <p><label>Name<br><input name="name" value="{ $data.name ?? '' }" required autocomplete="name"></label></p>
-    <p><label>Email<br><input type="email" name="email" value="{ $data.email ?? '' }" required autocomplete="email"></label></p>
-    <p><label>Password<br><input type="password" name="password" required autocomplete="new-password"></label></p>
-    <p><button>Create account</button></p>
-  </form>
+  <sign-up-form
+    name="{$data.name ?? ''}"
+    email="{$data.email ?? ''}"
+    problems="{$data.problems ?? []}" />
   <p>Already have one? <a href="/login">Sign in</a></p>
 </layout>

@@ -1,11 +1,12 @@
 --- make
 to: {{ paths.controllers }}/accounts.kscript
 ---
-// Signing up, in and out{{#unless passkeys}}, password resets{{/unless}}{{#if api}}, API tokens{{/if}} and the account page, made by kscript make auth.
-// The routes are in {{ routes_file }}, and the pages in
-// {{ paths.views }}/auth/. KScript.Auth keeps the users, sessions and tokens,
-// and checks the CSRF token every form sends with {! @csrf_field() } (see the
-// Sign-in guide).
+// Signing up, in and out{{#unless passkeys}} and password resets{{/unless}}{{#if api}}, and API tokens{{/if}}, made by kscript make auth.
+// The routes are in {{ routes_file }}, the pages in {{ paths.views }}/auth/
+// and their parts in {{ paths.components }}/. The account page's components
+// make and revoke API tokens and passkeys themselves. KScript.Auth keeps the
+// users, sessions and tokens, and checks the CSRF token every form sends with
+// {! @csrf_field() } (see the Sign-in guide).
 import KScript.Http
 import KScript.Auth
 {{#unless passkeys}}
@@ -97,27 +98,6 @@ fn reset(form: map) {
 }
 
 {{/unless}}
-/// GET /account
-fn account() => @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()) })
-
-/// Removes a passkey belonging to the current session's user.
-fn delete_passkey(id: string) {
-  @revoke_passkey($id)
-  return @redirect('/account')
-}
-
-/// POST /account/tokens: makes an API token, shown once.
-fn make_token(form: map) {
-  token = @api_token(@user(), name: $form.name ?? 'token')
-  return @view('auth/account', data: { user: @user(), tokens: @api_tokens(@user()), new_token: $token })
-}
-
-/// POST /account/tokens/:id/delete
-fn delete_token(id: string) {
-  @revoke_token($id, user: @user())
-  $session->flash('status', 'The token was revoked.')
-  return @redirect(/account)
-}
 {{#if api}}
 
 {{#unless passkeys}}
