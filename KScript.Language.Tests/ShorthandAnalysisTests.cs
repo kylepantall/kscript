@@ -74,7 +74,7 @@ namespace KScript.Language.Tests
         [InlineData("set: $tab", "KS2003 set: needs to: as well.")]
         [InlineData("toggle: $open, by: 2", "KS2003 by: goes straight after increment: or decrement:, and only once.")]
         [InlineData("increment: $count, by: 2, by: 3", "KS2003 by: goes straight after increment: or decrement:, and only once.")]
-        [InlineData("explode: $open", "KS2003 A handler has no 'explode:' shorthand. It takes toggle:, call:, increment:, decrement:, set:, add:, remove:, a function to call, or statements.")]
+        [InlineData("explode: $open", "KS2003 A handler has no 'explode:' shorthand. It takes toggle:, call:, increment:")]
         [InlineData("toggle: $open, count += 1", "Shorthands and statements can't be mixed in one handler.")]
         [InlineData("call: $tab", "KS5005 call: needs a function or one of the component's methods, and $tab is string.")]
         [InlineData("toggle: $nope", "$nope is not defined")]
@@ -83,6 +83,44 @@ namespace KScript.Language.Tests
         public void A_mistake_in_a_shorthand_is_reported(string handler, string message)
         {
             Assert.Contains(message, Messages(Check($"<button @on-click({handler})>x</button>")));
+        }
+
+        [Fact]
+        public void Modifiers_options_and_conditions_check_clean()
+        {
+            TestHelpers.AssertClean(Check("""
+                <button @on-click(reset: $draft, confirm: 'Clear it?', once: true)>a</button>
+                <button @on-click(cycle: $tab, through: ['all', 'open'], self: true)>b</button>
+                <input @on-keydown(call: $clear, key: [ctrl, s], prevent: true)>
+                <input @on-input(set: $tab, to: 'x', debounce: 300ms, throttle: 1s, disable: true)>
+                <input @bind($draft, on: blur, trim: true, debounce: 200ms)>
+                <input @bind($count, as: int)>
+                <p @show($open)>c</p>
+                <button @live-disable(while: $draft == '')>d</button>
+                """));
+        }
+
+        [Theory]
+        [InlineData("confirm: 'Sure?'", "KS2003 confirm: changes when an action runs, and this handler has no action.")]
+        [InlineData("toggle: $open, once: true, once: true", "once: is given twice.")]
+        [InlineData("toggle: $open, once: yes", "once: takes true or false")]
+        [InlineData("toggle: $open, key: [ctrl]", "key: needs a key as well as ctrl, alt, shift or meta")]
+        [InlineData("toggle: $open, key: banana", "key: takes a key name")]
+        [InlineData("cycle: $tab, through: 'all'", "KS5005")]
+        [InlineData("explode: $open", "confirm:, key:")]
+        public void A_mistake_in_a_modifier_is_reported(string handler, string message)
+        {
+            Assert.Contains(message, Messages(Check($"<button @on-click({handler})>x</button>")));
+        }
+
+        [Theory]
+        [InlineData("<input @bind($draft, on: later)>", "on: takes input, change, blur or action.")]
+        [InlineData("<input @bind($draft, wait: 2)>", "@bind has no 'wait:' option.")]
+        [InlineData("<input @bind($draft, trim: 1)>", "trim: takes true or false.")]
+        [InlineData("<input @bind($draft, as: int, as: int)>", "as: is given twice.")]
+        public void A_mistake_in_a_binding_is_reported(string tag, string message)
+        {
+            Assert.Contains(message, Messages(Check(tag)));
         }
 
         [Fact]
@@ -149,6 +187,18 @@ namespace KScript.Language.Tests
 
             Assert.Equal("to:", At("<button @on-click(set: $tab, t\u2038)>x</button>").Items[0].Label);
             Assert.DoesNotContain(At("<button @on-click(count += 1, \u2038)>x</button>").Items, i => i.Label == "toggle:");
+        }
+
+        [Fact]
+        public void Completion_offers_each_modifier_once_and_hover_explains_it()
+        {
+            List<CompletionItem> items = At("<button @on-click(toggle: $open, \u2038)>x</button>").Items;
+            Assert.Contains(items, i => i.Label == "confirm:" && i.Detail == "modifier");
+            Assert.Contains(items, i => i.Label == "reset:");
+            List<string> later = At("<button @on-click(toggle: $open, confirm: 'Sure?', \u2038)>x</button>").Items.Select(i => i.Label).ToList();
+            Assert.DoesNotContain("confirm:", later);
+            Assert.Contains("debounce:", later);
+            Assert.Contains("(handler modifier)", At("<button @on-click(toggle: $open, conf\u2038irm: 'Sure?')>x</button>").Hover.Markdown);
         }
 
         [Fact]

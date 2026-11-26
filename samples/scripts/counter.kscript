@@ -11,7 +11,7 @@ Window(title: "Counter", width: 320, height: 220) {
 
   Text(size: 32) "{$count}"
   Row(gap: 8) {
-    Button(variant: primary, on_click: count += 1) "Add one"
+    Button(variant: primary, increment: $count) "Add one"
     Button(on_click: @reset()) "Reset"
   }
 }

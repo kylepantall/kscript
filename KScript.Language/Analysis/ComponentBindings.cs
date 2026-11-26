@@ -30,9 +30,14 @@ public sealed partial class Analyzer
     private void CheckBinding(MarkupElement element, MarkupAttribute attribute, Scope scope)
     {
         var value = attribute.Value;
-        string path = value.Value.Trim().TrimStart('$');
+        BindDirective.Reading binding = BindDirective.Read(value.Value);
+        foreach ((TextSpan problemSpan, string message) in binding.Problems)
+            Report(value.ToSource(problemSpan), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, message);
+        if (binding.Get("debounce") is ExprNode debounce)
+            AnalyzeExpressionRegion(Slice(value, debounce.Span), RegionKind.Expression, scope, element, attribute);
+        string path = binding.Path;
         string[] names = path.Split('.');
-        int index = value.Value.IndexOf(path, StringComparison.Ordinal);
+        int index = binding.PathSpan.Start;
         var span = value.ToSource(new TextSpan(index, names[0].Length));
         var writable = ComponentBindings.Writable(result, scope, element, span.Start);
         var bound = writable.FirstOrDefault(s => s.Name == names[0]);

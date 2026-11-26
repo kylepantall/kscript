@@ -284,7 +284,7 @@ In XML, a type is `<type name="Repo">` with a `<field name="stars" type="int" fr
 ### Where data meets a type
 
 ```kscript
-repo = @api($url)->check()->json(as: Repo) // KScript.Net
+repo = @api($url, as: Repo) // KScript.Net: ->check()->json(as: Repo)
 repos = @read_json('repos.json', as: Repo) // KScript.IO; a list maps item by item
 user = $text->json(as: User)
 user = User($data) // a map, a list or JSON text
@@ -781,7 +781,7 @@ Only `.kscript` and `.ks.xml` files can be imported. A function the script decla
 | `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, header, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@random_bytes(16, format: 'hex')` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
-| `KScript.Net` | Sends HTTP requests with `@api(url, options: { method, headers, body, timeout })`. The response has `.status`, `.is_ok`, `.text`, `->json()` and `->check()`. Also provides `@download(url, to)` and `@query_string`. A path such as `'/api/notes'` asks the project's own routes. See [Calling your own API](http.md#calling-your-own-api). |
+| `KScript.Net` | Sends HTTP requests with `@api(url, options: { method, headers, body, timeout })`, or the shorthands `post:`, `put:`, `patch:`, `delete:`, `bearer:`, `timeout:`, `retries:` and `as:`. The response has `.status`, `.is_ok`, `.text`, `->json()` and `->check()`. Also provides `@download(url, to)` and `@query_string`. A path such as `'/api/notes'` asks the project's own routes. See [Calling your own API](http.md#calling-your-own-api). |
 | `KScript.Markdown` | `@markdown(text)` and `@read_markdown(path)` (`html`, `title`, `meta` from front matter), `->markdown()` |
 | `KScript.Web` | Renders pages with layouts, components and live blocks for `kscript serve`. Pages have KScript.IO, KScript.Markdown and KScript.Web without importing them. |
 | `KScript.AI` | `@llm(prompt, system, schema, tools, model, max_tokens)`, `llm(into, system, schema, tools, model, max_tokens)`, `@chat(system)` with `->ask()` `.history` `->reset()`. Claude, with the key from `ANTHROPIC_API_KEY` (see [Language models](#language-models-kscriptai)). |

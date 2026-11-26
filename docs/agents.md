@@ -163,7 +163,7 @@ show them under each entry:
   - e.g. `[1, 2]->push(3, 4)`
 - `@api(url: string, options?: map): response` Makes an HTTP request and returns the response.
   - `options.timeout: duration` Maximum wait for an outbound HTTP(S) request. Example `30s`.
-  - prefer: @api($url)->check()->json(as: Type) to fail fast and check the data's shape.
+  - prefer: @api($url, as: Type) (the same as ->check()->json(as: Type)) to fail fast and check the data's shape.
   - pitfall: A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.
 ```
 

@@ -1,15 +1,21 @@
 import KScript.Web
 
-/// A small task list whose buttons are all handler shorthands: each one says
-/// the action it runs (toggle:, add: to:, remove: from:, increment:, set: to:,
-/// call: with:), and @class switches classes on by conditions.
+/// A small task list whose controls are all shorthands. Each handler says the
+/// action it runs (toggle:, add: to:, remove: from:, increment:, set: to:,
+/// reset:, cycle:, call: with:, emit:), modifiers say when (confirm:, key:,
+/// once:), @bind takes options (trim:, debounce:, as:), and @class and @show
+/// switch classes and visibility by conditions.
 type TaskBoard extends Component {
   tasks: string[] = ['Buy milk', 'Call the bank']
   done: string[] = []
   draft: string = ''
+  search: string = ''
+  goal: int = 3
   compact: bool = false
+  tips: bool = true
   added: int = 0
   filter: string = 'all'
+  view: string = 'list'
   note: string = ''
 
   fn finish(task: string) {
@@ -18,27 +24,43 @@ type TaskBoard extends Component {
   }
 
   fn render() => ```html
-    <form @on-submit(add: $draft, to: $tasks, increment: $added, set: $draft, to: '')>
-      <input @bind('draft') placeholder="New task">
-      <button>Add</button>
+    <p @show($tips)>
+      Tip: press Escape in the search box to clear it.
+      <button type="button" @on-click(toggle: $tips, once: true)>Hide tips</button>
+    </p>
+    <form @on-submit(add: $draft, to: $tasks, increment: $added, reset: $draft)>
+      <input @bind($draft, trim: true) placeholder="New task">
+      <button @live-disable(while: $draft == '')>Add</button>
     </form>
+    <p>
+      <input
+        @bind($search, debounce: 300ms, trim: true)
+        @on-keydown(reset: $search, key: escape)
+        placeholder="Search">
+      <label>Goal <input type="number" @bind($goal, as: int)></label>
+    </p>
     <p>
       <button type="button" @on-click(toggle: $compact)>Compact</button>
       <button type="button" @on-click(set: $filter, to: 'all')>All</button>
       <button type="button" @on-click(set: $filter, to: 'open')>Open</button>
+      <button type="button" @on-click(cycle: $view, through: ['list', 'grid'])>View</button>
     </p>
-    <ul @class(compact: $compact, 'is-filtered': $filter == 'open')>
+    <ul @class(compact: $compact, 'is-filtered': $filter == 'open', grid: $view == 'grid')>
       <for each="task" in="$tasks">
-        <if test="$filter == 'all' or not $done->contains($task)">
+        <if test="($filter == 'all' or not $done->contains($task)) and $task->lower()->contains($search->lower())">
           <li>
             <span @class({ $done->contains($task): ['done', 'struck'] })>{$task}</span>
-            <button type="button" @on-click(call: $finish, with: [$task])>Finish {$task}</button>
-            <button type="button" @on-click(remove: $task, from: $tasks)>Remove {$task}</button>
+            <button
+              type="button"
+              @on-click(call: $finish, with: [$task], emit: 'task-finished')>Finish {$task}</button>
+            <button
+              type="button"
+              @on-click(remove: $task, from: $tasks, confirm: 'Remove this task?')>Remove {$task}</button>
           </li>
         </if>
       </for>
     </ul>
-    <p>Added {$added} · Showing {$filter}</p>
+    <p>Added {$added} · Showing {$filter} · {$view} · Goal {$goal}</p>
     <if test="$note"><p>{$note}</p></if>
     ```
 }

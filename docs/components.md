@@ -114,8 +114,8 @@ type NoteEditor extends Component {
 
   fn render() {
     return ```html
-    <label>Title <input @bind('title') @bind-on('blur')></label>
-    <label><input type="checkbox" @bind('done')> Done</label>
+    <label>Title <input @bind($title, on: blur)></label>
+    <label><input type="checkbox" @bind($done)> Done</label>
     <button type="button" @on-click(title = ''; done = false)>Clear</button>
     ```
   }
@@ -126,18 +126,21 @@ Mount it with `<note-editor />` or give it an initial title with `<note-editor t
 
 KScript restores fields the instance changed on later actions. Fields the component only reads can pick up fresh values from the caller on each render. A browser can submit edits only for controls rendered with a matching binding. Use the current server session to authorize writes.
 
-Put KScript behavior in directives on the opening HTML tag. For example, `@bind('title')` takes a field path, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and suggests the allowed values for options such as `@bind-on('blur')`. Existing HTML spellings such as `bind="title"` and `on-click="count += 1"` work too.
+Put KScript behavior in directives on the opening HTML tag. For example, `@bind($title, on: blur)` takes a field and options, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and checks each option's value. Existing HTML spellings such as `bind="title"` and `on-click="count += 1"` work too.
 
 Use `<state name="…" value="…" />` at the top level of a component template or directly inside a `<live>` block. Read it with `$name` and assign it with `name = …`. A normal state value survives actions on that rendered block.
 
 | Need | Markup |
 | --- | --- |
-| Text editing | `<input bind="draft">` |
-| An existing map field | `<input bind="draft.title">` |
-| An edit that waits for a change event | `<input bind="draft" bind-on="change">` |
-| An edit that waits for focus to leave | `<input bind="draft" bind-on="blur">` |
-| A value sent with the next action | `<input bind="draft" bind-on="action">` |
-| A checkbox | `<input type="checkbox" bind="enabled">` |
+| Text editing | `<input @bind($draft)>` |
+| An existing map field | `<input @bind($draft.title)>` |
+| An edit that waits for a change event | `<input @bind($draft, on: change)>` |
+| An edit that waits for focus to leave | `<input @bind($draft, on: blur)>` |
+| A value sent with the next action | `<input @bind($draft, on: action)>` |
+| A value sent once typing stops | `<input @bind($query, debounce: 300ms)>` |
+| Spaces trimmed on the way in | `<input @bind($name, trim: true)>` |
+| A value read as a type (refused if it isn't one) | `<input type="number" @bind($age, as: int)>` (`string`, `int`, `number` or `bool`) |
+| A checkbox | `<input type="checkbox" @bind($enabled)>` |
 | A radio group | Give radios the same binding and each its own `value`. |
 | Multiple selected values | Bind `<select multiple>` to a list. |
 | A shareable URL | `<state name="page" value="1" query="page" />` |
@@ -284,7 +287,7 @@ type CommentThread extends Component {
     return ```html
     <section>
       <p>{Comment->where(post_id: $post_id)->count()} comments, {$order} first</p>
-      <input @bind('draft.body')>
+      <input @bind($draft.body)>
       <button type="button" @on-click($add)>Add</button>
     </section>
     ```
@@ -321,7 +324,7 @@ type NoteCard extends Component {
     Box(padding: 8, border: "#334155") {
       Row(gap: 8) {
         Text(weight: bold) "{$title}"
-        Button(on_click: $open) "{ $open ? 'Hide' : 'Show' }"
+        Button(toggle: $open) "{ $open ? 'Hide' : 'Show' }"
       }
       if $open {
         Text(wrap) "{$body}"
@@ -451,6 +454,33 @@ A handler can name what it does instead of spelling out the statement. Each shor
 | `set: $tab, to: 'notes'` | `tab = 'notes'` | any |
 | `add: $draft, to: $tags` | `tags = $tags->push($draft)` | list |
 | `remove: $tag, from: $tags` | `tags = $tags->remove($tag)` | list |
+| `reset: $draft`, `reset: [$title, $done]` | each field back to the value it starts with (its default, or its `<state>` value) | any |
+| `cycle: $view, through: ['list', 'grid']` | the next value in the list, wrapping round (without `through:`, the next value of the field's enum) | any |
+| `save: $note` | `$note->save()` | KScript.Data record |
+| `delete: $note` | `$note->delete()` | KScript.Data record |
+| `emit: 'notes-changed'` | `@emit_event('notes-changed')` | none |
+| `go: '/notes'` | `@live_redirect('/notes')` | none |
+
+Modifiers go with the actions and change when or how they run. The browser applies them before it sends anything.
+
+| Modifier | What it does |
+| --- | --- |
+| `confirm: 'Remove this note?'` | Asks first, and runs only if the person says yes. |
+| `key: enter`, `key: [ctrl, s]` | Runs only for that key, with exactly those modifier keys (`ctrl`, `alt`, `shift`, `meta`). Keys are `enter`, `escape`, `space`, `tab`, `up`, `down`, `left`, `right`, a letter or a digit. |
+| `prevent: true` | Stops the browser's own action, such as saving the page on ctrl+s. |
+| `debounce: 300ms` | Waits until the events stop for that long, then runs once. |
+| `throttle: 1s` | Runs at most once in that long. |
+| `once: true` | Runs the first time only. |
+| `self: true` | Runs only when the event starts on the element itself, not on something inside it. |
+| `disable: true` | Disables the element while its action runs. |
+
+```html
+<input @bind($query, debounce: 300ms) @on-keydown(reset: $query, key: escape)>
+<button @on-click(delete: $note, confirm: 'Delete this note?', emit: 'notes-changed')>Delete</button>
+<form @on-keydown(save: $note, key: [ctrl, s], prevent: true)>…</form>
+```
+
+In a window, the actions go straight on a button or box: `Button(toggle: $open) "Details"` and `Button(increment: $count, by: 5) "+5"`. Modifiers need a browser, so a window handler that has one stops with an error saying so.
 
 `kscript check` and the editor check each field's type, complete the names (and `by:`, `to:`, `from:` or `with:` after the action they go with), and show the statement a shorthand stands for on hover.
 
@@ -478,7 +508,7 @@ A condition is a bool, or a list of bools that must all be true. With the condit
 | Lifecycle | `on-init`, `on-visible`, `on-tick` with `every="1s"` |
 | Other components and client code | `on-event` and a named `on-action` |
 
-Use `prevent-default="keydown"` on a handler element to cancel a browser default synchronously. Use `live-confirm="Remove this note?"` to confirm a destructive action before posting it. An action can call `@live_redirect('/notes')` for a same-site redirect or `@skip_render()` to save state without updating the current HTML.
+Use `prevent: true` in a handler (or `prevent-default="keydown"` on its element) to cancel a browser default synchronously. Use `confirm: 'Remove this note?'` in a handler (or `live-confirm` on its element) to confirm a destructive action before posting it. `@show($open)` keeps a tag in the page and hides it while the value is false, so focus and scroll survive, and `@live-disable(while: $saving)` disables a control while a condition holds as well as while an action runs. An action can call `@live_redirect('/notes')` for a same-site redirect or `@skip_render()` to save state without updating the current HTML.
 
 ### Events between components
 

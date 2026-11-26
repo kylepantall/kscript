@@ -23,6 +23,8 @@ public class PageVisitTests
           <button @on-click(call: $missing)>Break</button>
           <label><input type="checkbox" @on-change(toggle: $broken)> Broken</label>
           <p @class(on: $broken)>State</p>
+          <input placeholder="Search" @on-keydown(set: $name, to: 'Esc', key: escape)>
+          <input placeholder="Save" @on-keydown(set: $name, to: 'Saved', key: [ctrl, s])>
           ```
         }
         """;
@@ -57,6 +59,10 @@ public class PageVisitTests
         Assert.Equal("on", Run(site, "echo @visit('/')->change('Broken')->classes('State')->join(',')"));
         Assert.Equal("", Run(site, "echo @visit('/')->classes('State')->join(',')"));
         Assert.Contains("<button", Run(site, "echo @visit('/').html"));
+        Assert.Contains("Name Esc", Run(site, "echo @visit('/')->press('escape', in: 'Search').text"));
+        Assert.Contains("Name Add one", Run(site, "echo @visit('/')->press('enter', in: 'Search').text"));
+        Assert.Contains("Name Saved", Run(site, "echo @visit('/')->press(['ctrl', 's'], in: 'Save').text"));
+        Assert.Contains("Name Add one", Run(site, "echo @visit('/')->press('s', in: 'Save').text"));
     }
 
     [Theory]
@@ -69,6 +75,7 @@ public class PageVisitTests
     [InlineData("@visit('/')->classes('Missing')", "nothing on the page has the text 'Missing'")]
     [InlineData("@visit('/')->click('Break')", "failed (500)")]
     [InlineData("@visit('/plain')", "the page didn't render.")]
+    [InlineData("@visit('/')->press(['ctrl'])", "->press() needs a key")]
     public void A_visit_says_what_went_wrong(string code, string message)
     {
         using var site = Site();

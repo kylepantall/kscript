@@ -363,6 +363,25 @@ namespace KScript.Runtime
 
         public FieldDefinition Field(string name) => fields.FirstOrDefault(f => f.Name == name);
 
+        /// <summary>
+        /// The value a field starts with: its declared default (<c>draft: string = ''</c>), else what its type starts
+        /// as (0, '', false, []). False when the type has no such field. Used by the reset: handler shorthand.
+        /// </summary>
+        public bool TryDefault(Interpreter interpreter, string name, out object value)
+        {
+            value = null;
+            if (Field(name) is not FieldDefinition f || f.Computed) return false;
+            if (f.HasDefault)
+            {
+                RecordType owner = f.Owner ?? this;
+                Scope s = owner.Closure.Child();
+                value = f.DefaultNode != null ? interpreter.Evaluate(f.DefaultNode, s, new EvalContext(owner.Module, null)) : interpreter.EvaluateText(f.DefaultText, s, owner.Module);
+                return true;
+            }
+            value = f.Optional ? null : ShapeMapper.Initializer(f.Type)?.Invoke();
+            return true;
+        }
+
         /// <summary>Adds a field at a place in the list, such as a model's key first.</summary>
         internal void InsertField(int index, FieldDefinition field)
         {

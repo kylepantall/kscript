@@ -36,6 +36,19 @@ namespace KScript.Language.Features
                 ReplaceSpan = replace,
                 SortText = "0" + a.Name,
             }).ToList();
+            // Modifiers (confirm:, key:, debounce:) go with the actions; each once.
+            HandlerShorthands.Reading written = atStart ? null : HandlerShorthands.Read(before[..lead.Length].TrimEnd(','));
+            items.AddRange(HandlerShorthands.Modifiers.Where(m => written?.Modifiers.Any(w => w.Modifier == m) != true).Select(m => new CompletionItem
+            {
+                Label = m.Name + ":",
+                FilterText = m.Name,
+                Kind = CompletionKind.Keyword,
+                Detail = "modifier",
+                Documentation = m.Description,
+                InsertText = m.Name + ": ",
+                ReplaceSpan = replace,
+                SortText = "1" + m.Name,
+            }));
             if (!atStart && HandlerShorthands.Read(before[..lead.Length].TrimEnd(',')).Steps.LastOrDefault() is { Companion: null } last && last.Action.Companion != null)
             {
                 items.Insert(0, new CompletionItem
@@ -60,7 +73,13 @@ namespace KScript.Language.Features
                 || !HandlerShorthands.IsShorthand(attribute.Value.Value)) return null;
             DecodedText value = attribute.Value;
             int local = value.FromSource(cursor.Offset);
-            foreach (HandlerShorthands.Step step in HandlerShorthands.Read(value.Value).Steps)
+            HandlerShorthands.Reading reading = HandlerShorthands.Read(value.Value);
+            foreach ((HandlerShorthands.Modifier modifier, var argument) in reading.Modifiers)
+            {
+                if (local >= argument.NameSpan.Start && local <= argument.NameSpan.End)
+                    return new HoverResult($"**{modifier.Name}:** (handler modifier)\n\n{modifier.Description}", value.ToSource(argument.NameSpan));
+            }
+            foreach (HandlerShorthands.Step step in reading.Steps)
             {
                 foreach (var argument in new[] { step.Value, step.Companion }.Where(a => a != null))
                 {

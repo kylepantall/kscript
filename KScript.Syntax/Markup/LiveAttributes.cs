@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using KScript.Metadata;
+using KScript.Syntax;
+using KScript.Syntax.Text;
 
 namespace KScript.Pages
 {
@@ -16,6 +18,20 @@ namespace KScript.Pages
         public static AttributeInfo Get(string name) => Attributes.GetValueOrDefault(
             name.StartsWith("live-use-", StringComparison.OrdinalIgnoreCase) ? "live-use-" : name);
         public static bool IsDirective(string name) => Get(name) != null;
+        /// <summary>
+        /// @live-disable(while: $saving): the condition's span in the text, or null when there is none (plain
+        /// @live-disable()), and what is wrong with it, or null.
+        /// </summary>
+        public static (TextSpan? Condition, string Problem) DisableCondition(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text) || text.Trim() is "true" or "") return (null, null);
+            const string usage = "@live-disable() takes nothing, or while: and a condition: @live-disable(while: $saving).";
+            ParseResult parse = KScript.Syntax.ExpressionParser.ParseNamedArguments(text);
+            var arguments = parse.Nodes.OfType<KScript.Syntax.ArgumentNode>().ToList();
+            if (parse.Errors.Count > 0 || arguments.Count != 1 || arguments[0].Name != "while") return (null, usage);
+            return (arguments[0].Value.Span, null);
+        }
+
         public static LiveDirectiveArgument? ArgumentFor(string name) => Get(name) switch
         {
             null => null,
@@ -41,7 +57,8 @@ namespace KScript.Pages
             yield return new("live-id", AttributeKind.Template, "Give this component instance a stable identity.");
             yield return new("live-upload", AttributeKind.Bool, "Send the selected files with the action.");
             yield return new("live-loading", AttributeKind.Bool, "Show this element while an action is pending.");
-            yield return new("live-disable", AttributeKind.Bool, "Disable this control while an action is pending.");
+            yield return new("live-disable", AttributeKind.Bool, "Disable this control while an action is pending, or while a condition holds: @live-disable(while: $saving).");
+            yield return new("show", AttributeKind.Expression, "Shows the tag while the value is true and hides it (keeping it in the page) while false: @show($open).");
             yield return new("live-offline", AttributeKind.Bool, "Show this element when the browser is offline.");
             yield return new("live-error", AttributeKind.Bool, "Show this element when an action fails.");
             yield return new("live-cloak", AttributeKind.Bool, "Hide this element until the component starts.");

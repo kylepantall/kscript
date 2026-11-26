@@ -7,6 +7,9 @@ using KScript.Syntax.Markup;
 
 namespace KScript.Runtime
 {
+    /// <summary>The value a field starts with, for the reset: handler shorthand; false when the field has none.</summary>
+    public delegate bool FieldDefault(string name, out object value);
+
     public sealed partial class Interpreter
     {
         #region Entry points
@@ -147,7 +150,7 @@ namespace KScript.Runtime
         {
             if (HandlerShorthands.IsShorthand(text?.Value))
             {
-                RunShorthands(text, scope, module);
+                RunShorthands(text, scope, module, page: !bareBool);
                 return;
             }
             ParseResult parsed = GetParse(module, text, ParseMode.Statements);
@@ -199,8 +202,47 @@ namespace KScript.Runtime
                 $"A handler that is one value calls a function, and ${variable.Name} is {Values.Describe(value)}. Write statements instead, such as {variable.Name} = ….", "Type");
         }
 
+        /// <summary>The values of the enum a component field is declared as (size: Size), or null.</summary>
+        private static IReadOnlyList<string> EnumValuesOf(ExprNode field, Scope scope)
+        {
+            if (FieldName(field) is not string name || !scope.TryGet("this", out object self) || self is not Record record) return null;
+            string type = record.Type.Field(name)?.Type?.Name;
+            return type != null && scope.TryGet(type, out object declared) && declared is EnumType e ? e.Names : null;
+        }
+
+        /// <summary>The name a variable is assigned by ($draft, $.draft), or null for anything else.</summary>
+        private static string FieldName(ExprNode node) => node is VariableNode v ? v.Name : null;
+
+        /// <summary>Assigns a value to the field a shorthand names: $draft, $.draft or $note.title.</summary>
+        private void Assign(ExprNode field, object value, Scope scope, EvalContext ctx)
+        {
+            string target = ctx.Origin.Value.Substring(field.Span.Start, field.Span.Length);
+            if (field is VariableNode variable && !target.StartsWith("$.", StringComparison.Ordinal))
+            {
+                scope.Assign(variable.Name, value);
+                return;
+            }
+            var holder = new Scope(scope);
+            holder.Declare(HandlerShorthands.ValueVariable, value);
+            target = target.StartsWith("$.", StringComparison.Ordinal) ? target[2..] : target.StartsWith('$') ? target[1..] : target;
+            string statement = target + " = $" + HandlerShorthands.ValueVariable;
+            int at = ctx.ToSource(field.Span.Start) ?? 0;
+            ExecuteStatements(new DecodedText(statement, Enumerable.Repeat(at, statement.Length + 1).ToArray()), holder, ctx.Module, declare: false);
+        }
+
+        /// <summary>
+        /// The value a field starts with, for reset:: a live block's &lt;state&gt; (through the page's
+        /// <see cref="HandlerShorthands.DefaultsVariable"/>), else a component's declared default.
+        /// </summary>
+        private bool DefaultOf(Scope scope, string name, out object value)
+        {
+            value = null;
+            if (scope.TryGet(HandlerShorthands.DefaultsVariable, out object found) && found is FieldDefault defaults && defaults(name, out value)) return true;
+            return scope.TryGet("this", out object self) && self is Record record && record.Type.TryDefault(this, name, out value);
+        }
+
         /// <summary>Runs a handler written as shorthands, one step at a time.</summary>
-        private void RunShorthands(DecodedText text, Scope scope, Module module)
+        private void RunShorthands(DecodedText text, Scope scope, Module module, bool page)
         {
             HandlerShorthands.Reading reading = HandlerShorthands.Read(text.Value);
             if (reading.Parse.Errors.FirstOrDefault() is { } syntax)
@@ -212,8 +254,44 @@ namespace KScript.Runtime
                 throw new KScriptException(reading.Problems[0].Message, "Syntax") { Offset = text.ToSource(reading.Problems[0].Span.Start), OffsetModule = module };
             }
             var ctx = new EvalContext(module, text);
+            if (!page && reading.Modifiers.Count > 0)
+            {
+                ArgumentNode modifier = reading.Modifiers[0].Argument;
+                throw Fail(modifier, ctx, HandlerShorthands.WindowModifierMessage(modifier.Name), "Syntax");
+            }
+            // key: enter runs only for that key. The browser checks it too; this keeps a page honest without one.
+            if (reading.ModifierArgument("key") is ArgumentNode key
+                && !HandlerShorthands.KeyMatches(key.Value, scope.TryGet("event", out object ev) ? ev as IReadOnlyDictionary<string, object> : null))
+            {
+                return;
+            }
             foreach (HandlerShorthands.Step step in reading.Steps)
             {
+                if (step.Action.Name == HandlerShorthands.Reset)
+                {
+                    foreach (ExprNode field in step.Value.Value is ListNode fields ? fields.Items : new List<ExprNode> { step.Value.Value })
+                    {
+                        string name = FieldName(field) ?? throw Fail(field, ctx, "reset: takes a field, such as reset: $draft, or a list of them: reset: [$title, $done].", "Syntax");
+                        if (!DefaultOf(scope, name, out object start))
+                        {
+                            throw Fail(field, ctx, $"reset: puts a field back to the value it starts with, and ${name} has none here. Use set: ${name}, to: … instead.", "Name");
+                        }
+                        Assign(field, start, scope, ctx);
+                    }
+                    continue;
+                }
+                if (step.Action.Name == HandlerShorthands.Cycle)
+                {
+                    object current = Evaluate(step.Value.Value, scope, ctx);
+                    List<object> values = step.Companion != null
+                        ? Evaluate(step.Companion.Value, scope, ctx) as List<object> ?? throw Fail(step.Companion.Value, ctx, "through: takes a list of the values to go through: through: ['list', 'grid'].", "Type")
+                        : EnumValuesOf(step.Value.Value, scope) is IReadOnlyList<string> names ? names.Cast<object>().ToList()
+                        : throw Fail(step.Value.Value, ctx, $"cycle: goes through an enum's values, and {text.Value.Substring(step.Value.Value.Span.Start, step.Value.Value.Span.Length)} is {Values.Describe(current)}. Give the values with through: [...].", "Type");
+                    if (values.Count == 0) throw Fail(step.Companion.Value, ctx, "through: needs at least one value.", "Value");
+                    int at = values.FindIndex(v => Values.LooseEquals(v, current));
+                    Assign(step.Value.Value, values[(at + 1) % values.Count], scope, ctx);
+                    continue;
+                }
                 if (step.Action.Name == HandlerShorthands.Call)
                 {
                     object[] args = step.Companion == null ? Array.Empty<object>()

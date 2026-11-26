@@ -90,6 +90,7 @@ namespace KScript.Web
                 KType.PageVisit, call => PageVisit.Open(call, Values.ToStr(call.Arg(0))), "<let name=\"page\" value=\"@visit('/tasks')->fill('draft', 'Buy milk')->click('Add')\" />\n<echo>{ $page.text }</echo>");
             VisitMethod(p, "click", "text: string", "Runs the live on-click handler of the element with this text (or aria-label or title) and redraws its block. Returns the page, so clicks chain.", KType.PageVisit);
             VisitMethod(p, "change", "text: string", "Runs the on-change handler of the input with this label (the text of the <label> around it), such as a checkbox, and redraws its block.", KType.PageVisit);
+            VisitMethod(p, "press", "key, in?: string", "Presses a key on the element with on-keydown (the one with this text, label or placeholder, when given in:): press('enter'), press(['ctrl', 's']).", KType.PageVisit);
             VisitMethod(p, "submit", "text?: string", "Runs the on-submit handler of the form (the one with this text, when given) and redraws its block.", KType.PageVisit);
             VisitMethod(p, "fill", "field: string, value", "Types a value into the input bound to this field (bind=\"$draft\"), sent with the next click or submit.", KType.PageVisit);
             VisitMethod(p, "classes", "text: string", "The classes of the first element whose own text is this: classes('Buy milk').", KType.List);

@@ -48,4 +48,55 @@ describe(name: "task board") {
   test(name: "a page the site doesn't have is NotFound") {
     expect(value: @visit('/nope'), throws: NotFound)
   }
+
+  test(name: "trim: tidies the draft, and reset: puts it back to ''") {
+    page = @visit('/')->fill('draft', '  Walk the dog  ')->submit()
+    expect(value: $page.text, contains: 'Remove Walk the dog')
+    expect(value: $page.html, contains: 'value=""')
+  }
+
+  test(name: "@live-disable(while:) disables Add until there is a draft") {
+    expect(
+      value: @visit('/').html,
+      matches: '<button data-ks-live-disable disabled>Add'
+    )
+  }
+
+  test(name: "key: escape clears the search, and other keys don't") {
+    page = @visit('/')->fill('search', 'milk')->press('enter', in: 'Search')
+    expect(value: $page.text, not_contains: 'Call the bank')
+    $page->press('escape', in: 'Search')
+    expect(value: $page.text, contains: 'Call the bank')
+  }
+
+  test(name: "cycle: goes round the views") {
+    page = @visit('/')->click('View')
+    expect(value: $page.text, contains: '· grid ·')
+    expect(value: $page.html, contains: 'class="grid"')
+    expect(value: $page->click('View').text, contains: '· list ·')
+  }
+
+  test(name: "as: int reads the goal as a number, and refuses words") {
+    expect(
+      value: @visit('/')->fill('goal', '7')->click('Compact').text,
+      contains: 'Goal 7'
+    )
+    expect(
+      value: @visit('/')->fill('goal', 'seven')->click('Compact'),
+      throws: Http
+    )
+  }
+
+  test(name: "@show hides the tips once they are dismissed") {
+    page = @visit('/')
+    expect(value: $page.html, not_contains: '<p hidden>')
+    expect(value: $page->click('Hide tips').html, contains: '<p hidden>')
+  }
+
+  test(name: "modifiers reach the browser") {
+    html = @visit('/').html
+    expect(value: $html, contains: 'Remove this task?')
+    expect(value: $html, contains: 'data-ks-mods-click')
+    expect(value: $html, contains: 'data-ks-bind-debounce="300"')
+  }
 }

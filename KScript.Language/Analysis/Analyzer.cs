@@ -1040,6 +1040,10 @@ namespace KScript.Language.Analysis
                 {
                     AnalyzeClassDirective(attr, e, scope);
                 }
+                else if (attr.Name is "show" or "live-disable" && Kind != DocumentKind.Script && attr.Value != null)
+                {
+                    AnalyzeConditionDirective(attr, e, scope);
+                }
                 else if (component == null && attr.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {
                     CheckBinding(e, attr, scope);
@@ -1317,7 +1321,7 @@ namespace KScript.Language.Analysis
                     AnalyzeTemplate(attr.Value, scope, e, attr, allowBare: false);
                     break;
                 case AttributeKind.VariableReference:
-                    Symbol target = ReferenceVariableByName(attr.Value, scope, isWrite: true, mustBeMutable: true);
+                    Symbol target = ReferenceVariableByName(attr.Name == "bind" ? Slice(attr.Value, BindDirective.Read(attr.Value.Value).PathSpan) : attr.Value, scope, isWrite: true, mustBeMutable: true);
                     if (target != null && attr.Name == "bind")
                     {
                         // A bound control shows the value as well as changing it.

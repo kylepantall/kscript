@@ -27,8 +27,27 @@ namespace KScript.Language.Analysis
             }
             if (reading.Parse.Errors.Count > 0) return;
 
+            foreach ((HandlerShorthands.Modifier modifier, ArgumentNode argument) in reading.Modifiers)
+            {
+                if (modifier.Value is HandlerShorthands.ModifierValue.Text or HandlerShorthands.ModifierValue.Duration)
+                    AnalyzeExpressionRegion(Slice(text, argument.Value.Span), RegionKind.Expression, scope, e, attr);
+            }
             foreach (HandlerShorthands.Step step in reading.Steps)
             {
+                if (step.Action.Name is HandlerShorthands.Reset or HandlerShorthands.Cycle)
+                {
+                    // The field (or list of fields) must exist; cycle:'s through: is the list it goes round.
+                    AnalyzeExpressionRegion(Slice(text, step.Value.Value.Span), RegionKind.Expression, scope, e, attr);
+                    if (step.Companion != null)
+                    {
+                        ExpressionRegion through = AnalyzeExpressionRegion(Slice(text, step.Companion.Value.Span), RegionKind.Expression, scope, e, attr);
+                        string listType = through.Parse.Success && through.Parse.Root is ExprNode root ? Infer(root, through).Type : KType.Any;
+                        if (listType != KType.Any && listType != KType.List && !listType.EndsWith("[]", StringComparison.Ordinal))
+                            Report(text.ToSource(step.Companion.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                                $"through: takes a list of the values to go through, such as ['list', 'grid'], and this is {listType}.");
+                    }
+                    continue;
+                }
                 if (step.Action.Name == HandlerShorthands.Call)
                 {
                     handlerShorthand = HandlerShorthands.Call;
@@ -99,6 +118,25 @@ namespace KScript.Language.Analysis
                     Report(text.ToSource(entry.Classes), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"@class: '{literal.Value}' isn't a class name. A class has letters, digits, - and _.");
                 }
+            }
+        }
+
+        /// <summary>@show($open) and @live-disable(while: $saving): the condition gives true or false.</summary>
+        private void AnalyzeConditionDirective(MarkupAttribute attr, MarkupElement e, Scope scope)
+        {
+            DecodedText text = attr.Value;
+            TextSpan? span = new TextSpan(0, text.Value.Length);
+            if (attr.Name == "live-disable")
+            {
+                (span, string problem) = Pages.LiveAttributes.DisableCondition(text.Value);
+                if (problem != null) Report(text.SourceSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, problem);
+            }
+            if (span is not TextSpan condition || condition.Length == 0) return;
+            ExpressionRegion region = AnalyzeExpressionRegion(Slice(text, condition), RegionKind.Expression, scope, e, attr);
+            if (region.Parse.Success && region.Parse.Root is ExprNode root && Infer(root, region).Type is string type && type is not (KType.Bool or KType.Any))
+            {
+                Report(text.ToSource(condition), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    $"@{(attr.Name == "show" ? "show" : "live-disable")} needs a condition that is true or false, and {region.Source.Value} is {type}.");
             }
         }
 

@@ -1,3 +1,4 @@
+using KScript.Syntax.Markup;
 using KScript.Metadata;
 using KScript.Runtime;
 
@@ -37,6 +38,12 @@ namespace KScript.UI
         };
 
         private static A[] With(A[] common, params A[] own) => own.Concat(common).ToArray();
+
+        /// <summary>toggle:, call:, increment: and the other handler shorthands, straight on an element with one obvious event.</summary>
+        private static A[] Shorthands(string handler) => HandlerShorthands.WindowNames.Select(name =>
+            new A(name, K.Expression, HandlerShorthands.Get(name) is { } action
+                ? $"{action.Description} Runs on {handler}, like {handler}: \"{name}: …\"."
+                : $"Goes with {string.Join(" or ", HandlerShorthands.Actions.Where(a => a.Companion == name).Select(a => a.Name + ":"))}.")).ToArray();
 
         private static readonly A Gap = new A("gap", K.Expression, "Space between items, in pixels.");
         private static readonly A Align = new A("align", K.Enum, "How items line up across the container: start, center, end or stretch.", false, "start", "center", "end", "stretch");
@@ -89,10 +96,10 @@ namespace KScript.UI
                 Example = "<Text size=\"24\" weight=\"bold\">Hello, {$name}!</Text>",
             }, run => UIElements.Node(run, "Text", text: true));
 
-            p.Element(new ElementInfo("Button", "A button. Its text is the label; on_click runs when it is pressed.", ContentKind.Template, With(Box,
-                new A("on_click", K.Statements, "Runs when the button is pressed, e.g. on_click=\"count += 1\"."),
+            p.Element(new ElementInfo("Button", "A button. Its text is the label; on_click runs when it is pressed, or name the action straight on it: toggle=\"$open\".", ContentKind.Template, With(Box,
+                new[] { new A("on_click", K.Statements, "Runs when the button is pressed, e.g. on_click=\"count += 1\"."),
                 new A("variant", K.Enum, "primary makes it stand out.", false, "normal", "primary"),
-                Disabled))
+                Disabled }.Concat(Shorthands("on_click")).ToArray()))
             {
                 Context = ElementContext.Script,
                 Example = "<Button variant=\"primary\" on_click=\"count += 1\">Add one</Button>",
@@ -134,9 +141,9 @@ namespace KScript.UI
                 Example = "<Slider bind=\"volume\" min=\"0\" max=\"10\" step=\"1\" />",
             }, run => UIElements.Node(run, "Slider", text: false));
 
-            p.Element(new ElementInfo("Box", "A rectangle: a coloured cell, a card or a panel. It can hold other items, and on_click makes it clickable.", ContentKind.Statements, With(Box,
-                new A("on_click", K.Statements, "Runs when it is clicked."),
-                new A("border", K.Template, "A border colour.")))
+            p.Element(new ElementInfo("Box", "A rectangle: a coloured cell, a card or a panel. It can hold other items, and on_click (or a shorthand such as toggle=\"$on\") makes it clickable.", ContentKind.Statements, With(Box,
+                new[] { new A("on_click", K.Statements, "Runs when it is clicked."),
+                new A("border", K.Template, "A border colour.") }.Concat(Shorthands("on_click")).ToArray()))
             {
                 Context = ElementContext.Script,
                 Example = "<Box width=\"20\" height=\"20\" background=\"{ $on ? 'lime' : '#222' }\" on_click=\"on = not $on\" />",

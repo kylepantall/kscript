@@ -9,7 +9,7 @@ for repo in $repos {
     { $repo.license ?? 'none' }"
 }
 
-// The same works for a live API: @api($url)->check()->json(as: Repo) with
+// The same works for a live API: @api($url, as: Repo) with
 // KScript.Net.
 try {
   bad = Repo({

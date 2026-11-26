@@ -16,7 +16,7 @@ unless: auth
       class="add-note"
       on-submit="problem = @add_note($draft) ?? ''; draft = $problem == '' ? '' : $draft">
       <input
-        bind="draft"
+        @bind($draft)
         placeholder="What do you want to remember?"
         autocomplete="off">
       <button>Add</button>

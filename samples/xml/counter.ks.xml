@@ -11,7 +11,7 @@
 
   <Text size="32">{$count}</Text>
   <Row gap="8">
-    <Button variant="primary" on_click="count += 1">Add one</Button>
+    <Button variant="primary" increment="$count">Add one</Button>
     <Button on_click="@reset()">Reset</Button>
   </Row>
 </KScript.Window>

@@ -67,6 +67,34 @@ public class UITests
     }
 
     [Fact]
+    public void ButtonsTakeHandlerShorthandsStraightOnThem()
+    {
+        const string xml = """
+            <KScript.Window title="Shorthands">
+              <let name="count" value="0" />
+              <let name="open" value="false" />
+              <let name="tags" value="[]" />
+              <Text>{$count} {$open} {$tags->join(',')}</Text>
+              <Button increment="$count" by="5" toggle="$open">Bump</Button>
+              <Button add="'x'" to="$tags">Tag</Button>
+              <Box set="$count" to="0" width="10" height="10" />
+              <Button on_click="toggle: $open, confirm: 'Sure?'">Ask</Button>
+            </KScript.Window>
+            """;
+        RunWindow(xml, s =>
+        {
+            s.Click("Bump");
+            Assert.Equal("5 true", s.FindAll("Text")[0].Text);
+            s.Click("Tag");
+            Assert.Equal("5 true x", s.FindAll("Text")[0].Text);
+            s.Fire(s.FindAll("Box")[0], "on_click");
+            Assert.StartsWith("0 ", s.FindAll("Text")[0].Text);
+            s.Click("Ask");
+            Assert.Contains("confirm: works on pages", s.Error);
+        });
+    }
+
+    [Fact]
     public void LoopsAndConditionsBuildTheLayout()
     {
         const string xml = """

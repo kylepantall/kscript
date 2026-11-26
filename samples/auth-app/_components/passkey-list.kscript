@@ -17,7 +17,7 @@ type PasskeyList extends Component {
         <for each="key" in="$keys">
           <li>
             Added {$key.created_at}
-            <button type="button" @on-click($this->remove($key.id)) live-confirm="Remove this passkey?">Remove passkey</button>
+            <button type="button" @on-click(call: $remove, with: [$key.id], confirm: 'Remove this passkey?')>Remove passkey</button>
           </li>
         </for>
       </ul>

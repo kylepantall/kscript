@@ -15,7 +15,7 @@
       "patterns": [{ "include": "#handler-body" }]
     },
     {
-      "begin": "(?<!\\S)@(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every|class(?:-if)?)(?=\\s*\\()",
+      "begin": "(?<!\\S)@(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every|class(?:-if)?|show)(?=\\s*\\()",
       "beginCaptures": {
         "0": { "name": "keyword.control.directive.kscript" }
       },
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "begin": "(?<!\\S)(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|on-(?:action|cancel|change|click|close|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every|class-if)(?=\\s|=|/?>)",
+      "begin": "(?<!\\S)(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|on-(?:action|cancel|change|click|close|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)|bind(?:-on)?|sort-(?:item|axis)|drag-value|prevent-default|event-name|every|class-if|show)(?=\\s|=|/?>)",
       "beginCaptures": {
         "0": { "name": "keyword.control.directive.kscript" }
       },
