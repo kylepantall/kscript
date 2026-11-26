@@ -20,7 +20,7 @@ namespace KScript.Updates
         public const string FileName = "SHA256SUMS";
 
         /// <summary>The first release that has to have a SHA256SUMS file. Earlier ones were published without.</summary>
-        private static readonly Version FirstListed = new Version(0, 10, 0);
+        private static readonly Version FirstListed = new Version(0, 26, 0);
 
         /// <summary>Whether a release must list its checksums: one that doesn't is refused, not installed unchecked.</summary>
         public static bool Required(string version) => SelfUpdater.TryParseVersion(version, out Version parsed) && parsed >= FirstListed;
