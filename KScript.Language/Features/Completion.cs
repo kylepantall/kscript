@@ -55,6 +55,12 @@ namespace KScript.Language.Features
                     return propValues;
                 if (cursor.InAttributeValue && LiveAttributeValues(analysis, cursor) is List<CompletionItem> liveValues)
                     return liveValues;
+                if (cursor.InAttributeValue && ShorthandCompletions(analysis, cursor) is List<CompletionItem> shorthands)
+                {
+                    // At the start of a handler, statements and calls fit too; after a shorthand's comma only shorthands do.
+                    if (HandlerShorthands.IsShorthand(cursor.Attribute.Value.Value)) return shorthands;
+                    return shorthands.Concat(GetCompletionsAt(analysis, offset)).ToList();
+                }
                 if (cursor.InStartTag && !cursor.InElementName && !cursor.InAttributeValue)
                     return PageAttributePosition(analysis.Source.Text, offset)
                         ? AttributeCompletions(analysis, cursor.TagElement, offset) : new List<CompletionItem>();

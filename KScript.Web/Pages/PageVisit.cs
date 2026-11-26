@@ -1,0 +1,221 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+using KScript.Runtime;
+
+namespace KScript.Pages
+{
+    /// <summary>
+    /// @visit('/'): a page of the project rendered in a test, as a browser would get it. <c>->click('Add')</c> (or <c>->change('Buy milk')</c>, <c>->submit()</c>) runs
+    /// the live handler of the element with that text and redraws its block, <c>->fill('draft', 'milk')</c> types into
+    /// a bound input, and <c>.html</c>, <c>.text</c> and <c>->classes('Buy milk')</c> show the result.
+    /// </summary>
+    public sealed class PageVisit : IKObject
+    {
+        private static readonly Regex StartTag = new Regex(@"<([a-zA-Z][\w-]*)((?:[^>""']|""[^""]*""|'[^']*')*)>", RegexOptions.Compiled);
+        private static readonly HashSet<string> VoidTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr",
+        };
+
+        private readonly PageSite site;
+        private readonly Dictionary<string, object> binds = new Dictionary<string, object>(StringComparer.Ordinal);
+
+        private PageVisit(PageSite site, string path)
+        {
+            this.site = site;
+            Path = path;
+        }
+
+        public string TypeName => KScript.Metadata.KType.PageVisit;
+
+        /// <summary>The address visited, such as /tasks.</summary>
+        public string Path { get; }
+
+        /// <summary>The page's HTML as it is now, after any clicks.</summary>
+        public string Html { get; private set; }
+
+        public double Status { get; private set; }
+
+        public string ToText() => $"page {Path}";
+
+        /// <summary>Renders a page of the site the calling script belongs to (serve.root in its kscript.json, else its folder).</summary>
+        public static PageVisit Open(CallContext call, string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw call.Error("@visit() needs the address of a page, such as @visit('/') or @visit('/tasks').", "Argument");
+            if (!path.StartsWith('/')) path = "/" + path;
+            string start = call.Module?.Directory ?? call.Interpreter.Host.WorkingDirectory;
+            Projects.ProjectConfig config = Projects.ProjectConfig.FindAndLoad(start);
+            var site = new PageSite(config?.SiteRoot ?? start);
+            var visit = new PageVisit(site, path);
+
+            var uri = new Uri(new Uri("http://localhost"), path);
+            PageRoute route = site.Resolve(uri.AbsolutePath);
+            if (route.Kind != PageRoute.RouteKind.Page) throw call.Error($"@visit('{path}'): the site has no page at {uri.AbsolutePath}.", "NotFound");
+            var request = new Dictionary<string, object>
+            {
+                [RequestFields.Path.Name] = uri.AbsolutePath,
+                [RequestFields.Url.Name] = uri.PathAndQuery,
+                [RequestFields.Query.Name] = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).ToDictionary(q => q.Key, q => (object)q.Value.ToString()),
+            };
+            if (route.Locale != null) request[RequestFields.Locale.Name] = route.Locale;
+            PageResult result;
+            try
+            {
+                result = PageRenderer.RenderFile(new PageContext(site.Root, request) { StartupConfig = site.StartupConfig }, route.File, route.Params);
+            }
+            catch (PageException ex)
+            {
+                throw call.Error($"@visit('{path}'): the page didn't render. {ex.Message}", "Http");
+            }
+            visit.Html = result.Body;
+            visit.Status = result.Status;
+            return visit;
+        }
+
+        public bool TryGetMember(string name, out object value)
+        {
+            value = name switch
+            {
+                "path" => Path,
+                "status" => Status,
+                "html" => Html,
+                "text" => Text(Html),
+                _ => null,
+            };
+            return name is "path" or "status" or "html" or "text";
+        }
+
+        public bool TryCallMethod(CallContext call, string name, out object result)
+        {
+            result = this;
+            switch (name)
+            {
+                case "click":
+                    Fire(call, "click", Label(call));
+                    return true;
+                case "change":
+                    Fire(call, "change", Label(call));
+                    return true;
+                case "submit":
+                    Fire(call, "submit", call.Has(0) ? Label(call) : null);
+                    return true;
+                case "fill":
+                {
+                    string field = Values.ToStr(call.Arg(0)).TrimStart('$');
+                    if (!Html.Contains($"data-ks-bind=\"{Values.HtmlEscape(field)}\"", StringComparison.Ordinal))
+                        throw call.Error($"->fill('{field}', ...): the page has no input bound to {field}.", "NotFound");
+                    binds[field] = call.Arg(1);
+                    return true;
+                }
+                case "classes":
+                    result = Classes(call, Label(call));
+                    return true;
+                default:
+                    result = null;
+                    return false;
+            }
+        }
+
+        private static string Label(CallContext call) =>
+            call.Arg(0) is string label && label.Trim().Length > 0 ? label.Trim() : throw call.Error($"{call.Display} needs the text of a button or link on the page, such as 'Add'.", "Argument");
+
+        /// <summary>Runs the live handler of the element whose text is <paramref name="label"/> and puts its block's new HTML in the page.</summary>
+        private void Fire(CallContext call, string eventName, string label)
+        {
+            string attribute = "data-ks-on-" + eventName;
+            var candidates = new List<(int Start, string Handler, string Args)>();
+            foreach (Match tag in StartTag.Matches(Html))
+            {
+                Match handler = Regex.Match(tag.Groups[2].Value, $@"\b{attribute}=""(\d+)""");
+                if (!handler.Success) continue;
+                int end = ElementEnd(tag);
+                string text = Text(Html[tag.Index..end]);
+                // An input has no text of its own: the label around it names it.
+                if (text.Length == 0 && EnclosingLabel(tag.Index) is string around) text = around;
+                if (label == null || text == label || (eventName == "submit" && text.Contains(label, StringComparison.Ordinal)) || Attribute(tag, "aria-label") == label || Attribute(tag, "title") == label)
+                    candidates.Add((tag.Index, handler.Groups[1].Value, Attribute(tag, "data-ks-args-" + handler.Groups[1].Value) ?? Attribute(tag, "data-ks-args")));
+            }
+            if (candidates.Count == 0)
+            {
+                throw call.Error(label == null
+                    ? $"{call.Display}: the page has no form with on-{eventName}."
+                    : $"{call.Display}: nothing on the page with the text '{label}' has on-{eventName}.", "NotFound");
+            }
+            (int start, string number, string args) = candidates[0];
+            Match block = StartTag.Matches(Html).Where(t => t.Index < start && t.Groups[2].Value.Contains("data-ks-live=\"", StringComparison.Ordinal) && ElementEnd(t) > start)
+                .LastOrDefault() ?? throw call.Error($"{call.Display}: '{label}' isn't inside a live block, so it has nothing to run.", "Context");
+            int blockEnd = ElementEnd(block);
+            string blockHtml = Html[block.Index..blockEnd];
+            var blockBinds = binds.Where(b => blockHtml.Contains($"data-ks-bind=\"{Values.HtmlEscape(b.Key)}\"", StringComparison.Ordinal))
+                .ToDictionary(b => b.Key, b => b.Value, StringComparer.Ordinal);
+            string json = Values.ToJson(new Dictionary<string, object>
+            {
+                ["page"] = Path,
+                ["block"] = System.Net.WebUtility.HtmlDecode(Attribute(block, "data-ks-live")),
+                ["handler"] = double.Parse(number, System.Globalization.CultureInfo.InvariantCulture),
+                ["state"] = System.Net.WebUtility.HtmlDecode(Attribute(block, "data-ks-state") ?? string.Empty),
+                ["args"] = args == null ? null : System.Net.WebUtility.HtmlDecode(args),
+                ["binds"] = blockBinds,
+                ["event"] = new Dictionary<string, object>(),
+            });
+            PageResult result = PageServer.HandleLive(site, json, new Dictionary<string, object>());
+            Status = result.Status;
+            if (result.Status != 200) throw call.Error($"{call.Display} on '{label ?? eventName}' failed ({result.Status}): {result.Body}", "Http");
+            foreach (string key in blockBinds.Keys) binds.Remove(key);
+            Html = Html[..block.Index] + result.Body + Html[blockEnd..];
+        }
+
+        /// <summary>The text of the &lt;label&gt; an element is inside, or null.</summary>
+        private string EnclosingLabel(int index)
+        {
+            Match label = StartTag.Matches(Html).Where(t => t.Index < index && t.Groups[1].Value.Equals("label", StringComparison.OrdinalIgnoreCase) && ElementEnd(t) > index).LastOrDefault();
+            return label == null ? null : Text(Html[label.Index..ElementEnd(label)]);
+        }
+
+        /// <summary>The classes of the first element whose own text is <paramref name="label"/>.</summary>
+        private List<object> Classes(CallContext call, string label)
+        {
+            foreach (Match tag in StartTag.Matches(Html))
+            {
+                int after = tag.Index + tag.Length;
+                int next = Html.IndexOf('<', after);
+                string own = System.Net.WebUtility.HtmlDecode(Html[after..(next < 0 ? Html.Length : next)]).Trim();
+                if (own != label) continue;
+                string classes = System.Net.WebUtility.HtmlDecode(Attribute(tag, "class") ?? string.Empty);
+                return classes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(c => (object)c).ToList();
+            }
+            throw call.Error($"{call.Display}: nothing on the page has the text '{label}'.", "NotFound");
+        }
+
+        private static string Attribute(Match tag, string name) =>
+            Regex.Match(tag.Groups[2].Value, $@"(?:^|\s){Regex.Escape(name)}=""([^""]*)""") is { Success: true } m ? m.Groups[1].Value : null;
+
+        /// <summary>Where the element a start tag opens ends: after its matching end tag.</summary>
+        private int ElementEnd(Match tag)
+        {
+            string name = tag.Groups[1].Value;
+            int after = tag.Index + tag.Length;
+            if (VoidTags.Contains(name) || tag.Value.EndsWith("/>", StringComparison.Ordinal)) return after;
+            var tags = new Regex($@"<(/?){Regex.Escape(name)}\b((?:[^>""']|""[^""]*""|'[^']*')*)>", RegexOptions.IgnoreCase);
+            int depth = 1;
+            for (Match m = tags.Match(Html, after); m.Success; m = m.NextMatch())
+            {
+                if (m.Groups[1].Value == "/") depth--;
+                else if (!m.Value.EndsWith("/>", StringComparison.Ordinal)) depth++;
+                if (depth == 0) return m.Index + m.Length;
+            }
+            return Html.Length;
+        }
+
+        /// <summary>The words a reader sees: no tags, scripts or styles, and runs of spaces made one.</summary>
+        private static string Text(string html)
+        {
+            string text = Regex.Replace(html ?? string.Empty, @"<(script|style)\b.*?</\1>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<[^>]*>", " ");
+            return Regex.Replace(System.Net.WebUtility.HtmlDecode(text), @"\s+", " ").Trim();
+        }
+    }
+}

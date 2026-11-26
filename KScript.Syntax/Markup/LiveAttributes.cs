@@ -20,7 +20,7 @@ namespace KScript.Pages
         {
             null => null,
             { Name: "live-use-" or "live-dirty" or "prevent-default" } => LiveDirectiveArgument.OptionalText,
-            { Kind: AttributeKind.Statements } => LiveDirectiveArgument.Statements,
+            { Kind: AttributeKind.Statements or AttributeKind.Expression } => LiveDirectiveArgument.Statements,
             { Kind: AttributeKind.Bool } => LiveDirectiveArgument.Flag,
             _ => LiveDirectiveArgument.Text,
         };
@@ -61,6 +61,7 @@ namespace KScript.Pages
             yield return new("drag-value", AttributeKind.Template, "Send this draggable element's value to the drop handler.");
             yield return new("every", AttributeKind.Template, "Set the on-tick interval, for example 1s.");
             yield return new("event-name", AttributeKind.Text, "Filter on-event by the emitted event name.");
+            yield return new(Syntax.Markup.ClassDirective.Attribute, AttributeKind.Expression, "Switch classes on by conditions: @class(done: $todo.done) or @class({ $todo.done: ['done', 'struck'] }).");
             yield return new("prevent-default", AttributeKind.Text, "Cancel the default browser action for the named events.");
         }
     }

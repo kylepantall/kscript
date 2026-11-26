@@ -268,7 +268,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.kscript", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.kscript" })
+        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.kscript", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", "tests/tasks-page.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.kscript" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);
@@ -364,7 +364,7 @@ public class MakeProjectTests : IDisposable
         var e = new StringWriter { NewLine = "\n" };
         int code = KScript.Testing.TestCommand.Run(new[] { Path.Combine(parent.Root, "app") }, o, e, color: false);
         Assert.True(code == 0, o.ToString() + e);
-        Assert.Contains("Tests:    14 passed, 14 total", o.ToString());
+        Assert.Contains("Tests:    18 passed, 18 total", o.ToString());
     }
 
     [Fact]
@@ -407,7 +407,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "site");
         Assert.DoesNotContain(".kscript", output.Replace(".kscript/agents/", string.Empty));
-        foreach (var f in new[] { "lib/tasks.ks.xml", "lib/greeting.ks.xml", "scripts/hello.ks.xml", "desktop.ks.xml", "routes/api.ks.xml", "controllers/tasks.ks.xml", "tests/tasks.test.ks.xml", "tests/greeting.test.ks.xml" })
+        foreach (var f in new[] { "lib/tasks.ks.xml", "lib/greeting.ks.xml", "scripts/hello.ks.xml", "desktop.ks.xml", "routes/api.ks.xml", "controllers/tasks.ks.xml", "tests/tasks.test.ks.xml", "tests/tasks-page.test.ks.xml", "tests/greeting.test.ks.xml" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.False(File.Exists(Path.Combine(root, Path.ChangeExtension(f, null).Replace(".ks", "") + ".kscript")));
@@ -423,7 +423,7 @@ public class MakeProjectTests : IDisposable
         var o = new StringWriter { NewLine = "\n" };
         var e = new StringWriter { NewLine = "\n" };
         Assert.True(KScript.Testing.TestCommand.Run(new[] { root }, o, e, color: false) == 0, o.ToString() + e);
-        Assert.Contains("Tests:    14 passed, 14 total", o.ToString());
+        Assert.Contains("Tests:    18 passed, 18 total", o.ToString());
 
         // kscript make in the project follows its make.syntax.
         Assert.Equal(0, MakeCommandRun("script", "tidy", "--dir", root).Code);

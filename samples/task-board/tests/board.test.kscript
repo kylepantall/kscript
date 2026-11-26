@@ -1,0 +1,51 @@
+// Clicks through the task board. Run with: kscript test samples/task-board
+import KScript.Web
+
+describe(name: "task board") {
+  test(name: "the page starts with two open tasks") {
+    page = @visit('/')
+    expect(value: $page.text, contains: 'Buy milk')
+    expect(value: $page.text, contains: 'Added 0 · Showing all')
+    expect(value: $page->classes('Buy milk'), not_contains: 'done')
+  }
+
+  test(name: "add: to: puts the draft on the list and set: to: clears it") {
+    page = @visit('/')->fill('draft', 'Walk the dog')->submit()
+    expect(value: $page.text, contains: 'Remove Walk the dog')
+    expect(value: $page.text, contains: 'Added 1')
+    expect(value: $page.html, contains: 'value=""')
+  }
+
+  test(name: "call: with: runs a method, and @class marks the task done") {
+    page = @visit('/')->click('Finish Buy milk')
+    expect(value: $page->classes('Buy milk'), equals: ['done', 'struck'])
+    expect(value: $page.text, contains: 'Finished Buy milk')
+  }
+
+  test(name: "remove: from: takes a task off the list") {
+    page = @visit('/')->click('Remove Call the bank')
+    expect(value: $page.text, not_contains: 'Call the bank')
+  }
+
+  test(name: "toggle: flips a bool, and @class follows it") {
+    page = @visit('/')
+    expect(value: $page.html, not_contains: 'class="compact"')
+    $page->click('Compact')
+    expect(value: $page.html, contains: 'class="compact"')
+    $page->click('Compact')
+    expect(value: $page.html, not_contains: 'class="compact"')
+  }
+
+  test(name: "set: to: picks the filter") {
+    page = @visit('/')->click('Finish Buy milk')->click('Open')
+    expect(value: $page.text, contains: 'Showing open')
+    expect(value: $page.text, not_contains: 'Remove Buy milk')
+    expect(value: $page.html, contains: 'class="is-filtered"')
+    $page->click('All')
+    expect(value: $page.text, contains: 'Remove Buy milk')
+  }
+
+  test(name: "a page the site doesn't have is NotFound") {
+    expect(value: @visit('/nope'), throws: NotFound)
+  }
+}

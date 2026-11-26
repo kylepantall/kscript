@@ -13,14 +13,14 @@ $k samples/scripts/oldest.kscript
 
 group "Check KScript 2 samples"
 $k check libraries samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage samples/documents \
-  samples/queue-app samples/data --warnings-as-errors
+  samples/queue-app samples/data samples/task-board --warnings-as-errors
 
 group "Check KScript formatting"
 $k fmt --check libraries samples/scripts samples/xml samples/life-lab samples/http-app samples/auth-app samples/storage \
-  samples/documents samples/queue-app samples/data samples/types "Example Sites/team"
+  samples/documents samples/queue-app samples/data samples/task-board samples/types "Example Sites/team"
 
 group "Run KScript tests"
-$k test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
+$k test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data samples/task-board
 
 group "Run the data sample's migrations and seeder"
 $k db migrate --seed --project samples/data --no-ansi < /dev/null

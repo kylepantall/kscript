@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript.schema.json",
+  "name": "task-board",
+  "standard": "kscript:recommended",
+  "serve": { "root": ".", "port": 8080 },
+  "make": { "syntax": "kscript" },
+  "lint": { "exclude": ["README.md"] }
+}

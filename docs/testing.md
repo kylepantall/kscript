@@ -179,6 +179,29 @@ test(name: "hello.kscript greets the name it is given") {
 
 Use it for scripts that do their work at the top level or call `exit`. A test that calls `exit` itself fails.
 
+### Pages
+
+`@visit(path)` (from KScript.Web) renders a page of the project as a browser gets it: the site is `serve.root` in the nearest kscript.json. Its live handlers run on the server as they would in a browser, so a test can click through a page:
+
+- `->click(text)` runs the on-click handler of the button or link with that text (or `aria-label` or `title`).
+- `->change(text)` runs the on-change handler of the input whose `<label>` has that text, such as a checkbox.
+- `->fill(field, value)` types into the input bound to that field, and `->submit(text?)` runs a form's on-submit.
+- `.text` is the words on the page, `.html` its HTML, and `->classes(text)` the classes of the element whose own text that is.
+
+Each of these returns the page, so they chain. A page that isn't there is a `NotFound` error.
+
+```kscript
+import KScript.Web
+
+test(name: "adding a task clears the box") {
+  page = @visit('/tasks')->fill('draft', 'Write the docs')->submit()
+  expect(value: $page.text, contains: 'Write the docs')
+  expect(value: $page->classes('Write the docs'), not_contains: 'done')
+}
+```
+
+samples/task-board has a page whose buttons are all handler shorthands, with a test for each.
+
 ## Command line
 
 ```sh

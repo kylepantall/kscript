@@ -185,8 +185,8 @@ Reusable components become live automatically when their templates use state, ev
 <live id="counter">
   <state name="count" value="0" />
   <p>{$count}</p>
-  <button on-click="count -= 1">−</button>
-  <button on-click="count += 1">+</button>
+  <button on-click="decrement: $count">−</button>
+  <button on-click="increment: $count">+</button>
 </live>
 
 <live id="search">

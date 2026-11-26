@@ -1,0 +1,44 @@
+import KScript.Web
+
+/// A small task list whose buttons are all handler shorthands: each one says
+/// the action it runs (toggle:, add: to:, remove: from:, increment:, set: to:,
+/// call: with:), and @class switches classes on by conditions.
+type TaskBoard extends Component {
+  tasks: string[] = ['Buy milk', 'Call the bank']
+  done: string[] = []
+  draft: string = ''
+  compact: bool = false
+  added: int = 0
+  filter: string = 'all'
+  note: string = ''
+
+  fn finish(task: string) {
+    done = $done->push($task)
+    note = "Finished {$task}"
+  }
+
+  fn render() => ```html
+    <form @on-submit(add: $draft, to: $tasks, increment: $added, set: $draft, to: '')>
+      <input @bind('draft') placeholder="New task">
+      <button>Add</button>
+    </form>
+    <p>
+      <button type="button" @on-click(toggle: $compact)>Compact</button>
+      <button type="button" @on-click(set: $filter, to: 'all')>All</button>
+      <button type="button" @on-click(set: $filter, to: 'open')>Open</button>
+    </p>
+    <ul @class(compact: $compact, 'is-filtered': $filter == 'open')>
+      <for each="task" in="$tasks">
+        <if test="$filter == 'all' or not $done->contains($task)">
+          <li>
+            <span @class({ $done->contains($task): ['done', 'struck'] })>{$task}</span>
+            <button type="button" @on-click(call: $finish, with: [$task])>Finish {$task}</button>
+            <button type="button" @on-click(remove: $task, from: $tasks)>Remove {$task}</button>
+          </li>
+        </if>
+      </for>
+    </ul>
+    <p>Added {$added} · Showing {$filter}</p>
+    <if test="$note"><p>{$note}</p></if>
+    ```
+}
