@@ -102,6 +102,60 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>Checks <c>@focus($cond)</c>: the condition gives a bool. <c>focus="{$cond}"</c> is read the same way.</summary>
+        private void AnalyzeFocusDirective(MarkupAttribute attr, MarkupElement e, Scope scope)
+        {
+            DecodedText text = Unbraced(attr.Value);
+            if (text.Value.Trim().Length == 0) return;
+            ExpressionRegion condition = AnalyzeExpressionRegion(text, RegionKind.Expression, scope, e, attr);
+            if (condition.Parse.Success && condition.Parse.Root is ExprNode root && Infer(root, condition).Type is string type && type is not (KType.Bool or KType.Any))
+            {
+                Report(text.ToSource(new TextSpan(0, text.Value.Length)), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                    $"@focus: {text.Value.Trim()} must be true or false, and it is {type}.");
+            }
+        }
+
+        /// <summary>Checks <c>@pending('crumple', for: 'delete')</c>: a class (or list of them), then the methods whose actions count.</summary>
+        private void AnalyzePendingDirective(MarkupAttribute attr, MarkupElement e, Scope scope)
+        {
+            DecodedText text = Unbraced(attr.Value);
+            PendingDirective.Reading reading = PendingDirective.Read(text.Value);
+            foreach ((TextSpan span, string message) in reading.Problems)
+            {
+                Report(text.ToSource(span), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "@pending: " + message);
+            }
+            if (reading.Classes is TextSpan classSpan)
+            {
+                ExpressionRegion classes = AnalyzeExpressionRegion(Slice(text, classSpan), RegionKind.Expression, scope, e, attr);
+                if (classes.Parse.Success && classes.Parse.Root is LiteralNode { Kind: LiteralKind.String, Template: null } literal && !ClassDirective.IsClassName(literal.Value?.ToString() ?? string.Empty))
+                {
+                    Report(text.ToSource(classSpan), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"@pending: '{literal.Value}' isn't a class name. A class has letters, digits, - and _.");
+                }
+            }
+            if (reading.For is TextSpan forSpan)
+            {
+                ExpressionRegion methods = AnalyzeExpressionRegion(Slice(text, forSpan), RegionKind.Expression, scope, e, attr);
+                if (methods.Parse.Success && methods.Parse.Root is VariableNode)
+                {
+                    Report(text.ToSource(forSpan), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"@pending: for: takes the method's name in quotes, for: '{text.Value.Substring(forSpan.Start, forSpan.Length).Trim().TrimStart('$')}'.");
+                }
+            }
+        }
+
+        /// <summary>The expression inside <c>{ }</c> when the whole value is one, else the value as written.</summary>
+        private static DecodedText Unbraced(DecodedText text)
+        {
+            string value = text.Value;
+            int start = 0, end = value.Length;
+            while (start < end && char.IsWhiteSpace(value[start])) start++;
+            while (end > start && char.IsWhiteSpace(value[end - 1])) end--;
+            if (end - start >= 3 && value[start] == '{' && value[end - 1] == '}' && value[start + 1] != '{')
+                return Slice(text, TextSpan.FromBounds(start + 1, end - 1));
+            return text;
+        }
+
         /// <summary>Part of a decoded text, keeping each character's place in the source.</summary>
         private static DecodedText Slice(DecodedText text, TextSpan span) =>
             new DecodedText(text.Value.Substring(span.Start, span.Length), Enumerable.Range(span.Start, span.Length + 1).Select(text.ToSource).ToArray());

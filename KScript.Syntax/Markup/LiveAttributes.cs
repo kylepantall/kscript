@@ -5,7 +5,7 @@ using KScript.Metadata;
 
 namespace KScript.Pages
 {
-    public enum LiveDirectiveArgument { Text, OptionalText, Flag, Statements }
+    public enum LiveDirectiveArgument { Text, OptionalText, Flag, Statements, OptionalExpression }
 
     /// <summary>The live attributes authors can put on HTML elements and component invocations.</summary>
     public static class LiveAttributes
@@ -20,6 +20,7 @@ namespace KScript.Pages
         {
             null => null,
             { Name: "live-use-" or "live-dirty" or "prevent-default" } => LiveDirectiveArgument.OptionalText,
+            { Name: "focus" } => LiveDirectiveArgument.OptionalExpression,
             { Kind: AttributeKind.Statements or AttributeKind.Expression } => LiveDirectiveArgument.Statements,
             { Kind: AttributeKind.Bool } => LiveDirectiveArgument.Flag,
             _ => LiveDirectiveArgument.Text,
@@ -62,6 +63,9 @@ namespace KScript.Pages
             yield return new("every", AttributeKind.Template, "Set the on-tick interval, for example 1s.");
             yield return new("event-name", AttributeKind.Text, "Filter on-event by the emitted event name.");
             yield return new(Syntax.Markup.ClassDirective.Attribute, AttributeKind.Expression, "Switch classes on by conditions: @class(done: $todo.done) or @class({ $todo.done: ['done', 'struck'] }).");
+            yield return new("focus", AttributeKind.Expression, "Give this element focus when it appears, or when its condition turns true: @focus() or @focus($editing).");
+            yield return new("autogrow", AttributeKind.Bool, "Grow this textarea with its text.");
+            yield return new(Syntax.Markup.PendingDirective.Attribute, AttributeKind.Expression, "Add classes while an action runs: @pending('saving'), or @pending('crumple', for: 'delete') for one method's actions.");
             yield return new("prevent-default", AttributeKind.Text, "Cancel the default browser action for the named events.");
         }
     }
