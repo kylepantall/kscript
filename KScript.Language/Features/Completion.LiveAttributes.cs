@@ -84,7 +84,6 @@ namespace KScript.Language.Features
                 "every" => element.GetAttribute("on-tick") != null,
                 "event-name" => element.GetAttribute("on-event") != null,
                 "sort-axis" => element.GetAttribute("on-sort") != null,
-                "drag-value" => string.Equals(element.GetAttributeValue("draggable"), "true", StringComparison.OrdinalIgnoreCase),
                 "live-disable" => tag is "button" or "fieldset" or "input" or "optgroup" or "option" or "select" or "textarea",
                 _ => true,
             };

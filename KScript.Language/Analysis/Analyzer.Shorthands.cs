@@ -182,6 +182,29 @@ namespace KScript.Language.Analysis
             }
         }
 
+        /// <summary>Checks <c>@drag(front: true, copy: true, value: $c)</c>: known options, each of its type.</summary>
+        private void AnalyzeDragDirective(MarkupAttribute attr, MarkupElement e, Scope scope)
+        {
+            DecodedText text = Unbraced(attr.Value);
+            DragDirective.Reading reading = DragDirective.Read(text.Value);
+            foreach ((TextSpan span, string message) in reading.Problems)
+            {
+                Report(text.ToSource(span), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, "@drag: " + message);
+            }
+            foreach ((DragDirective.Option option, ArgumentNode argument) in reading.Values)
+            {
+                ExpressionRegion value = AnalyzeExpressionRegion(Slice(text, argument.Value.Span), RegionKind.Expression, scope, e, attr);
+                if (option.Type == KType.Any || !value.Parse.Success || value.Parse.Root is not ExprNode root) continue;
+                string type = Infer(root, value).Type;
+                bool fits = type == KType.Any || type == option.Type || option.Type == KType.Number && type is "int" or "float";
+                if (!fits)
+                {
+                    Report(text.ToSource(argument.Value.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                        $"@drag: {option.Name}: takes a {option.Type}, and {value.Source.Value.Trim()} is {type}.");
+                }
+            }
+        }
+
         /// <summary>The expression inside <c>{ }</c> when the whole value is one, else the value as written.</summary>
         private static DecodedText Unbraced(DecodedText text)
         {

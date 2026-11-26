@@ -11,6 +11,21 @@ const liveDom = (() => {
         !next.hasAttribute("data-ks-live-replace") && !next.hasAttribute("data-ks-model-form"));
   }
 
+  // Classes the runtime puts on for a while (dragging, drag-settled) survive a redraw until it takes them off.
+  const held = new WeakMap();
+  function hold(el, name, on) {
+    if (!el) return;
+    let names = held.get(el);
+    if (on) {
+      if (!names) held.set(el, names = new Set());
+      names.add(name);
+      el.classList.add(name);
+    } else {
+      names?.delete(name);
+      el.classList.remove(name);
+    }
+  }
+
   function attributes(current, next) {
     for (const attr of Array.from(current.attributes))
       if (!next.hasAttributeNS(attr.namespaceURI, attr.localName))
@@ -18,6 +33,8 @@ const liveDom = (() => {
     for (const attr of next.attributes)
       if (current.getAttributeNS(attr.namespaceURI, attr.localName) !== attr.value)
         current.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+    const kept = held.get(current);
+    if (kept?.size) current.classList.add(...kept);
   }
 
   function children(current, next) {
@@ -80,7 +97,7 @@ const liveDom = (() => {
     if (next instanceof HTMLTextAreaElement && current.value !== next.value) current.value = next.value;
   }
 
-  return function (current, next) {
+  const morph = function (current, next) {
     if (!compatible(current, next)) {
       current.replaceWith(next);
       return next;
@@ -88,4 +105,6 @@ const liveDom = (() => {
     update(current, next);
     return current;
   };
+  morph.hold = hold;
+  return morph;
 })();

@@ -52,7 +52,6 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain(At("<span title=\"name @‸\"></span>", "@", fenced: true), i => i.Label == "@live-action");
             Assert.DoesNotContain(At("<span>hello @‸</span>", "@", fenced: true), i => i.Label == "@live-action");
             Assert.DoesNotContain(At("<input type=\"FILE\" ‸>", " ", fenced: true), i => i.Label == "@bind");
-            Assert.DoesNotContain(At("<span draggable=\"false\" ‸></span>", " ", fenced: true), i => i.Label == "@drag-value");
         }
 
         [Theory]
