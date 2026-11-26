@@ -110,5 +110,42 @@ namespace KScript.Language.Tests
             Assert.Contains("replace", methods);
             Assert.DoesNotContain("to_pdf", methods);
         }
+
+        [Theory]
+        [InlineData("@paper()->\u2038\n\n")]
+        [InlineData("echo @paper()->\u2038\n")]
+        [InlineData("x = @paper()->\u2038\n\n// below\n")]
+        public void An_unfinished_arrow_above_a_fn_keeps_the_fn_and_offers_only_its_type_methods(string above)
+        {
+            // The fn under an unfinished -> was read as the method's name, so @paper() had no type and every
+            // type's methods (a date's ->iso()) were offered.
+            var service = new KScript.Language.Features.LanguageService(files: KScript.Language.Analysis.EmptyFileSystem.Instance);
+            (string text, int offset) = TestHelpers.WithCaret("import KScript.Document\n\n" + above + "fn paper() => ```latex\n  \\section{Example}\n  ```\n");
+            var analysis = service.Analyze(text, "test.kscript");
+            Assert.Equal("latex", Assert.Single(analysis.Symbols, s => s.Name == "paper").ReturnShape.Type);
+            var methods = service.GetCompletions(analysis, offset).Select(item => item.Label).ToList();
+            Assert.Contains("save", methods);
+            Assert.Contains("replace", methods);
+            Assert.DoesNotContain("iso", methods);
+            Assert.DoesNotContain("upper", methods);
+        }
+
+        [Theory]
+        [InlineData("type Point {\n  x: int\n}\n", "type")]
+        [InlineData("enum Size { small, large }\n", "enum")]
+        [InlineData("fn hidden() {\n  return 1\n}\n", "fn")]
+        public void A_declaration_after_an_unfinished_arrow_starts_its_own_statement(string declaration, string element)
+        {
+            var doc = KScript.Syntax.Markup.CodeParser.Parse("$x->\n" + declaration);
+            Assert.Contains(doc.DescendantElements(), e => e.Name == element);
+        }
+
+        [Fact]
+        public void A_lambda_on_the_next_line_still_continues_the_value()
+        {
+            var service = new KScript.Language.Features.LanguageService(files: KScript.Language.Analysis.EmptyFileSystem.Instance);
+            var analysis = service.Analyze("double =\n  fn(x) => $x * 2\necho $double->call(2)\n", "test.kscript");
+            Assert.True(!analysis.Errors.Any(), string.Join("\n", analysis.Errors.Select(e => e.Message)));
+        }
     }
 }

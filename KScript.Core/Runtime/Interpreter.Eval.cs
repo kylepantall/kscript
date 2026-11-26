@@ -143,6 +143,10 @@ namespace KScript.Runtime
         /// </summary>
         public void RunHandler(DecodedText text, Scope scope, Module module)
         {
+            if (KScript.Syntax.Markup.ComponentScript.LabelledHandler(text?.Value) is (string label, string labelled, _))
+            {
+                throw new KScriptException(KScript.Syntax.Markup.ComponentScript.LabelledHandlerMessage(label, labelled), "Syntax") { Offset = text.ToSource(0), OffsetModule = module };
+            }
             ParseResult parsed = GetParse(module, text, ParseMode.Statements);
             if (parsed.Nodes.Count == 1 && parsed.Nodes[0] is VariableNode variable)
             {

@@ -29,6 +29,7 @@ public class ValueHandlerTests
             <button on-click="$add">Add</button>
             <button on-click="$label">Bad</button>
             <button on-click="$missing">Missing</button>
+            <button @on-click(toggle: $open)>Labelled</button>
             ```
           }
         }
@@ -72,6 +73,15 @@ public class ValueHandlerTests
         PageResult failed = Event(site, 2, site.Render("index.html").Body);
         Assert.Contains("flips a bool or calls a function", failed.Body);
         Assert.Contains("missing", Event(site, 3, site.Render("index.html").Body).Body);
+    }
+
+    [Fact]
+    public void A_page_handler_with_a_label_says_to_drop_it()
+    {
+        using var site = Site();
+        PageResult failed = Event(site, 4, site.Render("index.html").Body);
+        Assert.Contains("A handler takes no named arguments", failed.Body);
+        Assert.Contains("write just $open", failed.Body);
     }
 
     [Fact]

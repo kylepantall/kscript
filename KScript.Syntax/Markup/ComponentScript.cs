@@ -23,6 +23,29 @@ namespace KScript.Syntax.Markup
         public static string NestedOnlyInComponent(MarkupElement nested) =>
             $"Only a component can hold its own types, so {nested.Name} {nested.GetAttributeValue("name")?.Trim()} can't sit inside {nested.Parent.Name} {nested.Parent.GetAttributeValue("name")?.Trim()}. Give it its own file.";
 
+        #region Handlers
+
+        private static readonly System.Text.RegularExpressions.Regex LabelledValue =
+            new(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\$[A-Za-z_][A-Za-z0-9_]*)\s*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// A handler written as a label and one value, <c>@on-click(toggle: $open)</c>: handlers take no named
+        /// arguments, and one value is enough (a bool flips, a function is called). Null for any other handler.
+        /// <c>Value</c> is the offset and length of the value in <paramref name="handler"/>.
+        /// </summary>
+        public static (string Label, string Value, int ValueStart)? LabelledHandler(string handler)
+        {
+            if (handler == null) return null;
+            System.Text.RegularExpressions.Match m = LabelledValue.Match(handler);
+            return m.Success ? (m.Groups[1].Value, m.Groups[2].Value, m.Groups[2].Index) : null;
+        }
+
+        /// <summary>What to say about a <see cref="LabelledHandler"/>, at run time and in the editor.</summary>
+        public static string LabelledHandlerMessage(string label, string value) =>
+            $"A handler takes no named arguments, so drop '{label}:' and write just {value}. One value is enough: a bool flips and a function is called.";
+
+        #endregion
+
         #region Surfaces
 
         public const string RenderMethod = "render";

@@ -153,6 +153,22 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void A_labelled_handler_value_says_to_drop_the_label_and_offers_the_fix()
+        {
+            string text = Card1("<button @on-click(toggle: $open)>Flip</button>");
+            DocumentAnalysis analysis = Check("_components/flip-card.kscript", text);
+            Diagnostic problem = Assert.Single(analysis.Diagnostics);
+            Assert.Equal(DiagnosticCodes.StatementSyntax, problem.Code);
+            Assert.Equal("A handler takes no named arguments, so drop 'toggle:' and write just $open. One value is enough: a bool flips and a function is called.", problem.Message);
+            Assert.Equal("toggle: $open", text.Substring(problem.Span.Start, problem.Span.Length));
+            QuickFix fix = Assert.Single(problem.Fixes);
+            Assert.Equal("Change to $open", fix.Title);
+            TestHelpers.AssertClean(Check("_components/flip-card.kscript", AnalyzerTests.Apply(text, fix.Changes)));
+            // The value is still checked once the label is set aside.
+            Assert.Contains("$nope is not defined", Messages(Check("_components/flip-card.kscript", Card1("<button @on-click(toggle: $nope)>Flip</button>"))));
+        }
+
+        [Fact]
         public void A_window_handler_can_be_a_bool_or_a_function()
         {
             const string window = """

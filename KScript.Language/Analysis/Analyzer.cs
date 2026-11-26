@@ -1026,6 +1026,15 @@ namespace KScript.Language.Analysis
                     // $event (value, checked, key) describes the browser event the handler runs for.
                     Scope handlerScope = new Scope(scope, e.Span);
                     handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    if (ComponentScript.LabelledHandler(attr.ValueText) is (string label, string value, int valueStart))
+                    {
+                        // @on-click(toggle: $open): one value is the whole handler, so the label goes.
+                        TextSpan labelled = attr.Value.ToSource(TextSpan.FromBounds(attr.ValueText.Length - attr.ValueText.TrimStart().Length, valueStart + value.Length));
+                        Report(labelled, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax, ComponentScript.LabelledHandlerMessage(label, value),
+                            new[] { new QuickFix($"Change to {value}", new TextChange(labelled, value)) });
+                        AnalyzeStatements(new DecodedText(value, Enumerable.Range(valueStart, value.Length + 1).Select(attr.Value.ToSource).ToArray()), e, attr, handlerScope, declare: false, requireEffect: true);
+                        continue;
+                    }
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                 }
                 else if (component == null && attr.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
