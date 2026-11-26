@@ -30,6 +30,12 @@ namespace KScript.Compile
         /// <summary>Where kscript keeps the runtimes it downloads for other platforms.</summary>
         public string RuntimeCache { get; set; } = DefaultCache();
         public HttpMessageHandler Handler { get; set; } = new HttpClientHandler();
+        /// <summary>
+        /// True for a kscript built from the repository (dotnet build): its assemblies are files on disk, which a
+        /// release (one binary) never has. Its version number may match a release that its code does not, so it
+        /// downloads no runtime.
+        /// </summary>
+        public bool DevelopmentBuild { get; set; } = !string.IsNullOrEmpty(SelfUpdater.AssemblyLocation());
         /// <summary>Seals a Mac app with Apple's codesign, which only exists on a Mac. Returns an error or null.</summary>
         public Func<string, string> Codesign { get; set; } = OperatingSystem.IsMacOS() ? RunCodesign : null;
 
@@ -134,9 +140,9 @@ namespace KScript.Compile
             try
             {
                 if (!string.Equals(to, "exe", StringComparison.OrdinalIgnoreCase))
-                    throw new CompileException($"kscript compile --to {to} isn't available yet. Programs (--to exe, the default) are; compiling to other languages is on the roadmap (docs/roadmap.md).");
+                    throw new CompileException($"kscript compile --to {to} isn't available yet. Programs (--to exe, the default) are; compiling to other languages is on the roadmap (docs/roadmap.md).") { Usage = true };
                 List<Target> targets = ParseTargets(targetText, env.HostRuntime);
-                if (runtime != null && targets.Count != 1) throw new CompileException("--runtime is the kscript for one platform, so it needs exactly one --target.");
+                if (runtime != null && targets.Count != 1) throw new CompileException("--runtime is the kscript for one platform, so it needs exactly one --target.") { Usage = true };
 
                 ProgramPlan plan = Plan(source, name, outDir, output, out string sourceFolder);
                 outDir = Path.GetFullPath(outDir ?? Path.Combine(sourceFolder, "dist"));
@@ -158,7 +164,7 @@ namespace KScript.Compile
             catch (CompileException ex)
             {
                 KScript.Runtime.ErrorReport.Write(error, ex);
-                return 1;
+                return ex.Usage ? ExitCodes.Usage : ExitCodes.Failed;
             }
             catch (ProjectConfigException ex)
             {
@@ -182,7 +188,7 @@ namespace KScript.Compile
         {
             output.WriteLine("Usage: kscript compile [script or project folder] [--target name[,name]] [--out folder] [--name \"My App\"]");
             output.WriteLine();
-            output.WriteLine("Builds a program that runs without kscript: a terminal script, a <KScript.Window> desktop app, or a");
+            output.WriteLine("Builds a program that runs without kscript: a terminal script, a desktop app (a Window block), or a");
             output.WriteLine("kscript serve site. It holds the script, its imports and files, and only the packages it uses.");
             output.WriteLine();
             output.WriteLine("  --target    " + string.Join(", ", Targets.Select(t => t.Name)) + ", or all (default: this computer).");
@@ -192,7 +198,7 @@ namespace KScript.Compile
             output.WriteLine("  --runtime   A kscript release binary or archive for the target, instead of downloading one.");
             output.WriteLine("  --to        exe (the default). Other languages are planned; see docs/roadmap.md.");
             output.WriteLine();
-            output.WriteLine("With no script, kscript.json names it: { \"app\": { \"main\": \"app.ks.xml\", \"name\": \"My App\", \"icon\": \"icon.png\" } }.");
+            output.WriteLine("With no script, kscript.json names it: { \"app\": { \"main\": \"app.kscript\", \"name\": \"My App\", \"icon\": \"icon.png\" } }.");
             output.WriteLine("A project without app.main but with pages compiles to a program that serves the site.");
         }
 
@@ -208,7 +214,7 @@ namespace KScript.Compile
             if (string.IsNullOrWhiteSpace(text))
             {
                 Target host = Targets.FirstOrDefault(t => t.Runtime == hostRuntime)
-                    ?? throw new CompileException("There's no kscript release for this computer, so pick a --target: " + string.Join(", ", Targets.Select(t => t.Name)) + ".");
+                    ?? throw new CompileException("There's no kscript release for this computer, so pick a --target: " + string.Join(", ", Targets.Select(t => t.Name)) + ".") { Usage = true };
                 return new List<Target> { host };
             }
             var list = new List<Target>();
@@ -221,7 +227,7 @@ namespace KScript.Compile
                 }
                 string canonical = Aliases.TryGetValue(part, out string alias) ? alias : part;
                 Target target = Targets.FirstOrDefault(t => t.Name.Equals(canonical, StringComparison.OrdinalIgnoreCase))
-                    ?? throw new CompileException($"There's no target '{part}'. Targets: {string.Join(", ", Targets.Select(t => t.Name))}, or all.");
+                    ?? throw new CompileException($"There's no target '{part}'. Targets: {string.Join(", ", Targets.Select(t => t.Name))}, or all.") { Usage = true };
                 list.Add(target);
             }
             return list.Distinct().ToList();
@@ -237,16 +243,16 @@ namespace KScript.Compile
 
             var plan = new ProgramPlan();
             string script = source != null && File.Exists(source) ? Path.GetFullPath(source) : null;
-            if (source != null && script == null && !Directory.Exists(source)) throw new CompileException($"There is no script or folder at '{source}'.");
+            if (source != null && script == null && !Directory.Exists(source)) throw new CompileException($"There is no script or folder at '{source}'.") { Usage = true };
             if (script == null && project?.App.Main != null) script = Path.GetFullPath(Path.Combine(project.Directory, project.App.Main));
-            if (script != null && !File.Exists(script)) throw new CompileException($"app.main: there is no script at '{script}'.");
+            if (script != null && !File.Exists(script)) throw new CompileException($"app.main: there is no script at '{script}'.") { Usage = true };
 
             string siteRoot = null;
             if (script == null)
             {
                 siteRoot = project != null ? project.SiteRoot : Path.GetFullPath(source ?? ".");
-                if (!LooksLikeSite(siteRoot))
-                    throw new CompileException("Which script? Run kscript compile <script>, or add \"app\": { \"main\": \"app.ks.xml\" } to kscript.json.");
+                if (!LooksLikeSite(siteRoot, project))
+                    throw new CompileException("Which script? Run kscript compile <script>, or add \"app\": { \"main\": \"app.kscript\" } to kscript.json.") { Usage = true };
             }
 
             // Everything in the project (or, without one, the script's or site's folder) goes in, so imports and data work.
@@ -309,14 +315,23 @@ namespace KScript.Compile
             if (project?.App.Icon != null)
             {
                 plan.IconPath = Path.GetFullPath(Path.Combine(project.Directory, project.App.Icon));
-                if (!File.Exists(plan.IconPath)) throw new CompileException($"app.icon: there is no file at '{plan.IconPath}'.");
+                if (!File.Exists(plan.IconPath)) throw new CompileException($"app.icon: there is no file at '{plan.IconPath}'.") { Usage = true };
             }
             return plan;
         }
 
-        private static bool LooksLikeSite(string folder) =>
-            Directory.Exists(folder) && Directory.EnumerateFiles(folder).Select(Path.GetFileName)
-                .Any(f => f.StartsWith("index.", StringComparison.OrdinalIgnoreCase) || f.StartsWith("routes.", StringComparison.OrdinalIgnoreCase) || f.StartsWith("api.", StringComparison.OrdinalIgnoreCase));
+        /// <summary>
+        /// True for a folder kscript serve has something to serve from: an index page, or the route files kscript serve
+        /// reads (http.routes in kscript.json, else routes, api, routes/web and routes/api).
+        /// </summary>
+        internal static bool LooksLikeSite(string folder, ProjectConfig project)
+        {
+            if (!Directory.Exists(folder)) return false;
+            if (Directory.EnumerateFiles(folder).Select(Path.GetFileName).Any(f => f.StartsWith("index.", StringComparison.OrdinalIgnoreCase))) return true;
+            IEnumerable<string> routes = project?.Http.Routes?.Select(r => Path.Combine(folder, r.File))
+                ?? HttpSettings.DefaultRouteNames.SelectMany(name => ScriptFiles.Extensions.Select(ext => Path.Combine(folder, name + ext)));
+            return routes.Any(File.Exists);
+        }
 
         /// <summary>Adds the packages that the chosen packages always import.</summary>
         private static void AddRequired(SortedSet<string> packages)
@@ -465,7 +480,7 @@ namespace KScript.Compile
         internal static string SafeName(string name)
         {
             string cleaned = new string((name ?? "").Where(c => !Path.GetInvalidFileNameChars().Contains(c) && c != '/' && c != '\\' && c != ':' && c != '*' && c != '?' && c != '"' && c != '<' && c != '>' && c != '|').ToArray()).Trim();
-            if (cleaned.Length == 0) throw new CompileException($"'{name}' can't be used as a program name.");
+            if (cleaned.Length == 0) throw new CompileException($"'{name}' can't be used as a program name.") { Usage = true };
             return cleaned;
         }
 
@@ -499,7 +514,7 @@ namespace KScript.Compile
         public string FromFile(string path, CompileCommand.Target target)
         {
             path = Path.GetFullPath(path);
-            if (!File.Exists(path)) throw new CompileException($"--runtime: there is no file at '{path}'.");
+            if (!File.Exists(path)) throw new CompileException($"--runtime: there is no file at '{path}'.") { Usage = true };
             if (!path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && !path.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) return path;
             string extracted = Path.Combine(Path.GetTempPath(), "kscript-runtime-" + Guid.NewGuid().ToString("N"), BinaryName(target));
             Directory.CreateDirectory(Path.GetDirectoryName(extracted));
@@ -514,11 +529,13 @@ namespace KScript.Compile
             string version = env.Version;
             string cached = Path.Combine(env.RuntimeCache, version, target.Runtime, BinaryName(target));
             if (File.Exists(cached)) return cached;
-            if (!SelfUpdater.TryParseVersion(version, out Version parsed) || parsed == new Version(0, 0, 0) || version.Contains("-dev", StringComparison.Ordinal))
+            if (env.DevelopmentBuild || !SelfUpdater.TryParseVersion(version, out Version parsed) || parsed == new Version(0, 0, 0) || version.Contains("-dev", StringComparison.Ordinal))
                 throw new CompileException($"This kscript is a development build ({version}), so there's no release to get the {target.Name} kscript from. Use a release kscript, or pass --runtime with a kscript built for {target.Name}.");
 
             string asset = SelfUpdater.RuntimeAssetName(target.Runtime);
             string url = $"https://github.com/{env.Repository}/releases/download/v{version}/{asset}";
+            if (!string.Equals(env.Repository, SelfUpdater.DefaultRepository, StringComparison.OrdinalIgnoreCase))
+                new KScript.Output.CliOutput(log).Info($"Using releases from {env.Repository} (KSCRIPT_REPO).");
             new KScript.Output.CliOutput(log).Info($"Downloading kscript {version} for {target.Name} (once; kept in {env.RuntimeCache})");
             using var client = new HttpClient(env.Handler, disposeHandler: false);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("kscript-compile");
@@ -526,9 +543,32 @@ namespace KScript.Compile
             if (!response.IsSuccessStatusCode)
                 throw new CompileException($"Couldn't download {url} ({(int)response.StatusCode}). kscript {version} may have no release for {target.Name}.");
 
+            // The archive is checked against the release's SHA256SUMS before anything in it is used.
+            byte[] bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            using (HttpResponseMessage sums = client.GetAsync($"https://github.com/{env.Repository}/releases/download/v{version}/{Checksums.FileName}").GetAwaiter().GetResult())
+            {
+                if (sums.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        Checksums.Verify(bytes, asset, sums.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+                    }
+                    catch (ChecksumException ex)
+                    {
+                        throw new CompileException(ex.Message);
+                    }
+                }
+                else if (sums.StatusCode != System.Net.HttpStatusCode.NotFound)
+                    throw new CompileException($"Couldn't download the checksums of kscript {version} ({(int)sums.StatusCode}), so the download can't be checked. Try again.");
+                else if (Checksums.Required(version))
+                    throw new CompileException(Checksums.Missing("v" + version));
+                else
+                    new KScript.Output.CliOutput(log).Info(Checksums.Unchecked("v" + version));
+            }
+
             Directory.CreateDirectory(Path.GetDirectoryName(cached));
             string staged = cached + ".download";
-            using (Stream archive = response.Content.ReadAsStream()) Extract(archive, asset, staged);
+            using (Stream archive = new MemoryStream(bytes)) Extract(archive, asset, staged);
             File.Move(staged, cached, overwrite: true);
             return cached;
         }

@@ -149,9 +149,10 @@ namespace KScript.Auth
 
         /// <summary>
         /// The user whose email and password these are, or null. It takes about as long when there is no such user,
-        /// so the time doesn't tell anyone which emails have accounts. A hash made with older settings is made again.
+        /// so the time doesn't tell anyone which emails have accounts. A hash made with older settings is made again,
+        /// with the password's own algorithm or else <paramref name="algorithm"/> (the project's), or argon2id.
         /// </summary>
-        public Dictionary<string, object> Verify(object email, object password)
+        public Dictionary<string, object> Verify(object email, object password, string algorithm = null)
         {
             string address = email is ISemanticText t ? t.Text : AuthApp.Text(email);
             PasswordValue secret = password as PasswordValue;
@@ -165,9 +166,10 @@ namespace KScript.Auth
                 return null;
             }
             if (!secret.Verify(stored)) return null;
-            if (PasswordValue.NeedsRehash(stored))
+            algorithm = (secret.Algorithm ?? algorithm ?? "argon2id").Trim().ToLowerInvariant();
+            if (PasswordValue.NeedsRehash(stored, algorithm))
             {
-                record[HashField] = secret.Hash(null);
+                record[HashField] = secret.Hash(algorithm);
                 App.Users.Put(AuthApp.Text(record["id"]), record);
             }
             return Show(record);
@@ -294,7 +296,7 @@ namespace KScript.Auth
             "find_email" => Show(RecordByEmail(c.Arg(0) is ISemanticText t ? t.Text : c.Str(0))),
             "all" => All(),
             "count" => (double)Count(),
-            "verify" => Verify(c.Arg(0), c.Arg(1)),
+            "verify" => Verify(c.Arg(0), c.Arg(1), PasswordValue.ProjectAlgorithm(c.Module)),
             "update" => Update(c, IdOf(c.Arg(0), "->update()"), Fields(c, 1)),
             "set_password" => SetPassword(c, IdOf(c.Arg(0), "->set_password()"), c.Arg(1)),
             _ => Delete(IdOf(c.Arg(0), "->delete()")),

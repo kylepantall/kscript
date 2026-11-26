@@ -124,8 +124,23 @@ namespace KScript.Queueing
         }
 
         /// <summary>Runs <c>fn handle()</c> for a job, with its fields (and $this and $job) as variables.</summary>
-        internal object RunHandle(Interpreter interpreter, JobValue job, Dictionary<string, object> context) =>
-            RunMethod(interpreter, Handle, "handle", job, context, Array.Empty<object>());
+        internal object RunHandle(Interpreter interpreter, JobValue job, Dictionary<string, object> context)
+        {
+            handles.Value++;
+            try
+            {
+                return RunMethod(interpreter, Handle, "handle", job, context, Array.Empty<object>());
+            }
+            finally
+            {
+                handles.Value--;
+            }
+        }
+
+        private static readonly AsyncLocal<int> handles = new AsyncLocal<int>();
+
+        /// <summary>True while a job's handle runs here: @release_job() and @fail_job() only mean something there.</summary>
+        internal static bool InHandle => handles.Value > 0;
 
         /// <summary>Runs <c>fn failed(err)</c> when a job has used up its tries; nothing happens without one.</summary>
         internal void RunFailed(Interpreter interpreter, JobValue job, Dictionary<string, object> context, KScriptException error)
@@ -219,7 +234,6 @@ namespace KScript.Queueing
             value = name switch
             {
                 "jobs" => Jobs.Cast<object>().ToList(),
-                "count" => (double)Jobs.Count,
                 _ => null,
             };
             return value != null;
@@ -232,6 +246,9 @@ namespace KScript.Queueing
                 case "dispatch":
                     Dispatcher.NeedsImport(call, "->dispatch()");
                     result = Dispatcher.Dispatch(call, Jobs, DispatchOptions.From(call, 0));
+                    return true;
+                case "count":
+                    result = (double)Jobs.Count;
                     return true;
                 case "run":
                     foreach (JobValue job in Jobs) Dispatcher.RunHere(call.Interpreter, job);
@@ -274,10 +291,14 @@ namespace KScript.Queueing
                     _ => throw new KScriptException($"at: should be a date, such as @now()->add(hours: 1), not {Values.Describe(at)}.", "Argument"),
                 };
             }
-            if (call.Arg(first + 2, "queue") is object q) options.Queue = Values.ToStr(q).Trim();
-            if (call.Arg(first + 3, "connection") is object c) options.Connection = Values.ToStr(c).Trim();
+            if (call.Arg(first + 2, "queue") is object q) options.Queue = NonEmpty("queue", Values.ToStr(q));
+            if (call.Arg(first + 3, "connection") is object c) options.Connection = NonEmpty("connection", Values.ToStr(c));
             return options;
         }
+
+        /// <summary>A queue or connection name given to dispatch: a job's own options refuse an empty one too.</summary>
+        private static string NonEmpty(string option, string value) =>
+            string.IsNullOrWhiteSpace(value) ? throw new KScriptException($"->dispatch() {option}: can't be empty.", "Argument") : value.Trim();
     }
 
     /// <summary>@release_job(after:) in a handle: put the job back without using up a try.</summary>

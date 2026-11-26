@@ -10,14 +10,27 @@ namespace KScript.Mathematics
     /// <summary>KScript.Math: roots, powers, trigonometry, logarithms, random numbers and statistics.</summary>
     public sealed class MathPackage : KScriptPackage
     {
-        private static readonly Random Shared = new Random();
-        private static Random seeded;
+        /// <summary>Where a host keeps the generator @random_seed made, so one run's seed never reaches another's.</summary>
+        private const string SeededKey = "KScript.Math.Seeded";
+
+        /// <summary>The largest whole number a number holds exactly (2 to the power 53).</summary>
+        private const double LargestWhole = 9007199254740992d;
 
         public override string Name => "KScript.Math";
 
         public override string Description => "Roots, powers, trigonometry, logarithms, random numbers and statistics.";
 
-        private static Random Rng => seeded ?? Shared;
+        /// <summary>The run's seeded generator, or the shared one, which is safe to use from many requests at once.</summary>
+        private static Random Rng(CallContext c) => c.Host.Items.GetValueOrDefault(SeededKey) as Random ?? Random.Shared;
+
+        /// <summary>A whole number argument (a fraction is dropped), refused when it is too large to be held exactly.</summary>
+        private static long Whole(CallContext c, int index)
+        {
+            double value = c.Num(index);
+            if (double.IsNaN(value) || M.Abs(value) > LargestWhole)
+                throw c.Error($"{c.Display} works with whole numbers up to {Values.FormatNumber(LargestWhole)}, but got {Values.FormatNumber(value)}.", "Argument");
+            return (long)value;
+        }
 
         protected override void Register(PackageBuilder p)
         {
@@ -28,7 +41,7 @@ namespace KScript.Mathematics
             One(p, "sqrt", "The square root.", M.Sqrt, "<echo>{ @sqrt(2) }</echo>");
             One(p, "cbrt", "The cube root.", M.Cbrt);
             One(p, "abs", "The number without its sign.", M.Abs);
-            One(p, "sign", "-1, 0 or 1.", x => M.Sign(x));
+            One(p, "sign", "-1, 0 or 1.", x => double.IsNaN(x) ? double.NaN : M.Sign(x));
             One(p, "exp", "e to the power of the number.", M.Exp);
             One(p, "sin", "The sine of an angle in radians.", M.Sin);
             One(p, "cos", "The cosine of an angle in radians.", M.Cos);
@@ -61,11 +74,14 @@ namespace KScript.Mathematics
                 if (min > max) throw c.Error($"@clamp() needs min ({min}) to be at most max ({max}).", "Argument");
                 return M.Clamp(c.Num(0), min, max);
             });
-            p.Command("gcd", "a, b", "The greatest common divisor of two whole numbers.", KType.Number, c => (double)Gcd((long)c.Num(0), (long)c.Num(1)));
+            p.Command("gcd", "a, b", "The greatest common divisor of two whole numbers.", KType.Number, c => (double)Gcd(Whole(c, 0), Whole(c, 1)));
             p.Command("lcm", "a, b", "The least common multiple of two whole numbers.", KType.Number, c =>
             {
-                long a = (long)c.Num(0), b = (long)c.Num(1);
-                return a == 0 || b == 0 ? 0d : (double)M.Abs(a / Gcd(a, b) * b);
+                long a = Whole(c, 0), b = Whole(c, 1);
+                if (a == 0 || b == 0) return 0d;
+                double multiple = M.Abs((double)(a / Gcd(a, b)) * b);
+                if (multiple > LargestWhole) throw c.Error($"The least common multiple of {a} and {b} is too large to hold exactly.", "Math");
+                return multiple;
             });
             p.Command("factorial", "n", "n! for a whole number from 0 to 170.", KType.Number, c =>
             {
@@ -78,30 +94,30 @@ namespace KScript.Mathematics
 
             p.Command("random", "low?, high?", "A random number: from 0 up to 1 with no arguments, or a whole number from low to high (both included).", KType.Number, c =>
             {
-                if (!c.Has(0)) return Rng.NextDouble();
-                long low = c.Has(1) ? (long)c.Num(0) : 0, high = c.Has(1) ? (long)c.Num(1) : (long)c.Num(0);
+                if (!c.Has(0)) return Rng(c).NextDouble();
+                long low = c.Has(1) ? Whole(c, 0) : 0, high = c.Has(1) ? Whole(c, 1) : Whole(c, 0);
                 if (low > high) throw c.Error($"@random() needs low ({low}) to be at most high ({high}).", "Argument");
-                return (double)Rng.NextInt64(low, high + 1);
+                return (double)Rng(c).NextInt64(low, high + 1);
             }, "<let name=\"roll\" value=\"@random(1, 6)\" />");
             p.Command("random_bytes", "count: number, format?: string", "Generates 1 to 65536 bytes with the operating system's cryptographic random generator. Returns lowercase hex by default, or unpadded base64url.",
                 KType.String, RandomBytes, "@random_bytes(16, format: 'hex')->count()");
             p.Command("random_seed", "seed", "Makes @random(), @pick() and @shuffle() repeat the same sequence, for tests.", KType.Null, c =>
             {
-                seeded = new Random(c.Int(0));
+                c.Host.Items[SeededKey] = new Random(c.Int(0));
                 return null;
             });
             p.Command("pick", "list", "A random item from a list.", KType.Any, c =>
             {
                 List<object> list = c.List(0);
                 if (list.Count == 0) throw c.Error("@pick() needs a list with at least one item.", "Argument");
-                return list[Rng.Next(list.Count)];
+                return list[Rng(c).Next(list.Count)];
             });
             p.Command("shuffle", "list", "A copy of a list in random order.", KType.List, c =>
             {
                 var copy = new List<object>(c.List(0));
                 for (int i = copy.Count - 1; i > 0; i--)
                 {
-                    int j = Rng.Next(i + 1);
+                    int j = Rng(c).Next(i + 1);
                     (copy[i], copy[j]) = (copy[j], copy[i]);
                 }
                 return copy;

@@ -30,6 +30,8 @@ namespace KScript.Language.Features
             ["match"] = "match ${1:\\$value} {\n\t$0\n}",
             ["type"] = "type ${1:Name} {\n\t${2:field}: ${3:string}\n}",
             ["enum"] = "enum ${1:Name} { ${2:a}, ${3:b} }",
+            ["error"] = "error ${1:Name} {\n\t$0\n}",
+            ["extend"] = "extend ${1:string} {\n\tfn ${2:name}() => $0\n}",
             ["echo"] = "echo $0",
             ["return"] = "return $0",
             ["throw"] = "throw \"$0\"",
@@ -38,7 +40,7 @@ namespace KScript.Language.Features
         };
 
         /// <summary>Elements a .kscript statement can't start with: they're written another way (x = 3, name: type).</summary>
-        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field", "case", "default" };
+        private static readonly HashSet<string> NotCodeStatements = new HashSet<string> { "kscript", "do", "let", "set", "field", "case", "default", "call" };
 
         /// <summary>Words after which an expression starts (<c>echo ‸</c>, <c>if ‸</c>, <c>$a and ‸</c>).</summary>
         private static readonly HashSet<string> ExpressionKeywordsBefore = new HashSet<string>

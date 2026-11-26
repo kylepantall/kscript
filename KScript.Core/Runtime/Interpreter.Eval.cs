@@ -429,12 +429,15 @@ namespace KScript.Runtime
                 case MatchNode match:
                 {
                     object subject = Evaluate(match.Subject, scope, ctx);
+                    // As in a match statement, $it is the value being matched.
+                    Scope arms = scope.Child();
+                    arms.Declare("it", subject);
                     foreach (MatchArmNode arm in match.Arms)
                     {
-                        if ((arm.Patterns.Count == 0 || arm.Patterns.Any(p => Matches(subject, p, scope, ctx)))
-                            && (arm.Guard == null || Values.Truthy(Evaluate(arm.Guard, scope, ctx))))
+                        if ((arm.Patterns.Count == 0 || arm.Patterns.Any(p => Matches(subject, p, arms, ctx)))
+                            && (arm.Guard == null || Values.Truthy(Evaluate(arm.Guard, arms, ctx))))
                         {
-                            return Evaluate(arm.Result, scope, ctx);
+                            return Evaluate(arm.Result, arms, ctx);
                         }
                     }
                     return null;
@@ -514,7 +517,11 @@ namespace KScript.Runtime
             {
                 // A bare word (downloads, recursive, not recursive) means something only to the parameter it lands on.
                 object value = TextAsWritten(a.Value, callName) ?? BareWordOf(a.Value, scope, ctx, afterNamed: named != null && a.Name == null) ?? BareListOf(a.Value, scope, ctx) ?? Evaluate(a.Value, scope, ctx);
-                if (a.Name != null) (named ??= new Dictionary<string, object>(StringComparer.Ordinal))[a.Name] = value;
+                if (a.Name != null)
+                {
+                    named ??= new Dictionary<string, object>(StringComparer.Ordinal);
+                    if (!named.TryAdd(a.Name, value)) throw Fail(a.Value, ctx, $"'{a.Name}' is given twice.", "Argument");
+                }
                 else if (named != null && !(value is BareWord)) args.Add(new LatePositional(value));
                 else args.Add(value);
             }
@@ -608,11 +615,11 @@ namespace KScript.Runtime
             double step = by != null ? Values.ToNumber(by, "The step of a range") : (end >= start ? 1 : -1);
             if (step == 0) throw Fail(range, ctx, "A range can't have a step of 0.", "Argument");
             var list = new List<object>();
-            for (double x = start; step > 0 ? x < end : x > end; x += step)
-            {
-                list.Add(x);
-                if (list.Count > 10_000_000) throw Fail(range, ctx, "The range is too large (more than 10 million numbers).", "Limit");
-            }
+            // Each number is worked out from the start, so a step such as 0.1 doesn't drift past the end.
+            double span = (end - start) / step;
+            double count = Math.Ceiling(span - Math.Abs(span) * 1e-12);
+            if (double.IsNaN(count) || count > 10_000_000) throw Fail(range, ctx, "The range is too large (more than 10 million numbers).", "Limit");
+            for (int i = 0; i < count; i++) list.Add(start + i * step);
             return list;
         }
 
@@ -626,16 +633,7 @@ namespace KScript.Runtime
                     return Values.Truthy(Evaluate(bin.Left, scope, ctx)) || Values.Truthy(Evaluate(bin.Right, scope, ctx));
                 case "??":
                 {
-                    object left;
-                    try
-                    {
-                        left = Evaluate(bin.Left, scope, ctx);
-                    }
-                    catch (KScriptException ex) when ((ex.Type == "Name" || ex.Type == "Null") && (bin.Left is VariableNode || bin.Left is MemberNode))
-                    {
-                        // $maybe ?? 'default' works when $maybe was never declared.
-                        left = null;
-                    }
+                    object left = bin.Left is VariableNode or MemberNode ? EvaluateOrNull(bin.Left, scope, ctx) : Evaluate(bin.Left, scope, ctx);
                     return left ?? Evaluate(bin.Right, scope, ctx);
                 }
                 case ".":
@@ -658,6 +656,54 @@ namespace KScript.Runtime
             object b = Evaluate(bin.Right, scope, ctx);
             return Binary(bin.Operator, a, b, bin, ctx);
         }
+
+        /// <summary>
+        /// The left of ??: a variable that was never declared, or a field read through null, gives null
+        /// ($maybe ?? 'default', $user.address.city ?? '-'). A call in the chain runs as usual, so an error
+        /// inside the function it calls is still reported.
+        /// </summary>
+        private object EvaluateOrNull(ExprNode node, Scope scope, EvalContext ctx)
+        {
+            ExprNode root = node;
+            while (root is MemberNode or IndexNode) root = root is MemberNode m ? m.Target : ((IndexNode)root).Target;
+            if (root is CommandCallNode or CallNode or MethodCallNode)
+            {
+                switch (node)
+                {
+                    case MemberNode member:
+                    {
+                        object target = EvaluateOrNull(member.Target, scope, ctx);
+                        if (target == null) return null;
+                        try
+                        {
+                            return GetMember(target, member.Name, member, ctx);
+                        }
+                        catch (KScriptException ex) when (ex.Type == "Name")
+                        {
+                            return null;
+                        }
+                    }
+                    case IndexNode index:
+                    {
+                        object target = EvaluateOrNull(index.Target, scope, ctx);
+                        return target == null ? null : GetIndex(target, Evaluate(index.Index, scope, ctx), index, ctx);
+                    }
+                    default:
+                        return Evaluate(node, scope, ctx);
+                }
+            }
+            try
+            {
+                return Evaluate(node, scope, ctx);
+            }
+            catch (KScriptException ex) when ((ex.Type == "Name" || ex.Type == "Null") && node is VariableNode or MemberNode)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>The longest text 'ab' * n makes.</summary>
+        private const int MaxRepeatedLength = 100_000_000;
 
         private object HandleCompare(BinaryNode bin, object other, CommandCallNode word, EvalContext ctx)
         {
@@ -690,10 +736,10 @@ namespace KScript.Runtime
                 case "!=": return !Values.LooseEquals(a, b);
                 case "===": return Values.StrictEquals(a, b);
                 case "!==": return !Values.StrictEquals(a, b);
-                case "<": return Values.CompareRelation(a, b, "lt") < 0;
-                case "<=": return Values.CompareRelation(a, b, "le") <= 0;
-                case ">": return Values.CompareRelation(a, b, "gt") > 0;
-                case ">=": return Values.CompareRelation(a, b, "ge") >= 0;
+                case "<": return Values.CompareRelation(a, b, "<") < 0;
+                case "<=": return Values.CompareRelation(a, b, "<=") <= 0;
+                case ">": return Values.CompareRelation(a, b, ">") > 0;
+                case ">=": return Values.CompareRelation(a, b, ">=") >= 0;
                 case "in":
                     return b switch
                     {
@@ -713,14 +759,18 @@ namespace KScript.Runtime
                         return merged;
                     }
                     if (a is string || b is string) return Values.ToStr(a) + Values.ToStr(b);
-                    if (a is DateTime date && b is double days) return date.AddDays(days);
+                    if (a is DateTime date && b is double days) return Values.ShiftDate(() => date.AddDays(days));
                     return Values.ToNumber(a, $"'+'{where}") + Values.ToNumber(b, $"'+'{where}");
                 case "-":
                     if (a is DateTime d1 && b is DateTime d2) return (d1 - d2).TotalDays;
-                    if (a is DateTime d3 && b is double n) return d3.AddDays(-n);
+                    if (a is DateTime d3 && b is double n) return Values.ShiftDate(() => d3.AddDays(-n));
                     return Values.ToNumber(a, $"'-'{where}") - Values.ToNumber(b, $"'-'{where}");
                 case "*":
-                    if (a is string rs && b is double times) return string.Concat(Enumerable.Repeat(rs, Math.Max(0, (int)times)));
+                    if (a is string rs && b is double times)
+                    {
+                        if (times * rs.Length > MaxRepeatedLength) throw Fail(node, ctx, $"Repeating the text {Values.FormatNumber(times)} times would make it too long.", "Limit");
+                        return double.IsNaN(times) || times < 1 ? string.Empty : string.Concat(Enumerable.Repeat(rs, (int)times));
+                    }
                     return Values.ToNumber(a, $"'*'{where}") * Values.ToNumber(b, $"'*'{where}");
                 case "/":
                 {
@@ -810,7 +860,10 @@ namespace KScript.Runtime
                 {
                     int i = Values.ToInt(key, "A text index");
                     if (i < 0) i += s.Length;
-                    return i >= 0 && i < s.Length ? s[i].ToString() : null;
+                    if (i < 0 || i >= s.Length) return null;
+                    // Either half of a character that takes two places gives the whole character, never half of one.
+                    if (char.IsLowSurrogate(s[i]) && i > 0 && char.IsHighSurrogate(s[i - 1])) return s.Substring(i - 1, 2);
+                    return char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1]) ? s.Substring(i, 2) : s[i].ToString();
                 }
                 case IKObject obj when obj.TryGetMember(Values.ToStr(key), out object field):
                     return field;
@@ -1044,6 +1097,12 @@ namespace KScript.Runtime
                 {
                     // filter(...) after a pipe is a method of the value; slugify() is a function or command.
                     if (scope.TryGet(id.Name, out object stored) && Values.Unwrap(stored) is ICallable fn) return Call(fn, args, named, scope, ctx.Module);
+                    // Repo($data), Repo(name: 'x'), Email('a@b.co'), Size('small'): calling a type makes a value of it. A type the
+                    // script declares wins over a built-in error type of the same name (type Config, type Name).
+                    if (stored is RecordType or RefinedType or EnumType)
+                    {
+                        return Construct(stored, args, named, scope, ctx);
+                    }
                     // NotFound(id: 42) makes an error, for throw.
                     if (!piped && ErrorTypes.FindExact(id.Name, scope) is ErrorType error)
                     {
@@ -1055,11 +1114,6 @@ namespace KScript.Runtime
                         {
                             throw Fail(call, ctx, ex.Words, ex.Type);
                         }
-                    }
-                    // Repo($data), Repo(name: 'x'), Email('a@b.co'), Size('small'): calling a type makes a value of it.
-                    if (stored is RecordType or RefinedType or EnumType)
-                    {
-                        return Construct(stored, args, named, scope, ctx);
                     }
                     if (!piped && id.Name == SemanticTypes.Uuid)
                         throw Fail(call, ctx, "Use 'value as uuid' to validate text as a UUID. Use @uuid() to generate a UUID.", "Argument");

@@ -311,8 +311,10 @@ namespace KScript.Syntax
                 }
             }
 
-            Position++;
-            return new Token(TokenKind.Error, c.ToString(), new TextSpan(start, 1), $"Unexpected character '{c}'.");
+            // A character outside the basic plane (an emoji) is two code units: report it whole.
+            Position += char.IsHighSurrogate(c) && Position + 1 < end && char.IsLowSurrogate(text[Position + 1]) ? 2 : 1;
+            string unexpected = text.Substring(start, Position - start);
+            return new Token(TokenKind.Error, unexpected, new TextSpan(start, unexpected.Length), $"Unexpected character '{unexpected}'.");
         }
 
         /// <summary>
@@ -358,8 +360,47 @@ namespace KScript.Syntax
             int pathEnd = SlashPathEnd(text, start, end);
             if (pathEnd < 0) return -1;
             int regexEnd = RegexEnd(text, start, end);
-            if (regexEnd > 0 && pathEnd <= regexEnd && RegexFlagsAreReal(text.Substring(start, regexEnd - start))) return -1;
+            if (regexEnd > 0 && pathEnd <= regexEnd && RegexFlagsAreReal(text.Substring(start, regexEnd - start)) &&
+                !RegexClosesInsideLaterText(text, pathEnd, regexEnd, end)) return -1;
             return pathEnd;
+        }
+
+        /// <summary>
+        /// True when the / that would close a regex is inside a quoted text of a later argument, as in
+        /// <c>path: /old, redirect: "/x"</c>: the path ended at the comma, and the second / belongs to "/x". The quote
+        /// has to open where a value starts (after a colon, comma, bracket or =) and close on the same line, so a regex
+        /// with a quote of its own (<c>/I can't/i</c>, <c>/a,b"/</c>) is still a regex.
+        /// </summary>
+        private static bool RegexClosesInsideLaterText(string text, int pathEnd, int regexEnd, int end)
+        {
+            if (pathEnd >= end || text[pathEnd] is not (',' or ')' or ']' or '}')) return false;
+            int close = text.LastIndexOf('/', regexEnd - 1);
+            char quote = '\0';
+            for (int i = pathEnd; i < end && text[i] != '\n'; i++)
+            {
+                char ch = text[i];
+                if (quote != '\0')
+                {
+                    if (ch == '\\') i++;
+                    else if (ch == quote)
+                    {
+                        if (i > close) return true;
+                        quote = '\0';
+                    }
+                }
+                else if (i >= close)
+                {
+                    return false;
+                }
+                else if (ch is '"' or '\'')
+                {
+                    int before = i - 1;
+                    while (before > pathEnd && text[before] is ' ' or '\t') before--;
+                    if (text[before] is not (':' or ',' or '(' or '[' or '{' or '=')) return false;
+                    quote = ch;
+                }
+            }
+            return false;
         }
 
         /// <summary>The end of a /pattern/flags regex at <paramref name="start"/> (as the lexer reads one), or -1.</summary>
@@ -590,7 +631,8 @@ namespace KScript.Syntax
                 }
                 break;
             }
-            return labels >= 2 ? i : -1;
+            // 1+@math.sqrt(4) is arithmetic with a call, not an address.
+            return labels >= 2 && !(i < end && text[i] == '(') ? i : -1;
         }
 
         /// <summary>Tokenizes the whole input (used for highlighting and completion).</summary>

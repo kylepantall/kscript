@@ -183,7 +183,7 @@ public sealed class DataRelationTests : DataFixture
             """);
         Assert.Equal("Ada: Notes 1 1", lines[0]);
         Assert.Equal("Ben: Hello 0 0", lines[1]);
-        Assert.Equal("Cy:", lines[2]);
+        Assert.Equal("Cy: ", lines[2]);
         Assert.Equal("Maths", lines[3]);
         Assert.Equal("true", lines[4]);
         Assert.Equal("false", lines[5]);
@@ -401,6 +401,18 @@ public sealed class DataRelationTests : DataFixture
             echo Comment->with(post)->where(body: 'Ok')->first().post ?? 'gone'
             """);
         Assert.Equal(new[] { "1", "1", "2", "1", "Ada, Ben", "gone" }, lines);
+    }
+
+    [Fact]
+    public void OrWhereOnARecordsRelationStaysWithThatRecord()
+    {
+        // Ben's Hello is published too, but it is not one of Ada's posts.
+        Assert.Equal(new[] { "Engines, Notes", "Notes", "Engines", "1" }, Lines(Blog + """
+            echo $ada->posts()->where(views: 50)->or_where(published: true)->order_by(title)->pluck(title)
+            echo $ada->posts()->or_where(published: true)->pluck(title)
+            echo $ada->drafts()->or_where(fn(p) => $p.views > 10)->pluck(title)
+            echo $ben->posts()->where(title: 'none')->or_where(fn(p) => $p.views > 1)->count()
+            """));
     }
 
     [Fact]

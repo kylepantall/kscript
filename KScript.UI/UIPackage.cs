@@ -9,7 +9,7 @@ namespace KScript.UI
     /// <summary>
     /// KScript.UI: desktop windows. A script whose root is &lt;KScript.Window&gt; opens a native window (macOS,
     /// Windows, Linux) laid out with &lt;Column&gt;, &lt;Row&gt; and &lt;Grid&gt; and filled with &lt;Text&gt;,
-    /// &lt;Button&gt;, &lt;TextBox&gt; and friends. on-* attributes run KScript when the person uses a control, and
+    /// &lt;Button&gt;, &lt;TextBox&gt; and friends. on_* attributes run KScript when the person uses a control, and
     /// the window is drawn again from its variables, like a &lt;live&gt; block on a page.
     /// </summary>
     /// <remarks>
@@ -59,7 +59,7 @@ namespace KScript.UI
         {
             ComponentElements.AddSurface(new WindowSurface());
 
-            p.Element(new ElementInfo("Window", "Opens a desktop window. Its direct <let>, <fn> and <import> children run once and hold its state; the rest is the layout, drawn again after every on-* handler. The script continues when the window is closed.", ContentKind.Statements,
+            p.Element(new ElementInfo("Window", "Opens a desktop window. Its direct <let>, <fn> and <import> children run once and hold its state; the rest is the layout, drawn again after every on_* handler. The script continues when the window is closed.", ContentKind.Statements,
                 new A("title", K.Template, "The title bar text."),
                 new A("width", K.Expression, "Starting width in pixels (default 800)."),
                 new A("height", K.Expression, "Starting height in pixels (default 600)."),
@@ -67,7 +67,7 @@ namespace KScript.UI
                 new A("background", K.Template, "The window's colour."),
                 new A("padding", K.Expression, "Space around the layout, in pixels (default 16)."),
                 new A("gap", K.Expression, "Space between the window's top-level items (default 12)."),
-                new A("resizable", K.Bool, "no fixes the size."))
+                new A("resizable", K.Bool, "false fixes the size."))
             {
                 Context = ElementContext.Script,
                 Example = "<KScript.Window title=\"Counter\" width=\"300\" height=\"200\">\n  <let name=\"count\" value=\"0\" />\n  <Text size=\"32\">{$count}</Text>\n  <Button on_click=\"count += 1\">Add one</Button>\n</KScript.Window>",

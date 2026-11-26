@@ -68,13 +68,42 @@ namespace KScript.Style
             // The open KScript elements: CSS is only wrapped where statements go, not inside <echo> or <let>.
             var open = new Stack<bool>();
             bool Wrap() => open.Count == 0 || open.Peek();
+            // Where the CSS is: inside a string ("..." or '...', which ends with its line at the latest) a < is
+            // text, so content: "<b>" and an inline SVG in url("data:image/svg+xml,<svg ...>") stay as written.
+            char quote = '\0';
+            bool escaped = false;
+            int comment = -1;
             int i = 0;
             while (i < source.Length)
             {
-                int tagEnd = source[i] == '<' ? TagEnd(source, i) : -1;
+                int tagEnd = source[i] == '<' && quote == '\0' ? TagEnd(source, i) : -1;
                 if (tagEnd < 0)
                 {
-                    text.Append(source[i++]);
+                    char c = source[i];
+                    if (!Wrap())
+                    {
+                        // The text of an <echo> or <let> is KScript's, not CSS.
+                    }
+                    else if (comment >= 0)
+                    {
+                        if (c == '/' && source[i - 1] == '*' && i - 1 > comment) comment = -1;
+                    }
+                    else if (quote != '\0')
+                    {
+                        if (escaped) escaped = false;
+                        else if (c == '\\') escaped = true;
+                        else if (c == quote || c == '\n') quote = '\0';
+                    }
+                    else if (c == '"' || c == '\'')
+                    {
+                        quote = c;
+                    }
+                    else if (c == '*' && i > 0 && source[i - 1] == '/')
+                    {
+                        comment = i;
+                    }
+                    text.Append(c);
+                    i++;
                     continue;
                 }
 
@@ -149,7 +178,7 @@ namespace KScript.Style
 
         /// <summary>
         /// The end of a KScript tag or comment starting at <paramref name="start"/>: &lt;name ...&gt;, &lt;/name&gt;
-        /// or &lt;!-- ... --&gt;. CSS never uses &lt; otherwise. -1 when it isn't one.
+        /// or &lt;!-- ... --&gt;. Outside a string, CSS never uses &lt; otherwise. -1 when it isn't one.
         /// </summary>
         private static int TagEnd(string s, int start)
         {

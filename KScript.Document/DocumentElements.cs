@@ -22,6 +22,9 @@ namespace KScript.Documents
             public Table Table;
             public Bibliography Bibliography;
 
+            /// <summary>How many sections are open: a section inside five others is the deepest there is.</summary>
+            public int SectionDepth;
+
             public List<Block> Target => Targets.Peek();
         }
 
@@ -110,7 +113,8 @@ namespace KScript.Documents
                 }
                 catch (KScriptException e) when (e.Line == 0)
                 {
-                    throw run.Error($"{option}: {e.Message}", option, e.Type);
+                    // Most settings name themselves in their message (paper: 'a9' isn't a paper size).
+                    throw run.Error(e.Message.StartsWith(option, StringComparison.Ordinal) ? e.Message : $"{option}: {e.Message}", option, e.Type);
                 }
             }
             doc.Title = Blank(run.Template("title"));
@@ -178,18 +182,31 @@ namespace KScript.Documents
 
         // ---- blocks ------------------------------------------------------------------------------------------------
 
+        /// <summary>Headings have six levels in every format (h1 to h6, Word's Heading 1 to 6).</summary>
+        internal const int MaxSectionDepth = 6;
+
         internal static bool? Section(ElementRun run)
         {
             Builder b = Current(run);
+            if (b.SectionDepth >= MaxSectionDepth)
+                throw run.Error($"Sections go {MaxSectionDepth} levels deep at most, and this one is inside {b.SectionDepth} others. Put it next to the section it is in.", null, "Syntax");
             var section = new Section
             {
                 Title = Inlines(run, run.RequiredTemplate("title")),
-                Id = Blank(run.Raw("id")),
+                Id = Blank(run.Template("id")),
                 Numbered = run.Flag("numbered", true),
                 NewPage = run.Flag("new_page"),
             };
             b.Target.Add(section);
-            Into(run, section.Blocks, () => run.RunChildren());
+            b.SectionDepth++;
+            try
+            {
+                Into(run, section.Blocks, () => run.RunChildren());
+            }
+            finally
+            {
+                b.SectionDepth--;
+            }
             return null;
         }
 
@@ -203,7 +220,7 @@ namespace KScript.Documents
             for (int i = 0; i < paragraphs.Count; i++)
             {
                 paragraphs[i].Align = align;
-                if (i == 0) paragraphs[i].Id = Blank(run.Raw("id"));
+                if (i == 0) paragraphs[i].Id = Blank(run.Template("id"));
                 b.Target.Add(paragraphs[i]);
             }
             return null;
@@ -283,7 +300,7 @@ namespace KScript.Documents
             Builder b = Current(run);
             var table = new Table
             {
-                Id = Blank(run.Raw("id")),
+                Id = Blank(run.Template("id")),
                 Caption = run.Has("caption") ? Inlines(run, run.Template("caption")) : null,
                 Rules = run.Has("rules") ? Located(run, () => Units.Rules(run.Template("rules")), "rules") : b.Doc.Style.TableRules,
                 Scale = run.Number("size", 1),
@@ -365,7 +382,7 @@ namespace KScript.Documents
             {
                 Source = System.IO.Path.GetRelativePath(b.Doc.BaseDirectory, full),
                 Caption = run.Has("caption") ? Inlines(run, run.Template("caption")) : null,
-                Id = Blank(run.Raw("id")),
+                Id = Blank(run.Template("id")),
                 Width = width,
                 Image = Located(run, () => ImageData.Load(full), "path"),
             };
@@ -377,13 +394,13 @@ namespace KScript.Documents
         {
             Builder b = Current(run);
             string latex = run.Text();
-            b.Target.Add(new MathBlock { Latex = latex, Node = Located(run, () => MathParser.Parse(latex)), Id = Blank(run.Raw("id")), Numbered = run.Flag("numbered", true) });
+            b.Target.Add(new MathBlock { Latex = latex, Node = Located(run, () => MathParser.Parse(latex)), Id = Blank(run.Template("id")), Numbered = run.Flag("numbered", true) });
             return null;
         }
 
         internal static bool? Code(ElementRun run)
         {
-            Current(run).Target.Add(new CodeBlock { Text = run.Text(), Language = Blank(run.Raw("language")), Id = Blank(run.Raw("id")) });
+            Current(run).Target.Add(new CodeBlock { Text = run.Text(), Language = Blank(run.Template("language")), Id = Blank(run.Template("id")) });
             return null;
         }
 
@@ -424,7 +441,7 @@ namespace KScript.Documents
         internal static bool? Source(ElementRun run)
         {
             Builder b = Current(run);
-            var source = new Source { Key = run.RequiredRaw("id").Trim(), Type = Blank(run.Raw("type")) ?? "misc" };
+            var source = new Source { Key = run.RequiredTemplate("id").Trim(), Type = Blank(run.Raw("type")) ?? "misc" };
             foreach (var attr in run.Element.Attributes)
             {
                 if (attr.Name == "id" || attr.Name == "type") continue;

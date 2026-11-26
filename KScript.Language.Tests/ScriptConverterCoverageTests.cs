@@ -140,5 +140,13 @@ namespace KScript.Language.Tests
         [InlineData("a.test.ks.xml", "a.test.kscript")]
         [InlineData("a.txt", "a.txt.kscript")]
         public void ConvertedPaths(string path, string converted) => Assert.Equal(converted, ScriptConverter.ConvertedPath(path));
+        [Fact]
+        public void AStringOverSeveralLinesKeepsItsValueBothWays()
+        {
+            const string code = "if true {\n  c = \"multi\nline { 1 + 1 }\n  indented\"\n  echo $c\n}\n";
+            string xml = ToXml(code).Text;
+            Assert.Contains("\"multi\nline { 1 + 1 }\n  indented\"", xml);
+            Assert.Contains("c = \"multi\nline { 1 + 1 }\n  indented\"", ToCode(xml).Text);
+        }
     }
 }

@@ -126,14 +126,15 @@ public class ErrorReportTests
     {
         try
         {
-            Assert.Equal(new[] { "serve", "site" }, CommandLine.TakeDebug(new[] { "serve", "--debug", "site" }));
-            Assert.True(ErrorReport.Debug);
-            ErrorReport.Debug = false;
-            Assert.Equal(new[] { "app.kscript", "--debug" }, CommandLine.TakeDebug(new[] { "--debug", "app.kscript", "--debug" }));
-            Assert.True(ErrorReport.Debug);
-            ErrorReport.Debug = false;
-            Assert.Equal(new[] { "./app", "--debug" }, CommandLine.TakeDebug(new[] { "./app", "--debug" }));
-            Assert.False(ErrorReport.Debug);
+            var serve = CommandLine.TakeGlobalOptions(new[] { "serve", "--debug", "site" });
+            Assert.Equal(new[] { "serve", "site" }, serve.Rest);
+            Assert.True(serve.Debug);
+            var script = CommandLine.TakeGlobalOptions(new[] { "--debug", "app.kscript", "--debug" });
+            Assert.Equal(new[] { "app.kscript", "--debug" }, script.Rest);
+            Assert.True(script.Debug);
+            var own = CommandLine.TakeGlobalOptions(new[] { "./app", "--debug" });
+            Assert.Equal(new[] { "./app", "--debug" }, own.Rest);
+            Assert.False(own.Debug);
         }
         finally
         {

@@ -106,7 +106,7 @@ namespace KScript.Runtime
             // .env files are read first, so ${NAME} in any file can use their values.
             var dotenv = new Dictionary<string, string>(StringComparer.Ordinal);
             var envValues = new Dictionary<string, List<KeyValuePair<string, string>>>();
-            string Lookup(string name) => System.Environment.GetEnvironmentVariable(name) ?? (dotenv.TryGetValue(name, out string v) ? v : null);
+            string Lookup(string name) => host.EnvironmentVariable(name) ?? (dotenv.TryGetValue(name, out string v) ? v : null);
             foreach (var layer in layers.Where(l => l.EnvFile))
             {
                 var pairs = DotEnv.Parse(File.ReadAllText(layer.Path), Lookup, Path.GetFileName(layer.Path));
@@ -155,7 +155,7 @@ namespace KScript.Runtime
             if (!string.IsNullOrEmpty(options.Prefix))
             {
                 var pairs = new List<KeyValuePair<string, string>>();
-                foreach (System.Collections.DictionaryEntry e in System.Environment.GetEnvironmentVariables())
+                foreach (System.Collections.DictionaryEntry e in host.HideEnvironment ? new System.Collections.Hashtable() : System.Environment.GetEnvironmentVariables())
                 {
                     pairs.Add(new KeyValuePair<string, string>((string)e.Key, (string)e.Value));
                 }

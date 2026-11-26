@@ -391,14 +391,16 @@ namespace KScript.Language.Formatting
             char c = text[p];
             // 1, 2 => { ... } in a match statement: the arm's block.
             if (c == '>' && p > 0 && s.ArmArrow[p - 1]) return true;
-            if (c == ')' || c == ']' || c == '"') return true;
+            int lineStart = text.LastIndexOf('\n', Math.Max(0, brace - 1)) + 1;
+            // A head can end with a call, an index or text in either kind of quotes: if $name == 'a' { ... }.
+            // x = match $list->count() { ... } is still a value, as below.
+            if (c == ')' || c == ']' || c == '"' || c == '\'') return !HasTopLevelAssignment(text, lineStart, brace);
             if (!Lexer.IsIdentChar(c)) return false;
             int end = p + 1;
             while (p >= 0 && (Lexer.IsIdentChar(text[p]) || text[p] == '.' || text[p] == '-')) p--;
             string word = text.Substring(p + 1, end - p - 1);
             if (ValueWords.Contains(word)) return false;
             // enum Size { small, medium } holds a list of names, not statements: leave its layout alone.
-            int lineStart = text.LastIndexOf('\n', Math.Max(0, brace - 1)) + 1;
             string head = text.Substring(lineStart, brace - lineStart).TrimStart();
             if (head.StartsWith("enum ", StringComparison.Ordinal)) return false;
             // x = match $choice { ... } is a value, not a block: an assignment before the brace makes it one.
@@ -424,9 +426,11 @@ namespace KScript.Language.Formatting
             return false;
         }
 
+        /// <summary>Whether the statement that ends at <paramref name="end"/> assigns: an earlier statement on the line (x = 5; if ...) doesn't count.</summary>
         private static bool HasTopLevelAssignment(string text, int start, int end)
         {
             int depth = 0;
+            bool assigns = false;
             for (int i = start; i < end; i++)
             {
                 char c = text[i];
@@ -443,12 +447,13 @@ namespace KScript.Language.Formatting
                 if (c == '/' && Peek(text, i + 1) == '/' && !KScript.Syntax.Lexer.AfterUrlScheme(text, i)) return false;
                 if (c == '(' || c == '[' || c == '{') depth++;
                 else if (c == ')' || c == ']' || c == '}') depth--;
+                else if (depth == 0 && c == ';') assigns = false;
                 else if (depth == 0 && IsAssignment(text, i, out int length))
                 {
-                    return true;
+                    assigns = true;
                 }
             }
-            return false;
+            return assigns;
         }
 
         /// <summary>The comments that switch formatting off for part of a file.</summary>
@@ -1616,7 +1621,8 @@ namespace KScript.Language.Formatting
                 }
                 string body = s.Text.Substring(first + 3, end - first - 3).Trim();
                 bool fence = body.StartsWith("```", StringComparison.Ordinal);
-                if (body.StartsWith("@", StringComparison.Ordinal)) inExample = body.StartsWith("@example", StringComparison.Ordinal);
+                // Only a tag ends an example: its code often starts with a call (@greet('Kyle')).
+                if (DocTagAt(body, 0) is string tag) inExample = tag == "example";
                 keep[line] = inFence || fence || inExample || body.StartsWith("|", StringComparison.Ordinal) || body.StartsWith("#", StringComparison.Ordinal);
                 if (fence) inFence = !inFence;
             }
@@ -1655,6 +1661,8 @@ namespace KScript.Language.Formatting
             {
                 if (text[i] != ' ' || text[i - 1] == ' ' || i + 1 >= end || text[i + 1] == ' ') continue;
                 if (Column(i) > options.PrintWidth) break;
+                // The words that move down must still read as the rest of this line, not as a tag, list item or directive.
+                if (StartsSomethingElse(text.Substring(i + 1, end - i - 1), slashes - first == 3)) continue;
                 best = i;
             }
             if (best < 0) return false;
@@ -1689,6 +1697,21 @@ namespace KScript.Language.Formatting
             }
             return true;
         }
+
+        /// <summary>The doc tag (without @) a doc line starts with at an index, or null: @param, not @greet('Kyle').</summary>
+        private static string DocTagAt(string body, int at)
+        {
+            if (at >= body.Length || body[at] != '@') return null;
+            int end = at + 1;
+            while (end < body.Length && (Lexer.IsIdentChar(body[end]) || body[end] == '-')) end++;
+            string name = body.Substring(at + 1, end - at - 1);
+            return DocComment.FindTag(name) != null ? name : null;
+        }
+
+        /// <summary>Text that, at the start of a comment line, would be read as something new: a doc tag, a Markdown list item, heading, table or quote, a fence or a formatter directive.</summary>
+        private static bool StartsSomethingElse(string rest, bool doc) =>
+            (doc && DocTagAt(rest, 0) != null)
+            || System.Text.RegularExpressions.Regex.IsMatch(rest, @"^([-*+]|\d+[.)]) |^[|#>]|^```|^kscript-fmt");
 
         private static bool IsQuote(Scan s, int i) => (s.Text[i] == '"' || s.Text[i] == '\'') && (i == 0 || s.States[i - 1] == State.Code || s.States[i - 1] == State.LineComment || s.States[i - 1] == State.BlockComment);
 

@@ -76,6 +76,30 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AComponentsRenderAndStyleAreCalledByThePage()
+        {
+            const string badge = """
+                import KScript.Web
+
+                type Badge extends Component {
+                  label: string
+
+                  fn render(): Component => ```html
+                  <span class="note-badge">{$label}</span>
+                  ```
+
+                  override fn style(): ComponentStyle => ```css
+                  .note-badge { padding: 0.25rem; }
+                  ```
+
+                  fn helper() => 1
+                }
+                """;
+            DocumentAnalysis a = Analyzer.Analyze(badge, "_components/badge.kscript");
+            Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.UnusedFunction && (d.Message.Contains("style") || d.Message.Contains("render")));
+        }
+
+        [Fact]
         public void RemovingAFunctionTakesItsDocComment()
         {
             const string code = "/// Says hi.\n/// @param who Someone.\nfn hello(who) {\n  echo \"Hi $who\"\n}\nfn main() => 1\necho @main()";
@@ -308,7 +332,7 @@ namespace KScript.Language.Tests
             string text = Script("<fn name=\"f\" params=\"a, b, c\"><return value=\"$b\" /></fn>\n<fn name=\"g\" params=\"only\"><return value=\"1\" /></fn>\n"
                 + "<fn name=\"dead\" params=\"z\" value=\"1\" />\n<fn name=\"skip\" params=\"_q\" value=\"1\" />\n"
                 + "<let name=\"h\" value=\"fn(x, y) => $x\" />\n<let name=\"k\" value=\"fn(x, y) => $y\" />\n<let name=\"m\" value=\"fn(_x) => 1\" />\n"
-                + "<echo>{ @f(1, 2, 3) } { @g(1) } { @skip(1) } { $h(1, 2) } { $k(1, 2) } { $m(1) }</echo>");
+                + "<echo>{ @f(1, 2) } { @g() } { @skip(1) } { $h(1, 2) } { $k(1, 2) } { $m(1) }</echo>");
             DocumentAnalysis a = Check(text);
             Assert.Equal(new[] { "KS6004:a", "KS6004:c", "KS6004:only", "KS6002:dead", "KS6004:y" }, Unused(a));
 
@@ -325,11 +349,16 @@ namespace KScript.Language.Tests
         [Fact]
         public void CodeFormatParameters()
         {
-            const string code = "fn one(x) => 1\nfn two(a, b) => $a\necho @one(1) + @two(1, 2)";
+            // No call passes x or b, so removing them leaves every call working.
+            const string code = "fn one(x = 0) => 1\nfn two(a, b = 0) => $a\necho @one() + @two(1)";
             DocumentAnalysis a = Check(code, "test.kscript");
             Assert.Equal(new[] { "KS6004:x", "KS6004:b" }, Unused(a));
             Assert.StartsWith("fn one() => 1\n", Fix(a, Find(a, DiagnosticCodes.UnusedParameter, "x"), "Remove"));
             Assert.Contains("fn two(a) => $a", Fix(a, Find(a, DiagnosticCodes.UnusedParameter, "b"), "Remove"));
+
+            // A call that passes the parameter would stop working, so there is only the rename.
+            DocumentAnalysis passed = Check("fn two(a, b) => $a\necho @two(1, 2)", "test.kscript");
+            Assert.Equal(new[] { "Rename to _b (unused on purpose)" }, Find(passed, DiagnosticCodes.UnusedParameter, "b").Fixes.Select(f => f.Title));
         }
 
         #endregion

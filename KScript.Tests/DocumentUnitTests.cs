@@ -233,6 +233,7 @@ public sealed class DocumentStyleTests
             ("font", "comic", "isn't a font"), ("align", "up", "align"), ("rules", "double", "rules"), ("citations", "harvard", "citation style"),
             ("numbered", "maybe", "true or false"), ("line_height", "-1", "positive number"), ("paper", "10cm x tall", "paper size"), ("paper", "1 x 2 x 3", "paper size"),
             ("margin", "-1cm", "isn't a length"), ("accent", "blurple", "colour"), ("nosuch", "x", "nosuch"),
+            ("size", "-3", "size: '-3' isn't a text size. Use a number of points"), ("size", "0", "size: 0 is too small"),
         })
         {
             Assert.Contains(message, Assert.Throws<KScriptException>(() => new DocumentStyle().Set(name, value)).Message);
@@ -306,6 +307,109 @@ public sealed class DocumentWriterTests
         Assert.NotEmpty(DocxWriter.Write(doc));
         Assert.Contains("<blockquote>", HtmlWriter.Write(doc));
         Assert.Contains("> Quoted.", MarkdownWriter.Write(doc));
+    }
+
+    [Fact]
+    public void Links_keep_their_brackets_and_only_go_to_safe_places()
+    {
+        var wiki = Assert.Single(InlineParser.Parse("See [Life](https://en.wikipedia.org/wiki/Life_(game)).").OfType<LinkInline>());
+        Assert.Equal("https://en.wikipedia.org/wiki/Life_(game)", wiki.Url);
+        Assert.Equal("See Life.", InlineParser.Plain(InlineParser.Parse("See [Life](https://en.wikipedia.org/wiki/Life_(game)).")));
+
+        foreach (string url in new[] { "https://x.org/a?b=1#c", "http://x.org", "mailto:a@b.org", "other.html", "#intro", "notes/a:b.html", "?q=a:b" })
+            Assert.True(InlineParser.IsLinkTarget(url), url);
+        foreach (string url in new[] { "javascript:alert(1)", "JavaScript:alert(1)", "data:text/html,x", "vbscript:x", "file:///etc/passwd", "" })
+            Assert.False(InlineParser.IsLinkTarget(url), url);
+
+        // Text often comes from data: a script address is never made into a link, in any format.
+        Document doc = Doc(P("Click [here](javascript:alert(1)) or [there](https://safe.example)."));
+        Assert.Single(doc.Blocks.OfType<Paragraph>().Single().Inlines.OfType<LinkInline>());
+        Assert.DoesNotContain("href=\"javascript", HtmlWriter.Write(doc));
+        Assert.Contains("href=\"https://safe.example\"", HtmlWriter.Write(doc));
+
+        var cited = Doc(P("See [@k]."));
+        cited.Sources["k"] = new Source { Key = "k", Fields = { ["title"] = "T", ["url"] = "javascript:alert(1)" } };
+        Assert.DoesNotContain("href=\"javascript", HtmlWriter.Write(cited));
+    }
+
+    [Fact]
+    public void Markdown_keeps_code_titles_and_cells_as_text()
+    {
+        var table = new Table();
+        table.Rows.Add(new TableRow { Header = true, Cells = { new TableCell { Inlines = InlineParser.Parse("name") } } });
+        table.Rows.Add(new TableRow { Cells = { new TableCell { Inlines = new List<Inline> { new TextInline("a|b"), new CodeInline("c|d") } } } });
+        var quote = new Quote { Attribution = "<i>who</i>" };
+        quote.Blocks.Add(P("Said."));
+        Document doc = Doc(new CodeBlock { Text = "before\n```\n# not a heading\n````\nafter", Language = "md" }, table, new Table { Caption = InlineParser.Parse("Nothing found.") }, quote);
+        doc.Title = "<b>Bold</b> *title*";
+        doc.Subtitle = "a_b";
+        doc.Authors.Add(new Author { Name = "A <a@b>" });
+        doc.Keywords.Add("x*y");
+
+        string md = MarkdownWriter.Write(doc);
+        // The fence is longer than the longest run of backticks in the code, so the code can't end it.
+        Assert.Contains("`````md\nbefore\n```\n# not a heading\n````\nafter\n`````\n", md);
+        Assert.Contains("# \\<b\\>Bold\\</b\\> \\*title\\*\n", md);
+        Assert.Contains("*a\\_b*", md);
+        Assert.Contains("A \\<a@b\\>", md);
+        Assert.Contains("**Keywords:** x\\*y", md);
+        Assert.Contains("\u2014 \\<i\\>who\\</i\\>", md);
+        // A | in a cell is escaped once, in text and in code alike.
+        Assert.Contains("| a\\|b`c\\|d` |", md);
+        // A table with no rows is left out.
+        Assert.DoesNotContain("Nothing found", md);
+        Assert.DoesNotContain("||", md);
+    }
+
+    [Fact]
+    public void LaTeX_breaks_long_tables_and_escapes_labels_links_and_images()
+    {
+        var longTable = new Table { Caption = InlineParser.Parse("Many rows."), Id = "tab-caf\u00E9" };
+        longTable.Rows.Add(new TableRow { Header = true, Cells = { new TableCell { Inlines = InlineParser.Parse("N") } } });
+        for (int i = 0; i <= LatexWriter.LongTableRows; i++) longTable.Rows.Add(new TableRow { Cells = { new TableCell { Inlines = InlineParser.Parse("r") } } });
+        var shortTable = new Table();
+        shortTable.Rows.Add(new TableRow { Cells = { new TableCell { Inlines = InlineParser.Parse("only") } } });
+        Document doc = Doc(longTable, shortTable, new Table { Caption = InlineParser.Parse("Nothing found.") },
+            P("See Table [#tab-caf\u00E9] and [a link](https://x.org/a%20b?c=1&d={e}#f)."),
+            new Figure { Source = "50%_off#1.png", Width = 0.5, Image = ImageData.FromBytes(DocumentFixture.Png(2, 2, 2), "x.png") });
+
+        string tex = LatexWriter.Write(doc);
+        Assert.Contains("\\usepackage{longtable}", tex);
+        // The caption is on the first page only; the heading row is repeated on every page.
+        Assert.Contains("\\begin{longtable}{l}\n\\caption{Many rows.}\\label{tab-caf.ue9.} \\\\\n\\toprule\n\\textbf{N} \\\\\n\\midrule\n\\endfirsthead\n\\toprule\n\\textbf{N} \\\\\n\\midrule\n\\endhead\n", tex);
+        Assert.Contains("\\end{longtable}", tex);
+        Assert.Contains("\\begin{tabular}{l}\n\\toprule\nonly", tex);
+        Assert.DoesNotContain("Nothing found", tex);
+        Assert.DoesNotContain("\\begin{tabular}{}", tex);
+        Assert.Contains("Table \\ref{tab-caf.ue9.}", tex);
+        Assert.Contains("\\href{https://x.org/a\\%20b?c=1\\&d=\\%7Be\\%7D\\#f}{a link}", tex);
+        Assert.Contains("{\\detokenize{50%_off#1.png}}", tex);
+        Assert.Equal("eq-1_a:b.c", LatexWriter.LabelName("eq-1_a:b.c"));
+    }
+
+    [Fact]
+    public void Characters_XML_cannot_hold_are_left_out_of_Word_and_HTML()
+    {
+        const string dirty = "a\u0001b\u000Bc\u001B[31md\uFFFEe \U0001D4B3 tab\there";
+        Document doc = Doc(P(dirty), new CodeBlock { Text = dirty }, new MathBlock { Node = MathParser.Parse("\\text{x\u0001y}"), Numbered = false });
+        doc.Title = dirty;
+        doc.Authors.Add(new Author { Name = dirty });
+
+        using (var zip = new System.IO.Compression.ZipArchive(new MemoryStream(DocxWriter.Write(doc))))
+        {
+            foreach (var entry in zip.Entries.Where(e => e.Name.EndsWith(".xml", StringComparison.Ordinal) || e.Name.EndsWith(".rels", StringComparison.Ordinal)))
+            {
+                using var reader = new StreamReader(entry.Open());
+                string xml = reader.ReadToEnd();
+                // Throws if a part isn't well-formed XML, which is what stops Word opening the file.
+                System.Xml.Linq.XDocument.Parse(xml);
+                Assert.DoesNotContain('\u0001', xml);
+            }
+        }
+        string html = HtmlWriter.Write(doc);
+        Assert.DoesNotContain('\u0001', html);
+        Assert.DoesNotContain('\u001B', html);
+        Assert.Contains("abc[31mde &#119987; tab\there", html);
     }
 
     [Fact]

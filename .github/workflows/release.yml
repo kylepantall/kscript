@@ -172,11 +172,26 @@ jobs:
           cat > /tmp/artifact-download/curl <<'CURL'
           #!/bin/sh
           set -eu
-          test "$2" = "https://github.com/kylepantall/kscript/releases/download/$KSCRIPT_VERSION/$ASSET"
-          cp "/tmp/$ASSET" "$4"
+          case "$2" in
+            "https://github.com/kylepantall/kscript/releases/download/$KSCRIPT_VERSION/$ASSET") cp "/tmp/$ASSET" "$4" ;;
+            "https://github.com/kylepantall/kscript/releases/download/$KSCRIPT_VERSION/SHA256SUMS") cp "${SUMS:-/tmp/SHA256SUMS}" "$4" ;;
+            *) exit 22 ;;
+          esac
           CURL
           chmod +x /tmp/artifact-download/curl
-          PATH="/tmp/artifact-download:$PATH" sh /tmp/install.sh
+          # The release job writes SHA256SUMS the same way.
+          (cd /tmp && sha256sum "$ASSET" > /tmp/SHA256SUMS)
+
+          # A download that isn't the file the release lists is refused, and nothing is installed.
+          sed 's/^[0-9a-f]\{8\}/00000000/' /tmp/SHA256SUMS > /tmp/WRONGSUMS
+          if SUMS=/tmp/WRONGSUMS PATH="/tmp/artifact-download:$PATH" sh /tmp/install.sh 2> /tmp/refused.err; then
+            echo "install.sh installed a download with the wrong checksum"; exit 1
+          fi
+          grep -F "the checksum of $ASSET is wrong" /tmp/refused.err
+          test ! -e /opt/kscript/bin/kscript
+
+          PATH="/tmp/artifact-download:$PATH" sh /tmp/install.sh | tee /tmp/install.out
+          grep -Fx "Checked $ASSET against the release's SHA256SUMS." /tmp/install.out
           /opt/kscript/bin/kscript --version | grep -Fx "${KSCRIPT_VERSION#v}"
           printf '<kscript><echo>Bookworm smoke test passed</echo></kscript>\n' > /tmp/smoke.ks.xml
           /opt/kscript/bin/kscript /tmp/smoke.ks.xml | grep -Fx 'Bookworm smoke test passed'
@@ -223,6 +238,14 @@ jobs:
         with:
           path: assets
           merge-multiple: true
+
+      # kscript update, kscript compile, install.sh and install.ps1 check what they download against this list.
+      - name: List the checksums
+        working-directory: assets
+        run: |
+          sha256sum * > ../SHA256SUMS
+          mv ../SHA256SUMS SHA256SUMS
+          cat SHA256SUMS
 
       - uses: softprops/action-gh-release@v3
         with:

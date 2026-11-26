@@ -123,7 +123,7 @@ public class ComponentElementTests
     [Fact]
     public void The_terminal_draws_a_component_with_its_terminal_render()
     {
-        Assert.Equal("* Milk: Two pints\nfrom the list\n* Eggs:\n",
+        Assert.Equal("* Milk: Two pints\nfrom the list\n* Eggs: \n",
             Run(NoteCard + "NoteCard(title: 'Milk', body: 'Two pints') {\n  echo \"from the list\"\n}\nNoteCard(title: 'Eggs')\n", path: Path.Combine(Path.GetTempPath(), "component-terminal.kscript")));
     }
 

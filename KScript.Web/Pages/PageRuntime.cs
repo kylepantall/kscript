@@ -11,8 +11,18 @@ namespace KScript.Pages
     /// <summary>An error in a page. <see cref="Location"/> says where (file and line).</summary>
     public class PageException : Exception, KScript.Runtime.IKScriptError
     {
-        public KScript.Runtime.KScriptException ToKScriptError() =>
-            InnerException is KScript.Runtime.KScriptException k && k.Message == Message ? k : KScript.Runtime.ErrorReport.At(Message, "Page", Location, this);
+        public KScript.Runtime.KScriptException ToKScriptError()
+        {
+            if (InnerException is not KScript.Runtime.KScriptException k || k.Message != Message)
+                return KScript.Runtime.ErrorReport.At(Message, "Page", Location, this);
+            if (Location == null) return k;
+            // The expression's own position counts from the start of its { } or attribute, so it is always 1:1.
+            // The renderer knows the line of the element it was rendering: say that one, with the error's own type.
+            var located = KScript.Runtime.ErrorReport.At(Message, k.Type, Location, this);
+            located.Declared = k.Declared;
+            foreach (var field in k.Fields) located.Fields[field.Key] = field.Value;
+            return located;
+        }
 
         public PageException(string message) : base(message) { }
         public PageException(string message, Exception inner) : base(message, inner) { }

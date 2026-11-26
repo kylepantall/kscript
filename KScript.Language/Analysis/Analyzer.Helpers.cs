@@ -474,7 +474,7 @@ namespace KScript.Language.Analysis
             {
                 int typeStart = start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length);
                 CheckMoneyRates(type, value.ToSource(new TextSpan(typeStart, type.Length)));
-                ReferenceImportedType(type, value.ToSource(new TextSpan(typeStart, TypeInference.WithoutTypeArguments(type).TrimEnd('?').TrimEnd().Length)));
+                ReferenceTypeName(type, value.ToSource(new TextSpan(typeStart, type.Length)));
             }
             if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
@@ -587,6 +587,25 @@ namespace KScript.Language.Analysis
         #endregion
     
         /// <summary>A type without its [] and ?: Repo for Repo[]?.</summary>
+        /// <summary>
+        /// A declared type written where a value gets its type (<c>u: User</c>, <c>all: User[]</c>, <c>w: User?</c>) is a
+        /// reference to it: the name alone, so a rename keeps the <c>[]</c>, <c>?</c> or rules after it.
+        /// </summary>
+        private void ReferenceTypeName(string text, TextSpan span, Scope scope = null)
+        {
+            string name = TypeBase(text);
+            TextSpan nameSpan = name.Length > 0 && name.Length <= span.Length && text.TrimStart().StartsWith(name, StringComparison.Ordinal)
+                ? new TextSpan(span.Start, name.Length) : span;
+            if ((scope ?? result.RootScope).Lookup(name, span.Start) is Symbol symbol && symbol.SourcePath == null && IsTypeSymbol(symbol))
+            {
+                result.References.Add(new SymbolReference(symbol, nameSpan, false, false));
+            }
+            else
+            {
+                ReferenceImportedType(text, nameSpan);
+            }
+        }
+
         private static string TypeBase(string type)
         {
             string t = TypeInference.WithoutTypeArguments(type.Trim()).TrimEnd('?').TrimEnd();

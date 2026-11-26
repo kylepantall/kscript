@@ -72,7 +72,7 @@ namespace KScript.Documents.Export
             sb.Append("\\usepackage[paperwidth=").Append(Units.N(S.PageWidth)).Append("pt,paperheight=").Append(Units.N(S.PageHeight))
                 .Append("pt,top=").Append(Units.N(S.MarginTop)).Append("pt,bottom=").Append(Units.N(S.MarginBottom))
                 .Append("pt,left=").Append(Units.N(S.MarginLeft)).Append("pt,right=").Append(Units.N(S.MarginRight)).Append("pt]{geometry}\n");
-            sb.Append("\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{array}\n\\usepackage{booktabs}\n\\usepackage{enumitem}\n");
+            sb.Append("\\usepackage{amsmath,amssymb}\n\\usepackage{graphicx}\n\\usepackage{array}\n\\usepackage{longtable}\n\\usepackage{booktabs}\n\\usepackage{enumitem}\n");
             sb.Append("\\usepackage[table]{xcolor}\n\\usepackage{fancyhdr}\n\\usepackage{lastpage}\n");
             if (S.Citations == CitationStyle.AuthorYear) sb.Append("\\usepackage[round]{natbib}\n");
             if (S.ParagraphSpacing > 0) sb.Append("\\usepackage{parskip}\n");
@@ -150,9 +150,42 @@ namespace KScript.Documents.Export
             foreach (Block b in blocks) Block(b);
         }
 
+        /// <summary>An id as a LaTeX label: the characters TeX reads specially (\ { } % # ~ ^ $ & and spaces) are written as their code.</summary>
+        internal static string LabelName(string id)
+        {
+            var o = new StringBuilder(id.Length);
+            foreach (char c in id)
+            {
+                if (char.IsLetterOrDigit(c) && c < 128 || c is '-' or '_' or ':' or '.') o.Append(c);
+                else o.Append(".u").Append(((int)c).ToString("x", System.Globalization.CultureInfo.InvariantCulture)).Append('.');
+            }
+            return o.ToString();
+        }
+
+        /// <summary>A link's address for \href: the characters that would end or break the argument are percent-encoded.</summary>
+        internal static string HrefTarget(string url)
+        {
+            var o = new StringBuilder(url.Length + 8);
+            foreach (char c in url)
+            {
+                switch (c)
+                {
+                    case '%': o.Append("\\%"); break;
+                    case '#': o.Append("\\#"); break;
+                    case '&': o.Append("\\&"); break;
+                    case '\\': o.Append("\\%5C"); break;
+                    case '{': o.Append("\\%7B"); break;
+                    case '}': o.Append("\\%7D"); break;
+                    case ' ': o.Append("\\%20"); break;
+                    default: o.Append(c); break;
+                }
+            }
+            return o.ToString();
+        }
+
         private void Label(Block b)
         {
-            if (b.Id != null) sb.Append("\\label{").Append(b.Id).Append('}');
+            if (b.Id != null) sb.Append("\\label{").Append(LabelName(b.Id)).Append('}');
         }
 
         private void Block(Block block)
@@ -276,11 +309,18 @@ namespace KScript.Documents.Export
         {
             string full = Path.GetFullPath(Path.Combine(doc.BaseDirectory, source));
             string relative = Path.GetRelativePath(outputDirectory, full).Replace('\\', '/');
-            return relative.Contains(' ') ? "\"" + relative + "\"" : relative;
+            if (relative.Contains(' ')) relative = "\"" + relative + "\"";
+            // \detokenize keeps % # & $ ~ ^ in a file name as the characters they are.
+            return relative.IndexOfAny(new[] { '%', '#', '&', '$', '~', '^' }) >= 0 ? "\\detokenize{" + relative + "}" : relative;
         }
+
+        /// <summary>Tables with more rows than this are written as a longtable, since they may not fit on a page.</summary>
+        internal const int LongTableRows = 30;
 
         private void Table(Table t)
         {
+            // A table with no rows (a query that found nothing) has nothing to show, and LaTeX won't take one.
+            if (t.Rows.Count == 0) return;
             int columns = t.ColumnCount;
             bool grid = t.Rules == TableRules.Grid;
             var spec = new StringBuilder(grid ? "|" : string.Empty);
@@ -301,16 +341,33 @@ namespace KScript.Documents.Export
                 if (grid) spec.Append('|');
             }
             bool floating = t.Caption != null;
-            sb.Append(floating ? "\\begin{table}[htbp]\n\\centering\n" : "\\begin{center}\n");
-            if (floating)
+            // A long table goes in a longtable, which carries on over the page (a tabular can't) and repeats its heading rows.
+            bool breaks = t.Rows.Count > LongTableRows;
+            int headerRows = t.Rows.TakeWhile(r => r.Header).Count();
+            if (breaks)
             {
-                sb.Append("\\caption{").Append(Inlines(t.Caption)).Append('}');
-                Label(t);
-                sb.Append('\n');
+                sb.Append(t.Scale < 1 ? "{\\small\n" : string.Empty).Append("\\begin{longtable}{").Append(spec).Append("}\n");
+                if (floating)
+                {
+                    sb.Append("\\caption{").Append(Inlines(t.Caption)).Append('}');
+                    Label(t);
+                    sb.Append(" \\\\\n");
+                }
             }
-            if (t.Scale < 1) sb.Append("\\small\n");
-            sb.Append("\\begin{tabular}{").Append(spec).Append("}\n");
+            else
+            {
+                sb.Append(floating ? "\\begin{table}[htbp]\n\\centering\n" : "\\begin{center}\n");
+                if (floating)
+                {
+                    sb.Append("\\caption{").Append(Inlines(t.Caption)).Append('}');
+                    Label(t);
+                    sb.Append('\n');
+                }
+                if (t.Scale < 1) sb.Append("\\small\n");
+                sb.Append("\\begin{tabular}{").Append(spec).Append("}\n");
+            }
             string top = t.Rules switch { TableRules.Booktabs => "\\toprule\n", TableRules.Grid => "\\hline\n", _ => string.Empty };
+            int headStart = sb.Length;
             sb.Append(top);
             for (int i = 0; i < t.Rows.Count; i++)
             {
@@ -335,8 +392,19 @@ namespace KScript.Documents.Export
                 bool lastHeader = row.Header && (i + 1 >= t.Rows.Count || !t.Rows[i + 1].Header);
                 if (grid) sb.Append("\\hline\n");
                 else if (lastHeader && t.Rules == TableRules.Booktabs) sb.Append("\\midrule\n");
+                if (breaks && headerRows > 0 && i == headerRows - 1)
+                {
+                    // The first page has the caption above the heading rows; the pages after it repeat the heading rows alone.
+                    string head = sb.ToString(headStart, sb.Length - headStart);
+                    sb.Append("\\endfirsthead\n").Append(head).Append("\\endhead\n");
+                }
             }
             if (t.Rules == TableRules.Booktabs) sb.Append("\\bottomrule\n");
+            if (breaks)
+            {
+                sb.Append("\\end{longtable}\n").Append(t.Scale < 1 ? "}\n\n" : "\n");
+                return;
+            }
             sb.Append("\\end{tabular}\n");
             sb.Append(floating ? "\\end{table}\n\n" : "\\end{center}\n\n");
         }
@@ -380,7 +448,7 @@ namespace KScript.Documents.Export
                         o.Append("\\texttt{").Append(Escape(c.Text)).Append('}');
                         break;
                     case LinkInline l:
-                        o.Append("\\href{").Append(l.Url.Replace("%", "\\%").Replace("#", "\\#")).Append("}{").Append(Inlines(l.Children)).Append('}');
+                        o.Append("\\href{").Append(HrefTarget(l.Url)).Append("}{").Append(Inlines(l.Children)).Append('}');
                         break;
                     case MathInline m:
                         o.Append('$').Append(MathLatex.Write(m.Node)).Append('$');
@@ -389,7 +457,7 @@ namespace KScript.Documents.Export
                         o.Append(S.Citations == CitationStyle.AuthorYear ? "\\citep{" : "\\cite{").Append(string.Join(",", c.Keys)).Append('}');
                         break;
                     case RefInline r:
-                        o.Append(resolved.Targets[r.Id] is MathBlock ? "\\eqref{" : "\\ref{").Append(r.Id).Append('}');
+                        o.Append(resolved.Targets[r.Id] is MathBlock ? "\\eqref{" : "\\ref{").Append(LabelName(r.Id)).Append('}');
                         break;
                     case FootnoteInline f:
                         o.Append("\\footnote{").Append(Inlines(f.Children)).Append('}');

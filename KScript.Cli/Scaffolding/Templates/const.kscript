@@ -5,6 +5,7 @@ usage: <name> [--values "max_items = 10, site_name = 'Shop'"]
 --values: The constants, comma separated, as name = value (default an example)
 example: kscript make const limits --values "max_items = 10, page_size = 25"
 example: kscript make const app --values "name = 'Shop', version = '1.0'"
+checks: values=assignments
 to: {{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.lib }}/{{ dir }}{{ kebab }}{{ ext }}", then use the values as $name
 ---

@@ -120,6 +120,18 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void AChainIsCountedWithCountLikeEverythingElse()
+        {
+            const string chain = "c = @chain([Welcome(user_id: 1, email: 'a@example.com')])\n";
+            AssertClean(Open(Welcome + chain + "echo $c->count()\necho @fake_queue()->count()\n"));
+            (string text, int offset) = WithCaret(Welcome + chain + "echo $c->‸\n");
+            List<string> labels = Service.GetCompletions(Service.Analyze(text, DocPath), offset).Select(i => i.Label).ToList();
+            Assert.Contains("count", labels);
+            Assert.Contains("dispatch", labels);
+            Assert.Contains("run", labels);
+        }
+
+        [Fact]
         public void JobVariablesComplete()
         {
             string code = Welcome.Replace("echo $err.message", "echo $job.‸");

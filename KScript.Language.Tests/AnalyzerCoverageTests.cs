@@ -111,7 +111,7 @@ namespace KScript.Language.Tests
         [InlineData("<fn name=\"f\" value=\"1\" /><call fn=\"@f\" />")]
         [InlineData("<call fn=\"char_of\" args=\"65\" />")]
         [InlineData("<fn name=\"f\" params=\"a, , b\" value=\"1\" /><echo>{ @f(1, 2) }</echo>")]
-        [InlineData("<fn name=\"f\" params=\"$a\" value=\"$a\" /><echo>{ @f(1) }</echo>")]
+        [InlineData("<fn name=\"f\" params=\"a\" value=\"$a\" /><echo>{ @f(1) }</echo>")]
         [InlineData("<for each=\"$k, $v\" in=\"{}\"><echo>{$k}</echo></for>")]
         [InlineData("<import package=\"KScript.IO\" /><echo>{ @read_json('') } { @read_json('blank.json') } { @read_json('broken.json') }</echo>")]
         [InlineData("<fn name=\"f\"><if test=\"true\"><return value=\"1\" /></if><return value=\"'a'\" /></fn><echo>{ @f() }</echo>")]

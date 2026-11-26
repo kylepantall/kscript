@@ -239,9 +239,17 @@ namespace KScript.Queueing
             Rows($"SELECT DISTINCT {Q("queue")} FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL ORDER BY {Q("queue")}").Select(r => Values.ToStr(r["queue"])).ToList();
 
         public int Clear(string queue) =>
-            queue == null
-                ? Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL")
-                : Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL AND {Q("queue")} = @p1", queue);
+            Transaction(tx =>
+            {
+                // A cleared unique job no longer holds its key, so it can be dispatched again.
+                string where = $"{Q("reserved_until")} IS NULL" + (queue == null ? string.Empty : $" AND {Q("queue")} = @p1");
+                object[] parameters = queue == null ? Array.Empty<object>() : new object[] { queue };
+                foreach (Dictionary<string, object> row in tx.Rows($"SELECT {Q("payload")} FROM {Q(JobsTable)} WHERE {where}", parameters))
+                {
+                    if (Parse(row["payload"])?.UniqueKey is string key) tx.Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1", key);
+                }
+                return tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {where}", parameters);
+            });
 
         public bool Retry(string id) =>
             Transaction(tx =>

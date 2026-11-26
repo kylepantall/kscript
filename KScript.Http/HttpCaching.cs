@@ -113,8 +113,16 @@ namespace KScript.Http
         public static HttpResponse CacheResponse(string argument, RequestContext ctx, Dictionary<string, object> request, Func<HttpResponse> next)
         {
             double seconds = CachePackage.Seconds(string.IsNullOrWhiteSpace(argument) ? "60" : argument.Trim()).Value;
-            // Requests that carry a login are never answered from (or kept in) the shared cache.
-            if (ctx.Live != null || !IsRead(request) || BuiltInMiddleware.Header(request, "authorization") != null) return next();
+            // Requests that carry a login, a session or any other cookie are never answered from (or kept in) the
+            // shared cache: what they get may be theirs alone.
+            if (ctx.Live != null || !IsRead(request)) return next();
+            if (BuiltInMiddleware.Header(request, "authorization") != null || BuiltInMiddleware.Header(request, "cookie") != null ||
+                (request.GetValueOrDefault("cookies") is Dictionary<string, object> cookies && cookies.Count > 0))
+            {
+                HttpResponse own = next();
+                own.Headers["X-Cache"] = "MISS";
+                return own;
+            }
 
             CacheStore store = MemoryCacheStore.Named("http:" + ctx.App.SiteRoot);
             string key = Values.ToStr(request["url"]);
@@ -132,7 +140,10 @@ namespace KScript.Http
 
             HttpResponse response = next();
             string control = response.Headers.TryGetValue("Cache-Control", out object c) ? Values.ToStr(c) : string.Empty;
-            if (response.Status == 200 && !control.Contains("no-store", StringComparison.OrdinalIgnoreCase) && !control.Contains("private", StringComparison.OrdinalIgnoreCase))
+            // An answer that sets a cookie or started a session (a form's CSRF token, a flash message) belongs to this
+            // visitor: it is not kept, and a Set-Cookie header is never given to anyone else.
+            bool personal = response.Headers.ContainsKey("Set-Cookie") || ctx.Auth.SessionId != null;
+            if (response.Status == 200 && !personal && !control.Contains("no-store", StringComparison.OrdinalIgnoreCase) && !control.Contains("private", StringComparison.OrdinalIgnoreCase))
             {
                 store.Put(key, new Dictionary<string, object>
                 {

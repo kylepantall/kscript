@@ -65,6 +65,117 @@ public sealed class MakeGeneratorTests : IDisposable
     private static string[] Words(string command) =>
         Regex.Matches(command, "\"([^\"]*)\"|(\\S+)").Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value).ToArray();
 
+    [Theory]
+    [InlineData("--status should be an HTTP status", "error", "E", "--status", "abc")]
+    [InlineData("--tries should be a whole number", "job", "J", "--tries", "abc")]
+    [InlineData("--timeout should be a length of time", "job", "J", "--timeout", "forever")]
+    [InlineData("--backoff should be lengths of time", "job", "J", "--backoff", "10s, soon")]
+    [InlineData("--width should be a whole number", "window", "w", "--width", "abc")]
+    [InlineData("--minutes should be a number", "cache", "c", "--minutes", "abc")]
+    [InlineData("--level should be trace, debug, info, warn, error or fatal", "logger", "l", "--level", "loud")]
+    [InlineData("--template should be paper, report, plain, letter or invoice", "document", "d", "--template", "nope")]
+    [InlineData("The name should be a locale such as fr or en-GB", "locale", "not a locale")]
+    [InlineData("--values should be constants written as name = value", "const", "c", "--values", "x")]
+    [InlineData("--values should be names that start with a letter", "enum", "Size", "--values", "1,2")]
+    [InlineData("'bad field' is not one", "type", "T", "--fields", "bad field")]
+    [InlineData("'a' is there twice", "type", "T", "--fields", "a: string, a: int")]
+    [InlineData("--sample should be a file in the project", "type", "T", "--sample", "missing.json")]
+    [InlineData("--fields should be fields written as name: type", "model", "M", "--fields", "name")]
+    [InlineData("--status needs a value", "error", "E", "--status")]
+    public void GeneratorsRefuseOptionValuesThatWouldNotCheck(string expected, params string[] args)
+    {
+        string app = Project();
+        string[] before = Directory.GetFiles(app, "*", SearchOption.AllDirectories);
+        var (code, _, err) = Make(app, args);
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains(expected, err);
+        Assert.Equal(before, Directory.GetFiles(app, "*", SearchOption.AllDirectories));
+    }
+
+    [Theory]
+    [InlineData("kscript")]
+    [InlineData("xml")]
+    public void GeneratorsTakeTheOptionValuesTheirHelpShows(string format)
+    {
+        string app = Project(format);
+        File.WriteAllText(Path.Combine(app, "order.json"), "{ \"id\": 1, \"total\": 9.5 }");
+        foreach (string[] args in new[]
+        {
+            new[] { "error", "PaymentFailed", "--status", "402", "--fields", "order: int, reason?: string" },
+            new[] { "job", "SendWelcome", "--tries", "5", "--timeout", "5m", "--backoff", "10s, 1m, 5m", "--fields", "user_id: int, email: email" },
+            new[] { "window", "settings", "--width", "400", "--height", "300" },
+            new[] { "cache", "api-cache", "--minutes", "0.5" },
+            new[] { "logger", "alerts", "--level", "error" },
+            new[] { "document", "a-letter", "--template", "letter" },
+            new[] { "document", "an-invoice", "--template", "invoice" },
+            new[] { "locale", "en-GB", "--keys", "welcome,sign_in" },
+            new[] { "const", "limits", "--values", "max_items = 10, name = 'Shop'" },
+            new[] { "enum", "OrderStatus", "--values", "pending,paid" },
+            new[] { "type", "Repo", "--fields", "name: string, stars: int from stargazers_count, topics: string[] = []" },
+            new[] { "type", "Order", "--sample", "order.json" },
+        })
+        {
+            var (code, _, err) = Make(app, args);
+            Assert.True(code == 0, string.Join(" ", args) + ": " + err);
+        }
+        AssertNoErrors(app);
+    }
+
+    [Fact]
+    public void ProjectsRefuseAnOptionTheirTemplateDoesNotHave()
+    {
+        var o = new StringWriter();
+        var e = new StringWriter();
+        Assert.Equal(ExitCodes.Usage, MakeCommand.Run(new[] { "project", "shop", "--docker", "-n", "--dir", parent.Root }, o, e));
+        Assert.Contains("The web project template has no --docker option", e.ToString());
+        Assert.False(Directory.Exists(Path.Combine(parent.Root, "shop")));
+        Assert.Equal(ExitCodes.Usage, MakeCommand.Run(new[] { "project", "shop", "--no-dekstop", "-n", "--dry-run", "--dir", parent.Root }, o, e));
+    }
+
+    [Fact]
+    public void TheMakefileOfANewProjectOnlyRunsCommandsKscriptHas()
+    {
+        string app = Project();
+        Assert.Equal(0, MakeCommand.Run(new[] { "project", "site", "-n", "--dir", parent.Root }, new StringWriter(), new StringWriter()));
+        foreach (string makefile in new[] { Path.Combine(app, "Makefile"), Path.Combine(parent.Root, "site", "Makefile") })
+        {
+            foreach (Match command in Regex.Matches(File.ReadAllText(makefile), @"\$\(KSCRIPT\) ([a-z]+)(?=\s)"))
+                Assert.True(CliReference.Find(command.Groups[1].Value) != null, $"{makefile}: kscript {command.Groups[1].Value}");
+        }
+        Assert.DoesNotContain("app build", File.ReadAllText(Path.Combine(parent.Root, "site", "desktop.kscript")));
+    }
+
+    [Theory]
+    [InlineData("kscript")]
+    [InlineData("xml")]
+    public void RoutesRefuseValuesThatWouldBreakTheRoutesFile(string format)
+    {
+        string app = Project(format);
+        Assert.Equal(0, Make(app, "route", "users").Code);
+        string routes = Directory.GetFiles(Path.Combine(app, "routes"), "web.*").Single();
+        string before = File.ReadAllText(routes);
+
+        var (code, _, err) = Make(app, "route", "w", "--name", "it's \"q\"");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("--name is the route's name", err);
+        (code, _, err) = Make(app, "route", "a b/{id}");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("is not a route path", err);
+        (code, _, err) = Make(app, "route", "teams/{id}/people/{id}");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("has the parameter {id} twice", err);
+        (code, _, err) = Make(app, "route", "x/{id}", "--where", "slug: int");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("--where has a rule for 'slug'", err);
+        (code, _, err) = Make(app, "route", "y/{id}", "--where", "id: \"int\"");
+        Assert.Equal(ExitCodes.Usage, code);
+        Assert.Contains("--where takes rules such as", err);
+
+        Assert.Equal(before, File.ReadAllText(routes));
+        Assert.False(File.Exists(Path.Combine(app, "controllers", "w.kscript")) || File.Exists(Path.Combine(app, "controllers", "w.ks.xml")));
+        AssertNoErrors(app);
+    }
+
     [Fact]
     public void RoutesAddThemselvesToTheRoutesFileWithTheirController()
     {

@@ -16,6 +16,10 @@ namespace KScript.Language.Analysis
         /// </summary>
         private void CheckSpellings()
         {
+            foreach (OldSpelling found in result.Markup.DescendantElements().SelectMany(OldSpellings.InParameters))
+            {
+                Report(found.Span, OldSpellings.Severity(IsCodeFile), found.Code, found.Message, found.Fix == null ? null : new[] { found.Fix });
+            }
             foreach (ExpressionRegion region in result.Regions.ToList())
             {
                 IEnumerable<ExprNode> roots = region.Parse != null

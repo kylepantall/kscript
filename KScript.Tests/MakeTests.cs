@@ -144,6 +144,33 @@ public class ScaffolderTests
     }
 
     [Fact]
+    public void ComponentIsWrittenInXmlWhenAskedAndRendersInAPage()
+    {
+        using var site = new TempSite(("_layout.html", "<main><slot /></main>"));
+        var (code, output, err) = Make(site.Root, "component", "Hero", "--props", "title,sub-title", "--syntax", "xml");
+
+        Assert.True(code == 0, err);
+        Assert.Contains("Created _components/hero.ks.xml", output);
+        Assert.False(File.Exists(Path.Combine(site.Root, "_components/hero.kscript")));
+        Assert.Contains("<type name=\"Hero\" extends=\"Component\">", Read(site, "_components/hero.ks.xml"));
+
+        site.Write("index.html", "<hero title=\"Hello\" sub-title=\"World\"><b>inner</b></hero>");
+        string html = site.Render("index.html").Body;
+        Assert.Contains("<p>Hello</p>", html);
+        Assert.Contains("<p>World</p>", html);
+        Assert.Contains("<b>inner</b>", html);
+
+        // A project that writes XML (make.syntax) gets XML components too, the model-bound and live ones included.
+        site.Write("kscript.json", "{ \"make\": { \"syntax\": \"xml\" } }");
+        Assert.Equal(0, Make(site.Root, "model", "Note", "--fields", "title: string", "--component").Code);
+        Assert.Equal(0, Make(site.Root, "component", "OrderDetails", "--live").Code);
+        Assert.True(File.Exists(Path.Combine(site.Root, "_components/note.ks.xml")));
+        Assert.True(File.Exists(Path.Combine(site.Root, "_components/order-details.ks.xml")));
+        var o = new StringWriter();
+        Assert.True(KScript.LanguageServer.CheckCommand.Run(new[] { site.Root }, o) == 0, o.ToString());
+    }
+
+    [Fact]
     public void ModelAndComponentCanBeGeneratedTogetherAndRendered()
     {
         using var site = new TempSite();

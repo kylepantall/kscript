@@ -16,7 +16,7 @@ Window(title: "Counter", width: 320, height: 200) {
 }
 ```
 
-`kscript counter.kscript` opens it, and the script ends when the window is closed. It works like a `<live>` block on a page:
+`kscript counter.kscript` opens it, and the script ends when the window is closed. A window needs a desktop: on a server or over SSH with no display, the script stops with a `UI` error. It works like a `<live>` block on a page:
 
 - `import KScript.UI` goes at the top of the file with the other imports. Variables and `fn` functions directly inside `Window` run once and hold the window's state.
 - Everything else is the layout. After every `on_click`, `on_change`, `on_enter` or `on_tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
@@ -25,18 +25,19 @@ Window(title: "Counter", width: 320, height: 200) {
 - `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
 - A [component](components.md#components-in-windows-and-the-terminal) with a window `render` is drawn by writing it as a statement: `NoteCard(title: "Milk")`. Each one keeps its own state.
+- `@close_window()` in a handler closes the window.
 - `Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
 
 | Element | What it is |
 | --- | --- |
 | `Column(gap, align, scroll)`, `Row(gap, align, wrap)`, `Grid(columns, gap)` | Layout: top to bottom, side by side, or equal columns. |
-| `Text(size, weight, color, wrap)` | Text. |
+| `Text(size, weight, color, wrap, text_align)` | Text. |
 | `Button(on_click, variant: primary, disabled)` | A button. |
 | `TextBox(bind, placeholder, on_enter, multiline)`, `CheckBox(bind)`, `Select(bind, options)`, `Slider(bind, min, max, step)` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
 | `Box(on_click, border)` | A rectangle: a cell, a card or a panel. It can hold other elements. |
 | `Spacer(size)`, `Timer(every, when, on_tick)` | Space, and a timer. |
 
-Every element takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `Window` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
+Every element except `Spacer` and `Timer` takes `width`, `height`, `padding`, `margin`, `background`, `radius` and `tooltip`. Colours are names such as `teal` or `#rrggbb`. `Window` takes `title`, `width`, `height`, `theme` (`dark`, `light` or `system`), `background`, `padding`, `gap` and `resizable`.
 
 ## Building the app: kscript compile
 

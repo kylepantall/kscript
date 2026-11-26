@@ -40,7 +40,8 @@ namespace KScript.Docs
 
         private static string PackageSlug(string package) => "/reference/" + (package.StartsWith("KScript.", StringComparison.Ordinal) ? package.Substring(8) : package).ToLowerInvariant();
 
-        internal static string TypeSlug(string type) => "/reference/methods/" + type;
+        /// <summary>A type's page. A list type's [] can't go in a page address, so money[] is at /reference/methods/money-list.</summary>
+        internal static string TypeSlug(string type) => "/reference/methods/" + type.Replace("[]", "-list", StringComparison.Ordinal);
 
         internal static string ElementAnchor(ElementInfo e) => "el-" + Html.Slug(e.Name);
 
@@ -310,7 +311,7 @@ namespace KScript.Docs
             if (e.MustBeInside?.Count > 0) facts.Add($"Goes inside {string.Join(" or ", e.MustBeInside.Select(TagName))}.");
             if (e.MustFollow?.Count > 0) facts.Add($"Follows {string.Join(" or ", e.MustFollow.Select(TagName))}.");
             if (e.IsLoop) facts.Add(Html.Dual("A loop: <code>&lt;break /&gt;</code> and <code>&lt;continue /&gt;</code> work inside.", "A loop: <code>break</code> and <code>continue</code> work inside."));
-            if (e.AllowsExtraAttributes) facts.Add(Html.Dual("Other attributes become variables.", "Other options become variables."));
+            if (e.AllowsExtraAttributes) facts.Add(Html.Dual($"Other attributes {e.ExtraAttributesDo}.", $"Other options {e.ExtraAttributesDo}."));
             sb.Append($"<p class=\"facts{(codeHelp == null ? string.Empty : " f-xml")}\">{string.Join(" ", facts)}</p>");
 
             void AppendOptions(IEnumerable<AttributeInfo> options, string formatClass, string label)
@@ -471,7 +472,8 @@ namespace KScript.Docs
         internal static string ExampleScript(string example)
         {
             string text = example.Replace("\r\n", "\n").Trim();
-            return text.StartsWith("<", StringComparison.Ordinal) ? text : $"<echo>{{ {text} }}</echo>";
+            // An expression goes inside an element, where & and < have to be written the XML way.
+            return text.StartsWith("<", StringComparison.Ordinal) ? text : $"<echo>{{ {text.Replace("&", "&amp;").Replace("<", "&lt;")} }}</echo>";
         }
 
         /// <summary>

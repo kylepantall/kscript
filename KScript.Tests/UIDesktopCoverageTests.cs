@@ -235,6 +235,17 @@ public class UIDesktopCoverageTests
     }
 
     [Fact]
+    public void A_computer_with_no_display_is_explained()
+    {
+        // What Avalonia's X11 platform throws on a server, in a container or over SSH without forwarding.
+        var error = Assert.Throws<KScriptException>(() => DesktopHost.Open(null, () => throw new Exception("XOpenDisplay failed")));
+        Assert.Equal("UI", error.Type);
+        Assert.Contains("no display", error.Message);
+        Assert.True(DesktopHost.NoDisplay(new TypeInitializationException("X11", new Exception("XOpenDisplay failed"))));
+        Assert.False(DesktopHost.NoDisplay(new Exception("x")));
+    }
+
+    [Fact]
     public void Errors_get_a_window_of_their_own()
     {
         string shown = null;

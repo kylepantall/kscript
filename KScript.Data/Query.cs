@@ -28,6 +28,11 @@ namespace KScript.Data
 
         public SqlExpr Where { get; private init; }
 
+        /// <summary>The part of <see cref="Where"/> every row must meet whatever is added with ->or_where(), and the part ->or_where() widens.</summary>
+        private SqlExpr Pinned { get; init; }
+
+        private SqlExpr Loose { get; init; }
+
         public IReadOnlyList<(SqlExpr Expr, bool Descending)> Order { get; private init; } = Array.Empty<(SqlExpr, bool)>();
 
         public int? Limit { get; private init; }
@@ -84,9 +89,15 @@ namespace KScript.Data
 
         #region Building
 
-        public Query And(SqlExpr condition) => this with { Where = Where == null ? condition : new SqlBinary("AND", Where, condition) };
+        public Query And(SqlExpr condition) => Narrowed(Loose == null ? condition : new SqlBinary("AND", Loose, condition));
 
-        public Query Or(SqlExpr condition) => this with { Where = Where == null ? condition : new SqlBinary("OR", Where, condition) };
+        /// <summary>Widens what the script asked for. What the query is tied to (the record of <c>$user->posts()</c>) still holds.</summary>
+        public Query Or(SqlExpr condition) => Narrowed(Loose == null ? condition : new SqlBinary("OR", Loose, condition));
+
+        private Query Narrowed(SqlExpr loose) => this with { Loose = loose, Where = Pinned == null ? loose : new SqlBinary("AND", Pinned, loose) };
+
+        /// <summary>Ties the query to its conditions so far: a later ->or_where() adds to what follows, never to these.</summary>
+        public Query Pin() => this with { Pinned = Where, Loose = null };
 
         public Query OrderBy(SqlExpr expr, bool descending) => this with { Order = Order.Append((expr, descending)).ToList() };
 
@@ -189,7 +200,7 @@ namespace KScript.Data
         public SqlStatement SelectStatement(string select = null, bool withOrder = true)
         {
             Dialect d = Database.Dialect;
-            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct && select == null ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d));
+            var w = new SqlWriter(d).Append("SELECT ").Append(Distinct ? "DISTINCT " : string.Empty).Append(select ?? SelectList(d));
             if (select == null)
             {
                 // ->with_count(posts): (SELECT COUNT(*) FROM posts AS c1 WHERE c1.author_id = users.id) AS posts_count
@@ -285,12 +296,12 @@ namespace KScript.Data
             return Rows.FromDb(raw, c.Column, call.Interpreter);
         }
 
-        public bool Exists(CallContext call) => Database.Rows(call.Interpreter, Taking(1).SelectStatement("1"), Table).Count > 0;
+        public bool Exists(CallContext call) => Database.Rows(call.Interpreter, (this with { Distinct = false }).Taking(1).SelectStatement("1"), Table).Count > 0;
 
         public List<object> Pluck(CallContext call, string column)
         {
             SqlColumn c = ColumnNamed(column, " for ->pluck()");
-            return Database.Rows(call.Interpreter, SelectStatement(Database.Dialect.Quote(column)), Table)
+            return Database.Rows(call.Interpreter, SelectStatement(Database.Dialect.Quote(c.Name)), Table)
                 .Select(r => Model == null ? Rows.Plain(r.Values.First()) : Rows.FromDb(r.Values.First(), c.Column, call.Interpreter)).ToList();
         }
 
@@ -302,8 +313,10 @@ namespace KScript.Data
             if (page < 1) page = 1;
             double total = (this with { Limit = null, Offset = null }).Count(call);
             int last = Math.Max(1, (int)Math.Ceiling(total / perPage));
-            List<object> items = Taking(perPage).Skipping((page - 1) * perPage).Get(call);
-            int from = items.Count == 0 ? 0 : (page - 1) * perPage + 1;
+            // A page past the last one a database can count to has no rows, like any page past the end.
+            long skip = (long)(page - 1) * perPage;
+            List<object> items = skip > int.MaxValue ? new List<object>() : Taking(perPage).Skipping((int)skip).Get(call);
+            int from = items.Count == 0 ? 0 : (int)skip + 1;
             return new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 ["items"] = items,
@@ -344,12 +357,17 @@ namespace KScript.Data
         {
             if (size < 1) throw new KScriptException("->chunk() needs a size of 1 or more.", "Argument");
             Query ordered = Order.Count > 0 ? this : OrderBy(Model != null ? new SqlColumn(Model.Key, Model.KeyColumn) : Database.Dialect.RowOrder, false);
+            int? left = Limit;
             for (int page = 0; ; page++)
             {
-                List<object> batch = ordered.Taking(size).Skipping((Offset ?? 0) + page * size).Get(call);
+                // ->limit(n) is the most rows read in all, so the last batch may be smaller.
+                int take = left is int rest ? Math.Min(size, rest) : size;
+                if (take == 0) return;
+                List<object> batch = ordered.Taking(take).Skipping((Offset ?? 0) + page * size).Get(call);
                 if (batch.Count == 0) return;
                 if (call.Call(fn, batch, (double)page) is false) return;
                 if (batch.Count < size) return;
+                if (left != null) left -= batch.Count;
             }
         }
 
@@ -357,9 +375,22 @@ namespace KScript.Data
 
         #region Writing
 
-        /// <summary>UPDATE ... SET for every row the query reads. Returns how many rows changed.</summary>
-        public double Update(CallContext call, IEnumerable<KeyValuePair<string, object>> values, bool converted = false)
+        /// <summary>
+        /// A statement that changes rows has no LIMIT or OFFSET that every database takes, so a query with one is
+        /// refused, rather than changing every row that matches.
+        /// </summary>
+        private void NeedNoLimit(string method)
         {
+            if (Limit == null && Offset == null) return;
+            string key = Model?.Key ?? "id";
+            throw new KScriptException($"->{method}() changes every row that matches, so it can't follow ->limit() or ->offset(). "
+                + $"Read the keys first, then change those rows: ->where({key}: $query->pluck({key}))->{method}(...).", "Argument");
+        }
+
+        /// <summary>UPDATE ... SET for every row the query reads. Returns how many rows changed.</summary>
+        public double Update(CallContext call, IEnumerable<KeyValuePair<string, object>> values, bool converted = false, string method = "update")
+        {
+            NeedNoLimit(method);
             Dialect d = Database.Dialect;
             var w = new SqlWriter(d).Append("UPDATE ").Name(Table).Append(" SET ");
             bool any = false;
@@ -369,9 +400,12 @@ namespace KScript.Data
             foreach (KeyValuePair<string, object> v in list)
             {
                 SqlColumn c = ColumnNamed(v.Key, " for ->update()");
-                object value = Model != null && !converted ? Records.Convert(call, Model, v.Key, v.Value) : v.Value;
+                object value = v.Value;
+                // author: $user sets author_id to the user's key, as ->where(author: $user) compares it.
+                if (Model?.Relation(v.Key) is Relation r && value is Record target) value = ModelInfo.KeyOfTarget(r, target);
+                if (Model != null && !converted) value = Records.Convert(call, Model, c.Name, value);
                 if (any) w.Append(", ");
-                w.Name(v.Key).Append(" = ").Expr(new SqlValue(value, c.Column));
+                w.Name(c.Name).Append(" = ").Expr(new SqlValue(value, c.Column));
                 any = true;
             }
             if (!any) return 0;
@@ -380,13 +414,16 @@ namespace KScript.Data
         }
 
         /// <summary>Adds to a number column on every row the query reads.</summary>
-        public double Increment(CallContext call, string column, double by)
+        public double Increment(CallContext call, string column, double by, string method = "increment")
         {
-            SqlColumn c = ColumnNamed(column, " for ->increment()");
+            NeedNoLimit(method);
+            SqlColumn c = ColumnNamed(column, $" for ->{method}()");
             if (c.Column != null && c.Column.Kind is not (ColumnKind.Integer or ColumnKind.Real))
-                throw new KScriptException($"->increment() needs a number column, but {Model.Name}.{column} is {c.Column.Field.Type}.", "Type");
+                throw new KScriptException($"->{method}() needs a number column, but {Model.Name}.{column} is {c.Column.Field.Type}.", "Type");
+            if (c.Column?.Kind == ColumnKind.Integer && by != Math.Floor(by))
+                throw new KScriptException($"{Model.Name}.{column} holds whole numbers, so ->{method}() can't change it by {Values.FormatNumber(Math.Abs(by))}.", "Argument");
             Dialect d = Database.Dialect;
-            var w = new SqlWriter(d).Append("UPDATE ").Name(Table).Append(" SET ").Name(column).Append(" = ").Name(column).Append(" + ").Expr(new SqlValue(by, c.Column));
+            var w = new SqlWriter(d).Append("UPDATE ").Name(Table).Append(" SET ").Name(c.Name).Append(" = ").Name(c.Name).Append(" + ").Expr(new SqlValue(by, c.Column));
             if (Model?.Timestamps == true) w.Append(", ").Name(ModelInfo.UpdatedAt).Append(" = ").Expr(new SqlValue(Rows.Clock()));
             WriteWhere(w);
             return Database.Execute(call.Interpreter, w.Build(), Table);
@@ -395,7 +432,8 @@ namespace KScript.Data
         /// <summary>Deletes every row the query reads: soft-deleting models only mark them, unless <paramref name="force"/>.</summary>
         public double Delete(CallContext call, bool force)
         {
-            if (Model?.SoftDeletes == true && !force) return Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, Rows.Clock()) });
+            NeedNoLimit(force ? "force_delete" : "delete");
+            if (Model?.SoftDeletes == true && !force) return Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, Rows.Clock()) }, method: "delete");
             var w = new SqlWriter(Database.Dialect).Append("DELETE FROM ").Name(Table);
             WriteWhere(w);
             return Database.Execute(call.Interpreter, w.Build(), Table);
@@ -405,7 +443,7 @@ namespace KScript.Data
         public double Restore(CallContext call)
         {
             if (Model?.SoftDeletes != true) throw new KScriptException($"->restore() is for models with soft_deletes: true, and {Model?.Name ?? Table} doesn't have it.", "Argument");
-            return (this with { Trashed = "only" }).Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, null) });
+            return (this with { Trashed = "only" }).Update(call, new[] { new KeyValuePair<string, object>(ModelInfo.DeletedAt, null) }, method: "restore");
         }
 
         /// <summary>Inserts rows into a table with no model (a model uses ->create()). Returns how many were added.</summary>

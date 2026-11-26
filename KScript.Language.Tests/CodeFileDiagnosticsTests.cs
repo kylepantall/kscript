@@ -12,6 +12,16 @@ namespace KScript.Language.Tests
         private static DocumentAnalysis Analyze(string text, string file) => Service.Analyze(text, Path.Combine(Path.GetTempPath(), file));
 
         [Fact]
+        public void ATextArgumentsFixedWordsAreWrittenBare()
+        {
+            // paper: takes a4, letter... or any size in quotes, so its own words need no quotes, as an enum's don't.
+            const string bare = "import KScript.Document\n\nDocument(to: \"a.pdf\", paper: letter) {\n}\n";
+            Assert.DoesNotContain(Analyze(bare, "a.kscript").Diagnostics, d => d.Code == DiagnosticCodes.QuoteText || d.Severity == DiagnosticSeverity.Error);
+            Diagnostic other = Analyze(bare.Replace("paper: letter", "paper: huge"), "a.kscript").Diagnostics.Single(d => d.Code == DiagnosticCodes.QuoteText);
+            Assert.Contains("paper: \"huge\"", other.Message);
+        }
+
+        [Fact]
         public void MissingImportsSuggestTheKscriptWay()
         {
             const string text = "// tests\nimport KScript.Math\n\ndescribe(name: \"x\") {\n}\n";
@@ -63,6 +73,28 @@ namespace KScript.Language.Tests
             Assert.Contains("Use ->to_string()->upper()", d.Message);
             // A parameter without a type may be anything, so text methods are fine on it.
             Assert.DoesNotContain(Analyze("fn f(x) => $x->trim()\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+        }
+
+        [Fact]
+        public void AMatchUsedAsAValueKnowsIt()
+        {
+            Assert.DoesNotContain(Analyze("fn size(x) => match $x { _ when $it > 9 => 'big', _ => 'small' }\necho @size(3)\n", "a.kscript").Diagnostics,
+                x => x.Severity == DiagnosticSeverity.Error);
+        }
+
+        [Fact]
+        public void ChainedComparisonsAreReported()
+        {
+            Diagnostic d = Analyze("n = 5\necho 1 < $n < 10\n", "a.kscript").Diagnostics.Single(x => x.Code == DiagnosticCodes.TypeMismatch);
+            Assert.Contains("Comparisons can't be chained", d.Message);
+            Assert.DoesNotContain(Analyze("n = 5\necho 1 < $n and $n < 10\necho (1 < $n) == true\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.TypeMismatch);
+        }
+
+        [Fact]
+        public void ContinueInsideAFunctionIsReportedLikeTheRuntime()
+        {
+            // The runtime agrees: break and continue stop at the function they are in.
+            Assert.Contains(Analyze("fn f() {\n  continue\n}\nfor i in 0..2 {\n  @f()\n}\n", "a.kscript").Diagnostics, x => x.Code == DiagnosticCodes.MisplacedElement);
         }
     }
 }

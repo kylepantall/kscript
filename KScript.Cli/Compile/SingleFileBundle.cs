@@ -205,6 +205,9 @@ namespace KScript.Compile
     {
         public CompileException(string message) : base(message) { }
 
+        /// <summary>True when the command line was wrong (a missing script, an unknown target): exit code 2, not 1.</summary>
+        public bool Usage { get; init; }
+
         public KScript.Runtime.KScriptException ToKScriptError() => new KScript.Runtime.KScriptException(Message, "Compile", this);
     }
 }

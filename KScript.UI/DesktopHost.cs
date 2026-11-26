@@ -71,7 +71,7 @@ namespace KScript.UI
             }
         }
 
-        /// <summary>Starts Avalonia and builds the window, explaining a missing native library rather than crashing.</summary>
+        /// <summary>Starts Avalonia and builds the window, explaining a missing native library or display rather than crashing.</summary>
         internal static WindowView Open(UISession session, Action start)
         {
             try
@@ -83,6 +83,24 @@ namespace KScript.UI
             {
                 throw new KScriptException(MissingLibraryMessage, "UI");
             }
+            catch (Exception ex) when (NoDisplay(ex))
+            {
+                throw new KScriptException(NoDisplayMessage, "UI");
+            }
+        }
+
+        internal const string NoDisplayMessage =
+            "There is no display to open the window on. Run the script on a computer's desktop; " +
+            "on a server or over SSH there is none (on Linux, DISPLAY says which display to use).";
+
+        /// <summary>True when Linux has no display to connect to: a server, a container, or SSH without forwarding.</summary>
+        internal static bool NoDisplay(Exception ex)
+        {
+            for (; ex != null; ex = ex.InnerException)
+            {
+                if (ex.Message.Contains("XOpenDisplay", StringComparison.Ordinal)) return true;
+            }
+            return false;
         }
 
         internal const string MissingLibraryMessage =

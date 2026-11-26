@@ -57,7 +57,7 @@ public class WebCoverageTests
             ("data.unknownext", "?"));
 
         PageResult form = await Handle(site, "POST", "/echo", "name=Ann", "application/x-www-form-urlencoded");
-        Assert.Equal("<p>POST Ann </p>", form.Body);
+        Assert.Equal("<p>POST Ann name=Ann</p>", form.Body);
         PageResult json = await Handle(site, "POST", "/echo", "{\"a\":1}", "application/json");
         Assert.Contains("{&quot;a&quot;:1}", json.Body);
 

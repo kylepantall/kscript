@@ -110,6 +110,16 @@ namespace KScript.Conversion
             var roots = inputs.Where(Directory.Exists).Select(Path.GetFullPath).ToList();
 
             int failures = 0;
+            var formats = new Dictionary<string, global::KScript.Language.Formatting.FormatOptions>(PathComparer);
+            try
+            {
+                foreach (string file in files) FormatFor(file, formats);
+            }
+            catch (KScript.Projects.ProjectConfigException ex)
+            {
+                KScript.Runtime.ErrorReport.Write(error, ex);
+                return ExitCodes.Usage;
+            }
             foreach (string file in files)
             {
                 if (!ScriptFiles.IsScript(file))
@@ -139,7 +149,9 @@ namespace KScript.Conversion
                 var notConverted = new List<string>();
                 Func<string, string> importPath = src => ImportPath(file, src, toCode: !isCode, converting, notConverted);
                 ConversionResult result = isCode ? ScriptConverter.ToXml(parsed, importPath, LanguageCatalog.Default.IsNameList) : ScriptConverter.ToCode(parsed, importPath, LanguageCatalog.Default.IsNameList);
-                string written = RenameMentions(result.Text, file, toCode: !isCode, converting, roots);
+                string target = outPath ?? ScriptConverter.ConvertedPath(file);
+                // Laid out as kscript fmt would, with the project's format settings, so the new file passes fmt --check.
+                string written = KScript.Scaffolding.ScriptFormat.Tidy(target, RenameMentions(result.Text, file, toCode: !isCode, converting, roots), FormatFor(file, formats));
                 foreach (string src in notConverted.Distinct())
                 {
                     error.WriteLine($"{file}: imports {src}, which has no {(isCode ? "XML" : ".kscript")} version yet, so the import is kept as it is. " +
@@ -156,14 +168,29 @@ namespace KScript.Conversion
                     continue;
                 }
 
-                string target = outPath ?? ScriptConverter.ConvertedPath(file);
                 if (File.Exists(target) && !force)
                 {
                     error.WriteLine($"{target} already exists. Use --force to replace it, or --out to pick another name.");
                     failures++;
                     continue;
                 }
-                File.WriteAllText(target, written);
+                string folder = Path.GetDirectoryName(Path.GetFullPath(target));
+                if (!Directory.Exists(folder))
+                {
+                    error.WriteLine($"Could not write {target}: there is no folder at '{folder}'.");
+                    failures++;
+                    continue;
+                }
+                try
+                {
+                    File.WriteAllText(target, written);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    error.WriteLine($"Could not write {target}: {ex.Message}");
+                    failures++;
+                    continue;
+                }
                 output.WriteLine($"{file} -> {target}");
             }
             if (!toStdout && outPath == null)
@@ -201,11 +228,13 @@ namespace KScript.Conversion
                 }
             }
 
-            // Pages in a converted folder import the scripts too (<import path="lib/tasks.ks.xml" />), and a project's
-            // Makefile runs them (kscript desktop.ks.xml).
+            // Pages in a converted folder import the scripts too (<import path="lib/tasks.ks.xml" />), a project's
+            // Makefile runs them (kscript desktop.ks.xml), and so do the scripts this run left in their own syntax
+            // (a .kscript component that imports a model which was XML until now).
             foreach (string page in roots.SelectMany(r => Directory.EnumerateFiles(r, "*", SearchOption.AllDirectories))
                          .Where(f => f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
-                                     || string.Equals(Path.GetFileName(f), "Makefile", StringComparison.Ordinal))
+                                     || string.Equals(Path.GetFileName(f), "Makefile", StringComparison.Ordinal)
+                                     || (ScriptFiles.IsScript(f) && !converting.Contains(Path.GetFullPath(f)) && !IsConverted(f, converting)))
                          .Where(f => !f.Split(Path.DirectorySeparatorChar).Any(part => part is "node_modules" or ".git" or "_templates"))
                          .Distinct(PathComparer).OrderBy(f => f, StringComparer.Ordinal))
             {
@@ -225,6 +254,15 @@ namespace KScript.Conversion
                 if (global::KScript.Language.Agents.AgentDocs.Write(root, format: code ? "kscript" : "xml", skip: converting).Count > 0)
                     output.WriteLine($"{Path.Combine(root, global::KScript.Language.Agents.AgentDocs.AgentsFile)}: updated for the converted files");
             }
+        }
+
+        /// <summary>The format settings of the project a file is in (kscript.json's format section), read once per folder.</summary>
+        private static global::KScript.Language.Formatting.FormatOptions FormatFor(string file, Dictionary<string, global::KScript.Language.Formatting.FormatOptions> formats)
+        {
+            string folder = Path.GetDirectoryName(Path.GetFullPath(file));
+            if (!formats.TryGetValue(folder, out var options))
+                formats[folder] = options = global::KScript.Language.Formatting.FormatOptions.From(KScript.Projects.ProjectConfig.FindAndLoad(folder));
+            return options;
         }
 
         private static readonly System.Text.RegularExpressions.Regex Glob = new System.Text.RegularExpressions.Regex(@"""([^""\s]*)\*\.((?:test\.)?)ks\.xml""");
@@ -287,11 +325,15 @@ namespace KScript.Conversion
 
         private static bool IsXmlScript(string path) => ScriptFiles.IsXml(path);
 
+        /// <summary>True for a file this run wrote: the converted version of one of the scripts it converted.</summary>
+        private static bool IsConverted(string path, HashSet<string> converting) =>
+            converting.Any(original => PathComparer.Equals(Path.GetFullPath(ScriptConverter.ConvertedPath(original)), Path.GetFullPath(path)));
+
         private static void PrintUsage(TextWriter writer)
         {
             writer.WriteLine("Usage: kscript convert <file-or-folder>... [--syntax kscript|xml] [--out file] [--stdout] [--force]");
             writer.WriteLine("  Writes the .kscript version of an XML script (x.ks.xml -> x.kscript), or the XML version of a .kscript file.");
-            writer.WriteLine("  The original is left as it is. A folder converts every script in it (*.ks.xml, *.ks, *.kscript, tests too).");
+            writer.WriteLine("  The original is left as it is. A folder converts every script in it (*.kscript and *.ks.xml, tests too).");
             writer.WriteLine("  Imports, and file names in comments and strings, that point at a converted script are changed to its new name.");
         }
     }

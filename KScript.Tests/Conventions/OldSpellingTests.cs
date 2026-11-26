@@ -28,6 +28,7 @@ public class OldSpellingTests
         { "x = 1\n$x += 1\necho $x\n", "Assign to x, without $", "x = 1\nx += 1\necho $x\n", "2\n" },
         { "f = fn($a) => $a * 2\necho $f(2)\n", "Declare the parameter as a", "f = fn(a) => $a * 2\necho $f(2)\n", "4\n" },
         { "echo \"{ [1, 2]->map(fn($a) => $a * 2) }\"\n", "Declare the parameter as a", "echo \"{ [1, 2]->map(fn(a) => $a * 2) }\"\n", "2, 4\n" },
+        { "fn twice($n: number) => $n * 2\necho @twice(2)\n", "Declare the parameter as n", "fn twice(n: number) => $n * 2\necho @twice(2)\n", "4\n" },
         // Comparisons are symbols
         { "n = 1\nif $n lt 10 {\n  echo \"x\"\n}\n", "Write <", "n = 1\nif $n < 10 {\n  echo \"x\"\n}\n", "x\n" },
         { "n = 1\necho \"{ $n ge 10 ? 'a' : 'b' }\"\n", "Write >=", "n = 1\necho \"{ $n >= 10 ? 'a' : 'b' }\"\n", "b\n" },

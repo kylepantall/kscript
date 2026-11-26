@@ -161,6 +161,12 @@ namespace KScript.Updates
                     output.WriteLine("The KScript extension is updated to the same release in every editor that has it (VS Code, Cursor, VSCodium, Windsurf).");
                     return 0;
                 }
+                else if (args[i] is not ("--check" or "--force" or "--no-ide"))
+                {
+                    // A mistyped --check must never go on to install a release.
+                    error.WriteLine($"Unknown option '{args[i]}' for kscript update. Use --check, --force, --version <tag> or --no-ide.");
+                    return ExitCodes.Usage;
+                }
             }
 
             try
@@ -228,6 +234,11 @@ namespace KScript.Updates
                 .Select(a => a.GetProperty("browser_download_url").GetString())
                 .FirstOrDefault();
 
+            string sumsUrl = json.RootElement.GetProperty("assets").EnumerateArray()
+                .Where(a => a.GetProperty("name").GetString() == Checksums.FileName)
+                .Select(a => a.GetProperty("browser_download_url").GetString())
+                .FirstOrDefault();
+
             bool newer = IsNewer(latestTag, current);
             if (checkOnly)
             {
@@ -258,6 +269,15 @@ namespace KScript.Updates
                 return 1;
             }
 
+            if (sumsUrl == null && Checksums.Required(latestTag))
+            {
+                error.WriteLine(Checksums.Missing(latestTag));
+                return 1;
+            }
+
+            // Releases from somewhere other than kscript's own repository are named, so a stray KSCRIPT_REPO is seen.
+            if (!string.Equals(repo, DefaultRepository, StringComparison.OrdinalIgnoreCase))
+                new KScript.Output.CliOutput(output).Info($"Using releases from {repo} (KSCRIPT_REPO).");
             new KScript.Output.CliOutput(output).Info($"Downloading kscript {latestTag} ({assetName})...");
             string dir = Path.GetDirectoryName(target);
             string staged = Path.Combine(dir, $".kscript-update-{Guid.NewGuid():N}" + (env.Windows ? ".exe" : ""));
@@ -268,6 +288,22 @@ namespace KScript.Updates
                 await using (var download = await http.GetStreamAsync(downloadUrl))
                 {
                     await download.CopyToAsync(archive);
+                }
+                if (sumsUrl == null)
+                {
+                    new KScript.Output.CliOutput(output).Info(Checksums.Unchecked(latestTag));
+                }
+                else
+                {
+                    try
+                    {
+                        Checksums.Verify(archive.ToArray(), assetName, await http.GetStringAsync(sumsUrl));
+                    }
+                    catch (ChecksumException ex)
+                    {
+                        error.WriteLine(ex.Message);
+                        return 1;
+                    }
                 }
                 archive.Position = 0;
                 ExtractBinary(archive, assetName, staged);

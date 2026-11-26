@@ -162,7 +162,8 @@ namespace KScript.Language.Analysis
                 if (root.Length > 0 && scope.Lookup(root, span.Start) is Symbol s)
                 {
                     names.Add(root);
-                    result.References.Add(new SymbolReference(s, span, false, false));
+                    // The text only mentions the name: that counts as a use, but it is not a reference to rename or find.
+                    mentionedInText.Add(s);
                 }
             }
             if (names.Count == 0)

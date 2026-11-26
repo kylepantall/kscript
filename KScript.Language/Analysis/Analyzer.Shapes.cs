@@ -821,11 +821,11 @@ namespace KScript.Language.Analysis
             }
             if (scope == null)
             {
-                ReferenceImportedType(text, span);
+                ReferenceTypeName(text, span);
             }
             else if (scope.Lookup(name, offset) is Symbol symbol && IsTypeSymbol(symbol))
             {
-                result.References.Add(new SymbolReference(symbol, span, false, false));
+                result.References.Add(new SymbolReference(symbol, text.StartsWith(name, StringComparison.Ordinal) ? new TextSpan(span.Start, name.Length) : span, false, false));
             }
             if (TypeNamed(text, offset) == null)
             {

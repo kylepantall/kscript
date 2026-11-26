@@ -106,13 +106,21 @@ namespace KScript.Storage
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
             if (append)
             {
-                File.AppendAllText(path, text, Encoding.UTF8);
+                // No encoding argument: naming UTF-8 here would start a new file with a byte order mark, which ->write() never does.
+                File.AppendAllText(path, text);
                 return null;
             }
             // Written beside the file and then moved over it, so a crash never leaves half a settings file.
             string temp = path + ".tmp-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            File.WriteAllText(temp, text);
-            File.Move(temp, path, overwrite: true);
+            try
+            {
+                File.WriteAllText(temp, text);
+                File.Move(temp, path, overwrite: true);
+            }
+            finally
+            {
+                File.Delete(temp);
+            }
             return null;
         }
 
@@ -136,6 +144,11 @@ namespace KScript.Storage
             // A regex (/\.json$/) is matched against each name, folders included; text is a wildcard such as '*.json'.
             RegexValue regex = Values.Unwrap(call.Arg(0)) as RegexValue;
             string pattern = regex == null && call.Has(0) && call.Arg(0) != null ? call.Str(0) : "*";
+            string[] parts = pattern.Replace('\\', '/').Split('/');
+            if (System.IO.Path.IsPathRooted(pattern) || pattern.StartsWith('/') || pattern.StartsWith('\\') || parts.Contains(".."))
+                throw new KScriptException($"'{pattern}' isn't inside the app's {Kind} folder. Use a pattern such as '*.json' or 'notes/*.txt'.", "Permission");
+            // A pattern may name a folder first (notes/*.txt); one that isn't there has no files.
+            if (parts.Length > 1 && !Directory.Exists(System.IO.Path.Combine(Path, string.Join('/', parts[..^1])))) return new List<object>();
             var option = call.Bool(1) ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             return Directory.EnumerateFiles(Path, pattern, option)
                 .Select(f => System.IO.Path.GetRelativePath(Path, f).Replace('\\', '/'))

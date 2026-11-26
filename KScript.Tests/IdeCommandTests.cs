@@ -345,6 +345,30 @@ namespace KScript.Tests
         }
 
         [Fact]
+        public void OnlyTheXmlFormUsesAnXmlModeAndProjectsAreFoundByKscriptJson()
+        {
+            string neovim = Run(new FakeHost(), "config", "neovim").Out;
+            Assert.Contains("extension = { kscript = 'kscript' }", neovim);
+            Assert.Contains("vim.treesitter.language.register('xml', 'kscriptxml')", neovim);
+            Assert.DoesNotContain("register('xml', 'kscript')", neovim);
+            Assert.Contains("'kscript.json'", neovim);
+
+            string helix = Run(new FakeHost(), "config", "helix").Out;
+            string kscript = helix.Substring(helix.IndexOf("name = \"kscript\"", StringComparison.Ordinal), helix.IndexOf("name = \"kscript-xml\"", StringComparison.Ordinal) - helix.IndexOf("name = \"kscript\"", StringComparison.Ordinal));
+            Assert.Contains("file-types = [\"kscript\"]", kscript);
+            Assert.DoesNotContain("grammar", kscript);
+            Assert.Contains("\"kscript.json\"", helix);
+
+            string sublime = Run(new FakeHost(), "config", "sublime").Out;
+            Assert.Contains("\"selector\": \"source.kscript | text.xml\"", sublime);
+            Assert.Contains("file_extensions: [kscript]", sublime);
+
+            string emacs = Run(new FakeHost(), "config", "emacs").Out;
+            Assert.Contains("(define-derived-mode kscript-mode prog-mode", emacs);
+            Assert.Contains("(define-derived-mode kscript-xml-mode nxml-mode", emacs);
+        }
+
+        [Fact]
         public void TheExtensionIdMatchesTheManifest()
         {
             string dir = AppContext.BaseDirectory;

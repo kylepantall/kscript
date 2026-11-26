@@ -29,7 +29,7 @@ namespace KScript.LanguageServer
                     case "--help":
                     case "-h":
                         output.WriteLine("Usage: kscript fmt [file-or-folder]... [--check]");
-                        output.WriteLine("  Tidies .ks.xml, .ks and .xml scripts and kscript serve .html pages. With no path, formats the current project.");
+                        output.WriteLine("  Tidies .kscript and .ks.xml scripts and kscript serve .html pages. With no path, formats the current project.");
                         output.WriteLine("  --check   Change nothing; list the files that aren't formatted and exit 1 if there are any (for CI).");
                         return 0;
                     default:
@@ -66,6 +66,11 @@ namespace KScript.LanguageServer
                     }
                     else if (File.Exists(path))
                     {
+                        if (!IsScriptName(path) && !IsPageName(path))
+                        {
+                            output.WriteLine($"{path} is not a script or a page: scripts end in {KScript.Syntax.Markup.ScriptFiles.Code}, or {KScript.Syntax.Markup.ScriptFiles.Xml} for the XML form, and pages in .html or .md.");
+                            return 2;
+                        }
                         files.Add(path);
                     }
                     else
@@ -84,7 +89,7 @@ namespace KScript.LanguageServer
             files = files.DistinctBy(f => Path.GetFullPath(f)).OrderBy(f => f, StringComparer.Ordinal).ToList();
             if (files.Count == 0)
             {
-                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files<kscript>; " +
+                output.WriteLine($"No KScript files found in {string.Join(", ", given)}. Scripts are .kscript or .ks.xml files; " +
                                  ".html pages are formatted in folders with _layout.html, _components/, _layouts/ or kscript.json.");
                 return 2;
             }
@@ -149,11 +154,14 @@ namespace KScript.LanguageServer
                 }
             }
 
-            string files1 = formatted == 1 ? "file" : "files";
+            // fmt tidies scripts and HTML pages; kscript check also reads Markdown pages, so its count can be higher.
+            string files1 = formatted == 1 ? "script or page" : "scripts and pages";
             if (changed + failed > 0) cli.NewLine();
             if (check)
             {
-                if (changed == 0) cli.Success($"{formatted} {files1} checked: all formatted.");
+                // Nothing could be read: the error below says so, and "all formatted" would be wrong.
+                if (formatted == 0 && failed > 0) { }
+                else if (changed == 0) cli.Success($"{formatted} {files1} checked: all formatted.");
                 else cli.Error($"{formatted} {files1} checked: {changed} need formatting. Run kscript fmt to fix {(changed == 1 ? "it" : "them")}.");
             }
             else
@@ -229,5 +237,8 @@ namespace KScript.LanguageServer
         private static readonly string[] SiteMarkers = { "_components", "_layouts", "_layout.html", ProjectConfig.FileName };
 
         private static bool IsScriptName(string f) => KScript.Syntax.Markup.ScriptFiles.IsScript(f);
+
+        private static bool IsPageName(string f) =>
+            f.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
     }
 }

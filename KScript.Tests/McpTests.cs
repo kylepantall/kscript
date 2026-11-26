@@ -498,6 +498,34 @@ public sealed class McpTests : IDisposable
     }
 
     [Fact]
+    public void Paths_only_reach_scripts_and_pages_in_the_servers_folder()
+    {
+        McpServer server = Server();
+        Write("notes.txt", "a secret");
+        Write("page.html", "<p>hi</p>\n");
+        string outside = Path.Combine(Path.GetTempPath(), "kscript-mcp-outside-" + Guid.NewGuid().ToString("N") + ".kscript");
+        File.WriteAllText(outside, "echo \"secret\"\n");
+        try
+        {
+            foreach (string tool in new[] { "format_code", "check_code" })
+            {
+                foreach (string path in new[] { "notes.txt", outside, "../" + Path.GetFileName(outside), "/etc/hostname" })
+                {
+                    var (text, error) = Call(server, tool, new { path });
+                    Assert.True(error, $"{tool} read {path}");
+                    Assert.Contains("isn't a script or page in the server's folder", text);
+                    Assert.DoesNotContain("secret", text);
+                }
+                Assert.False(Call(server, tool, new { path = "page.html" }).IsError);
+            }
+        }
+        finally
+        {
+            File.Delete(outside);
+        }
+    }
+
+    [Fact]
     public void Convert_code_switches_formats()
     {
         McpServer server = Server();
@@ -526,6 +554,29 @@ public sealed class McpTests : IDisposable
         Assert.True(failedError);
         Assert.Contains("Error:\n", failed);
         Assert.True(Call(server, "run_code").IsError);
+
+        // The sandbox has KScript.Data too, as its description says, and none of this computer's environment variables.
+        string description = Result(server, "tools/list")["tools"]!.AsArray().Single(t => t!["name"]!.GetValue<string>() == "run_code")!["description"]!.GetValue<string>();
+        Assert.Contains("Data", description);
+        Assert.False(Call(server, "run_code", new { code = "import KScript.Data\necho \"ok\"" }).IsError);
+        Assert.Contains("Output:\n0 none\n", Call(server, "run_code", new { code = "echo \"{ $env->count() } { @env('PATH', 'none') }\"" }).Text);
+    }
+
+    [Fact]
+    public void Variables_is_a_page_and_a_name_of_only_punctuation_has_no_matches()
+    {
+        McpServer server = Server();
+        var (variables, error) = Call(server, "read_doc", new { page = "variables" });
+        Assert.False(error);
+        Assert.StartsWith("# Built-in variables", variables);
+        Assert.StartsWith("# money[] fields and methods", Call(server, "read_doc", new { page = "kscript://docs/reference/methods/money-list" }).Text);
+
+        foreach (string name in new[] { "<", "@", "$" })
+        {
+            var (text, notFound) = Call(server, "lookup", new { name });
+            Assert.True(notFound);
+            Assert.Equal($"KScript has nothing called '{name}'.", text);
+        }
     }
 
     #endregion

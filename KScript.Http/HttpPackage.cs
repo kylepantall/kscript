@@ -185,7 +185,7 @@ namespace KScript.Http
                     var values = new Dictionary<string, object>(c.Named, StringComparer.Ordinal);
                     if (c.Count > 1 && Values.Unwrap(c.Arg(1)) is Dictionary<string, object> map) foreach (var kv in map) values[kv.Key] = kv.Value;
                     return table.Url(name, values);
-                }, "<a href=\"{@route('people.show', id: $p.id)}\">");
+                }, "<a href=\"{ @route('people.show', id: $p.id) }\">{ $p.name }</a>");
 
             RouteCatalog.Register(p);
 
@@ -461,7 +461,8 @@ namespace KScript.Http
         private static object Response(CallContext c)
         {
             object body = Values.Unwrap(c.Arg(0, "body"));
-            int status = c.Has(1, "status") && c.Arg(1, "status") != null ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 200;
+            bool statusGiven = c.Has(1, "status") && c.Arg(1, "status") != null;
+            int status = statusGiven ? (int)Values.ToNumber(c.Arg(1, "status"), "status") : 200;
             HttpResponse response = body switch
             {
                 HttpResponse existing => existing,
@@ -470,7 +471,8 @@ namespace KScript.Http
                     new HttpResponse(status, contentType: "application/octet-stream") { BodyBytes = bytes },
                 _ => HttpResponse.Json(body, status),
             };
-            response.Status = status;
+            // An answer passed in (a redirect, a 404 view) keeps its own status unless one is given here.
+            if (statusGiven) response.Status = status;
             if (c.Has(2, "type") && c.Arg(2, "type") != null) response.ContentType = Values.ToStr(c.Arg(2, "type"));
             if (c.Has(3, "headers") && Values.Unwrap(c.Arg(3, "headers")) is Dictionary<string, object> headers)
             {

@@ -41,6 +41,22 @@ namespace KScript.Language.Tests
             Assert.Equal("Europe/Lo", a.Source.Text.Substring(item.ReplaceSpan.Start, item.ReplaceSpan.Length));
         }
 
+        [Theory]
+        [InlineData("import KScript.Document\n\nDocument(to: \"a.pdf\", paper: ‸) {\n}\n", "main.kscript")]
+        [InlineData("<kscript>\n<import package=\"KScript.Document\" />\n<KScript.Document to=\"a.pdf\" paper=\"‸\">\n</KScript.Document>\n</kscript>", "main.ks.xml")]
+        public void Text_with_fixed_words_offers_them(string textWithCaret, string file)
+        {
+            (string text, int offset) = TestHelpers.WithCaret(textWithCaret);
+            DocumentAnalysis a = Service.Analyze(text, Path.Combine(Folder, file));
+            List<CompletionItem> items = Service.GetCompletions(a, offset);
+            Assert.Equal(new[] { "a4", "a3", "a5", "b5", "letter", "legal" }, items.Where(i => i.Kind == CompletionKind.Value).Select(i => i.Label));
+            // Accepting one writes the word where the caret is.
+            Assert.All(items.Where(i => i.Kind == CompletionKind.Value), i => Assert.Equal(offset, i.ReplaceSpan.Start));
+            // The title next to it is any text, so no words are offered there.
+            string title = text.Replace("paper", "title");
+            Assert.DoesNotContain(Service.GetCompletions(Service.Analyze(title, Path.Combine(Folder, file)), offset), i => i.Label == "letter");
+        }
+
         [Fact]
         public void Typed_variables_offer_enum_values_durations_and_more()
         {

@@ -66,7 +66,7 @@ fn sign_out() {
 ```
 
 - `@register(email, password, fields...)` checks the email and password with their types and your project's rules. It refuses an email someone already signed up with (case doesn't matter), keeps only an argon2id hash of the password, and keeps the other named values as the user's fields. A problem is a `Validation` error that names the field, which a route answers with 422.
-- `@attempt(email, password, remember?, session?)` returns the user, or `null`. When the email has no account it takes about as long, so the timing doesn't give away who has one. A hash made with older settings is made again. `session: false` only checks, for an API that answers with a token.
+- `@attempt(email, password, remember?, session?)` returns the user, or `null`. When the email has no account it takes about as long, so the timing doesn't give away who has one. A hash made with older settings is made again, with the algorithm the project's [password type](types.md#project-defaults-in-kscriptjson) names (argon2id unless it says `bcrypt`). `session: false` only checks, for an API that answers with a token.
 - `@login(user, remember?)` signs a user in. The session gets a new id, so an id seen before the sign-in can't be used. `remember: true` keeps them signed in for `http.auth.remember` (30 days) after the browser closes.
 - `@logout(everywhere?)` ends the session and removes its cookie. `everywhere: true` ends the user's sessions on every device.
 - `@user()` is the signed-in user (a map with `id`, `email`, `created_at` and their fields, never the hash), or `null`. `@is_signed_in()` is true when there is one.
@@ -191,7 +191,7 @@ $session->flash('status', 'Your profile was saved.')
 | `->regenerate()` | Gives the session a new id with the same values. `@login` does this for you. |
 | `.token` | The CSRF token, like `@csrf_token()`. |
 
-Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cookie is `HttpOnly` and `SameSite=Lax`. It is `Secure` on https, behind a proxy that sends `X-Forwarded-Proto: https`, or with `SameSite=None`. A session lasts `http.auth.lifetime` (2 hours) after the last request.
+Keys starting with `_` are kept by KScript.Auth, so they can't be set. The cookie is `HttpOnly` and `SameSite=Lax`. It is `Secure` on https, behind a proxy that sends `X-Forwarded-Proto: https`, or with `SameSite=None`. A session lasts `http.auth.lifetime` (2 hours) after the last request. Sessions and reset tokens that have run out are removed from the state folder now and then, as new ones are written.
 
 ## Users
 

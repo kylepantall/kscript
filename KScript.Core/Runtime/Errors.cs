@@ -92,6 +92,12 @@ namespace KScript.Runtime
     public abstract class ControlSignal : Exception
     {
         protected ControlSignal(string what) : base(what) { }
+
+        /// <summary>Where the statement is, for the error when nothing takes the signal (a break outside a loop).</summary>
+        public Module Module { get; init; }
+
+        /// <summary>The statement's offset in <see cref="Module"/>.</summary>
+        public int? Offset { get; init; }
     }
 
     public sealed class BreakSignal : ControlSignal

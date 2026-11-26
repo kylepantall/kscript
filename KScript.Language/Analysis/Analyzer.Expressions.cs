@@ -205,7 +205,29 @@ namespace KScript.Language.Analysis
                     AnalyzeExpr(comparison.Left, region, scope, ExprContext.Value);
                     AnalyzeExpr(comparison.Right, region, scope, ExprContext.Value);
                     CheckNativeOrdering(comparison, region);
+                    if (comparison.Left is BinaryNode { Operator: "<" or "<=" or ">" or ">=" } first && !InBrackets(first, region))
+                    {
+                        // 1 < $n < 10 compares true or false with 10, which the runtime refuses.
+                        Report(region.Source.ToSource(comparison.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
+                            $"Comparisons can't be chained: '{first.Operator}' gives true or false, which '{comparison.Operator}' can't compare with a number. Join two comparisons with and.");
+                    }
                     return;
+
+                case MatchNode match:
+                {
+                    // As in a match statement, $it is the value being matched.
+                    AnalyzeExpr(match.Subject, region, scope, ExprContext.Value);
+                    TextSpan matchSpan = region.Source.ToSource(match.Span);
+                    Scope arms = new Scope(scope, matchSpan);
+                    Symbol it = new Symbol { Name = "it", Kind = SymbolKind.BuiltIn, Description = "The value being matched." };
+                    result.Symbols.Add(it);
+                    arms.Declare(it, matchSpan.Start);
+                    foreach (ExprNode child in match.Children)
+                    {
+                        if (!ReferenceEquals(child, match.Subject)) AnalyzeExpr(child, region, arms, ExprContext.Value);
+                    }
+                    return;
+                }
 
                 default:
                     foreach (ExprNode child in node.Children)
@@ -735,6 +757,15 @@ namespace KScript.Language.Analysis
                         "A pipe needs a method, function, command or lambda on its right, as in |> upper() or |> json().");
                     return;
             }
+        }
+
+        /// <summary>True when the text right after <paramref name="node"/> closes a bracket, as in (1 &lt; 2) &lt; 3.</summary>
+        private static bool InBrackets(ExprNode node, ExpressionRegion region)
+        {
+            string text = region.Source.Value;
+            int i = node.Span.End;
+            while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
+            return i < text.Length && text[i] == ')';
         }
 
         private void AnalyzeLambda(LambdaNode lambda, ExpressionRegion region, Scope scope, TypeShape[] parameterShapes = null)

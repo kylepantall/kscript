@@ -56,8 +56,33 @@ tmp="$(mktemp -d)"
 package_dir=''
 trap 'rm -rf "$tmp"; if [ -n "$package_dir" ]; then rm -rf "$package_dir"; fi' EXIT INT TERM
 
+# The SHA-256 of a file, by whichever tool this system has; nothing when it has none.
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d ' ' -f 1
+  elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d ' ' -f 1
+  elif command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 -r "$1" | cut -d ' ' -f 1
+  fi
+}
+
+if [ "$REPO" != kylepantall/kscript ]; then say "Using releases from $REPO (KSCRIPT_REPO)."; fi
 say "Downloading $asset ($VERSION)..."
 download "$url" "$tmp/$asset" || fail "could not download $url"
+
+# The release lists the SHA-256 of each of its files in SHA256SUMS: check the download before unpacking it.
+if download "${url%/*}/SHA256SUMS" "$tmp/SHA256SUMS" 2>/dev/null; then
+  expected="$(awk -v name="$asset" '{ file = $2; sub(/^\*/, "", file); if (file == name) { print tolower($1); exit } }' "$tmp/SHA256SUMS")"
+  [ -n "$expected" ] || fail "SHA256SUMS doesn't list $asset, so the download can't be checked"
+  actual="$(sha256 "$tmp/$asset")"
+  if [ -z "$actual" ]; then
+    say "sha256sum, shasum or openssl is needed to check the download, and none is installed: it wasn't checked."
+  elif [ "$actual" = "$expected" ]; then
+    say "Checked $asset against the release's SHA256SUMS."
+  else
+    fail "the checksum of $asset is wrong: SHA256SUMS lists $expected but the download is $actual. It may be damaged or not the released file. Nothing was installed"
+  fi
+else
+  say "This release has no SHA256SUMS file (releases before 0.10 don't), so the download wasn't checked."
+fi
 mkdir -p "$BIN_DIR"
 package_dir="$(mktemp -d "$BIN_DIR/.kscript-install.XXXXXX")"
 tar -xzf "$tmp/$asset" -C "$package_dir" || fail "could not unpack $asset"

@@ -667,6 +667,35 @@ namespace KScript.Runtime
             return Convert(interpreter, value, parsed, what, scope, module);
         }
 
+        /// <summary>
+        /// Converts what a request sent (a path parameter, the query, a form, a JSON body) to a declared type. As
+        /// <see cref="Convert(Interpreter, object, string, string, Scope, Module)"/>, but a number has to be exactly
+        /// what the type says (1.9 or 1e999 is not an int, and is not cut down to one), and one text given to a list
+        /// is a list of one, since ?tag=a and ?tag=a&amp;tag=b must both fit string[].
+        /// </summary>
+        public static object ConvertRequest(Interpreter interpreter, object value, string type, string what, Scope scope, Module module)
+        {
+            TypeRef parsed = TypeRef.Parse(type) ?? throw new KScriptException($"'{type}' isn't a type. Write a name such as string, int or Repo, with [] for a list and ? to allow null.", "Type");
+            if (parsed.IsSimple && parsed.IsBuiltIn && TypeDefaults.For(module, parsed.Name) == null)
+            {
+                if (RequestNumberProblem(parsed.Name, value) is string problem) throw new KScriptException($"{what} {problem}", "Type");
+                return Values.ConvertTo(value, parsed.Name, what);
+            }
+            var mapper = new ShapeMapper(interpreter, scope, module) { FromRequest = true };
+            object result = mapper.Convert(value, true, parsed, "$", null, 0);
+            mapper.ThrowIfAny(what, parsed);
+            return result;
+        }
+
+        /// <summary>Why a number a request sent can't be the int, float or number asked for, or null when it can.</summary>
+        internal static string RequestNumberProblem(string type, object value)
+        {
+            if (type is not ("int" or "float" or "number") || !Values.TryNumber(Values.Unwrap(value), out double number)) return null;
+            if (!double.IsFinite(number)) return $"needs {(type == "int" ? "an int" : "a " + type)}, but got a number too large to hold.";
+            if (type == "int" && number != Math.Truncate(number)) return $"needs a whole number, but got {Values.Describe(value)}.";
+            return null;
+        }
+
         internal static object Convert(Interpreter interpreter, object value, TypeRef type, string what, Scope scope, Module module, bool normalize = true)
         {
             if (type.IsSimple && type.IsBuiltIn && TypeDefaults.For(module, type.Name) == null) return Values.ConvertTo(value, type.Name, what);
@@ -1331,7 +1360,10 @@ namespace KScript.Runtime
             if (type.Description != null) schema["description"] = type.Description;
             schema["properties"] = properties;
             if (required.Count > 0) schema["required"] = required;
-            schema["additionalProperties"] = type.Extra == ExtraKeys.Keep;
+            // For structured output (#/$defs/) the schema is strict. An OpenAPI document describes what the server
+            // does with a body: other fields are refused only under extra: error; by default they are left out, which
+            // "additionalProperties": false would wrongly call invalid.
+            if (refBase == "#/$defs/" || type.Extra != ExtraKeys.Drop) schema["additionalProperties"] = type.Extra == ExtraKeys.Keep;
             (type.Tag as IRecordKind)?.DescribeSchema(type, schema);
             return schema;
         }
@@ -1462,6 +1494,12 @@ namespace KScript.Runtime
 
         public List<ShapeProblem> Problems { get; } = new List<ShapeProblem>();
 
+        /// <summary>
+        /// True for what a request sent: numbers are not cut down or rounded to fit, and one text fits a list as its
+        /// only item (see <see cref="Shapes.ConvertRequest"/>).
+        /// </summary>
+        public bool FromRequest { get; init; }
+
         public void ThrowIfAny(string what, TypeRef type)
         {
             if (Problems.Count == 0) return;
@@ -1502,6 +1540,8 @@ namespace KScript.Runtime
             }
             if (type.ListDepth > 0)
             {
+                // A name sent once in a query or form is one text; sent twice it is a list. Both fit a list.
+                if (FromRequest && Values.Unwrap(value) is string one) value = new List<object> { one };
                 if (Values.Unwrap(value) is not List<object> list)
                 {
                     Problem(path, field, $"needs a list of {type.Item}, but got {Values.Describe(value)}.");
@@ -1533,6 +1573,17 @@ namespace KScript.Runtime
                 {
                     if (SemanticTypes.TryConvert(type.Name, value, out object converted, out string reason)) return converted;
                     Problem(path, field, SemanticTypes.Mismatch(type.Name, value, reason) + ".");
+                    return null;
+                }
+                if (FromRequest && Shapes.RequestNumberProblem(type.Name, value) is string wrongNumber)
+                {
+                    Problem(path, field, wrongNumber);
+                    return null;
+                }
+                // Data for an int is a whole number: 12.9 is reported, not cut down to 12.
+                if (string.Equals(type.Name, "int", StringComparison.OrdinalIgnoreCase) && Values.TryNumber(value, out double whole) && whole != Math.Truncate(whole))
+                {
+                    Problem(path, field, $"needs a whole number, but got {Values.Describe(value)}.");
                     return null;
                 }
                 try
@@ -1578,7 +1629,7 @@ namespace KScript.Runtime
                 }
                 else if (!type.IsA(typed.Type)) value = typed.Value;
             }
-            var inner = new ShapeMapper(interpreter, type.Closure, type.Module, normalizeValue);
+            var inner = new ShapeMapper(interpreter, type.Closure, type.Module, normalizeValue) { FromRequest = FromRequest };
             object mapped = inner.Convert(value, true, type.Base, path, field, depth + 1);
             if (normalizeValue && inner.Problems.Count == 0 && type.Rules.Normalize != null)
             {
@@ -1668,12 +1719,12 @@ namespace KScript.Runtime
 
             var record = new Record(type);
             var used = new HashSet<string>(StringComparer.Ordinal);
-            var mapper = new ShapeMapper(interpreter, type.Closure, type.Module, normalize);
+            var mapper = new ShapeMapper(interpreter, type.Closure, type.Module, normalize) { FromRequest = FromRequest };
             object ConvertField(FieldDefinition field, object raw, bool found, TypeRef target, string fieldPath)
             {
                 RecordType owner = field.Owner ?? type;
                 if (owner == type) return mapper.Convert(raw, found, target, fieldPath, field.Name, depth + 1);
-                var inherited = new ShapeMapper(interpreter, owner.Closure, owner.Module, normalize);
+                var inherited = new ShapeMapper(interpreter, owner.Closure, owner.Module, normalize) { FromRequest = FromRequest };
                 object result = inherited.Convert(raw, found, target, fieldPath, field.Name, depth + 1);
                 mapper.Problems.AddRange(inherited.Problems);
                 return result;

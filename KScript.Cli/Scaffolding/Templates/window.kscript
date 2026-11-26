@@ -7,6 +7,7 @@ usage: <name> [--title "Title"] [--width 480] [--height 360]
 --height: The height (default 360)
 example: kscript make window settings --width 400 --height 300
 example: kscript make window windows/about --title "About this app"
+checks: width=int; height=int
 to: {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Open it: kscript {{ paths.windows }}/{{ dir }}{{ kebab }}{{ ext }}. Build a program from it: kscript compile {{ dir }}{{ kebab }}{{ ext }}
 ---

@@ -104,7 +104,9 @@ namespace KScript.Net
     {
         private static readonly Lazy<HttpClient> Client = new Lazy<HttpClient>(() =>
         {
-            var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            // No cookie jar: the client is shared by every script and request of the process, so a cookie one
+            // answer sets must never ride along on a later call. A script that wants a cookie sends the header.
+            var client = new HttpClient(new SocketsHttpHandler { UseCookies = false }) { Timeout = Timeout.InfiniteTimeSpan };
             client.DefaultRequestHeaders.UserAgent.ParseAdd(HttpIdentity.Product);
             return client;
         });
@@ -157,8 +159,10 @@ namespace KScript.Net
                     </kscript>
                     """,
             }, Api);
-            p.Command("query_string", "map", "A map as a URL query: a=1&b=two.", KType.String, c =>
-                string.Join("&", c.Map(0).Where(kv => kv.Value != null).Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(Values.ToStr(kv.Value)))));
+            p.Command("query_string", "map", "A map as a URL query: a=1&b=two. A list is written once per item (tag=a&tag=b), the form @parse_query reads back.", KType.String, c =>
+                string.Join("&", c.Map(0).Where(kv => kv.Value != null)
+                    .SelectMany(kv => Values.Unwrap(kv.Value) is List<object> list ? list.Where(item => item != null).Select(item => (kv.Key, Value: item)) : new[] { (kv.Key, kv.Value) })
+                    .Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(Values.ToStr(kv.Value)))));
 
             p.Command("download", "url, to, overwrite?: bool", "Downloads a URL to a file and returns the file's full path. Folders are created as needed, and a relative path is from the script's folder. overwrite: false keeps a file that is already there.", KType.String, c =>
             {
@@ -203,6 +207,7 @@ namespace KScript.Net
                 throw c.Error($"@api() needs an http:// or https:// address, or a path on this app such as '/api/notes', but got '{url}'.", "Argument");
 
             string method = options.TryGetValue("method", out object m) && m != null ? Values.ToStr(m).ToUpperInvariant() : "GET";
+            if (!IsToken(method)) throw c.Error($"method '{method}' isn't an HTTP method. Use GET, POST, PUT, PATCH or DELETE.", "Argument");
             double retries = options.GetValueOrDefault("retries") is object count ? Values.ToNumber(count, "retries") : 0;
             if (retries < 0 || retries > 10 || retries != Math.Truncate(retries))
                 throw c.Error("retries must be a whole number from 0 to 10.", "Argument");
@@ -212,6 +217,7 @@ namespace KScript.Net
             double delay = options.GetValueOrDefault("retry_delay") is object wait ? Duration.Seconds(wait, "retry_delay") : 0.1;
             if (delay < 0 || seconds <= 0 || !double.IsFinite(seconds) || !double.IsFinite(delay))
                 throw c.Error("timeout must be positive and retry_delay must be nonnegative.", "Argument");
+            if (seconds > MaxWait || delay > MaxWait) throw c.Error("timeout and retry_delay can be at most 24 days.", "Argument");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(c.Interpreter.Options.Cancellation);
             timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
             try
@@ -233,6 +239,13 @@ namespace KScript.Net
                 throw new KScriptException($"{url} didn't answer within {seconds} seconds.", "Timeout");
             }
         }
+
+        /// <summary>The longest wait a timer takes: a little under 25 days.</summary>
+        private const double MaxWait = 24 * 86400;
+
+        /// <summary>Whether text can be an HTTP method: one or more letters, digits or the few signs a token allows.</summary>
+        private static bool IsToken(string text) =>
+            text.Length > 0 && text.All(ch => ch < 127 && (char.IsAsciiLetterOrDigit(ch) || "!#$%&'*+-.^_`|~".Contains(ch)));
 
         private static ResponseValue Send(CallContext c, Uri uri, string method, Dictionary<string, object> options, CancellationToken stop)
         {
@@ -263,7 +276,9 @@ namespace KScript.Net
                     request.Content = new StringContent(json ? Values.ToJson(body) : Values.ToStr(body), Encoding.UTF8);
                     defaultType = json ? "application/json" : "text/plain; charset=utf-8";
                 }
-                request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType ?? defaultType);
+                if (!MediaTypeHeaderValue.TryParse(contentType ?? defaultType, out MediaTypeHeaderValue type))
+                    throw c.Error($"Content-Type '{contentType}' isn't a content type. Write one such as application/json.", "Argument");
+                request.Content.Headers.ContentType = type;
             }
             try
             {

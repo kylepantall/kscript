@@ -27,6 +27,33 @@ public sealed class IOTests : IDisposable
     private string P(params string[] parts) => Path.Combine(new[] { dir }.Concat(parts).ToArray());
 
     [Fact]
+    public void Append_starts_a_file_without_a_byte_order_mark()
+    {
+        Run("<do>@append_text('new.txt', 'héllo')</do><do>@append_text('new.txt', '!')</do>");
+        Assert.Equal(new byte[] { 0x68, 0xC3, 0xA9, 0x6C, 0x6C, 0x6F, 0x21 }, File.ReadAllBytes(P("new.txt")));
+    }
+
+    [Theory]
+    [InlineData("copy", "copied")]
+    [InlineData("move", "moved")]
+    public void A_folder_is_not_copied_or_moved_into_itself(string command, string verb)
+    {
+        Directory.CreateDirectory(P("out", "sub"));
+        File.WriteAllText(P("out", "a.txt"), "a");
+        foreach (string to in new[] { "out/sub", "out/new/deeper" })
+        {
+            KScriptException error = Fails($"<do>@{command}('out', '{to}')</do>");
+            Assert.Equal("Argument", error.Type);
+            Assert.Contains($"can't be {verb} into itself", error.Message);
+        }
+        Assert.Empty(Directory.GetFileSystemEntries(P("out", "sub")));
+        Assert.False(Directory.Exists(P("out", "new")));
+        // A folder beside it whose name only starts the same way is somewhere else.
+        Run($"<do>@{command}('out', 'outside')</do>");
+        Assert.Equal("a", File.ReadAllText(P("outside", "a.txt")));
+    }
+
+    [Fact]
     public void File_values_answer_questions_about_themselves()
     {
         File.WriteAllText(P("notes.txt"), "one\ntwo");

@@ -72,7 +72,7 @@ namespace KScript.Data
         public SqlExpr Right { get; }
     }
 
-    /// <summary><c>NOT x</c>, <c>-x</c>, <c>x IS NULL</c> and <c>x IS NOT NULL</c>.</summary>
+    /// <summary><c>NOT x</c>, <c>-x</c>, <c>x IS NULL</c>, <c>x IS NOT NULL</c> and <c>x IS NOT TRUE</c> (not x, where an unknown x counts as false).</summary>
     internal sealed class SqlUnary : SqlExpr
     {
         public SqlUnary(string op, SqlExpr operand)
@@ -276,7 +276,7 @@ namespace KScript.Data
                 case SqlRaw raw:
                     sb.Append(raw.Text);
                     break;
-                case SqlUnary u when u.Op is "IS NULL" or "IS NOT NULL":
+                case SqlUnary u when u.Op is "IS NULL" or "IS NOT NULL" or "IS NOT TRUE":
                     if (nested) sb.Append('(');
                     Expr(u.Operand, nested: true);
                     sb.Append(' ').Append(u.Op);

@@ -34,6 +34,11 @@ namespace KScript.Http
         private RouteTable cached;
         private DateTime[] stamps;
         private readonly Dictionary<string, (DateTime Start, int Count)> throttle = new Dictionary<string, (DateTime, int)>(StringComparer.Ordinal);
+        private DateTime throttlePruned;
+        private double longestThrottle;
+
+        /// <summary>How many throttle counts are kept. Tests read it.</summary>
+        internal int ThrottleEntries { get { lock (throttle) return throttle.Count; } }
 
         public HttpApp(string siteRoot, ProjectConfig project = null, TextWriter log = null)
         {
@@ -271,6 +276,7 @@ namespace KScript.Http
             }
             catch (KScriptException ex)
             {
+                if (PageSite.HideErrorDetails) Log?.WriteLine("  error: " + (ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message));
                 return ErrorPage(ex);
             }
 
@@ -280,6 +286,12 @@ namespace KScript.Http
             if (table.Match(live ? "GET" : request.Method, path) == null && !IsApiPath(path)) return null;
 
             var (map, error) = await PageServer.ReadPageRequestAsync(request, live);
+            // A body that could not be read (too large, cut short): API paths say so in JSON, like their other errors.
+            if (error != null && error.Body.Length > 0 && IsApiPath(path))
+                return ToPage(HttpResponse.Json(new Dictionary<string, object>
+                {
+                    ["error"] = PageServer.BodyErrorMessage(error.Status), ["status"] = (double)error.Status,
+                }, error.Status), request.Method);
             if (error != null) return error;
             map[RouteRequestFields.Ip.Name] = request.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "127.0.0.1";
             return Handle(map);
@@ -288,7 +300,7 @@ namespace KScript.Http
         internal PageResult RenderFilePage(PageRoute route, Dictionary<string, object> request)
         {
             request[RequestFields.RouteInfo.Name] = RouteCatalog.PageInfo(route.Path, route.Params.Keys, RouteCatalog.PageLabelKey(this, route.File));
-            var ctx = new RequestContext(this, request);
+            var ctx = new RequestContext(this, request) { FilePage = true };
             try
             {
                 return RestoreLiveRequest(ctx) ?? PageRenderer.RenderFile(ctx.Page, route.File, route.Params);
@@ -455,7 +467,7 @@ namespace KScript.Http
         private HttpResponse Failure(RequestContext ctx, string message)
         {
             Log?.WriteLine("  error: " + message);
-            return ctx.ErrorResponse(500, message);
+            return ctx.ErrorResponse(500, PageSite.HideErrorDetails ? PageServer.HiddenErrorMessage : message);
         }
 
         /// <summary>A JSON body is read into <c>$request.json</c>; <c>$request.input</c> holds the query, form and JSON fields together.</summary>
@@ -596,7 +608,7 @@ namespace KScript.Http
                 }
                 try
                 {
-                    named[p.Name] = Shapes.Convert(interpreter, value, p.Type, what, fn.Closure, fn.Module);
+                    named[p.Name] = Shapes.ConvertRequest(interpreter, value, p.Type, what, fn.Closure, fn.Module);
                 }
                 catch (KScriptException ex) when (ex.Type == "Shape" || ex.Type == "Type" || ex.Type == "Argument")
                 {
@@ -644,14 +656,22 @@ namespace KScript.Http
             return result;
         }
 
-        private static PageResult ErrorPage(KScriptException ex) =>
-            PageServer.ErrorPage(new PageException(ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message));
+        private PageResult ErrorPage(KScriptException ex) =>
+            PageServer.ErrorPage(new PageException(ex.Location != null ? $"{ex.Location}: {ex.Message}" : ex.Message), !PageSite.HideErrorDetails);
 
         internal bool Throttle(string key, int limit, double seconds, out int remaining, out double retryAfter)
         {
             lock (throttle)
             {
                 DateTime now = Clock();
+                // Counts whose window ended are dropped now and then, so one entry per visitor doesn't stay forever.
+                longestThrottle = Math.Max(longestThrottle, seconds);
+                if ((now - throttlePruned).TotalSeconds >= 60 || now < throttlePruned)
+                {
+                    throttlePruned = now;
+                    foreach (string old in throttle.Where(e => (now - e.Value.Start).TotalSeconds >= longestThrottle).Select(e => e.Key).ToList())
+                        throttle.Remove(old);
+                }
                 if (!throttle.TryGetValue(key, out var entry) || (now - entry.Start).TotalSeconds >= seconds) entry = (now, 0);
                 entry.Count++;
                 throttle[key] = entry;
