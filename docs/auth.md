@@ -19,11 +19,100 @@ Then `kscript serve`, open `/register` to make an account, and `/account` to see
 | `routes/api.kscript` (with `--api`, added to) | `POST /api/tokens` and `GET /api/me`. |
 | `controllers/accounts.kscript` | The controller: sign up, sign in, sign out, resets, the account page and tokens. |
 | `requests/sign-up.kscript` | The `SignUp` type the sign-up form is checked against, imported by the controller. |
-| `views/auth/*.html` | The pages: login, register, forgot-password, reset-password and account. |
+| `_components/*.kscript` | The [components](components.md) the pages are made of: the sign-in, sign-up and password forms, the account details, the passkey list and the API tokens. |
+| `views/auth/*.html` | The pages: login, register, forgot-password, reset-password and account. Each holds a heading and its components. |
 | `_layout.html` | A plain layout, only when the site has none. |
 | `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet. |
 
-It respects `make.syntax` and `--syntax xml`, the folders in `paths`, and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
+It respects `make.syntax` and `--syntax xml`, the folders in `paths` (components go in `paths.components`), and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
+
+## Pages made of components
+
+Each page `kscript make auth` writes is a heading and a few components, so a form can be moved, restyled or used on another page without copying it. The controller passes what a form needs to show again, and the page hands it on:
+
+```html
+<!-- views/auth/login.html -->
+<layout path="/_layout.html" title="Sign in">
+  <h1>Sign in</h1>
+  <sign-in-form email="{$data.email ?? ''}" error="{$data.error}" />
+  <p><a href="/forgot-password">Forgot your password?</a> · <a href="/register">Create an account</a></p>
+</layout>
+```
+
+The component lists its inputs in `construct`, so `kscript check` reports a page that passes anything else:
+
+````kscript
+// _components/sign-in-form.kscript
+import KScript.Web
+import KScript.Auth
+
+type SignInForm extends Component {
+  construct({ email: string = '', error?: string })
+
+  fn render() => ```html
+    <status-message />
+    <if test="$error != null"><p class="error">{$error}</p></if>
+    <form method="post" action="/login">
+      {! @csrf_field() }
+      <p><label>Email<br><input type="email" name="email" value="{$email}" required autocomplete="email"></label></p>
+      <p><label>Password<br><input type="password" name="password" required autocomplete="current-password"></label></p>
+      <p><button>Sign in</button></p>
+    </form>
+    ```
+}
+````
+
+| Component | What it shows |
+| --- | --- |
+| `<sign-in-form>` | The email and password form, and **Sign in with a passkey** when the site has passkeys. |
+| `<sign-up-form>` | The name, email and password form, with the problems the `SignUp` type found. |
+| `<forgot-password-form>`, `<reset-password-form>` | Asking for a reset link, and choosing the new password. |
+| `<status-message>` | The message a controller flashed before its redirect. |
+| `<account-details>` | Who is signed in, and **Sign out**. |
+| `<passkey-list>` | The account's passkeys, to add or remove one. |
+| `<api-tokens>` | The account's API tokens, to make or revoke one. |
+
+Signing in and out changes the session cookie, so those forms post to the controller as usual. Making and revoking tokens and passkeys doesn't, so the account page's components do it themselves in [live actions](components.md#actions-and-browser-events), and `/account` is a plain view route: `Get(path: /account, view: 'auth/account')`. Their actions are `private`, so nothing outside the component can call them:
+
+````kscript
+// _components/api-tokens.kscript
+import KScript.Web
+import KScript.Auth
+
+type ApiTokens extends Component {
+  name: string
+  private shown?: string
+
+  private fn make() {
+    shown = @api_token(@user(), name: $name->trim())
+    name = ''
+  }
+
+  private fn revoke(id: string) {
+    shown = null
+    @revoke_token($id, user: @user())
+  }
+
+  fn render() => ```html
+    <h2>API tokens</h2>
+    <if test="$shown != null"><p class="status">Your new token is <code>{$shown}</code>. Copy it now: it won't be shown again.</p></if>
+    <ul>
+      <for each="t" in="@api_tokens(@user())">
+        <li>
+          {$t.name}, made {$t.created_at}
+          <button type="button" @on-click($this->revoke($t.id)) live-confirm="Revoke {$t.name}?">Revoke</button>
+        </li>
+      </for>
+    </ul>
+    <form @on-submit($make)>
+      <p><label>Name<br><input @bind('name') bind-on="action" required></label></p>
+      <p><button live-disable>Make a token</button></p>
+    </form>
+    ```
+}
+````
+
+A live action runs the page's route and its `auth` middleware again, so `@user()` is the signed-in user and a guest can't use it. Each action carries a proof signed with the session's CSRF token, so no other site can send one.
 
 ## Signing up and in
 
@@ -108,7 +197,7 @@ In a project made with `kscript make auth`, set the public origin in `kscript.js
 
 Sign in to an existing account, open `/account` and choose **Add a passkey**. Sign out, then choose **Sign in with a passkey** on `/login`. The browser asks you to unlock your passkey. Each successful sign-in starts a fresh KScript session, so existing `auth:session` routes and [model forms](web.md#model-forms) work with it. You can enroll multiple passkeys and remove a lost one from the account page.
 
-For your own pages, put these buttons on the sign-in and signed-in account pages respectively. KScript supplies the browser code and the HTTP endpoints.
+The `<sign-in-form>`, `<sign-up-form>` and `<passkey-list>` components hold these buttons. For your own pages, put them on the sign-in and signed-in account pages respectively. KScript supplies the browser code and the HTTP endpoints.
 
 ```html
 <button type="button" passkey="signup" passkey-redirect="/account">Create account with a passkey</button>
@@ -116,7 +205,7 @@ For your own pages, put these buttons on the sign-in and signed-in account pages
 <button type="button" passkey="register">Add a passkey</button>
 ```
 
-Use `@has_passkeys()` from KScript.Auth to show the controls when the site has enabled them. After sign-in the browser returns to the protected URL that prompted it, or to `http.auth.home`. The optional `passkey-redirect` overrides that destination with a page on the same origin. From a signed-in account page, `@passkeys()` lists that user's credential IDs and creation dates. Call `@revoke_passkey($id)` from a CSRF-protected POST to remove one.
+Use `@has_passkeys()` from KScript.Auth to show the controls when the site has enabled them. After sign-in the browser returns to the protected URL that prompted it, or to `http.auth.home`. The optional `passkey-redirect` overrides that destination with a page on the same origin. From a signed-in account page, `@passkeys()` lists that user's credential IDs and creation dates. Call `@revoke_passkey($id)` from a live action, as `<passkey-list>` does, or from a CSRF-protected POST to remove one.
 
 For a custom browser UI, POST `{}` as `application/json` to `/_ks/passkeys/signup/options` for a new account, `/_ks/passkeys/register/options` to add a credential, or `/_ks/passkeys/login/options` to sign in. Use the returned public-key options with the browser's credentials API. POST the resulting credential JSON to `verify` in the same path, from the same origin and session. Verification returns `{"ok":true}` on success and includes the destination in `redirect` for sign-in. Each challenge expires after five minutes and can be verified once, on the process that issued it. Restarting a server discards pending ceremonies. When using several workers, route both steps to the same worker. Accounts and completed credentials persist in the auth store.
 
@@ -137,7 +226,7 @@ Routes {
     Post(path: /login, to: @accounts.sign_in)
   }
   Group(middleware: auth) {
-    Get(path: /account, to: @accounts.account)
+    Get(path: /account, view: 'auth/account')
     Post(path: /logout, to: @accounts.sign_out)
   }
 }
@@ -332,19 +421,24 @@ test(name: "only the author may update a post") {
 
 ## Forms and CSRF
 
-A web route whose file imports KScript.Auth checks a CSRF token on every POST, PUT, PATCH and DELETE. That stops another site from submitting a form as someone who is signed in. Put the token in each form with `{! @csrf_field() }`:
+A web route whose file imports KScript.Auth checks a CSRF token on every POST, PUT, PATCH and DELETE. That stops another site from submitting a form as someone who is signed in. Put the token in each form with `{! @csrf_field() }`, in a page or a component:
 
-```html
-<import package="KScript.Auth" />
-<form method="post" action="/login">
-  {! @csrf_field() }
-  <input type="email" name="email">
-  <input type="password" name="password">
-  <button>Sign in</button>
-</form>
-```
+````kscript
+// _components/sign-out-button.kscript
+import KScript.Web
+import KScript.Auth
 
-Scripts in the page send `@csrf_token()` as an `X-CSRF-Token` header instead. A request without the right token gets `419 Page Expired`. API routes aren't checked, since they use tokens rather than cookies, and neither is a request with a bearer token and no cookie. Set `http.auth.csrf` to `false` to turn the check off.
+type SignOutButton extends Component {
+  fn render() => ```html
+    <form method="post" action="/logout">
+      {! @csrf_field() }
+      <button>Sign out</button>
+    </form>
+    ```
+}
+````
+
+Scripts in the page send `@csrf_token()` as an `X-CSRF-Token` header instead. A live component's actions need no field: each one carries a proof signed with the session's CSRF token. A request without the right token gets `419 Page Expired`. API routes aren't checked, since they use tokens rather than cookies, and neither is a request with a bearer token and no cookie. Set `http.auth.csrf` to `false` to turn the check off.
 
 ## The session
 

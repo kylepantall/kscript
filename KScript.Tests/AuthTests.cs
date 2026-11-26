@@ -142,14 +142,19 @@ public sealed class AuthKitTests : AuthSiteFixture
         Assert.Contains("fn issue_token(json: map)", Read("controllers/accounts.kscript"));
         Assert.Contains("import \"../requests/sign-up.kscript\"", Read("controllers/accounts.kscript"));
         Assert.Contains("type SignUp {", Read("requests/sign-up.kscript"));
-        Assert.Contains("{! @csrf_field() }", Read("views/auth/login.html"));
+        // The pages are thin: each form is a component.
+        Assert.Contains("<sign-in-form ", Read("views/auth/login.html"));
+        Assert.Contains("{! @csrf_field() }", Read("_components/sign-in-form.kscript"));
+        Assert.Contains("type ApiTokens extends Component", Read("_components/api-tokens.kscript"));
+        Assert.Contains("Get(path: /account, view: 'auth/account', name: \"account\")", web);
         Assert.Contains("\"types\": { \"password\": { \"min\": 10 } }", Read("kscript.json"));
         Assert.True(File.Exists(Path.Combine(Dir, "_layout.html")));
 
         // Running it again would add the routes twice.
         var again = Make(Dir, "auth");
         Assert.Equal(2, again.Code);
-        Assert.Contains("already has controllers/accounts.kscript", again.Err);
+        Assert.Contains("already has _components/account-details.kscript", again.Err);
+        Assert.Contains("controllers/accounts.kscript", again.Err);
     }
 
     [Fact]
@@ -270,11 +275,13 @@ public sealed class AuthKitTests : AuthSiteFixture
     {
         var b = new Browser(App());
         SignUp(b);
-        b.Get("/account");
-        PageResult made = b.Send("POST", "/account/tokens", new Dictionary<string, object> { ["_token"] = b.Token, ["name"] = "laptop" });
+        // The api-tokens component makes the token in a live action, and shows it once.
+        PageResult made = Live(b, b.Get("/account"), "API tokens", "on-submit", binds: new() { ["name"] = "laptop" });
+        Assert.True(made.Status == 200, made.Body);
         string token = Regex.Match(made.Body, "ks_[A-Za-z0-9_-]+").Value;
         Assert.StartsWith("ks_", token);
         Assert.Contains("laptop, made", made.Body);
+        Assert.DoesNotContain(token, b.Get("/account").Body);
 
         var api = new Browser(App());
         var bearer = new Dictionary<string, object> { ["authorization"] = "Bearer " + token };
@@ -297,10 +304,31 @@ public sealed class AuthKitTests : AuthSiteFixture
         Assert.Equal(401, refused.Status);
         Assert.Contains("don't match an account", refused.Body);
 
-        string id = Regex.Match(b.Get("/account").Body, @"laptop, made[^<]*<form method=""post"" action=""/account/tokens/([a-f0-9]+)/delete""").Groups[1].Value;
-        b.Send("POST", $"/account/tokens/{id}/delete", new Dictionary<string, object> { ["_token"] = b.Token });
-        Assert.Contains("The token was revoked.", b.Get("/account").Body);
+        // The API's token is listed too, so revoke the laptop's.
+        PageResult revoked = Live(b, b.Get("/account"), "API tokens", "on-click", after: "laptop, made");
+        Assert.True(revoked.Status == 200, revoked.Body);
+        Assert.DoesNotContain("laptop, made", revoked.Body);
         Assert.Equal(401, api.Get("/api/me", bearer).Status);
+    }
+
+    /// <summary>
+    /// Runs the first handler of a kind (on-click, on-submit) in the live component holding the text, after the
+    /// given text when there is one, as the page's script would.
+    /// </summary>
+    private static PageResult Live(Browser b, PageResult page, string holding, string handler, Dictionary<string, object> binds = null, string after = null)
+    {
+        Match block = Regex.Matches(page.Body, @"<div data-ks-live=""([^""]+)"" data-ks-route=""([^""]+)"" data-ks-state=""([^""]+)""[^>]*>(.*?)</div>", RegexOptions.Singleline)
+            .First(m => m.Groups[4].Value.Contains(holding, StringComparison.Ordinal));
+        string html = block.Groups[4].Value;
+        if (after != null) html = html.Substring(html.IndexOf(after, StringComparison.Ordinal));
+        Match on = Regex.Match(html, $@"data-ks-{handler}=""(\d+)""[^>]*?data-ks-args-\1=""([^""]+)""");
+        Assert.True(on.Success, block.Value);
+        return b.Send("POST", "/account", headers: new() { ["x-kscript-live"] = block.Groups[2].Value },
+            json: Values.ToJson(new Dictionary<string, object>
+            {
+                ["page"] = "/account", ["block"] = block.Groups[1].Value, ["handler"] = double.Parse(on.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+                ["state"] = block.Groups[3].Value, ["args"] = on.Groups[2].Value, ["binds"] = binds ?? new Dictionary<string, object>(),
+            }));
     }
 
     [Fact]

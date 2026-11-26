@@ -1,0 +1,38 @@
+--- make
+to: {{ paths.components }}/sign-up-form.kscript
+---
+import KScript.Web
+{{#unless passkeys}}
+import KScript.Auth
+{{/unless}}
+
+{{#if passkeys}}
+/// Making an account with a passkey: the browser makes the passkey, and the
+/// account is signed in.
+type SignUpForm extends Component {
+  fn render() => ```html
+    <p><button type="button" passkey="signup" passkey-redirect="/account">Create account with a passkey</button></p>
+    ```
+}
+{{else}}
+/// The sign-up form. It posts to /register, and the controller shows it again
+/// with what was typed and the problems the SignUp type found.
+type SignUpForm extends Component {
+  construct({ name: string = '', email: string = '', problems: map[] = [] })
+
+  fn render() => ```html
+    <if test="$problems->count() > 0">
+      <ul class="error">
+        <for each="problem" in="$problems"><li><if test="$problem.field != null"><strong>{$problem.field}</strong>: </if>{$problem.message}</li></for>
+      </ul>
+    </if>
+    <form method="post" action="/register">
+      {! @csrf_field() }
+      <p><label>Name<br><input name="name" value="{$name}" required autocomplete="name"></label></p>
+      <p><label>Email<br><input type="email" name="email" value="{$email}" required autocomplete="email"></label></p>
+      <p><label>Password<br><input type="password" name="password" required autocomplete="new-password"></label></p>
+      <p><button>Create account</button></p>
+    </form>
+    ```
+}
+{{/if}}
