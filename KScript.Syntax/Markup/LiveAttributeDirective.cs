@@ -13,6 +13,7 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
         "live-disable" => null,
         "bind" => "@bind needs the field it binds, such as @bind($draft).",
         "show" => "@show needs a condition, such as @show($open).",
+        PendingDirective.Attribute => "@pending needs a class, such as @pending('saving') or @pending('crumple', for: 'delete').",
         _ => $"@{name} needs a handler.",
     };
 
@@ -101,13 +102,6 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
             : $"@{name} needs a quoted value.");
         return true;
     }
-
-    private static string EmptyMessage(string name) => name switch
-    {
-        ClassDirective.Attribute => "@class needs classes and conditions, such as @class(done: $todo.done).",
-        PendingDirective.Attribute => "@pending needs a class, such as @pending('saving') or @pending('crumple', for: 'delete').",
-        _ => $"@{name} needs a handler.",
-    };
 
     private static int SkipSpace(string text, int pos)
     {
