@@ -509,7 +509,7 @@ For a drop target, put `draggable="true" drag-value="{$item.id}"` on the source 
 
 | Option | What it does |
 | --- | --- |
-| `front: true` | Raises the element above its siblings while it moves. |
+| `front: true` | Raises the element above the other `@drag` elements in its positioned parent. |
 | `scroll: '.surface'` | The container that scrolls when the pointer nears its edges. Defaults to the nearest scrolling ancestor. |
 | `skip: '.thumb'` | Presses on these belong to them, not to dragging. Fields, buttons, links and labels are always skipped. |
 | `threshold: 6` | How far the pointer moves before a press becomes a drag. Defaults to 4 pixels, so a click stays a click. |

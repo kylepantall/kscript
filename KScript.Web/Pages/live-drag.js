@@ -29,11 +29,14 @@ const liveDrag = (() => {
     else if (e.clientY < r.top + edge) surface.scrollTop -= 14;
   }
 
+  // Above every other draggable element in the same positioned parent. Each one can be in its own live
+  // component, so they are found by their directive rather than as siblings.
   function topZ(el) {
     let top = 0;
-    for (const sibling of el.parentElement?.children || []) {
-      if (sibling === el) continue;
-      const z = parseInt(getComputedStyle(sibling).zIndex, 10);
+    const parent = el.offsetParent || el.parentElement;
+    for (const other of parent?.querySelectorAll("[data-ks-drag]") || []) {
+      if (other === el) continue;
+      const z = parseInt(getComputedStyle(other).zIndex, 10);
       if (z > top) top = z;
     }
     return top + 1;

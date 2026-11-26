@@ -18,7 +18,7 @@ namespace KScript.Syntax.Markup
 
         public static IReadOnlyList<Option> Options { get; } = new[]
         {
-            new Option("front", KType.Bool, "Raise the element above its siblings while it moves. $event.z is the z-index it got."),
+            new Option("front", KType.Bool, "Raise the element above the other @drag elements in its positioned parent. $event.z is the z-index it got."),
             new Option("scroll", KType.String, "The scrolling container (a CSS selector) that scrolls when the pointer nears its edges. Defaults to the nearest one."),
             new Option("skip", KType.String, "Presses on these (a CSS selector) belong to them, not to dragging. Fields, buttons, links and labels are always skipped."),
             new Option("threshold", KType.Number, "How far, in pixels, the pointer moves before a press becomes a drag. Defaults to 4, so a click stays a click."),
