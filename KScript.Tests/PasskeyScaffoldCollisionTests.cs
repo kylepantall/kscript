@@ -4,7 +4,7 @@ public sealed class PasskeyScaffoldCollisionTests : AuthSiteFixture
 {
     [Theory]
     [InlineData("Post(path: '/login', to: @old.login)")]
-    [InlineData("Get(path: '/account/passkeys/{id}/delete', to: @old.remove)")]
+    [InlineData("Get(path: '/account', to: @old.account)")]
     [InlineData("Post(path: '/forgot-password', to: @old.reset)")]
     public void ForceKeepsExistingHandlersAndFiles(string route)
     {

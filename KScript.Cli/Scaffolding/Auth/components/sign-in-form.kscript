@@ -1,0 +1,36 @@
+--- make
+to: {{ paths.components }}/sign-in-form.kscript
+---
+import KScript.Web
+{{#unless passkeys}}
+import KScript.Auth
+{{/unless}}
+
+{{#if passkeys}}
+/// Signing in with a passkey. The browser asks for the passkey, and KScript.Auth
+/// starts the session.
+type SignInForm extends Component {
+  fn render() => ```html
+    <p><button type="button" passkey="login">Sign in with a passkey</button></p>
+    ```
+}
+{{else}}
+/// The sign-in form. It posts to /login, and the controller shows it again with
+/// the email and an error when they don't match an account.
+type SignInForm extends Component {
+  construct({ email: string = '', error?: string })
+
+  fn render() => ```html
+    <status-message />
+    <if test="$error != null"><p class="error">{$error}</p></if>
+    <form method="post" action="/login">
+      {! @csrf_field() }
+      <p><label>Email<br><input type="email" name="email" value="{$email}" required autocomplete="email"></label></p>
+      <p><label>Password<br><input type="password" name="password" required autocomplete="current-password"></label></p>
+      <p><label><input type="checkbox" name="remember" value="yes"> Keep me signed in</label></p>
+      <p><button>Sign in</button></p>
+    </form>
+    <if test="@has_passkeys()"><p><button type="button" passkey="login">Sign in with a passkey</button></p></if>
+    ```
+}
+{{/if}}

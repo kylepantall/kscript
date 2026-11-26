@@ -1,0 +1,42 @@
+import KScript.Web
+import KScript.Auth
+
+/// The signed-in user's API tokens. A new token is shown once, because only its
+/// hash is kept.
+type ApiTokens extends Component {
+  name: string
+  private shown?: string
+
+  private fn make() {
+    shown = @api_token(@user(), name: $name->trim())
+    name = ''
+  }
+
+  private fn revoke(id: string) {
+    shown = null
+    @revoke_token($id, user: @user())
+  }
+
+  fn render() => ```html
+    <h2>API tokens</h2>
+    <p>Programs send a token as <code>Authorization: Bearer &lt;token&gt;</code> to act as you.</p>
+    <if test="$shown != null"><p class="status">Your new token is <code>{$shown}</code>. Copy it now: it won't be shown again.</p></if>
+    <ul>
+      <for each="t" in="@api_tokens(@user())">
+        <li>
+          {$t.name}, made {$t.created_at}
+          <button type="button" @on-click($this->revoke($t.id)) live-confirm="Revoke {$t.name}?">Revoke</button>
+        </li>
+      </for>
+    </ul>
+    <form @on-submit($make)>
+      <p>
+        <label>
+          Name<br>
+          <input @bind('name') bind-on="action" placeholder="laptop" required>
+        </label>
+      </p>
+      <p><button live-disable>Make a token</button></p>
+    </form>
+    ```
+}
