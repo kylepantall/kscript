@@ -1,31 +1,31 @@
 describe(name: "Map updates") {
   test(name: "a missing setting uses its default while null and false are preserved") {
     settings = { retries: null, alerts: false }
-    expect(value: $settings->get('retries', 3), same: null)
-    expect(value: $settings->get('alerts', true), same: false)
-    expect(value: $settings->get('limit', 10), same: 10)
-    expect(value: $settings->has('retries'), same: true)
-    expect(value: $settings->has('limit'), same: false)
+    expect($settings->get('retries', 3), same: null)
+    expect($settings->get('alerts', true), same: false)
+    expect($settings->get('limit', 10), same: 10)
+    expect($settings->has('retries'), same: true)
+    expect($settings->has('limit'), same: false)
   }
 
   test(name: "a computed key can be added and removed on separate copies") {
     labels = { team: 'support' }
     key = 'after-hours'
     shift = $labels->set($key, true)
-    expect(value: $shift[$key], same: true)
-    expect(value: $labels->has($key), same: false)
-    expect(value: $shift->remove($key), same: $labels)
-    expect(value: $shift->has($key), same: true)
+    expect($shift[$key], same: true)
+    expect($labels->has($key), same: false)
+    expect($shift->remove($key), same: $labels)
+    expect($shift->has($key), same: true)
   }
 
   test(name: "merging overrides replaces a complete nested setting") {
     defaults = { region: 'north', alerts: { email: true, sms: true } }
     merged = $defaults->merge({ alerts: { sms: false }, timeout: 5 })
     expect(
-      value: $merged,
+      $merged,
       same: { region: 'north', alerts: { sms: false }, timeout: 5 }
     )
-    expect(value: $defaults.alerts.email, same: true)
+    expect($defaults.alerts.email, same: true)
   }
 
   test(name: "filtering and mapping receive both the value and its key") {
@@ -33,13 +33,13 @@ describe(name: "Map updates") {
     available = $stock
       |> filter(fn(qty, key) => $qty > 0 and $key != 'trial')
       |> map(fn(qty, key) => "{$key} ({$qty})")
-    expect(value: $available, same: { tea: 'tea (4)', milk: 'milk (3)' })
+    expect($available, same: { tea: 'tea (4)', milk: 'milk (3)' })
   }
 
   test(name: "entries become rows that can be sorted by value") {
     distances = { depot: 12, shop: 3, station: 7 }
-    nearest = $distances->entries()->sort_by(fn(stop) => $stop.value)
-    expect(value: $nearest->pluck(key), same: ['shop', 'station', 'depot'])
-    expect(value: $nearest->first(), same: { key: 'shop', value: 3 })
+    nearest = $distances->entries()->sort_by(.value)
+    expect($nearest->pluck(key), same: ['shop', 'station', 'depot'])
+    expect($nearest->first(), same: { key: 'shop', value: 3 })
   }
 }

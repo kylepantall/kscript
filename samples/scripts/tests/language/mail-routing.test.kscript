@@ -8,19 +8,19 @@ type ForwardingRule {
 describe(name: 'Mail routing with domain-limited email addresses') {
   test(name: 'normalization lowercases the domain and preserves the mailbox case') {
     address: TeamAddress = 'Desk@EXAMPLE.ORG'
-    expect(value: $address->mailbox(), same: 'Desk')
-    expect(value: $address.domain, same: 'example.org')
+    expect($address->mailbox(), same: 'Desk')
+    expect($address.domain, same: 'example.org')
   }
 
   test(name: 'valid addresses outside the team domain are refused') {
     outside: email = 'Desk@example.net'
-    expect(value: $outside.domain, same: 'example.net')
-    expect(value: $outside as TeamAddress, throws: Shape)
+    expect($outside.domain, same: 'example.net')
+    expect($outside as TeamAddress, throws: Shape)
   }
 
   test(name: 'a malformed mailbox cannot pass merely by using the right domain') {
-    expect(value: TeamAddress('@example.org'), throws: Shape)
-    expect(value: TeamAddress('desk.example.org'), throws: Shape)
+    expect(TeamAddress('@example.org'), throws: Shape)
+    expect(TeamAddress('desk.example.org'), throws: Shape)
   }
 
   test(name: 'optional recipients retain the type methods when present') {
@@ -28,9 +28,9 @@ describe(name: 'Mail routing with domain-limited email addresses') {
       sender: 'alice@example.org',
       recipient: 'Desk@EXAMPLE.ORG'
     )
-    expect(value: $rule.recipient->mailbox(), same: 'Desk')
+    expect($rule.recipient->mailbox(), same: 'Desk')
     absent = ForwardingRule(sender: 'alice@example.org')
-    expect(value: $absent.recipient, same: null)
+    expect($absent.recipient, same: null)
   }
 
   test(name: 'a refused forwarding update keeps the previous valid recipient') {
@@ -41,6 +41,6 @@ describe(name: 'Mail routing with domain-limited email addresses') {
     expect_error(type: Shape) {
       rule.recipient = 'desk@example.net'
     }
-    expect(value: $rule.recipient->mailbox(), same: 'desk')
+    expect($rule.recipient->mailbox(), same: 'desk')
   }
 }

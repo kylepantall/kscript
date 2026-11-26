@@ -186,7 +186,7 @@ What a controller returns becomes the response:
 | --- | --- |
 | A map, list, number or true/false | JSON (`application/json`). |
 | Text | HTML. |
-| `@view('people/show', person: $p)` | The view rendered with its layout. |
+| `@view('people/show', person: $p)` | The view rendered with its layout. `status: 422` sets the status, such as `@view('auth/login', data: { error: $err.message }, status: 429)`. |
 | `@response(body, status: 201, type: 'text/csv', headers: { … })` | Your own status, type and headers. A map or list body is JSON. |
 | `@redirect(/people)`, `@redirect(to: '/new', status: 301)` | A redirect. |
 | nothing (`null`) | `204 No Content`. |
@@ -408,17 +408,19 @@ added = @api(/api/notes, post: { title: 'Ship it' })
 echo $added.status   // 201
 ```
 
-It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The arguments and the response are the same as for an address: `post:` and the other methods, `options: { headers: … }`, then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
 
-Named shorthands cover the options set most. Each is the same as its long form:
+The method and body are one named argument, and the options people set most have one too:
 
-| Shorthand | Same as |
+| Argument | What it does |
 | --- | --- |
-| `post: { title: 'Ship it' }`, `put: $note`, `patch: $changes` | `options: { method: 'POST', body: … }` with that method |
-| `delete: true` | `options: { method: 'DELETE' }` (anything but `true` is sent as the body) |
-| `bearer: $token` | `options: { headers: { Authorization: 'Bearer …' } }` |
-| `timeout: 5s`, `retries: 3` | the same fields in `options` |
-| `as: Note` | `->check()->json(as: Note)`: the response must succeed, and its JSON becomes `Note` records |
+| `post: { title: 'Ship it' }`, `put: $note`, `patch: $changes` | Sends that method with this body. A map or list is sent as JSON. Without one, the request is a GET. |
+| `delete: true` | Sends a DELETE with no body (anything else is sent as the body). |
+| `bearer: $token` | Adds `Authorization: Bearer …` to the headers. |
+| `timeout: 5s`, `retries: 3` | The same fields as in `options`. |
+| `as: Note` | The response must succeed, and its JSON becomes `Note` records. |
+
+`post: null` and `delete: false` send nothing, so a helper can pass its own arguments straight on: `@api($url, post: $post, delete: $delete)`.
 
 An option given both ways is an error, so a request says each thing once.
 

@@ -25,7 +25,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
         Write("_components/counter.html", """
             <live id="item-{$item}">
               <state name="count" value="0" /><state name="draft" value="''" />
-              <input bind="draft"><p>{$count} {$draft}</p>
+              <input bind="$draft"><p>{$count} {$draft}</p>
               <button on-click="count += 1">Add</button>
               <if test="false"><button on-click="count += 2">Hidden</button></if>
             </live>
@@ -124,7 +124,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
                 return ```html
                 <state name="moves" value="0" />
                 <state name="draft" value="''" />
-                <input bind="draft">
+                <input bind="$draft">
                 <span hidden {{action}} on-action="moves += 1"></span>
                 <p>{$moves}</p>
                 ```
@@ -149,8 +149,8 @@ public sealed class RoutedLiveTests : AuthSiteFixture
     public void ClassStateRestoresTypedFieldsAndRefreshesServerProps(bool explicitRoot)
     {
         const string controls = """
-            <input bind="count"><input bind="mode">
-            <select bind="numbers" multiple><option value="2">Two</option></select>
+            <input bind="$count"><input bind="$mode">
+            <select bind="$numbers" multiple><option value="2">Two</option></select>
             <button on-click="count += 1">Add</button>
             <button on-click="$this->increment()">Add via the class</button>
             <button on-click="numbers[0] = 'bad'">Invalid item</button>
@@ -217,7 +217,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
     {
         Write("_components/counter.html", """
             <state name="count" value="0" /><state name="draft" value="''" />
-            <input bind="draft" /><button on-click="count += 1">Add</button>
+            <input bind="$draft" /><button on-click="count += 1">Add</button>
             <mini-counter />
             """);
         Write("_components/mini-counter.html", """
@@ -234,7 +234,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
                   draft: string = ''
                   fn render(): Component {
                     return ```html
-                    <input bind="draft"><button on-click="count += 1">Add</button>
+                    <input bind="$draft"><button on-click="count += 1">Add</button>
                     <mini-counter parent-count="{$count}" />
                     ```
                   }
@@ -283,7 +283,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
             <live id="item-{$item}">
               <state name="count" value="0" session="counter" locked />
               <state name="draft" value="''" />
-              <input bind="draft">
+              <input bind="$draft">
               <button on-click="count += 1">Add</button>
               <p>{$count}</p>
             </live>
@@ -306,7 +306,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
     {
         Write("_components/counter.html", """
             <live id="item-{$item}">
-              <state name="draft" value="''" /><input bind="draft">
+              <state name="draft" value="''" /><input bind="$draft">
               <button on-click="@live_download('report.txt', bytes: 'Hello'->to_base64())">Download</button>
               <button on-click="@live_download('../report.txt', bytes: 'Hello'->to_base64())">Invalid</button>
             </live>
@@ -328,7 +328,7 @@ public sealed class RoutedLiveTests : AuthSiteFixture
         Write("_components/counter.html", """
             <live id="item-{$item}">
               <state name="count" value="0" /><state name="draft" value="''" />
-              <input bind="draft">
+              <input bind="$draft">
               <button on-click="count += 1; @skip_render()">Update quietly</button>
               <button on-click="count += 1">Refresh</button>
               <p>{$count} {$draft}</p>

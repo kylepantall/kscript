@@ -1351,7 +1351,10 @@ namespace KScript.Syntax.Markup
                 sb.Append(pad).Append(ElementInfo.BareName(e.Name));
                 if (e.Attributes.Count > 0)
                 {
-                    sb.Append('(').Append(string.Join(", ", e.Attributes.Select(a => FormatAttribute(e, a)))).Append(')');
+                    string positional = CodeArguments.Positional(e.Name);
+                    IEnumerable<string> arguments = e.Attributes.Where(a => a.Name == positional && a.Value != null).Select(a => FormatAttribute(e, a) is string written && written.StartsWith(a.Name + ": ", StringComparison.Ordinal) ? written[(a.Name.Length + 2)..] : a.ValueText)
+                        .Concat(e.Attributes.Where(a => a.Name != positional || a.Value == null).Select(a => FormatAttribute(e, a)));
+                    sb.Append('(').Append(string.Join(", ", arguments)).Append(')');
                 }
                 List<MarkupNode> content = e.Children.Where(c => !(c is MarkupText t && t.IsWhitespace)).ToList();
                 bool hasElements = content.Any(c => c is MarkupElement);

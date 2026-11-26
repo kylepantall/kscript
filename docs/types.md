@@ -251,7 +251,7 @@ Text next to a native value is read as that type, so `$wait + '15m'` and `$v < '
 | `password` | | none, and no `==` either: use `->verify()` | | |
 | `regex`, `base64`, `jwt`, `json`, `phone`, `cron`, `color`, `iban`, `card` | | none | | |
 
-A type without an order stops `<` and `->sort()` with a message. Sort by a key instead: `$colors->sort_by(fn(c) => $c.luminance)`. A few types compare by meaning rather than spelling: `json` ignores spacing and key order, `base64` ignores padding, `cron` compares the times it runs (`@daily == '0 0 * * *'`), and `color` compares the colour (`orange == '#ffa500'`).
+A type without an order stops `<` and `->sort()` with a message. Sort by a key instead: `$colors->sort_by(.luminance)`. A few types compare by meaning rather than spelling: `json` ignores spacing and key order, `base64` ignores padding, `cron` compares the times it runs (`@daily == '0 0 * * *'`), and `color` compares the colour (`orange == '#ffa500'`).
 
 Ranges of dates step by a duration, and default to a day:
 
@@ -733,7 +733,7 @@ found = $date->match('Due 2026-11')
 echo "{ $found.groups.year } { $date->test('no date') }"
 echo "{ $date->replace('2026-11', '${month}/${year}') }"
 echo "{ /\s*,\s*/->split('tea, coffee ,milk') }"
-echo "{ /\d+/->match_all('3 cats, 12 dogs')->map(fn(m) => $m.text) }"
+echo "{ /\d+/->match_all('3 cats, 12 dogs')->map(.text) }"
 ```
 
 `->match()` returns `{ text, index, groups, captures }`, or null when nothing matches. A regex that takes longer than a second to match stops with an error, so a bad pattern can't hang a server. In XML, write `<` inside an attribute or text as `&lt;`.

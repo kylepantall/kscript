@@ -16,11 +16,11 @@ fn sign_in(form: map) {
   user = null
   try {
     user = @attempt($form.email ?? '', $form.password ?? '', remember: $form.remember == 'yes')
-  } catch err when $err.type == 'TooManyRequests' {
-    return @view('auth/login', data: { error: $err.message, email: $form.email })->with_status(429)
+  } catch TooManyRequests as err {
+    return @view('auth/login', data: { error: $err.message, email: $form.email }, status: 429)
   }
   if $user == null {
-    return @view('auth/login', data: { error: "That email and password don't match an account.", email: $form.email })->with_status(422)
+    return @view('auth/login', data: { error: "That email and password don't match an account.", email: $form.email }, status: 422)
   }
   return @redirect(@intended())
 }
@@ -34,8 +34,8 @@ fn sign_up(form: map) {
   try {
     data = SignUp($form)
     user = @register($data.email, $data.password, name: $data.name->trim())
-  } catch err when $err.type == 'Shape' or $err.type == 'Validation' {
-    return @view('auth/register', data: { problems: $err.problems ?? [], name: $form.name, email: $form.email })->with_status(422)
+  } catch Shape | Validation as err {
+    return @view('auth/register', data: { problems: $err.problems ?? [], name: $form.name, email: $form.email }, status: 422)
   }
   @login($user)
   return @redirect(@intended())
@@ -71,12 +71,12 @@ fn reset(form: map) {
   user = null
   try {
     user = @reset_password($form.token ?? '', $form.password ?? '')
-  } catch err when $err.type == 'Validation' {
-    return @view('auth/reset-password', data: { token: $form.token, error: $err.message })->with_status(422)
+  } catch Validation as err {
+    return @view('auth/reset-password', data: { token: $form.token, error: $err.message }, status: 422)
   }
   if $user == null {
     expired = 'That link has expired or was already used. Ask for a new one.'
-    return @view('auth/forgot-password', data: { error: $expired })->with_status(422)
+    return @view('auth/forgot-password', data: { error: $expired }, status: 422)
   }
   @login($user)
   $session->flash('status', 'Your password has been changed.')

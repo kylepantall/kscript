@@ -28,7 +28,7 @@ echo "{ $person.name } is { $person['age'] }"
 people = [{ name: 'Joseph', age: 28 }, { name: 'Joan', age: 82 }]
 names = $people
   |> filter(fn(p) => $p.age >= 18)
-  |> map(fn(p) => $p.name)
+  |> map(.name)
   |> join(', ')
 by_age = fn(a, b) => $a.age - $b.age
 sorted = $people->sort($by_age)

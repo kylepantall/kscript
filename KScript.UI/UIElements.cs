@@ -87,10 +87,20 @@ namespace KScript.UI
                         break;
                     case AttributeKind.VariableReference when attr.Name == "bind":
                     {
-                        string name = attr.ValueText.Trim().TrimStart('$');
+                        // TextBox(bind: $name, trim: true, on: blur): the element's own on:, trim: and as: are the
+                        // binding's options, read by the same reader as @bind($name, trim: true) on a page.
+                        if (attr.ValueText.Contains(','))
+                            throw run.Error($"In a window the binding's options are the element's own: {run.Element.Name}(bind: ${attr.ValueText.Split(',')[0].Trim().TrimStart('$')}, trim: true).", "bind", "Syntax");
+                        var options = BindDirective.Options.Select(o => run.Element.GetAttribute(o.Name)).Where(o => o?.Value != null && info.GetAttribute(o.Name) != null).ToList();
+                        string written = "$" + attr.ValueText.Trim().TrimStart('$') + string.Concat(options.Select(o => ", " + o.Name + ": " + o.ValueText.Trim()));
+                        BindDirective.Reading binding = BindDirective.Read(written);
+                        if (binding.Problems.Count > 0)
+                            throw run.Error(binding.Problems[0].Message.Replace("@bind", run.Element.Name), "bind", "Syntax");
+                        string name = binding.Path;
                         if (!scope.TryGet(name, out object value))
                             throw run.Error($"bind=\"{name}\": ${name} isn't declared. Add <let name=\"{name}\" value=\"…\" /> directly inside <KScript.Window>.", "bind", "Name");
                         node.Bind = name;
+                        node.Binding = binding;
                         node.BindScope = scope;
                         node.Props["value"] = value;
                         break;

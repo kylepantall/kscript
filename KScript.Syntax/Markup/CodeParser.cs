@@ -2101,6 +2101,7 @@ namespace KScript.Syntax.Markup
         private void ParseAttributes(MarkupElement e)
         {
             int open = pos++;
+            bool first = true;
             while (true)
             {
                 SkipTrivia(newlines: true);
@@ -2121,7 +2122,23 @@ namespace KScript.Syntax.Markup
                 }
 
                 int nameStart = pos;
+                bool wasFirst = first;
+                first = false;
+                if (wasFirst && CodeArguments.Positional(e.Name) is string positional && !StartsNamedArgument())
+                {
+                    // expect($total, equals: 3): the one argument an element takes first, without its name.
+                    (int vs, int ve) = ReadExpression(Stop.Argument);
+                    AddAttribute(e, positional, DecodedText.Plain(text.Substring(vs, ve - vs), vs), TextSpan.FromBounds(vs, ve), new TextSpan(vs, 0), '\0');
+                    e.Attributes[e.Attributes.Count - 1].IsArgument = true;
+                    continue;
+                }
                 string name = ReadName();
+                if (wasFirst && name.Length > 0 && name == CodeArguments.Positional(e.Name))
+                {
+                    int after = pos;
+                    while (after < text.Length && text[after] is ' ' or '\t' or ':') after++;
+                    Spelling(TextSpan.FromBounds(nameStart, after), $"{e.Name} takes the {name} first, without its name: {e.Name}($total, equals: 3).", $"Remove {name}:", string.Empty);
+                }
                 if (name.Length == 0)
                 {
                     Error(new TextSpan(pos, 1), DiagnosticCodes.InvalidAttribute, $"Expected an argument's name, such as into: name, not '{text[pos]}'.");
@@ -2171,6 +2188,16 @@ namespace KScript.Syntax.Markup
                     AddAttribute(e, name, DecodedText.Plain("yes", nameStart), nameSpan, nameSpan, '\0');
                 }
             }
+        }
+
+        /// <summary>True when the text here is <c>name:</c> (or <c>name=</c>), the start of a named argument.</summary>
+        private bool StartsNamedArgument()
+        {
+            int at = pos;
+            if (at >= text.Length || !Lexer.IsIdentStart(text[at])) return false;
+            while (at < text.Length && (Lexer.IsIdentChar(text[at]) || text[at] == '-')) at++;
+            while (at < text.Length && text[at] is ' ' or '\t') at++;
+            return at < text.Length && text[at] is ':' or '=' && !(text[at] == '=' && at + 1 < text.Length && text[at + 1] is '=' or '>');
         }
 
         /// <summary>Parses '{' statements '}' into an element.</summary>

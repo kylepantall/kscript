@@ -176,12 +176,8 @@ namespace KScript.Net
                     {
                         Fields = new[]
                         {
-                            new ParameterInfo("method", optional: true, type: KType.String, description: "HTTP method. KScript converts it to uppercase.")
-                                { DefaultValue = "'GET'", Example = "'POST'" },
                             new ParameterInfo("headers", optional: true, type: KType.Map, description: "Header names and values. Set `User-Agent` to identify the client or `Content-Type` to override the body format header.")
                                 { DefaultValue = "{ 'User-Agent': 'kscript' }", Example = "{ Accept: 'application/json' }" },
-                            new ParameterInfo("body", optional: true, type: KType.Any, description: "Maps and lists are sent as JSON, base64 values as binary data, and other values as UTF-8 text.")
-                                { DefaultValue = "null", Example = "{ title: 'Ship it' }" },
                             new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "Maximum wait for an outbound HTTP(S) request. A number is seconds. In-process requests to project routes ignore this field.")
                                 { DefaultValue = "100s", Example = "30s" },
                             new ParameterInfo("retries", optional: true, type: KType.Number, description: "Additional attempts on transient outbound failures for GET, HEAD and OPTIONS.")
@@ -190,21 +186,21 @@ namespace KScript.Net
                                 { DefaultValue = "100ms", Example = "250ms" },
                         },
                     },
-                    new ParameterInfo("post", optional: true, type: KType.Any, description: "Shorthand: sends this body with POST. `@api('/notes', post: { title: 'Ship it' })` is `options: { method: 'POST', body: { ... } }`."),
-                    new ParameterInfo("put", optional: true, type: KType.Any, description: "Shorthand: sends this body with PUT."),
-                    new ParameterInfo("patch", optional: true, type: KType.Any, description: "Shorthand: sends this body with PATCH."),
-                    new ParameterInfo("delete", optional: true, type: KType.Any, description: "Shorthand: sends a DELETE. `delete: true` sends no body; anything else is sent as the body."),
-                    new ParameterInfo("bearer", optional: true, type: KType.String, description: "Shorthand: an Authorization: Bearer header with this token."),
-                    new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "Shorthand for options.timeout: 5s."),
-                    new ParameterInfo("retries", optional: true, type: KType.Number, description: "Shorthand for options.retries: 3."),
-                    new ParameterInfo("as", optional: true, type: KType.Type, description: "Shorthand: checks the response succeeded and reads its JSON as this type. `@api($url, as: Note)` is `@api($url)->check()->json(as: Note)`.")) })
+                    new ParameterInfo("post", optional: true, type: KType.Any, description: "Sends this body with POST: `@api('/notes', post: { title: 'Ship it' })`. Maps and lists are sent as JSON, base64 values as binary data, and other values as UTF-8 text. Without post:, put:, patch: or delete:, the request is a GET."),
+                    new ParameterInfo("put", optional: true, type: KType.Any, description: "Sends this body with PUT."),
+                    new ParameterInfo("patch", optional: true, type: KType.Any, description: "Sends this body with PATCH."),
+                    new ParameterInfo("delete", optional: true, type: KType.Any, description: "Sends a DELETE. `delete: true` sends no body; anything else is sent as the body."),
+                    new ParameterInfo("bearer", optional: true, type: KType.String, description: "An Authorization: Bearer header with this token."),
+                    new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "The same as options.timeout: 5s."),
+                    new ParameterInfo("retries", optional: true, type: KType.Number, description: "The same as options.retries: 3."),
+                    new ParameterInfo("as", optional: true, type: KType.Type, description: "Checks the response succeeded and reads its JSON as this type. `@api($url, as: Note)` is `@api($url)->check()->json(as: Note)`.")) })
             {
                 ReturnType = KType.Response,
                 Example = """
                     <kscript>
                       <import package="KScript.Net" />
                       <let name="url" value="$args->first() ?? 'https://httpbin.org/anything'" />
-                      <let name="reply" value="@api($url, options: { method: 'POST', headers: { Accept: 'application/json' }, body: { title: 'Ship it' }, timeout: 30s })" />
+                      <let name="reply" value="@api($url, post: { title: 'Ship it' }, options: { headers: { Accept: 'application/json' } }, timeout: 30s)" />
                       <echo>{ $reply->check().status }</echo>
                     </kscript>
                     """,
@@ -254,6 +250,9 @@ namespace KScript.Net
         private static object Api(CallContext c)
         {
             var options = c.Arg(1) == null ? new Dictionary<string, object>(StringComparer.Ordinal) : new Dictionary<string, object>(c.Map(1), StringComparer.Ordinal);
+            // The method and body are named arguments now: @api($url, post: $note), not options: { method: 'POST', body: $note }.
+            if (options.ContainsKey("method") || options.ContainsKey("body"))
+                throw c.Error("@api() takes the method and body as one argument: post: $body, put: $body, patch: $body or delete: true, not options: { method:, body: }.", "Argument");
             object Named(string name) => c.Arg(2 + Array.IndexOf(ApiShorthands, name), name);
             bool Given(string name) => c.Has(2 + Array.IndexOf(ApiShorthands, name), name);
             void Set(string option, object value, string shorthand)
@@ -261,7 +260,9 @@ namespace KScript.Net
                 if (options.ContainsKey(option)) throw c.Error($"@api() was given {option} twice: in options and as {shorthand}:. Give it once.", "Argument");
                 options[option] = value;
             }
-            string[] methods = new[] { "post", "put", "patch", "delete" }.Where(Given).ToArray();
+            // post: null and delete: false send nothing, so a helper can pass its own arguments straight on.
+            bool Sent(string method) => Given(method) && Values.Unwrap(Named(method)) is not (null or false);
+            string[] methods = new[] { "post", "put", "patch", "delete" }.Where(Sent).ToArray();
             if (methods.Length > 1) throw c.Error($"@api() takes one of post:, put:, patch: and delete:, and was given {string.Join(" and ", methods.Select(m => m + ":"))}.", "Argument");
             foreach (string method in methods)
             {

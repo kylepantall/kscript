@@ -20,8 +20,9 @@ Window(title: "Counter", width: 320, height: 200) {
 
 - `import KScript.UI` goes at the top of the file with the other imports. Variables and `fn` functions directly inside `Window` run once and hold the window's state.
 - Everything else is the layout. After every `on_click`, `on_change`, `on_enter` or `on_tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
-- A handler holds statements, or a single value: `on_click: $open` flips a bool, and `on_click: $save` calls the function `save`.
-- `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
+- A handler holds statements, or a function to call: `on_click: $save` calls the function `save`. A button or box also takes the [handler shorthands](components.md#handler-shorthands) directly: `Button(toggle: $open) "Details"`.
+- `bind: $name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
+- A `TextBox` takes the same binding options as `@bind` on a page: `TextBox(bind: $name, trim: true, on: blur)`. `on:` is `input` (as you type, the default), `change` or `blur` (when focus leaves or Enter is pressed). `trim: true` trims spaces, and `as: int` (`string`, `int`, `number` or `bool`) reads the value as that type and shows an error for one that isn't.
 - `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
 - `@close_window()` in a handler closes the window.
@@ -33,7 +34,7 @@ Window(title: "Counter", width: 320, height: 200) {
 | `Column(gap, align, scroll)`, `Row(gap, align, wrap)`, `Grid(columns, gap)` | Layout: top to bottom, side by side, or equal columns. |
 | `Text(size, weight, color, wrap, text_align)` | Text. |
 | `Button(on_click, variant: primary, disabled)` | A button. |
-| `TextBox(bind, placeholder, on_enter, multiline)`, `CheckBox(bind)`, `Select(bind, options)`, `Slider(bind, min, max, step)` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
+| `TextBox(bind, on, trim, as, placeholder, on_enter, multiline)`, `CheckBox(bind)`, `Select(bind, options)`, `Slider(bind, min, max, step)` | Inputs, each tied to a variable. `options` is a list, a list of `{ label, value }` maps, or a map from label to value. |
 | `Box(on_click, border)` | A rectangle: a cell, a card or a panel. It can hold other elements. |
 | `Spacer(size)`, `Timer(every, when, on_tick)` | Space, and a timer. |
 

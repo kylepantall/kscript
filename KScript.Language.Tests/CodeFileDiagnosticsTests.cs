@@ -40,7 +40,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void TestFilesGetKScriptTestWithoutAnImport()
         {
-            Assert.DoesNotContain(Analyze("describe(name: \"x\") {\n  test(name: \"y\") {\n    expect(value: 1, equals: 1)\n  }\n}\n", "a.test.kscript").Diagnostics,
+            Assert.DoesNotContain(Analyze("describe(name: \"x\") {\n  test(name: \"y\") {\n    expect(1, equals: 1)\n  }\n}\n", "a.test.kscript").Diagnostics,
                 x => x.Severity == DiagnosticSeverity.Error);
         }
 

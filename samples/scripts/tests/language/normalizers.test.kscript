@@ -13,26 +13,26 @@ fn key_size(key: PasskeySessionKey) => $key->break()
 
 test(name: 'a forward-declared helper sees the raw key before validation') {
   key = PasskeySessionKey('  passkey_Login  ')
-  expect(value: $key->to_string(), same: 'passkey_Login')
-  expect(value: $key->break(), equals: 13)
+  expect($key->to_string(), same: 'passkey_Login')
+  expect($key->break(), equals: 13)
 }
 
 test(name: 'a typed function parameter normalizes its argument') {
-  expect(value: @key_size(' passkey_Web '), equals: 11)
+  expect(@key_size(' passkey_Web '), equals: 11)
 }
 
 test(name: 'a cast keeps the methods of the refined value') {
   key = 'passkey_Test' as PasskeySessionKey
-  expect(value: @key_size($key), equals: 12)
-  expect(value: $key->trim_key(' space '), equals: 'space')
+  expect(@key_size($key), equals: 12)
+  expect($key->trim_key(' space '), equals: 'space')
 }
 
 test(name: 'the normalized key must still match its pattern') {
-  expect(value: PasskeySessionKey('  passkey_123  '), throws: Shape)
-  expect(value: PasskeySessionKey('     '), throws: Shape)
+  expect(PasskeySessionKey('  passkey_123  '), throws: Shape)
+  expect(PasskeySessionKey('     '), throws: Shape)
 }
 
 test(name: 'a lambda can name its own input and chain string methods') {
   name = LoginName('  JO  ')
-  expect(value: $name, same: 'jo')
+  expect($name, same: 'jo')
 }

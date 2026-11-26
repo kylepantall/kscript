@@ -12,48 +12,48 @@ fn access_label(level: string) => $level + ' access'
 describe(name: 'Delivery choices') {
   test(name: 'an enum exposes its options and their declaration order') {
     expect(
-      value: DeliverySpeed->keys(),
+      DeliverySpeed->keys(),
       equals: ['standard', 'express', 'overnight']
     )
-    expect(value: 'express' in DeliverySpeed, same: true)
-    expect(value: 'same-day' in DeliverySpeed, same: false)
+    expect('express' in DeliverySpeed, same: true)
+    expect('same-day' in DeliverySpeed, same: false)
   }
 
   test(name: 'bare values and explicit enum members select the same service') {
-    expect(value: @parcel_label(express), same: 'express tracked')
-    expect(value: @parcel_label(DeliverySpeed.express), same: 'express tracked')
+    expect(@parcel_label(express), same: 'express tracked')
+    expect(@parcel_label(DeliverySpeed.express), same: 'express tracked')
   }
 
   test(name: 'an enum member from a named import can be passed to a function') {
     expect(
-      value: @access_label(access.Visibility.public),
+      @access_label(access.Visibility.public),
       same: 'public access'
     )
   }
 
   test(name: 'quoted input is converted to the spelling declared by the enum') {
     preference = 'OVERNIGHT'
-    expect(value: @parcel_label($preference), same: 'overnight tracked')
+    expect(@parcel_label($preference), same: 'overnight tracked')
   }
 
   test(name: 'a flag can enable or disable tracking independently of argument order') {
-    expect(value: @parcel_label(tracked, standard), same: 'standard tracked')
+    expect(@parcel_label(tracked, standard), same: 'standard tracked')
     expect(
-      value: @parcel_label(speed: standard, not tracked),
+      @parcel_label(speed: standard, not tracked),
       same: 'standard untracked'
     )
   }
 
   test(name: 'a list parameter supplies enum context for each bare item') {
     expect(
-      value: @itinerary([express, standard, overnight]),
+      @itinerary([express, standard, overnight]),
       same: 'express then standard then overnight'
     )
-    expect(value: @itinerary([]), same: '')
+    expect(@itinerary([]), same: '')
   }
 
   test(name: 'an unknown service from external text fails enum conversion') {
     preference = 'same-day'
-    expect(value: @parcel_label($preference), throws: Argument)
+    expect(@parcel_label($preference), throws: Argument)
   }
 }

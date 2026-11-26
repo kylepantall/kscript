@@ -227,7 +227,7 @@ namespace KScript.Language.Tests
         {
             Memory files = new Memory();
             string path = Path.Combine(Path.GetDirectoryName(Main), "cart.test.kscript");
-            files.Files[path] = "test(name: adds an item) {\n  expect(value: 1, equals: 1)\n}\n";
+            files.Files[path] = "test(name: adds an item) {\n  expect(1, equals: 1)\n}\n";
             var (_, output) = Converse(files,
                 Init(),
                 Req(2, "kscript/tests", Doc(Workspace.PathToUri(path))),

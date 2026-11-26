@@ -40,19 +40,19 @@ describe(name: 'License issuer preconditions') {
     capture(into: out) {
       @run_issuer(['Site Pro'], 'portal', 'db', $ledger)
     }
-    expect(value: $out, same: 'License for Site Pro')
-    expect(value: $ledger.issued, same: ['Site Pro'])
-    expect(value: $log->entries(), count: 0)
+    expect($out, same: 'License for Site Pro')
+    expect($ledger.issued, same: ['Site Pro'])
+    expect($log->entries(), count: 0)
   }
 
   test(name: 'argument count takes priority over context and configuration') {
     capture(into: out) {
       @run_issuer([], 'shell', '', $ledger)
     }
-    expect(value: $out, same: '')
-    expect(value: $ledger.issued, count: 0)
+    expect($out, same: '')
+    expect($ledger.issued, count: 0)
     expect(
-      value: $log->entries()->pluck(message),
+      $log->entries()->pluck(message),
       same: ['Supply exactly one product']
     )
   }
@@ -61,19 +61,19 @@ describe(name: 'License issuer preconditions') {
     expect_error(type: Validation, contains: 'one product') {
       @issue_product(['Site', 'Pro'], 'portal', 'db', $ledger)
     }
-    expect(value: $ledger.issued, count: 0)
+    expect($ledger.issued, count: 0)
   }
 
   test(name: 'a missing issuer context reports its own guard before the database guard') {
     capture(into: out) {
       @run_issuer(['Site Pro'], 'shell', '', $ledger)
     }
-    expect(value: $out, same: '')
+    expect($out, same: '')
     expect(
-      value: $log->entries()->pluck(message),
+      $log->entries()->pluck(message),
       same: ['Run through the portal']
     )
-    expect(value: $ledger.issued, count: 0)
+    expect($ledger.issued, count: 0)
   }
 
   test(name: 'a blank connection reports once and a corrected retry issues once') {
@@ -81,11 +81,11 @@ describe(name: 'License issuer preconditions') {
       @run_issuer(['Pro'], 'portal', '  ', $ledger)
       @run_issuer(['Pro'], 'portal', 'db', $ledger)
     }
-    expect(value: $out, same: 'License for Pro')
+    expect($out, same: 'License for Pro')
     expect(
-      value: $log->entries()->pluck(message),
+      $log->entries()->pluck(message),
       same: ['Configure the database']
     )
-    expect(value: $ledger.issued, same: ['Pro'])
+    expect($ledger.issued, same: ['Pro'])
   }
 }

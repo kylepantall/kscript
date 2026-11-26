@@ -29,15 +29,15 @@ describe(name: 'Recursion and lexical scope') {
         { hours: 3, children: [] },
       ],
     }
-    expect(value: @total_branch($tree), same: 10)
-    expect(value: @total_branch($tree.children[0]), same: 6)
+    expect(@total_branch($tree), same: 10)
+    expect(@total_branch($tree.children[0]), same: 6)
   }
 
   test(name: 'mutually recursive functions reach the base case through either entry') {
-    expect(value: @even_count(0), same: true)
-    expect(value: @odd_count(0), same: false)
-    expect(value: @even_count(3), same: false)
-    expect(value: @odd_count(5), same: true)
+    expect(@even_count(0), same: true)
+    expect(@odd_count(0), same: false)
+    expect(@even_count(3), same: false)
+    expect(@odd_count(5), same: true)
   }
 
   test(name: 'a parameter shadows a variable with the same name in the enclosing scope') {
@@ -46,8 +46,8 @@ describe(name: 'Recursion and lexical scope') {
       units += 1
       return $units
     }
-    expect(value: @add_one(4), same: 5)
-    expect(value: $units, same: 10)
+    expect(@add_one(4), same: 5)
+    expect($units, same: 10)
   }
 
   test(name: 'each loop iteration captures its own value in a deferred function') {
@@ -56,7 +56,7 @@ describe(name: 'Recursion and lexical scope') {
       actions = $actions->push(fn() => $name)
     }
     labels = $actions->map(fn(action) => $action())
-    expect(value: $labels, equals: ['Ada', 'Mo', 'Ren'])
+    expect($labels, equals: ['Ada', 'Mo', 'Ren'])
   }
 
   test(name: 'a callback resolves its free variable in the defining scope') {
@@ -64,7 +64,7 @@ describe(name: 'Recursion and lexical scope') {
     reader = fn() => $label
     fn read_in_context(label: string, read: fn) => [$label, $read()]
     expect(
-      value: @read_in_context('caller', $reader),
+      @read_in_context('caller', $reader),
       equals: ['caller', 'definition']
     )
   }

@@ -14,7 +14,7 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 <layout path="_layout.html" title="People">
   <h1>People aged {$min} and over</h1>
   <ul>
-    <for each="p" in="$people |> filter(fn(p) => $p.age ge $min) |> sort_by(fn(p) => $p.name)">
+    <for each="p" in="$people |> filter(fn(p) => $p.age ge $min) |> sort_by(.name)">
       <li class="{ $p.age ge 65 ? 'senior' : '' }">
         <a href="/people/{$p.id}">{$p.name}</a> ({$p.age})
       </li>
@@ -191,26 +191,24 @@ Reusable components become live automatically when their templates use state, ev
 
 <live id="search">
   <state name="query" value="''" />
-  <input bind="query" placeholder="Search…">
-  <for each="p" in="$people->filter(fn(p) => $p.name->lower()->contains($query->lower()))">
-    <li>{$p.name}</li>
-  </for>
+  <input @bind($query) placeholder="Search…">
+  <li @each($people->filter(fn(p) => $p.name->lower()->contains($query->lower())), as: p)>{$p.name}</li>
 </live>
 ```
 
 - `<state name value>` declares the block's state. It travels with the page, signed so the browser can't change it, so the server can restore the component from the browser's next request. A signed state is not used up: the browser can send the same one again (the back button, a second tab), so a handler that must run once checks that for itself, for example against the database.
 - A live block calls back by asking for its page again with `GET`. A view shown in answer to a `POST` needs a `GET` route at the same address, or better a redirect to a `GET` page after the `POST`; without one the page is an error that says so.
 - `on-click`, `on-change`, `on-input`, `on-submit`, `on-keydown` and `on-enter` run statements like `count += 1; draft = ''`. Inside a loop, the loop variable is available to the handler (`on-click="items = $items->reject(fn(i) => $i.id == $item.id)"`). `$event.value`, `$event.key` and `$event.checked` describe the browser event.
-- A component can declare its own `<live>` block and use `on-keyup`, `on-escape`, `on-focusin`, `on-focusout`, `on-cancel`, `on-close`, `on-pointerdown`, `on-pointerup` and `on-pointercancel`. The event includes `code`, keyboard modifiers (`alt`, `ctrl`, `meta`, `shift`), `repeat`, pointer coordinates (`client_x`, `client_y`, `page_x`, `page_y`), `button`, `pointer_id` and `pointer_type` where applicable. On a handler's element, `prevent-default="keydown"` cancels that browser action before the request.
+- A component can declare its own `<live>` block and use `on-keyup`, `on-escape`, `on-focusin`, `on-focusout`, `on-cancel`, `on-close`, `on-pointerdown`, `on-pointerup` and `on-pointercancel`. The event includes `code`, keyboard modifiers (`alt`, `ctrl`, `meta`, `shift`), `repeat`, pointer coordinates (`client_x`, `client_y`, `page_x`, `page_y`), `button`, `pointer_id` and `pointer_type` where applicable. The handler modifier `prevent: true` cancels the browser's own action before the request, as in `@on-keydown(call: $save, key: [ctrl, s], prevent: true)`.
 - To drag one element onto another, mark the source `@drag(copy: true, value: $item.id)` and handle `on-drop` on the destination. Read `$event.drag_value`. Validate the ID and permissions in a handler that saves changes. Offer a keyboard action for the same operation.
 - To reorder siblings, use `on-sort` on their container and a unique `sort-item="{$item.id}"` on each child. Users can drag a child or focus it and press Alt+Up or Alt+Down. Set `sort-axis="horizontal"` for left-to-right lists. The action receives `$event.item`, zero-based `$event.from` and `$event.index`, and the proposed `$event.order` list. Validate the order before saving it.
-- `on-tick="…" every="200ms"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Put it in an `<if>` to start and stop it: `<if $playing><span on-tick="frame += 1" every="100"></span></if>`.
-- `bind="name"` ties an input to a state variable both ways and redraws the block as you type. A bound value is what a form control sends: text, a number, true or false, or a list of those. Anything else from the browser is refused with a `422`.
-- A radio group binds to a single value. A multiple select binds to a list of selected values. Add `bind-on="change"` or `bind-on="blur"` to choose when an edit triggers an update. With `bind-on="action"`, the value travels with the next component action.
-- Use `bind="draft.title"` to update an existing field in a live state map while retaining its other fields.
+- `on-tick="…" every="200ms"` runs a handler every 200 milliseconds for as long as that element is in the block, counted from when the last answer arrived. Give it `@if` to start and stop it: `<span on-tick="frame += 1" every="100" @if($playing)></span>`.
+- `@bind($name)` ties an input to a state variable both ways and redraws the block as you type. A bound value is what a form control sends: text, a number, true or false, or a list of those. Anything else from the browser is refused with a `422`.
+- A radio group binds to a single value. A multiple select binds to a list of selected values. Give `@bind` an `on:` option to choose when an edit triggers an update: `@bind($name, on: change)` or `on: blur`. With `on: action`, the value travels with the next component action.
+- Use `@bind($draft.title)` to update an existing field in a live state map while retaining its other fields.
 - Add `query="page"` to `<state name="page" value="1" />` to initialize it from the query string and reflect changes in the URL. Use this for filters or pagination. Query-backed state holds text, a number, a boolean or null. Null clears the parameter. Each update replaces the browser's current history entry.
 - Use `session="search-filters"` to carry a state value across visits in the current session. Use a separate key for independent instances. Add `locked` when only server actions should change a state variable. Signed state is visible in the page, so keep secrets in server-side values.
-- Use `on-init` to run a handler when the block mounts and `on-visible` when its element first enters the viewport. Each runs once per block. Use `live-loading` for a status message, `live-disable` to disable a control during a request, `live-offline` to display an offline notice, and `live-confirm="Remove this item?"` to ask for confirmation before a browser action.
+- Use `on-init` to run a handler when the block mounts and `on-visible` when its element first enters the viewport. Each runs once per block. Use `live-loading` for a status message, `live-disable` to disable a control during a request, `live-offline` to display an offline notice, and a handler's `confirm:` modifier (`@on-click(delete: $item, confirm: 'Remove this item?')`) to ask before an action.
 - Add `lazy` to a live block to defer its state initialization and rendering until it enters the viewport. Add `defer` to load it just after the initial document is ready. Put optional `<placeholder>` markup directly inside the block to reserve space while it loads.
 - Live updates retain matching DOM nodes. Add `live-key="{$item.id}"` to repeated siblings so they keep their identity when reordered. Use `live-replace` on an element that should be rebuilt on every update.
 - Use `live-dirty` to show an unsent edit notice. Set it to a binding name to watch only that field. Use `live-cloak` to hide an element until the browser runtime starts. Use `live-ignore` on a client-owned widget whose markup should survive updates. Keep server event controls and bindings outside that widget.

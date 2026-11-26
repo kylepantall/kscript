@@ -190,6 +190,15 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void Completion_lists_only_the_fields_an_action_takes()
+        {
+            Assert.Equal(new[] { "$open" }, At("<button @on-click(toggle: \u2038)>x</button>").Items.Select(i => i.Label));
+            Assert.Equal(new[] { "$count" }, At("<button @on-click(increment: $\u2038)>x</button>").Items.Select(i => i.Label));
+            Assert.Equal(new[] { "$tags" }, At("<button @on-click(add: $draft, to: \u2038)>x</button>").Items.Select(i => i.Label));
+            Assert.Equal("$count", Assert.Single(At("<button @on-click(toggle: $open, decrement: $co\u2038)>x</button>").Items).InsertText);
+        }
+
+        [Fact]
         public void Completion_offers_each_modifier_once_and_hover_explains_it()
         {
             List<CompletionItem> items = At("<button @on-click(toggle: $open, \u2038)>x</button>").Items;

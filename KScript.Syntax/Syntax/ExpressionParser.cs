@@ -757,6 +757,10 @@ namespace KScript.Syntax
                     {
                         return ParseMap();
                     }
+                    if ((t.Is(".") || t.Is("->")) && Peek(1).Kind == TokenKind.Identifier && Peek(1).Span.Start == t.Span.End)
+                    {
+                        return ParseItemFunction(t);
+                    }
                     break;
 
                 case TokenKind.Error:
@@ -835,6 +839,23 @@ namespace KScript.Syntax
             // Brackets don't get their own node; widening the span keeps hover and errors pointing at the whole group.
             node.Span = TextSpan.FromBounds(Math.Min(start, node.Span.Start), Math.Max(end, node.Span.End));
             return node;
+        }
+
+        /// <summary>The name a short function (<c>.price</c>, <c>->trim()</c>) gives its item. It can't be written, so it hides nothing.</summary>
+        public const string ItemParameter = "\0item";
+
+        /// <summary>
+        /// <c>.price</c> or <c>->trim()</c> where a value goes: a function of one item that reads that field or calls
+        /// that method, and the chain after it (<c>.author.name</c>, <c>->trim()->lower()</c>). Same as
+        /// <c>fn(item) => $item.price</c>.
+        /// </summary>
+        private ExprNode ParseItemFunction(Token start)
+        {
+            var item = new VariableNode { Name = ItemParameter, Span = new TextSpan(start.Span.Start, 0) };
+            ExprNode body = ParsePostfix(item, allowCast: false);
+            var lambda = new LambdaNode { Body = body, Span = TextSpan.FromBounds(start.Span.Start, body.Span.End), ItemShorthand = true };
+            lambda.Parameters.Add(new ParameterNode { Name = ItemParameter, Span = new TextSpan(start.Span.Start, 0) });
+            return lambda;
         }
 
         private ExprNode ParseLambda()

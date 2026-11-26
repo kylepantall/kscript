@@ -44,7 +44,7 @@ public sealed class DocsTests
         var api = site.Catalog.GetCommand("api");
         var options = api.Signatures.Single().Parameters.Single(p => p.Name == "options");
         Assert.Equal(KType.Map, options.Type);
-        Assert.Equal(new[] { "method", "headers", "body", "timeout", "retries", "retry_delay" }, options.Fields.Select(f => f.Name));
+        Assert.Equal(new[] { "headers", "timeout", "retries", "retry_delay" }, options.Fields.Select(f => f.Name));
         string html = site.Find("/reference/net").Body;
         Assert.Contains("href=\"#cmd-api-options\"", html);
         Assert.Contains("id=\"cmd-api-options\"", html);
@@ -64,7 +64,7 @@ public sealed class DocsTests
                 Assert.Contains(field.Example, page);
                 Assert.Contains(field.DefaultValue, page);
             }
-            Assert.Contains("method: 'POST'", page);
+            Assert.Contains("post: { title: 'Ship it' }", page);
             Assert.Contains(format == "xml" ? "<import package=\"KScript.Net\"" : "import KScript.Net", page);
         }
         Assert.Contains("In-process requests to project routes ignore this field", html);

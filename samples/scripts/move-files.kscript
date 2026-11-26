@@ -5,7 +5,7 @@ input(into: old_dir) "Move files from: "
 input(into: new_dir) "Move files to: "
 input(into: file_types) "File types (comma separated, such as txt, pdf): "
 
-types = $file_types->split(',')->map(fn(t) => $t->trim()->trim_start('.'))
+types = $file_types->split(',')->map(->trim()->trim_start('.'))
 for file in @files($old_dir) |> filter(fn(f) =>
   $types->contains($f.extension)) {
     target = @join_path($new_dir, $file.name)

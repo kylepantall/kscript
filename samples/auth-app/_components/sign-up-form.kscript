@@ -9,7 +9,7 @@ type SignUpForm extends Component {
   fn render() => ```html
     <if test="$problems->count() > 0">
       <ul class="error">
-        <for each="problem" in="$problems"><li><if test="$problem.field != null"><strong>{$problem.field}</strong>: </if>{$problem.message}</li></for>
+        <li @each($problems, as: problem)><if test="$problem.field != null"><strong>{$problem.field}</strong>: </if>{$problem.message}</li>
       </ul>
     </if>
     <form method="post" action="/register">

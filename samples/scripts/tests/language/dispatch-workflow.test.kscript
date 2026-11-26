@@ -17,11 +17,11 @@ describe(name: "Dispatching work orders") {
     )
     tickets = $policy->dispatch($orders)
 
-    expect(value: $tickets->pluck(id), same: [11, 10, 12])
-    expect(value: $tickets->pluck(queue), same: ['lab', 'field', 'field'])
-    expect(value: $tickets[0]->type(), same: 'DispatchTicket')
-    expect(value: $orders[0].team, equals: 'ops')
-    expect(value: $orders->pluck(id), same: [10, 11, 12])
+    expect($tickets->pluck(id), same: [11, 10, 12])
+    expect($tickets->pluck(queue), same: ['lab', 'field', 'field'])
+    expect($tickets[0]->type(), same: 'DispatchTicket')
+    expect($orders[0].team, equals: 'ops')
+    expect($orders->pluck(id), same: [10, 11, 12])
   }
 
   test(name: "unmapped teams share a fallback queue while known teams keep theirs") {
@@ -31,9 +31,9 @@ describe(name: "Dispatching work orders") {
       { id: 3, team: 'legal' }
     ]
     policy = DispatchPolicy(queues: { ops: 'field' }, fallback: 'triage')
-    queues = $policy->dispatch($orders)->group_by(fn(ticket) => $ticket.queue)
-    expect(value: $queues.field->pluck(id), same: [1])
-    expect(value: $queues.triage->pluck(id), same: [2, 3])
+    queues = $policy->dispatch($orders)->group_by(.queue)
+    expect($queues.field->pluck(id), same: [1])
+    expect($queues.triage->pluck(id), same: [2, 3])
   }
 
   test(name: "a strict policy propagates the lookup error for a normalized team") {
@@ -53,6 +53,6 @@ describe(name: "Dispatching work orders") {
 
   test(name: "empty input succeeds even for a strict policy with no routes") {
     policy = DispatchPolicy(queues: {}, fallback: '')
-    expect(value: $policy->dispatch([]), same: [])
+    expect($policy->dispatch([]), same: [])
   }
 }

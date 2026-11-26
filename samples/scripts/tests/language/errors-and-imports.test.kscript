@@ -10,16 +10,16 @@ fn order(id: int) {
 }
 
 test(name: 'a qualified import is callable inside a local function') {
-  expect(value: @order(5), equals: 'order-5')
+  expect(@order(5), equals: 'order-5')
 }
 
 test(name: 'an imported error retains its fields and parent type') {
   expect_error(type: NotFound, as: err) {
     @order(0)
   }
-  expect(value: $err.type, equals: 'OrderNotFound')
-  expect(value: $err.status, same: 404)
-  expect(value: $err.message, equals: 'No order 0')
+  expect($err.type, equals: 'OrderNotFound')
+  expect($err.status, same: 404)
+  expect($err.message, equals: 'No order 0')
 }
 
 test(name: 'catch then finally run in order') {
@@ -31,7 +31,7 @@ test(name: 'catch then finally run in order') {
   } finally {
     events = $events->push('finished')
   }
-  expect(value: $events, equals: ['OrderNotFound', 'finished'])
+  expect($events, equals: ['OrderNotFound', 'finished'])
 }
 
 test(name: 'rethrowing a cause keeps the original error fields') {
@@ -42,14 +42,14 @@ test(name: 'rethrowing a cause keeps the original error fields') {
       throw Validation(message: 'invalid order', cause: $inner)
     }
   }
-  expect(value: $outer.cause.type, same: 'OrderNotFound')
-  expect(value: $outer.cause.message, equals: 'No order -1')
+  expect($outer.cause.type, same: 'OrderNotFound')
+  expect($outer.cause.message, equals: 'No order -1')
 }
 
 test(name: 'named fields build a custom error independent of argument order') {
   expect_error(type: OutOfStock, as: err) {
     throw OutOfStock(wanted: 3, left: 1, item: 'tea')
   }
-  expect(value: $err.status, same: 409)
-  expect(value: $err.message, equals: 'Only 1 tea left, 3 wanted')
+  expect($err.status, same: 409)
+  expect($err.message, equals: 'Only 1 tea left, 3 wanted')
 }

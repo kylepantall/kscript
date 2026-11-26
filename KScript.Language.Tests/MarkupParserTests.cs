@@ -146,8 +146,7 @@ namespace KScript.Language.Tests
         }
 
         [Theory]
-        [InlineData("@bind('draft')", "bind", "draft")]
-        [InlineData("@bind-on(\"blur\")", "bind-on", "blur")]
+        [InlineData("@bind($draft)", "bind", "$draft")]
         [InlineData("@live-disable()", "live-disable", null)]
         [InlineData("@live-use-autosize()", "live-use-autosize", null)]
         [InlineData("@on-click(count += (')'->count() + (1 + 2)))", "on-click", "count += (')'->count() + (1 + 2))")]
@@ -166,7 +165,7 @@ namespace KScript.Language.Tests
         [InlineData("@bind(draft)", DiagnosticCodes.InvalidAttribute)]
         [InlineData("@on-click()", DiagnosticCodes.InvalidAttribute)]
         [InlineData("@live-disable('yes')", DiagnosticCodes.InvalidAttribute)]
-        [InlineData("bind='draft' @bind('draft')", DiagnosticCodes.DuplicateAttribute)]
+        [InlineData("bind='draft' @bind($draft)", DiagnosticCodes.DuplicateAttribute)]
         public void InvalidOrDuplicateDirectivesHaveAStartTagDiagnostic(string directives, string code)
         {
             var doc = Html($"<button {directives} title='ordinary'></button>");
@@ -191,11 +190,11 @@ namespace KScript.Language.Tests
         [Fact]
         public void AnUnfinishedHandlerStopsAtItsTagAndKeepsFollowingMarkup()
         {
-            var doc = Html("<button @on-click(count += 1>Run</button><input @bind('draft')>");
+            var doc = Html("<button @on-click(count += 1>Run</button><input @bind($draft)>");
             var diagnostic = Assert.Single(doc.Diagnostics);
             Assert.Equal(DiagnosticCodes.InvalidAttribute, diagnostic.Code);
             Assert.Equal("count += 1", doc.RootElements.First().GetAttributeValue("on-click"));
-            Assert.Equal("draft", doc.RootElements.Last().GetAttributeValue("bind"));
+            Assert.Equal("$draft", doc.RootElements.Last().GetAttributeValue("bind"));
         }
 
         [Fact]

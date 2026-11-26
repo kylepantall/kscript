@@ -880,13 +880,7 @@ namespace KScript.Pages
                     if (condition is { } span && Values.Truthy(Eval(a.Value.Substring(span.Start, span.Length), scope, state)) && !el.HasAttr("disabled")) sb.Append(" disabled");
                     continue;
                 }
-                if (a.Name == "bind-on")
-                {
-                    if (!hasBinding || !LiveAttributes.Get("bind-on").Options.Contains(a.Value))
-                        throw new PageException("Use bind-on with bind and choose input, change, blur or action.");
-                    sb.Append(" data-ks-bind-on=\"").Append(a.Value).Append('"');
-                    continue;
-                }
+                if (LiveAttributes.Retired.TryGetValue(a.Name, out string retired)) throw new PageException(retired);
                 if (a.Name == "live-upload")
                 {
                     if (state.LiveScope == null || inputType != "file" || el.Attr("name") is not string field)
@@ -953,12 +947,12 @@ namespace KScript.Pages
                 }
                 if (a.Name.StartsWith("live-use-", StringComparison.Ordinal) && state.LiveScope == null)
                     throw new PageException($"{a.Name} needs a live component or a <live> block.");
-                if (a.Name is "live-loading" or "live-offline" or "live-disable" or "live-confirm" or "live-key" or "live-replace"
+                if (a.Name is "live-loading" or "live-offline" or "live-disable" or "live-key" or "live-replace"
                     or "live-dirty" or "live-cloak" or "live-ignore" or "live-error")
                 {
                     if (state.LiveScope == null) throw new PageException($"{a.Name} only works inside a <live> block.");
                     sb.Append(" data-ks-").Append(a.Name);
-                    if (a.Name is "live-confirm" or "live-key" || a.Name == "live-dirty" && a.Value != null)
+                    if (a.Name is "live-key" || a.Name == "live-dirty" && a.Value != null)
                         sb.Append("=\"").Append(Values.HtmlEscape(Values.ToStr(AttributeValue(a, scope, state)))).Append('"');
                     continue;
                 }
@@ -1028,23 +1022,6 @@ namespace KScript.Pages
             {
                 yield return child;
                 foreach (PageElement below in Descendants(child)) yield return below;
-            }
-        }
-
-        /// <summary>A bound value read as as: says (string, int, number, bool), with what is wrong when it can't be.</summary>
-        private static (object Value, string Problem) ReadBound(object value, string type, string field)
-        {
-            string text = Values.ToStr(value)?.Trim() ?? string.Empty;
-            switch (type)
-            {
-                case "string":
-                    return (Values.ToStr(value), null);
-                case "bool":
-                    return value is bool b ? (b, null) : Values.ParseBool(text) is bool parsed ? (parsed, null) : (null, $"{field} takes true or false, and '{text}' is neither.");
-                case "int":
-                    return Values.TryNumber(text, out double whole) && whole == Math.Floor(whole) ? (whole, null) : (null, $"{field} takes a whole number, and '{text}' isn't one.");
-                default:
-                    return Values.TryNumber(text, out double number) ? (number, null) : (null, $"{field} takes a number, and '{text}' isn't one.");
             }
         }
 
@@ -1371,12 +1348,9 @@ namespace KScript.Pages
                     if (BindingOf(el, kv.Key) is { } binding)
                     {
                         // @bind($age, as: int, trim: true): read the value before it reaches the field.
-                        if (binding.Trim && next is string untrimmed) next = untrimmed.Trim();
-                        if (binding.Word("as") is string type && ReadBound(next, type, kv.Key) is var (converted, problem))
-                        {
-                            if (problem != null) throw new PageResponseSignal(new PageResult { Status = 422, ContentType = "text/plain; charset=utf-8", Body = problem });
-                            next = converted;
-                        }
+                        (object converted, string problem) = BoundValues.Read(next, binding, kv.Key);
+                        if (problem != null) throw new PageResponseSignal(new PageResult { Status = 422, ContentType = "text/plain; charset=utf-8", Body = problem });
+                        next = converted;
                     }
                     try
                     {

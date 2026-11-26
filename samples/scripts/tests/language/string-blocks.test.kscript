@@ -7,20 +7,20 @@ describe(name: "String interpolation and blocks") {
   test(name: "interpolation combines member access, arithmetic and a method call") {
     order = { sku: 'ab12', cartons: 2, pieces: 6 }
     label = "{$order.sku->upper()}: { $order.cartons * $order.pieces } pieces"
-    expect(value: $label, same: 'AB12: 12 pieces')
+    expect($label, same: 'AB12: 12 pieces')
   }
 
   test(name: "a route template keeps its argument braces beside interpolated text") {
     prefix = 'shops'
     template = '/shops/{id}'
-    expect(value: "/{$prefix}/{{id}}", same: $template)
+    expect("/{$prefix}/{{id}}", same: $template)
   }
 
   test(name: "a line continuation builds one sentence without indentation") {
     reader = 'Joan'
     greeting = "Hello {$reader}, \
       your order is ready."
-    expect(value: $greeting, same: 'Hello Joan, your order is ready.')
+    expect($greeting, same: 'Hello Joan, your order is ready.')
   }
 
   test(name: "a fenced string retains indentation, blank lines and placeholder text") {
@@ -30,7 +30,7 @@ describe(name: "String interpolation and blocks") {
         Collection after 4
       ```
     expect(
-      value: $notice->lines(),
+      $notice->lines(),
       same: ['Hello {name},', '', '  Collection after 4']
     )
   }
@@ -39,7 +39,7 @@ describe(name: "String interpolation and blocks") {
     slip = ```<PackingSlip>
       { "item": "Tea", "qty": "3" }
       ```
-    expect(value: $slip.item, same: 'Tea')
-    expect(value: $slip.qty, same: 3)
+    expect($slip.item, same: 'Tea')
+    expect($slip.qty, same: 3)
   }
 }

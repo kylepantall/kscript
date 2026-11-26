@@ -76,7 +76,6 @@ namespace KScript.Language.Features
             {
                 "live-id" => false,
                 "bind" => tag is "input" or "textarea" or "select" && !string.Equals(element.GetAttributeValue("type"), "file", StringComparison.OrdinalIgnoreCase),
-                "bind-on" => element.GetAttribute("bind") != null,
                 "live-upload" => tag == "input" && element.GetAttributeValue("type")?.ToLowerInvariant() == "file" && element.GetAttribute("name") != null,
                 "live-portal" => tag == "template",
                 "on-submit" => tag == "form",
@@ -123,7 +122,17 @@ namespace KScript.Language.Features
                     shape = shape != null && shape.Fields.TryGetValue(segment, out FieldInfo field) ? field.Shape : null;
                 names = shape?.Fields.Keys.Select(key => path[..(dot + 1)] + key) ?? Enumerable.Empty<string>();
             }
-            return names.Where(n => n.StartsWith(path, StringComparison.Ordinal)).Select(Choice).ToList();
+            // @bind names its field with $: complete the path only, so the options after it stay.
+            int pathStart = attribute.Value.SourceSpan.Start, pathEnd = pathStart;
+            string text = analysis.Source.Text;
+            while (pathEnd < attribute.Value.SourceSpan.End && (char.IsLetterOrDigit(text[pathEnd]) || text[pathEnd] is '_' or '.' or '$' or '-'))
+                pathEnd++;
+            bool bindClosed = text[attribute.Span.End - 1] == ')' || attribute.Quote != '\0' || text[attribute.NameSpan.Start] != '@';
+            return names.Where(n => n.StartsWith(path, StringComparison.Ordinal)).Select(n => new CompletionItem
+            {
+                Label = n, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(pathStart, pathEnd),
+                InsertText = "$" + n + (bindClosed ? "" : ")"),
+            }).ToList();
         }
     }
 }

@@ -17,7 +17,7 @@ public class PageVisitTests
           fn render() => ```html
           <p class="total big">Count {$count}</p>
           <p>Name {$name}</p>
-          <input @bind('name')>
+          <input @bind($name)>
           <button @on-click(increment: $count)>Add one</button>
           <button aria-label="Reset" @on-click(set: $count, to: 0)>×</button>
           <button @on-click(call: $missing)>Break</button>

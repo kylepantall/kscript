@@ -14,7 +14,18 @@ namespace KScript.Pages
     {
         private static readonly Dictionary<string, AttributeInfo> Attributes = Describe().ToDictionary(a => a.Name, StringComparer.OrdinalIgnoreCase);
 
-        public static IEnumerable<AttributeInfo> All => Attributes.Values;
+        public static IEnumerable<AttributeInfo> All => Attributes.Values.Where(a => !Retired.ContainsKey(a.Name));
+
+        /// <summary>
+        /// Attributes a shorthand replaced, each with what to write instead. They are still read, so the checker and
+        /// the renderer can say so, and both refuse them.
+        /// </summary>
+        public static IReadOnlyDictionary<string, string> Retired { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["live-confirm"] = "live-confirm is now the handler's confirm: modifier, such as @on-click(delete: $note, confirm: 'Delete this note?').",
+            ["prevent-default"] = "prevent-default is now the handler's prevent: modifier, such as @on-keydown(save: $note, key: [ctrl, s], prevent: true).",
+            ["bind-on"] = "bind-on is now @bind's on: option, such as @bind($draft, on: blur).",
+        };
         public static AttributeInfo Get(string name) => Attributes.GetValueOrDefault(
             name.StartsWith("live-use-", StringComparison.OrdinalIgnoreCase) ? "live-use-" : name);
         public static bool IsDirective(string name) => Get(name) != null;
@@ -59,6 +70,8 @@ namespace KScript.Pages
             yield return new("live-upload", AttributeKind.Bool, "Send the selected files with the action.");
             yield return new("live-loading", AttributeKind.Bool, "Show this element while an action is pending.");
             yield return new("live-disable", AttributeKind.Bool, "Disable this control while an action is pending, or while a condition holds: @live-disable(while: $saving).");
+            yield return new(KScript.Syntax.Markup.ElementDirectives.If, AttributeKind.Expression, "Draws the tag only while the condition is true: @if($note). Same as <if $note> around it.");
+            yield return new(KScript.Syntax.Markup.ElementDirectives.Each, AttributeKind.Expression, "Draws the tag once for each item: @each($tasks, as: task, at: i). Same as <for each=\"task\" in=\"$tasks\"> around it.");
             yield return new("show", AttributeKind.Expression, "Shows the tag while the value is true and hides it (keeping it in the page) while false: @show($open).");
             yield return new("live-offline", AttributeKind.Bool, "Show this element when the browser is offline.");
             yield return new("live-error", AttributeKind.Bool, "Show this element when an action fails.");

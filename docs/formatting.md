@@ -74,10 +74,10 @@ import KScript.Cache
 /// The value kept under the key, or else what compute gives, kept for cache.ttl, which says how long.
 fn cached(key: string, compute: fn) => @cache('memory', name: 'app')->remember($key, $compute, ttl: $config.cache.ttl ?? '5m')
 
-fn adults(people: list) => $people->filter(fn(p) => $p.age >= 18)->sort_by(fn(p) => $p.name)->map(fn(p) => $p.name)->take(20)
+fn adults(people: list) => $people->filter(fn(p) => $p.age >= 18)->sort_by(.name)->map(.name)->take(20)
 
 people = @read_json('people.json')
-names = $people |> filter(fn(p) => $p.age > 18) |> map(fn(p) => $p.name->upper()) |> sort()
+names = $people |> filter(fn(p) => $p.age > 18) |> map(.name->upper()) |> sort()
 ```
 
 becomes
@@ -95,14 +95,14 @@ fn cached(key: string, compute: fn) =>
 fn adults(people: list) =>
   $people
     ->filter(fn(p) => $p.age >= 18)
-    ->sort_by(fn(p) => $p.name)
-    ->map(fn(p) => $p.name)
+    ->sort_by(.name)
+    ->map(.name)
     ->take(20)
 
 people = @read_json('people.json')
 names = $people
   |> filter(fn(p) => $p.age > 18)
-  |> map(fn(p) => $p.name->upper())
+  |> map(.name->upper())
   |> sort()
 ```
 

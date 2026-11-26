@@ -4,8 +4,8 @@ describe(name: 'Typed keys in incoming JSON') {
   test(name: 'each key in a row is normalized independently') {
     body = '{"active":" key_Alpha ","candidates":[" key_alpha ","key_beta "]}'
     batch = $body->json(as: KeyBatch)
-    expect(value: $batch.active, same: 'key_Alpha')
-    expect(value: $batch.candidates, same: ['key_alpha', 'key_beta'])
+    expect($batch.active, same: 'key_Alpha')
+    expect($batch.candidates, same: ['key_alpha', 'key_beta'])
   }
 
   test(name: 'absent and explicit null previous keys both leave the required key intact') {
@@ -15,9 +15,9 @@ describe(name: 'Typed keys in incoming JSON') {
       previous: null,
       candidates: []
     )
-    expect(value: $without_key.previous, same: null)
-    expect(value: $with_null.previous, same: null)
-    expect(value: $with_null.active, same: $without_key.active)
+    expect($without_key.previous, same: null)
+    expect($with_null.previous, same: null)
+    expect($with_null.active, same: $without_key.active)
   }
 
   test(name: 'a present optional key is subject to the same rules as a required one') {
@@ -26,13 +26,13 @@ describe(name: 'Typed keys in incoming JSON') {
       previous: ' key_beta ',
       candidates: []
     )
-    expect(value: $batch.previous, same: 'key_beta')
+    expect($batch.previous, same: 'key_beta')
     problems = KeyBatch->check({
       active: 'key_alpha',
       previous: 'bad',
       candidates: []
     })
-    expect(value: $problems->pluck(path)->unique(), same: ['$.previous'])
+    expect($problems->pluck(path)->unique(), same: ['$.previous'])
   }
 
   test(name: 'invalid and null list items report their own indices') {
@@ -42,16 +42,16 @@ describe(name: 'Typed keys in incoming JSON') {
     }
     problems = KeyBatch->check($input)
     expect(
-      value: $problems->pluck(path)->unique(),
+      $problems->pluck(path)->unique(),
       same: ['$.candidates[1]', '$.candidates[2]']
     )
-    expect(value: KeyBatch($input), throws: Shape)
+    expect(KeyBatch($input), throws: Shape)
   }
 
   test(name: 'a missing required array is distinct from an empty array') {
     input = '{"active":"key_Alpha"}'
-    expect(value: $input->json(as: KeyBatch), throws: Shape)
+    expect($input->json(as: KeyBatch), throws: Shape)
     empty = '{"active":"key_Alpha","candidates":[]}'->json(as: KeyBatch)
-    expect(value: $empty.candidates, same: [])
+    expect($empty.candidates, same: [])
   }
 }

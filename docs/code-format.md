@@ -264,7 +264,7 @@ import "../lib/strings.kscript"
 
 describe(name: 'slugify') {
   test(name: 'joins words with dashes') {
-    expect(value: @slugify('Hello World'), equals: 'hello-world')
+    expect(@slugify('Hello World'), equals: 'hello-world')
   }
 }
 ```

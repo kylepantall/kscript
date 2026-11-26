@@ -5,42 +5,42 @@ type PassingScore with [ReviewScore] {
 }
 
 fn passing_scores(scores: ReviewScore[]) =>
-  $scores->filter(fn(score) => $score->passes())
+  $scores->filter(->passes())
 
 describe(name: 'Review score refinements') {
   test(name: 'both ends of the scale are valid and neighboring integers fail') {
-    expect(value: ReviewScore('0')->passes(), same: false)
-    expect(value: ReviewScore('100')->passes(), same: true)
-    expect(value: ReviewScore(-1), throws: Shape)
-    expect(value: ReviewScore(101), throws: Shape)
+    expect(ReviewScore('0')->passes(), same: false)
+    expect(ReviewScore('100')->passes(), same: true)
+    expect(ReviewScore(-1), throws: Shape)
+    expect(ReviewScore(101), throws: Shape)
   }
 
   test(name: 'typed list parameters convert every score before filtering in order') {
     passed = @passing_scores(['59', 61, '60', 0, 61])
     expect(
-      value: $passed->map(fn(score) => $score->to_number()),
+      $passed->map(->to_number()),
       same: [61, 60, 61]
     )
-    expect(value: @passing_scores([61, 'absent']), throws: Shape)
+    expect(@passing_scores([61, 'absent']), throws: Shape)
   }
 
   test(name: 'a narrower score keeps the base method and accepts the threshold') {
     pass: PassingScore = '60'
-    expect(value: $pass->passes(), same: true)
-    expect(value: $pass->to_number(), same: 60)
-    expect(value: PassingScore(59), throws: Shape)
+    expect($pass->passes(), same: true)
+    expect($pass->to_number(), same: 60)
+    expect(PassingScore(59), throws: Shape)
   }
 
   test(name: 'the outer refinement also enforces the upper bound inherited from the base') {
-    expect(value: PassingScore(100)->passes(), same: true)
-    expect(value: PassingScore(101), throws: Shape)
+    expect(PassingScore(100)->passes(), same: true)
+    expect(PassingScore(101), throws: Shape)
   }
 
   test(name: 'optional scores distinguish an absent grade from a failing zero') {
     absent = null as ReviewScore?
     zero = 0 as ReviewScore?
-    expect(value: $absent, same: null)
-    expect(value: $zero->passes(), same: false)
-    expect(value: 'absent' as ReviewScore?, throws: Shape)
+    expect($absent, same: null)
+    expect($zero->passes(), same: false)
+    expect('absent' as ReviewScore?, throws: Shape)
   }
 }

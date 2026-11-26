@@ -32,7 +32,22 @@ public sealed partial class Analyzer
         var value = attribute.Value;
         BindDirective.Reading binding = BindDirective.Read(value.Value);
         foreach ((TextSpan problemSpan, string message) in binding.Problems)
+        {
+            if (binding.OldPathSpan is TextSpan oldPath && oldPath.Start == problemSpan.Start && oldPath.Length == problemSpan.Length)
+            {
+                // @bind('draft') and bind="draft" name the field with $ now.
+                TextSpan old = value.ToSource(problemSpan);
+                // @bind('draft'): the value is the text inside the quotes, so the fix takes the quotes too.
+                string source = result.Source.Text;
+                if (old.Start > 1 && old.End < source.Length && source[old.Start - 1] is '\'' or '"' && source[old.End] == source[old.Start - 1]
+                    && source[old.Start - 2] == '(')
+                    old = TextSpan.FromBounds(old.Start - 1, old.End + 1);
+                Report(old, DiagnosticSeverity.Error, DiagnosticCodes.OneSpelling, message,
+                    new[] { new QuickFix("Change to $" + binding.Path, new TextChange(old, "$" + binding.Path)) });
+                continue;
+            }
             Report(value.ToSource(problemSpan), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, message);
+        }
         if (binding.Get("debounce") is ExprNode debounce)
             AnalyzeExpressionRegion(Slice(value, debounce.Span), RegionKind.Expression, scope, element, attribute);
         string path = binding.Path;

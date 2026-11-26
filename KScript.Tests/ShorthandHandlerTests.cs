@@ -16,6 +16,7 @@ public class ShorthandHandlerTests
           draft: string = 'red'
           tags: string[] = []
           said: string = ''
+          stock: int(min: 0) = 3
 
           fn say(word: string) {
             said = $word
@@ -23,6 +24,7 @@ public class ShorthandHandlerTests
 
           fn render() => ```html
           <p>{$open}|{$count}|{$tab}|{$draft}|{$tags->join(',')}|{$said}</p>
+          <b>{$stock}</b>
           <button @on-click(toggle: $open, increment: $count)>0</button>
           <button @on-click(increment: $count, by: 5)>1</button>
           <button @on-click(decrement: $count, by: 2)>2</button>
@@ -35,6 +37,7 @@ public class ShorthandHandlerTests
           <button @on-click(call: $nope)>9</button>
           <button @on-click(call: $tab)>10</button>
           <button @on-click(toggle: $open, count += 1)>11</button>
+          <button @on-click(decrement: $stock, by: 2)>12</button>
           ```
         }
         """;
@@ -93,5 +96,20 @@ public class ShorthandHandlerTests
         using var site = Site();
         string body = Event(site, handler, site.Render("index.html").Body).Body;
         Assert.Contains(System.Net.WebUtility.HtmlDecode(message), System.Net.WebUtility.HtmlDecode(body));
+    }
+
+    [Fact]
+    public void Decrement_stops_at_the_fields_min()
+    {
+        using var site = Site();
+        string html = site.Render("index.html").Body;
+        string Stock(string page) => System.Text.RegularExpressions.Regex.Match(page, "<b>([^<]*)</b>").Groups[1].Value;
+        Assert.Equal("3", Stock(html));
+        html = Event(site, 12, html).Body;
+        Assert.Equal("1", Stock(html));
+        html = Event(site, 12, html).Body;
+        Assert.Equal("0", Stock(html));
+        html = Event(site, 12, html).Body;
+        Assert.Equal("0", Stock(html));
     }
 }

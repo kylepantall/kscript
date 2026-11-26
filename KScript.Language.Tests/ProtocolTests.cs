@@ -670,14 +670,14 @@ namespace KScript.Language.Tests
             OpenAs("kscript-code", string.Join("\n",
                 "describe(name: slugify) {",
                 "  test(name: lower-cases words) {",
-                "    expect(value: 'a', equals: 'a')",
+                "    expect('a', equals: 'a')",
                 "  }",
                 "  for case in [{ text: 'One' }] { test(name: slug of '{$case.text}') {",
-                "    expect(value: $case.text, equals: 'One')",
+                "    expect($case.text, equals: 'One')",
                 "  } }",
                 "}",
                 "test(name: on its own) {",
-                "  expect(value: 1, equals: 1)",
+                "  expect(1, equals: 1)",
                 "}",
                 ""), uri);
 
@@ -715,7 +715,7 @@ namespace KScript.Language.Tests
             const string uri = "file:///work/tests/literals.test.kscript";
             OpenAs("kscript-code", """
                 describe(name: 'literal names') {
-                  test(name: 'keeps \n and {$title}') { expect(value: 1, equals: 1) }
+                  test(name: 'keeps \n and {$title}') { expect(1, equals: 1) }
                 }
                 """, uri);
             const string fullName = @"literal names › keeps \n and {$title}";

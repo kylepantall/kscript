@@ -5,39 +5,39 @@ describe(name: "List transformations") {
       { shop: 'west', id: 8 },
       { shop: 'east', id: 11 },
     ]
-    by_shop = $orders->group_by(fn(order) => $order.shop)
-    expect(value: $by_shop.east->pluck(id), same: [17, 11])
-    expect(value: $by_shop.west->pluck(id), same: [8])
+    by_shop = $orders->group_by(.shop)
+    expect($by_shop.east->pluck(id), same: [17, 11])
+    expect($by_shop.west->pluck(id), same: [8])
   }
 
   test(name: "indexing stock updates by SKU retains the latest row for each item") {
     updates = [{ sku: 'A', qty: 3 }, { sku: 'B', qty: 7 }, { sku: 'A', qty: 0 }]
-    latest = $updates->to_map(fn(row) => $row.sku)
-    expect(value: $latest['A'], same: { sku: 'A', qty: 0 })
-    expect(value: $latest['B'], same: { sku: 'B', qty: 7 })
-    expect(value: $latest->count(), same: 2)
+    latest = $updates->to_map(.sku)
+    expect($latest['A'], same: { sku: 'A', qty: 0 })
+    expect($latest['B'], same: { sku: 'B', qty: 7 })
+    expect($latest->count(), same: 2)
   }
 
   test(name: "batching keeps a partial final page and flatten restores the original order") {
     ids = [4, 7, 9, 12, 15]
     pages = $ids->chunk(2)
-    expect(value: $pages, same: [[4, 7], [9, 12], [15]])
-    expect(value: $pages->flatten(), same: $ids)
-    expect(value: []->chunk(2), same: [])
+    expect($pages, same: [[4, 7], [9, 12], [15]])
+    expect($pages->flatten(), same: $ids)
+    expect([]->chunk(2), same: [])
   }
 
   test(name: "zipping stops when either side runs out of values") {
     labels = ['high', 'medium', 'low']
-    expect(value: $labels->zip([5, 3]), same: [['high', 5], ['medium', 3]])
-    expect(value: [5, 3]->zip($labels), same: [[5, 'high'], [3, 'medium']])
-    expect(value: $labels->zip([]), same: [])
+    expect($labels->zip([5, 3]), same: [['high', 5], ['medium', 3]])
+    expect([5, 3]->zip($labels), same: [[5, 'high'], [3, 'medium']])
+    expect($labels->zip([]), same: [])
   }
 
   test(name: "a summary uses row weights and preserves an empty average") {
     lines = [{ qty: 4, price: 3 }, { qty: 2, price: 9 }]
-    expect(value: $lines->sum(fn(line) => $line.qty * $line.price), same: 30)
-    expect(value: $lines->average(fn(line) => $line.price), same: 6)
-    expect(value: []->sum(), same: 0)
-    expect(value: []->average(), same: null)
+    expect($lines->sum(fn(line) => $line.qty * $line.price), same: 30)
+    expect($lines->average(.price), same: 6)
+    expect([]->sum(), same: 0)
+    expect([]->average(), same: null)
   }
 }

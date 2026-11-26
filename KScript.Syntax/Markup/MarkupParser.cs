@@ -41,6 +41,7 @@ namespace KScript.Syntax.Markup
         private readonly DocumentKind kind;
         private readonly MarkupDocument document;
         private readonly Stack<MarkupElement> open = new Stack<MarkupElement>();
+        private bool wrapDirectives = true;
         private int pos;
 
         private MarkupParser(SourceText source, DocumentKind kind, TextSpan? range = null)
@@ -54,7 +55,7 @@ namespace KScript.Syntax.Markup
 
         private bool IsHtml => kind != DocumentKind.Script;
 
-        public static MarkupDocument Parse(string text, DocumentKind kind) => Parse(new SourceText(text), kind);
+        public static MarkupDocument Parse(string text, DocumentKind kind, bool wrapDirectives = true) => Parse(new SourceText(text), kind, wrapDirectives);
 
         /// <summary>Parses a file, choosing the syntax from its path: <c>.kscript</c> scripts use the brace-and-newline format.</summary>
         public static MarkupDocument Parse(SourceText source, DocumentKind kind, string path) =>
@@ -64,9 +65,13 @@ namespace KScript.Syntax.Markup
         public static bool IsCodePath(string path) =>
             path != null && path.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase);
 
-        public static MarkupDocument Parse(SourceText source, DocumentKind kind)
+        /// <summary>
+        /// Parses markup. <paramref name="wrapDirectives"/> puts a tag with @if or @each inside the &lt;if&gt; or
+        /// &lt;for&gt; it stands for, which the checker and the renderer read; the formatter keeps the tags as written.
+        /// </summary>
+        public static MarkupDocument Parse(SourceText source, DocumentKind kind, bool wrapDirectives = true)
         {
-            MarkupParser parser = new MarkupParser(source, kind);
+            MarkupParser parser = new MarkupParser(source, kind) { wrapDirectives = wrapDirectives };
             parser.Run();
             return parser.document;
         }
@@ -167,6 +172,7 @@ namespace KScript.Syntax.Markup
                 MarkupElement e = open.Pop();
                 CloseImplicitly(e, text.Length, reportIfRequired: true);
             }
+            if (IsHtml && wrapDirectives) ElementDirectives.Wrap(document.Children, null, (span, message) => Error(span, DiagnosticCodes.InvalidAttributeValue, message));
         }
 
         /// <summary>Parses a tag, comment, CDATA section or declaration at '&lt;'. Returns false if it is just text.</summary>
@@ -370,6 +376,7 @@ namespace KScript.Syntax.Markup
                         Quote = directive.Quote,
                         Value = directive.Value is TextSpan value ? DecodedText.Plain(text.Substring(value.Start, value.Length), value.Start) : null,
                         Owner = element,
+                        IsDirective = true,
                     };
                     if (directive.Error != null) Error(liveAttribute.Span, DiagnosticCodes.InvalidAttribute, directive.Error);
                     AddAttribute(element, liveAttribute);

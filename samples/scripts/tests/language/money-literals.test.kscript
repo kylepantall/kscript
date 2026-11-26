@@ -6,31 +6,31 @@ fn show_price_label(label: PriceLabel) => $label
 describe(name: "Compact money literals") {
   test(name: "an amount carries its currency without a type annotation") {
     price = GBP1.0
-    expect(value: $price->to_string(), same: 'GBP 1.00')
-    expect(value: $price.currency->to_string(), same: 'GBP')
-    expect(value: GBP12.amount, same: 12)
+    expect($price->to_string(), same: 'GBP 1.00')
+    expect($price.currency->to_string(), same: 'GBP')
+    expect(GBP12.amount, same: 12)
   }
 
   test(name: "arithmetic and method calls keep currency precision") {
-    expect(value: (GBP1.0 + GBP0.25)->to_string(), same: 'GBP 1.25')
-    expect(value: (-JPY3)->to_string(), same: 'JPY -3')
+    expect((GBP1.0 + GBP0.25)->to_string(), same: 'GBP 1.25')
+    expect((-JPY3)->to_string(), same: 'JPY -3')
     expect(
-      value: @credit_amount(GBP4, amount: GBP0.05)->to_string(),
+      @credit_amount(GBP4, amount: GBP0.05)->to_string(),
       same: 'GBP 4.05'
     )
   }
 
   test(name: "collection items and quoted text keep their own types") {
     items = [USD1, USD0.02]
-    expect(value: $items->total()->to_string(), same: 'USD 1.02')
+    expect($items->total()->to_string(), same: 'USD 1.02')
     quotes = { GBP1: 'GBP1.0' }
-    expect(value: $quotes.GBP1->lower(), same: 'gbp1.0')
+    expect($quotes.GBP1->lower(), same: 'gbp1.0')
   }
 
   test(name: "an expected enum claims its own currency-like member names") {
     label: PriceLabel = GBP1
-    expect(value: $label, same: 'GBP1')
-    expect(value: @show_price_label(JPY3), same: 'JPY3')
-    expect(value: @show_price_label(label: GBP1), same: 'GBP1')
+    expect($label, same: 'GBP1')
+    expect(@show_price_label(JPY3), same: 'JPY3')
+    expect(@show_price_label(label: GBP1), same: 'GBP1')
   }
 }

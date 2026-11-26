@@ -4,28 +4,28 @@ import "../lib/life.kscript"
 describe(name: "grids") {
   test(name: "blank grids are empty") {
     g = @blank(width: 4, height: 3)
-    expect(value: $g, equals: ['....', '....', '....'])
-    expect(value: @population($g), equals: 0)
+    expect($g, equals: ['....', '....', '....'])
+    expect(@population($g), equals: 0)
   }
 
   test(name: "toggle flips one cell and leaves the original alone") {
     g = @blank(width: 3, height: 3)
     t = @toggle($g, x: 1, y: 2)
-    expect(value: $t, equals: ['...', '...', '.O.'])
-    expect(value: @toggle($t, x: 1, y: 2), equals: $g)
-    expect(value: @population($g), equals: 0)
+    expect($t, equals: ['...', '...', '.O.'])
+    expect(@toggle($t, x: 1, y: 2), equals: $g)
+    expect(@population($g), equals: 0)
   }
 
   test(name: "patterns are centred") {
     expect(
-      value: @place(@blank(width: 5, height: 5), rows: ['OOO']),
+      @place(@blank(width: 5, height: 5), rows: ['OOO']),
       equals: ['.....', '.....', '.OOO.', '.....', '.....']
     )
   }
 
   test(name: "cells placed off the edge are dropped") {
     expect(
-      value: @place(
+      @place(
         @blank(width: 3, height: 2),
         rows: ['OOOO'],
         left: 1,
@@ -37,7 +37,7 @@ describe(name: "grids") {
 
   test(name: "grids print as text") {
     expect(
-      value: @to_text(['O.', '.O'], alive: '#', dead: '-'),
+      @to_text(['O.', '.O'], alive: '#', dead: '-'),
       equals: '#-' + @char_of(10) + '-#'
     )
   }
@@ -45,7 +45,7 @@ describe(name: "grids") {
   test(name: "the .cells format is read, comments and all") {
     nl = @char_of(10)
     expect(
-      value: @parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo'),
+      @parse_cells('!Name: glider' + $nl + '.O' + $nl + '..*' + $nl + 'ooo'),
       equals: ['.O.', '..O', 'OOO']
     )
   }
@@ -66,9 +66,9 @@ describe(name: "grids") {
 describe(name: "rules") {
   test(name: "neighbours count the 8 cells around, wrapping or not") {
     g = ['O..', '...', '..O']
-    expect(value: @neighbours($g, x: 1, y: 1), equals: 2)
-    expect(value: @neighbours($g, x: 0, y: 0, wrap: false), equals: 0)
-    expect(value: @neighbours($g, x: 0, y: 0, wrap: true), equals: 1)
+    expect(@neighbours($g, x: 1, y: 1), equals: 2)
+    expect(@neighbours($g, x: 0, y: 0, wrap: false), equals: 0)
+    expect(@neighbours($g, x: 0, y: 0, wrap: true), equals: 1)
   }
 
   for c in [
@@ -84,7 +84,7 @@ describe(name: "rules") {
     }] {
       test(name: "next_state: {$c.alive ? 'live' : 'dead'} cell with {$c.n} neighbours") {
         expect(
-          value: @next_state(alive: $c.alive, neighbours: $c.n),
+          @next_state(alive: $c.alive, neighbours: $c.n),
           equals: $c.next
         )
       }
@@ -93,15 +93,15 @@ describe(name: "rules") {
   test(name: "a blinker flips between a row and a column") {
     row = ['.....', '.....', '.OOO.', '.....', '.....']
     col = ['.....', '..O..', '..O..', '..O..', '.....']
-    expect(value: @next_generation($row), equals: $col)
-    expect(value: @next_generation($col), equals: $row)
+    expect(@next_generation($row), equals: $col)
+    expect(@next_generation($col), equals: $row)
   }
 
   test(name: "a glider moves one cell diagonally every 4 generations") {
     w = @pattern_world('glider', width: 8, height: 8)
     moved = @advance($w, generations: 4)
     expect(
-      value: $moved.grid,
+      $moved.grid,
       equals: @place(
         @blank(width: 8, height: 8),
         rows: $patterns.glider.rows,
@@ -109,14 +109,14 @@ describe(name: "rules") {
         top: 3
       )
     )
-    expect(value: $moved.generation, equals: 4)
+    expect($moved.generation, equals: 4)
   }
 
   test(name: "with walls, life at the edge dies instead of wrapping") {
     g = ['O..', 'O..', 'O..']
-    expect(value: @population(@next_generation($g, wrap: true)), equals: 9)
+    expect(@population(@next_generation($g, wrap: true)), equals: 9)
     expect(
-      value: @next_generation($g, wrap: false),
+      @next_generation($g, wrap: false),
       equals: ['...', 'OO.', '...']
     )
   }
@@ -125,78 +125,78 @@ describe(name: "rules") {
 describe(name: "worlds") {
   test(name: "flip takes the column,row a board button sends") {
     w = @flip(@new_world(@blank(width: 3, height: 3)), where: '2,0')
-    expect(value: $w.grid, equals: ['..O', '...', '...'])
-    expect(value: @flip($w, where: 'nonsense'), equals: $w)
-    expect(value: @flip($w, where: '9,9'), equals: $w)
-    expect(value: @flip($w, where: null), equals: $w)
+    expect($w.grid, equals: ['..O', '...', '...'])
+    expect(@flip($w, where: 'nonsense'), equals: $w)
+    expect(@flip($w, where: '9,9'), equals: $w)
+    expect(@flip($w, where: null), equals: $w)
   }
 
   test(name: "status spots still lifes, oscillators and extinction") {
     expect(
-      value: @status(@advance(
+      @status(@advance(
         @new_world(['....', '.OO.', '.OO.', '....']),
         generations: 2
       )),
       equals: 'Still life'
     )
     expect(
-      value: @status(@advance(
+      @status(@advance(
         @pattern_world('blinker', width: 5, height: 5),
         generations: 3
       )),
       equals: 'Oscillating, period 2'
     )
     expect(
-      value: @status(@advance(
+      @status(@advance(
         @pattern_world('pulsar', width: 17, height: 17),
         generations: 4
       )),
       equals: 'Oscillating, period 3'
     )
     expect(
-      value: @status(@advance(@new_world(['...', '.O.', '...']), generations: 1)),
+      @status(@advance(@new_world(['...', '.O.', '...']), generations: 1)),
       equals: 'Extinct'
     )
     expect(
-      value: @status(@pattern_world('glider', width: 10, height: 10)),
+      @status(@pattern_world('glider', width: 10, height: 10)),
       equals: 'Evolving'
     )
   }
 
   test(name: "advance counts births and deaths and stops when nothing is alive") {
     w = @advance(@pattern_world('blinker', width: 5, height: 5), generations: 2)
-    expect(value: [$w.births, $w.deaths], equals: [4, 4])
+    expect([$w.births, $w.deaths], equals: [4, 4])
     dead = @advance(@new_world(['...', '.O.', '...']), generations: 10)
-    expect(value: $dead.generation, equals: 1)
+    expect($dead.generation, equals: 1)
   }
 
   test(name: "summary has what both front ends show") {
     s = @summary(@pattern_world('glider', width: 10, height: 10))
-    expect(value: $s.population, equals: 5)
-    expect(value: $s.density, equals: 5)
-    expect(value: $s.size, equals: '10 × 10')
-    expect(value: $s.edges, equals: 'wrap around')
+    expect($s.population, equals: 5)
+    expect($s.density, equals: 5)
+    expect($s.size, equals: '10 × 10')
+    expect($s.edges, equals: 'wrap around')
   }
 }
 
 describe(name: "front ends") {
   test(name: "an unknown interactive preset opens a blank board") {
     world = @select_pattern('unknown', width: 4, height: 3, wrap: false)
-    expect(value: $world.grid, equals: ['....', '....', '....'])
-    expect(value: $world.wrap, equals: false)
+    expect($world.grid, equals: ['....', '....', '....'])
+    expect($world.wrap, equals: false)
   }
 
   test(name: "the terminal version plays a pattern and exits") {
     run = @run_script('../life.kscript', options: { args: ['blinker', '3'] })
-    expect(value: $run.code, equals: 0)
-    expect(value: $run.output, contains: 'Generation 3')
-    expect(value: $run.output, contains: 'Oscillating, period 2')
+    expect($run.code, equals: 0)
+    expect($run.output, contains: 'Generation 3')
+    expect($run.output, contains: 'Oscillating, period 2')
   }
 
   test(name: "the terminal version reports unknown patterns") {
     run = @run_script('../life.kscript', options: { args: ['no-such-pattern'] })
-    expect(value: $run.code, equals: 3)
-    expect(value: $run.output, contains: 'a pattern name or a file')
+    expect($run.code, equals: 3)
+    expect($run.output, contains: 'a pattern name or a file')
   }
 
   test(name: "the menu works with typed answers") {
@@ -204,8 +204,8 @@ describe(name: "front ends") {
       '../life.kscript',
       options: { input: '4' + @char_of(10) + '2' + @char_of(10) + '1' + @char_of(10) + '10' + @char_of(10) }
     )
-    expect(value: $run.code, equals: 0)
-    expect(value: $run.output, contains: 'Life Lab · blinker')
-    expect(value: $run.output, contains: 'Bye!')
+    expect($run.code, equals: 0)
+    expect($run.output, contains: 'Life Lab · blinker')
+    expect($run.output, contains: 'Bye!')
   }
 }

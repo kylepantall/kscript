@@ -718,7 +718,7 @@ public class PageLiveTests
             <live id="notes">
               <state name="draft" value="''" />
               <template live-portal="#outlet">
-                <input bind="draft" live-use-autosize>
+                <input bind="$draft" live-use-autosize>
                 <span live-stream="progress"></span>
                 <span live-action="save" on-action="draft = $event.data"></span>
                 <button live-client="edit">Edit</button>
@@ -746,7 +746,7 @@ public class PageLiveTests
             <live id="editor">
               <state name="draft" value="'Initial'" />
               <state name="count" value="0" />
-              <input @bind('draft') @bind-on('blur') @live-use-autosize()>
+              <input @bind($draft, on: blur) @live-use-autosize()>
               <button @live-disable() @on-click(count += (')'->count() + (1 + 2)))>Run</button>
               <p>{$count}</p>
             </live>
@@ -783,7 +783,7 @@ public class PageLiveTests
                   server: string = 'server'
                   fn render(): Component {
                     return ```html
-                    <input bind="count"><p>{$count}</p><button on-click="count += 1">Add</button>
+                    <input bind="$count"><p>{$count}</p><button on-click="count += 1">Add</button>
                     ```
                   }
                 }
@@ -823,8 +823,8 @@ public class PageLiveTests
         using var site = new TempSite(("index.html", """
             <live id="draft">
               <state name="draft" value="{ title: 'Before', count: 3 }" />
-              <input bind="draft.title">
-              <input bind="draft.count" type="number">
+              <input bind="$draft.title">
+              <input bind="$draft.count" type="number">
               <p>{$draft.title}: {$draft.count + 1}</p>
             </live>
             """));
@@ -844,9 +844,9 @@ public class PageLiveTests
             <live id="settings">
               <state name="color" value="'blue'" />
               <state name="roles" value="['editor']" />
-              <input type="radio" bind="color" value="red" checked>
-              <input type="radio" bind="color" value="blue">
-              <select bind="roles" bind-on="action" multiple>
+              <input type="radio" bind="$color" value="red" checked>
+              <input type="radio" bind="$color" value="blue">
+              <select bind="$roles, on: action" multiple>
                 <option value="reader" selected>Read</option>
                 <option value="editor">Edit</option>
               </select>
@@ -896,14 +896,14 @@ public class PageLiveTests
               <p on-init="count += 1" on-visible="count += 1">{$count}</p>
               <span live-loading role="status">Working</span>
               <span live-offline>Offline</span>
-              <button live-confirm="Really?" live-disable on-click="count = 0">Reset</button>
+              <button live-disable on-click="set: $count, to: 0, confirm: 'Really?'">Reset</button>
               <div live-key="row" live-replace>A row</div>
             </live>
             """).Body;
         Assert.Contains("data-ks-on-init=\"0\" data-ks-on-visible=\"1\"", html);
         Assert.Contains("data-ks-live-loading role=\"status\" hidden", html);
         Assert.Contains("data-ks-live-offline hidden", html);
-        Assert.Contains("data-ks-live-confirm=\"Really?\" data-ks-live-disable data-ks-on-click=\"2\"", html);
+        Assert.Contains("data-ks-live-disable data-ks-on-click=\"2\" data-ks-mods-click=\"{&quot;confirm&quot;:&quot;Really?&quot;}\"", html);
         Assert.Contains("data-ks-live-key=\"row\" data-ks-live-replace", html);
     }
 
@@ -911,7 +911,7 @@ public class PageLiveTests
     public void Loop_variables_are_passed_to_handlers_and_binds_update_state()
     {
         const string page = "<live id=\"t\"><state name=\"items\" value=\"['a', 'b', 'c']\" /><state name=\"draft\" value=\"''\" />" +
-                            "<input bind=\"draft\"><button on-click=\"items = $items->push($draft); draft = ''\">add</button>" +
+                            "<input bind=\"$draft\"><button on-click=\"items = $items->push($draft); draft = ''\">add</button>" +
                             "<for each=\"x\" in=\"$items\"><i on-click=\"items = $items->reject(fn(i) => $i == $x)\">{$x}</i></for></live>";
         using var site = new TempSite(("index.html", page));
         string html = site.Render("index.html").Body;

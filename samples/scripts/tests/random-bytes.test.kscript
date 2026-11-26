@@ -2,5 +2,5 @@ import KScript.Math
 
 test(name: "generate a 128-bit hex key") {
   key = @random_bytes(16, format: 'hex')
-  expect(value: $key->count(), equals: 32)
+  expect($key->count(), equals: 32)
 }

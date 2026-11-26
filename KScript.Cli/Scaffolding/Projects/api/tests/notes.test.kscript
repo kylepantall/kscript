@@ -14,8 +14,8 @@ fn sign_up() {
 {{/if}}
 
 /// Sends a request to the notes API{{#if auth}} as the test's user{{/if}}.
-fn notes_api(path: slash_path = /, method: string = 'GET', body = null{{#if auth}}, as = {}{{/if}}) {
-  return @api(/api/notes + $path, options: { method: $method, body: $body{{#if auth}}, headers: $as{{/if}} })
+fn notes_api(path: slash_path = /, post = null, put = null, delete: bool = false{{#if auth}}, as = {}{{/if}}) {
+  return @api(/api/notes + $path, post: $post, put: $put, delete: $delete{{#if auth}}, options: { headers: $as }{{/if}})
 }
 
 describe(name: "notes") {
@@ -30,7 +30,7 @@ describe(name: "notes") {
     me = @sign_up()
 {{else}}
     for note in @notes_api()->json() {
-      @notes_api(/$note.id, method: 'DELETE')
+      @notes_api(/$note.id, delete: true)
     }
 {{/if}}
   }
@@ -42,38 +42,38 @@ describe(name: "notes") {
 {{/if}}
 
   test(name: "the list starts empty") {
-    expect(value: @notes_api({{#if auth}}as: $me{{/if}})->json(), equals: [])
+    expect(@notes_api({{#if auth}}as: $me{{/if}})->json(), equals: [])
   }
 
   test(name: "a new note is saved and listed") {
-    added = @notes_api(/, method: 'POST', body: { title: 'Write the docs' }{{#if auth}}, as: $me{{/if}})
-    expect(value: $added.status, equals: 201)
+    added = @notes_api(/, post: { title: 'Write the docs' }{{#if auth}}, as: $me{{/if}})
+    expect($added.status, equals: 201)
     note = $added->json()
-    expect(value: $note.title, equals: 'Write the docs')
-    expect(value: $note.done, equals: false)
-    expect(value: @notes_api(/$note.id{{#if auth}}, as: $me{{/if}})->json().title, equals: 'Write the docs')
-    expect(value: @notes_api({{#if auth}}as: $me{{/if}})->json()->map(fn(n) => $n.title), equals: ['Write the docs'])
+    expect($note.title, equals: 'Write the docs')
+    expect($note.done, equals: false)
+    expect(@notes_api(/$note.id{{#if auth}}, as: $me{{/if}})->json().title, equals: 'Write the docs')
+    expect(@notes_api({{#if auth}}as: $me{{/if}})->json()->map(.title), equals: ['Write the docs'])
   }
 
   test(name: "a note without a title is turned away with 422") {
-    expect(value: @notes_api(/, method: 'POST', body: { title: '' }{{#if auth}}, as: $me{{/if}}).status, equals: 422)
+    expect(@notes_api(/, post: { title: '' }{{#if auth}}, as: $me{{/if}}).status, equals: 422)
   }
 
   test(name: "a note is changed and deleted") {
-    note = @notes_api(/, method: 'POST', body: { title: 'Ship it' }{{#if auth}}, as: $me{{/if}})->json()
-    changed = @notes_api(/$note.id, method: 'PUT', body: { title: 'Ship it', done: true }{{#if auth}}, as: $me{{/if}})
-    expect(value: $changed->json().done, equals: true)
-    expect(value: @notes_api(/$note.id, method: 'DELETE'{{#if auth}}, as: $me{{/if}}).status, equals: 204)
-    expect(value: @notes_api(/$note.id{{#if auth}}, as: $me{{/if}}).status, equals: 404)
+    note = @notes_api(/, post: { title: 'Ship it' }{{#if auth}}, as: $me{{/if}})->json()
+    changed = @notes_api(/$note.id, put: { title: 'Ship it', done: true }{{#if auth}}, as: $me{{/if}})
+    expect($changed->json().done, equals: true)
+    expect(@notes_api(/$note.id, delete: true{{#if auth}}, as: $me{{/if}}).status, equals: 204)
+    expect(@notes_api(/$note.id{{#if auth}}, as: $me{{/if}}).status, equals: 404)
   }
 {{#if auth}}
 
   test(name: "notes need a token, and only their owner sees them") {
-    expect(value: @notes_api().status, equals: 401)
-    note = @notes_api(/, method: 'POST', body: { title: 'Mine' }, as: $me)->json()
+    expect(@notes_api().status, equals: 401)
+    note = @notes_api(/, post: { title: 'Mine' }, as: $me)->json()
     other = @sign_up()
-    expect(value: @notes_api(/$note.id, as: $other).status, equals: 404)
-    expect(value: @notes_api(/, as: $other)->json(), equals: [])
+    expect(@notes_api(/$note.id, as: $other).status, equals: 404)
+    expect(@notes_api(/, as: $other)->json(), equals: [])
     @api(/api/me, delete: true, options: { headers: $other })
   }
 {{/if}}
@@ -83,7 +83,7 @@ describe(name: "notes") {
     first = @notes_api({{#if auth}}as: $me{{/if}})
     tag = $first->header('ETag')
     again = @api(/api/notes, options: { headers: { 'If-None-Match': $tag{{#if auth}}, Authorization: $me.Authorization{{/if}} } })
-    expect(value: $again.status, equals: 304)
+    expect($again.status, equals: 304)
   }
 {{/if}}
 }

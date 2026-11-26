@@ -11,32 +11,32 @@ fn issue_link(key: IssueKey) => "/issues/{$key->serial()}"
 describe(name: 'Issue key literals') {
   test(name: 'a matching unquoted word acquires normalization and methods') {
     key = issue-17
-    expect(value: $key->to_string(), same: 'ISSUE-17')
-    expect(value: $key->serial(), same: 17)
+    expect($key->to_string(), same: 'ISSUE-17')
+    expect($key->serial(), same: 17)
   }
 
   test(name: 'quoting the same spelling preserves the original text') {
     text = 'issue-17'
-    expect(value: $text, same: 'issue-17')
+    expect($text, same: 'issue-17')
     converted = $text as IssueKey
-    expect(value: $converted->to_string(), same: 'ISSUE-17')
+    expect($converted->to_string(), same: 'ISSUE-17')
   }
 
   test(name: 'compound literals can be list elements and map values') {
     backlog = [issue-2, issue-10]
     item = { previous: issue-1 }
-    expect(value: $backlog->map(fn(key) => $key->serial()), equals: [2, 10])
-    expect(value: $item.previous->serial(), same: 1)
+    expect($backlog->map(->serial()), equals: [2, 10])
+    expect($item.previous->serial(), same: 1)
   }
 
   test(name: 'typed parameters accept a literal and a key built from input') {
     sequence = 24
-    expect(value: @issue_link(issue-9), same: '/issues/9')
-    expect(value: @issue_link("issue-{$sequence}"), same: '/issues/24')
+    expect(@issue_link(issue-9), same: '/issues/9')
+    expect(@issue_link("issue-{$sequence}"), same: '/issues/24')
   }
 
   test(name: 'a recognized spelling also has to pass the remaining rules') {
-    expect(value: IssueKey('issue-0'), throws: Shape)
-    expect(value: IssueKey('prefix-issue-12'), throws: Shape)
+    expect(IssueKey('issue-0'), throws: Shape)
+    expect(IssueKey('prefix-issue-12'), throws: Shape)
   }
 }

@@ -225,6 +225,19 @@ public class HttpAppTests
     }
 
     [Fact]
+    public void AViewTakesItsStatus()
+    {
+        using var site = Site("""
+            <KScript.Routes>
+              <Get path="/limited"><return value="@view('people/show', person: { name: 'Slow down' }, status: 429)" /></Get>
+            </KScript.Routes>
+            """);
+        PageResult r = Send(App(site), "GET", "/limited");
+        Assert.Equal(429, r.Status);
+        Assert.Contains("<h1>Slow down</h1>", r.Body);
+    }
+
+    [Fact]
     public void ViewsRenderWithTheControllersData()
     {
         using var site = Site(Routes, ("views/about.html", "<p>About {$request.path}</p>"));

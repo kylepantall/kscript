@@ -3,8 +3,8 @@ import KScript.Web
 /// A small task list whose controls are all shorthands. Each handler says the
 /// action it runs (toggle:, add: to:, remove: from:, increment:, set: to:,
 /// reset:, cycle:, call: with:, emit:), modifiers say when (confirm:, key:,
-/// once:), @bind takes options (trim:, debounce:, as:), and @class and @show
-/// switch classes and visibility by conditions.
+/// once:), @bind takes options (trim:, debounce:, as:), @each and @if repeat
+/// and choose tags, and @class and @show switch classes and visibility.
 type TaskBoard extends Component {
   tasks: string[] = ['Buy milk', 'Call the bank']
   done: string[] = []
@@ -46,21 +46,19 @@ type TaskBoard extends Component {
       <button type="button" @on-click(cycle: $view, through: ['list', 'grid'])>View</button>
     </p>
     <ul @class(compact: $compact, 'is-filtered': $filter == 'open', grid: $view == 'grid')>
-      <for each="task" in="$tasks">
-        <if test="($filter == 'all' or not $done->contains($task)) and $task->lower()->contains($search->lower())">
-          <li>
-            <span @class({ $done->contains($task): ['done', 'struck'] })>{$task}</span>
-            <button
-              type="button"
-              @on-click(call: $finish, with: [$task], emit: 'task-finished')>Finish {$task}</button>
-            <button
-              type="button"
-              @on-click(remove: $task, from: $tasks, confirm: 'Remove this task?')>Remove {$task}</button>
-          </li>
-        </if>
-      </for>
+      <li
+        @each($tasks, as: task)
+        @if(($filter == 'all' or not $done->contains($task)) and $task->lower()->contains($search->lower()))>
+        <span @class({ $done->contains($task): ['done', 'struck'] })>{$task}</span>
+        <button
+          type="button"
+          @on-click(call: $finish, with: [$task], emit: 'task-finished')>Finish {$task}</button>
+        <button
+          type="button"
+          @on-click(remove: $task, from: $tasks, confirm: 'Remove this task?')>Remove {$task}</button>
+      </li>
     </ul>
     <p>Added {$added} · Showing {$filter} · {$view} · Goal {$goal}</p>
-    <if test="$note"><p>{$note}</p></if>
+    <p @if($note)>{$note}</p>
     ```
 }

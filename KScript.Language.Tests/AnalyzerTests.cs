@@ -286,7 +286,7 @@ namespace KScript.Language.Tests
         public void LiveBlocksDeclareStateAndCheckHandlers()
         {
             string page = "<live id=\"todos\">\n<state name=\"items\" value=\"[{ id: 1, text: 'a' }]\" />\n<state name=\"draft\" value=\"''\" />\n" +
-                          "<form on-submit=\"items = $items->push({ id: 2, text: $draft->trim() }); draft = ''\"><input bind=\"draft\"></form>\n" +
+                          "<form on-submit=\"items = $items->push({ id: 2, text: $draft->trim() }); draft = ''\"><input bind=\"$draft\"></form>\n" +
                           "<for each=\"t\" in=\"$items\"><p on-click=\"items = $items->reject(fn(x) => $x.id eq $t.id)\">{$t.text}</p></for>\n" +
                           "<else><p>Nothing yet.</p></else>\n</live>";
             AssertClean(Analyze(page, Path.Combine(Site, "todo.html"), SiteFiles()));
@@ -294,10 +294,10 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("<button on-click=\"n += 1\">+</button>", DiagnosticCodes.MisplacedElement, "on-click")]
-        [InlineData("<input bind=\"q\">", DiagnosticCodes.MisplacedElement, "bind")]
+        [InlineData("<input bind=\"$q\">", DiagnosticCodes.MisplacedElement, "bind")]
         [InlineData("<live id=\"x\"><button on-click=\"nope += 1\">+</button></live>", DiagnosticCodes.SetUndeclared, "nope")]
         [InlineData("<live id=\"x\"><button on-click=\"1 + 2\">+</button></live>", DiagnosticCodes.StatementSyntax, "1 + 2")]
-        [InlineData("<live id=\"x\"><input bind=\"ghost\"></live>", DiagnosticCodes.SetUndeclared, "ghost")]
+        [InlineData("<live id=\"x\"><input bind=\"$ghost\"></live>", DiagnosticCodes.SetUndeclared, "ghost")]
         [InlineData("<state name=\"n\" value=\"0\" />", DiagnosticCodes.MisplacedElement, "state")]
         public void LiveBlockProblems(string page, string code, string marked)
         {

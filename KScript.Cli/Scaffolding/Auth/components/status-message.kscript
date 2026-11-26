@@ -8,6 +8,6 @@ import KScript.Auth
 /// has been changed." Shows nothing when there is none.
 type StatusMessage extends Component {
   fn render() => ```html
-    <if test="$session->has('status')"><p class="status">{$session->get('status')}</p></if>
+    <p class="status" @if($session->has('status'))>{$session->get('status')}</p>
     ```
 }

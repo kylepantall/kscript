@@ -33,6 +33,9 @@ namespace KScript.Pages
 
         public char Quote { get; set; }
 
+        /// <summary>True when written as a directive, <c>@each(...)</c>.</summary>
+        public bool IsDirective { get; set; }
+
         /// <summary>For on-* attributes in a &lt;live&gt; block: the handler's number.</summary>
         public int HandlerIndex { get; set; } = -1;
     }
@@ -78,6 +81,41 @@ namespace KScript.Pages
             "let", "set", "do", "if", "elif", "else", "for", "while", "match", "case", "default",
             "layout", "prop", "slot", "markdown", "respond", "redirect", "include", "live", "state",
         };
+
+        /// <summary>A tag with @if or @each goes inside the &lt;if&gt; or &lt;for&gt; it stands for (<see cref="KScript.Syntax.Markup.ElementDirectives"/>).</summary>
+        private static void WrapDirectives(List<PageNode> nodes)
+        {
+            for (int n = 0; n < nodes.Count; n++)
+            {
+                if (nodes[n] is not PageElement element) continue;
+                WrapDirectives(element.Children);
+                PageAttribute condition = element.Attributes.FirstOrDefault(a => a.Name == KScript.Syntax.Markup.ElementDirectives.If && a.IsDirective && a.Value != null);
+                PageAttribute loop = element.Attributes.FirstOrDefault(a => a.Name == KScript.Syntax.Markup.ElementDirectives.Each && a.IsDirective && a.Value != null);
+                PageNode replacement = element;
+                if (condition != null)
+                {
+                    element.Attributes.Remove(condition);
+                    var wrapper = new PageElement { Name = "if", SourceName = "if", Line = element.Line, Offset = element.Offset };
+                    wrapper.Attributes.Add(new PageAttribute { Name = "test", SourceName = "test", Value = condition.Value, Quote = '"' });
+                    wrapper.Children.Add(replacement);
+                    replacement = wrapper;
+                }
+                if (loop != null)
+                {
+                    element.Attributes.Remove(loop);
+                    var reading = KScript.Syntax.Markup.ElementDirectives.ReadEach(loop.Value);
+                    if (reading.Problems.Count > 0) throw new PageException($"Line {element.Line}: {reading.Problems[0].Message}");
+                    var wrapper = new PageElement { Name = "for", SourceName = "for", Line = element.Line, Offset = element.Offset };
+                    string Part(KScript.Syntax.Text.TextSpan span) => loop.Value.Substring(span.Start, span.Length);
+                    wrapper.Attributes.Add(new PageAttribute { Name = "each", SourceName = "each", Value = Part(reading.As.Value), Quote = '"' });
+                    wrapper.Attributes.Add(new PageAttribute { Name = "in", SourceName = "in", Value = Part(reading.List), Quote = '"' });
+                    if (reading.At is KScript.Syntax.Text.TextSpan at) wrapper.Attributes.Add(new PageAttribute { Name = "at", SourceName = "at", Value = Part(at), Quote = '"' });
+                    wrapper.Children.Add(replacement);
+                    replacement = wrapper;
+                }
+                nodes[n] = replacement;
+            }
+        }
 
         public static List<PageNode> Parse(string text, int firstLine = 1, bool markdown = false)
         {
@@ -225,6 +263,7 @@ namespace KScript.Pages
                                 SourceName = directive.Name,
                                 Value = directive.Value is TextSpan value ? text.Substring(value.Start, value.Length) : null,
                                 Quote = directive.Quote,
+                                IsDirective = true,
                             });
                             j = directive.End;
                             continue;
@@ -316,6 +355,7 @@ namespace KScript.Pages
             }
 
             FlushText();
+            WrapDirectives(root.Children);
             DedentControlBodies(root.Children, null);
             TidyWhitespace(root.Children);
             return root.Children;

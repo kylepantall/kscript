@@ -1,3 +1,4 @@
+using KScript.Metadata;
 using KScript.Language.Analysis;
 using KScript.Syntax.Markup;
 using KScript.Syntax.Text;
@@ -21,6 +22,7 @@ namespace KScript.Language.Features
             int wordStart = local;
             while (wordStart > 0 && (char.IsLetterOrDigit(before[wordStart - 1]) || before[wordStart - 1] == '_')) wordStart--;
             string lead = before[..wordStart].TrimEnd();
+            if (FieldCompletions(analysis, cursor, value, before, local) is List<CompletionItem> fields) return fields;
             bool atStart = lead.Length == 0;
             if (!atStart && !(lead.EndsWith(',') && HandlerShorthands.IsShorthand(value.Value))) return null;
 
@@ -65,6 +67,49 @@ namespace KScript.Language.Features
             }
             return items;
         }
+
+        /// <summary>
+        /// Where a shorthand's field goes (<c>toggle: ‸</c>, <c>add: $draft, to: ‸</c>): the fields in scope whose type
+        /// the action takes, so toggle: lists only bools and increment: only numbers. Null anywhere else.
+        /// </summary>
+        private static List<CompletionItem> FieldCompletions(DocumentAnalysis analysis, Cursor cursor, DecodedText value, string before, int local)
+        {
+            int start = local;
+            while (start > 0 && (char.IsLetterOrDigit(before[start - 1]) || before[start - 1] is '_' or '$')) start--;
+            string lead = before[..start].TrimEnd();
+            if (!lead.EndsWith(':')) return null;
+            int nameEnd = lead.Length - 1, nameStart = nameEnd;
+            while (nameStart > 0 && (char.IsLetterOrDigit(lead[nameStart - 1]) || lead[nameStart - 1] == '_')) nameStart--;
+            string name = lead[nameStart..nameEnd];
+            string wanted = HandlerShorthands.Get(name) is { FieldIsCompanion: false, FieldType: string own } ? own : null;
+            if (wanted == null && nameStart > 0)
+            {
+                // to: after add: (from: after remove:) is the list the value goes in.
+                string earlier = lead[..nameStart].TrimEnd().TrimEnd(',');
+                if (HandlerShorthands.IsShorthand(earlier) && HandlerShorthands.Read(earlier).Steps.LastOrDefault() is { Companion: null } last
+                    && last.Action is { FieldIsCompanion: true } action && action.Companion == name)
+                    wanted = action.FieldType;
+            }
+            if (wanted == null) return null;
+            var replace = TextSpan.FromBounds(value.ToSource(start), cursor.Offset);
+            return ComponentBindings.Writable(analysis, analysis.ScopeAt(cursor.Offset), cursor.TagElement, cursor.Offset)
+                .Where(field => FitsShorthand(field.Shape.Type, wanted))
+                .Select(field => new CompletionItem
+                {
+                    Label = "$" + field.Name,
+                    FilterText = "$" + field.Name,
+                    Kind = CompletionKind.Variable,
+                    Detail = field.Shape.Display(),
+                    InsertText = "$" + field.Name,
+                    ReplaceSpan = replace,
+                    SortText = "0" + field.Name,
+                }).ToList();
+        }
+
+        /// <summary>True when a field of this type is one the action changes (a number for increment:, a list for add:).</summary>
+        internal static bool FitsShorthand(string type, string wanted) =>
+            type == KType.Any || type == wanted || wanted == KType.Number && type is "int" or "float"
+            || wanted == KType.List && (type == KType.List || type.EndsWith("[]", StringComparison.Ordinal));
 
         /// <summary>Hover on a shorthand's name in a handler: what it does and the statement it stands for.</summary>
         private static HoverResult ShorthandHover(Cursor cursor)

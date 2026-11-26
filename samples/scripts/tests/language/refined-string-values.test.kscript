@@ -8,28 +8,28 @@ fn key_for(label: string) {
 describe(name: 'Refined string keys') {
   test(name: 'typed assignments accept both bare static keys and interpolated labels') {
     static_key: PrefixedKey = key_alpha
-    expect(value: @key_for('alpha'), same: $static_key)
-    expect(value: @key_for('beta'), same: 'key_beta')
+    expect(@key_for('alpha'), same: $static_key)
+    expect(@key_for('beta'), same: 'key_beta')
   }
 
   test(name: 'trimming outer whitespace leaves the case-sensitive suffix intact') {
-    expect(value: PrefixedKey('  key_Alpha  '), same: 'key_Alpha')
-    expect(value: PrefixedKey('  KEY_Alpha  '), throws: Shape)
+    expect(PrefixedKey('  key_Alpha  '), same: 'key_Alpha')
+    expect(PrefixedKey('  KEY_Alpha  '), throws: Shape)
   }
 
   test(name: 'the shortest matching suffix has one letter') {
-    expect(value: @key_for('a')->count(), same: 5)
-    expect(value: @key_for(''), throws: Shape)
-    expect(value: @key_for('123'), throws: Shape)
+    expect(@key_for('a')->count(), same: 5)
+    expect(@key_for(''), throws: Shape)
+    expect(@key_for('123'), throws: Shape)
   }
 
   test(name: 'a valid prefix cannot hide a punctuation mark later in the suffix') {
-    expect(value: @key_for('Alpha.Beta'), throws: Shape)
-    expect(value: @key_for('Beta_'), throws: Shape)
+    expect(@key_for('Alpha.Beta'), throws: Shape)
+    expect(@key_for('Beta_'), throws: Shape)
   }
 
   test(name: 'only a trailing space is removed from the computed result') {
-    expect(value: @key_for('alpha '), same: 'key_alpha')
-    expect(value: @key_for(' alpha'), throws: Shape)
+    expect(@key_for('alpha '), same: 'key_alpha')
+    expect(@key_for(' alpha'), throws: Shape)
   }
 }

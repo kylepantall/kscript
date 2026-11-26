@@ -244,6 +244,9 @@ namespace KScript.Syntax
     {
         public List<ParameterNode> Parameters { get; } = new List<ParameterNode>();
         public ExprNode Body { get; internal set; }
+
+        /// <summary>True for a short function such as <c>.price</c> or <c>->trim()</c>, whose one parameter has no name in the source.</summary>
+        public bool ItemShorthand { get; internal set; }
         public override IEnumerable<ExprNode> Children => Parameters.Cast<ExprNode>().Append(Body);
     }
 

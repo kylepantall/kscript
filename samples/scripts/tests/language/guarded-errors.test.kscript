@@ -19,8 +19,8 @@ fn result(reply: map, state: map) {
 
 test(name: 'success skips error fields and evaluates the condition once') {
   state = { checks: 0, messages: 0 }
-  expect(value: @result({ r: 'success' }, $state), equals: 'success')
-  expect(value: $state, equals: { checks: 1, messages: 0 })
+  expect(@result({ r: 'success' }, $state), equals: 'success')
+  expect($state, equals: { checks: 1, messages: 0 })
 }
 
 test(name: 'the caller catches the typed error with its original code') {
@@ -29,9 +29,9 @@ test(name: 'the caller catches the typed error with its original code') {
   expect_error(type: Network, as: err) {
     @result($reply, $state)
   }
-  expect(value: $err.message, equals: 'Host refused: No access')
-  expect(value: $err['code'], same: 'denied')
-  expect(value: $state, equals: { checks: 1, messages: 1 })
+  expect($err.message, equals: 'Host refused: No access')
+  expect($err['code'], same: 'denied')
+  expect($state, equals: { checks: 1, messages: 1 })
 }
 
 test(name: 'a false guard can protect an expression that would throw') {
@@ -39,7 +39,7 @@ test(name: 'a false guard can protect an expression that would throw') {
     type: 'Validation'
     message: @fail('This expression must be skipped')
   }
-  expect(value: 1 + 1, equals: 2)
+  expect(1 + 1, equals: 2)
 }
 
 test(name: 'nested fields retain maps and lists in the caught error') {
@@ -50,7 +50,7 @@ test(name: 'nested fields retain maps and lists in the caught error') {
       details: { fields: ['login', 'token'], retry: false }
     }
   }
-  expect(value: $err['details'].fields, equals: ['login', 'token'])
+  expect($err['details'].fields, equals: ['login', 'token'])
 }
 
 test(name: 'the guard uses the value of a condition rather than key presence alone') {
@@ -59,5 +59,5 @@ test(name: 'the guard uses the value of a condition rather than key presence alo
     type: 'Network'
     message: 'unexpected failure'
   }
-  expect(value: $reply->has('failed'), equals: true)
+  expect($reply->has('failed'), equals: true)
 }

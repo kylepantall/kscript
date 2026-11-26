@@ -2,23 +2,23 @@ describe(name: 'Dates and durations') {
   test(name: 'a date format reads and writes leap day and rejects an impossible date') {
     layout: date_format = dd-MM-yyyy
     leap_day = $layout->parse('29-02-2024')
-    expect(value: $layout->format($leap_day), same: '29-02-2024')
-    expect(value: $layout->parse('29-02-2023'), throws: Format)
+    expect($layout->format($leap_day), same: '29-02-2024')
+    expect($layout->parse('29-02-2023'), throws: Format)
   }
 
   test(name: 'adding a duration crosses midnight and subtraction reverses it') {
     start = '2024-12-31T23:45:00'->to_date()
     finish = $start + 30m
-    expect(value: $finish->format('yyyy-MM-dd HH:mm'), same: '2025-01-01 00:15')
-    expect(value: $finish - 30m, same: $start)
+    expect($finish->format('yyyy-MM-dd HH:mm'), same: '2025-01-01 00:15')
+    expect($finish - 30m, same: $start)
   }
 
   test(name: 'dividing by a duration counts slots while dividing by a number shortens a slot') {
     window: duration = 1h15m
-    expect(value: $window / 15m, same: 5)
-    expect(value: ($window / 5)->iso(), same: 'PT15M')
-    expect(value: ($window % 30m)->to_string(), same: '15m')
-    expect(value: $window / 0s, throws: Math)
+    expect($window / 15m, same: 5)
+    expect(($window / 5)->iso(), same: 'PT15M')
+    expect(($window % 30m)->to_string(), same: '15m')
+    expect($window / 0s, throws: Math)
   }
 
   test(name: 'a date range steps over leap day and stops before the end date') {
@@ -28,6 +28,6 @@ describe(name: 'Dates and durations') {
     for day in $start..$end step 1d {
       days = $days->push($day->format('MM-dd'))
     }
-    expect(value: $days, equals: ['02-28', '02-29', '03-01'])
+    expect($days, equals: ['02-28', '02-29', '03-01'])
   }
 }

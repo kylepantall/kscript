@@ -159,7 +159,7 @@ namespace KScript.Http
             }, ModelFormBinding.Declare);
 
             p.Command("view", "name, data...",
-                "Renders a page from the views folder (or the site folder) with its layout, giving it the named values as variables: @view('people/show.html', person: $p). The extension may be left off.",
+                "Renders a page from the views folder (or the site folder) with its layout, giving it the named values as variables: @view('people/show.html', person: $p). The extension may be left off. status: sets the answer's status code: @view('auth/login', error: $message, status: 422).",
                 KType.HttpResponse, View, "<return value=\"@view('people/show', person: $person)\" />");
             p.Command("response", "body?, status?: number, type?, headers?: map",
                 "A response with a status code and headers. A map or list body is sent as JSON, text as HTML, and a base64 value as raw bytes. Set type to override the default Content-Type.",
@@ -474,8 +474,15 @@ namespace KScript.Http
             {
                 foreach (var kv in map) data[kv.Key] = kv.Value;
             }
-            foreach (var kv in c.Named) data[kv.Key] = kv.Value;
-            return ctx.RenderView(c.Str(0), data, fromController: true);
+            object status = null;
+            foreach (var kv in c.Named)
+            {
+                if (kv.Key == "status") status = kv.Value;
+                else data[kv.Key] = kv.Value;
+            }
+            object view = ctx.RenderView(c.Str(0), data, fromController: true);
+            if (status != null && view is HttpResponse response) response.Status = (int)Values.ToNumber(status, "status");
+            return view;
         }
 
         private static object Response(CallContext c)

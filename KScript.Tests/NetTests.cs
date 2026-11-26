@@ -87,9 +87,9 @@ public sealed class NetTests : IDisposable
     public void Api_sends_methods_headers_and_bodies()
     {
         string output = Run(
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'post', body: {{ a: 1 }}, headers: {{ 'X-Key': 'k' }} }}).text }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain', headers: {{ 'user-agent': 'example-app/1.0' }} }}).text }}</echo>" +
-            $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ headers: {{ 'X-Key': 'k' }} }}, post: {{ a: 1 }}).text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ headers: {{ 'user-agent': 'example-app/1.0' }} }}, put: 'plain').text }}</echo>" +
+            $"<echo>{{ @api('{server.Url}/echo', {{ headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}, patch: 'a=1').text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', null).status }}</echo>");
         Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain \nPATCH application/x-www-form-urlencoded a=1 \n201\n", output);
         Assert.Equal(new[] { "kscript", "example-app/1.0", "kscript", "kscript" }, server.Requests.Select(r => r.Headers["User-Agent"]));
@@ -180,9 +180,8 @@ public sealed class NetTests : IDisposable
 
     [Theory]
     [InlineData("{ timeout: 99999999999999 }", "timeout and retry_delay can be at most 24 days")]
-    [InlineData("{ method: 'GE T' }", "method 'GE T' isn't an HTTP method")]
-    [InlineData("{ method: '' }", "method '' isn't an HTTP method")]
-    [InlineData("{ method: 'post', body: 'x', headers: { 'Content-Type': 'not a type' } }", "Content-Type 'not a type' isn't a content type")]
+    [InlineData("{ method: 'POST' }", "takes the method and body as one argument")]
+    [InlineData("{ headers: { 'Content-Type': 'not a type' } }, post: 'x'", "Content-Type 'not a type' isn't a content type")]
     public void BadRequestOptionsAreRefusedInPlainWords(string options, string message)
     {
         var error = Fails($"<let name=\"r\" value=\"@api('{server.Url}/echo', {options})\" />");

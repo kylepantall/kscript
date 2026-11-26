@@ -3,38 +3,38 @@ describe(name: 'Expression operators') {
     price = 12
     quantity = 3
     delivery = 4
-    expect(value: $delivery + $quantity * $price, same: 40)
-    expect(value: ($delivery + $price) * $quantity, same: 48)
+    expect($delivery + $quantity * $price, same: 40)
+    expect(($delivery + $price) * $quantity, same: 48)
   }
 
   test(name: 'powers associate from the right and bind before a leading minus') {
-    expect(value: 2 ** 3 ** 2, same: 512)
-    expect(value: (2 ** 3) ** 2, same: 64)
-    expect(value: -2 ** 2, same: -4)
-    expect(value: (-2) ** 2, same: 4)
+    expect(2 ** 3 ** 2, same: 512)
+    expect((2 ** 3) ** 2, same: 64)
+    expect(-2 ** 2, same: -4)
+    expect((-2) ** 2, same: 4)
   }
 
   test(name: 'division keeps the fraction and both division operators reject zero') {
     amount = 7
-    expect(value: $amount / 2, same: 3.5)
-    expect(value: $amount % 2, same: 1)
-    expect(value: $amount / 0, throws: Math)
-    expect(value: $amount % 0, throws: Math)
+    expect($amount / 2, same: 3.5)
+    expect($amount % 2, same: 1)
+    expect($amount / 0, throws: Math)
+    expect($amount % 0, throws: Math)
   }
 
   test(name: 'membership checks items in a list, keys in a map and substrings in text') {
     colors = { accent: 'blue', border: 'grey' }
-    expect(value: '07' in [5, 7, 9], same: true)
-    expect(value: 'accent' in $colors, same: true)
-    expect(value: 'blue' in $colors, same: false)
-    expect(value: 'blu' in $colors.accent, same: true)
+    expect('07' in [5, 7, 9], same: true)
+    expect('accent' in $colors, same: true)
+    expect('blue' in $colors, same: false)
+    expect('blu' in $colors.accent, same: true)
   }
 
   test(name: 'and binds more tightly than or in an access rule') {
     editor = true
     owner = false
     published = false
-    expect(value: $editor or $owner and $published, same: true)
-    expect(value: ($editor or $owner) and $published, same: false)
+    expect($editor or $owner and $published, same: true)
+    expect(($editor or $owner) and $published, same: false)
   }
 }

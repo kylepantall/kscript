@@ -331,7 +331,7 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("@live-action('move-note')")]
-        [InlineData("@bind('draft')")]
+        [InlineData("@bind($draft)")]
         [InlineData("@bind-on('blur')")]
         [InlineData("@live-disable()")]
         [InlineData("@on-click(count += (')'->count() + 1))")]

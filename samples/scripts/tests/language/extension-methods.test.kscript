@@ -8,20 +8,20 @@ extend Account {
 describe(name: 'Extension methods') {
   test(name: 'an imported method is available on a built-in date') {
     invoice_date = '2024-01-05'->to_date()
-    expect(value: $invoice_date->month_key(), same: '2024-01')
+    expect($invoice_date->month_key(), same: '2024-01')
   }
 
   test(name: 'an extension can call another extension on both receivers') {
     first = '2024-12-01'->to_date()
-    expect(value: $first->shares_month('2024-12-31'->to_date()), same: true)
-    expect(value: $first->shares_month('2025-12-01'->to_date()), same: false)
+    expect($first->shares_month('2024-12-31'->to_date()), same: true)
+    expect($first->shares_month('2025-12-01'->to_date()), same: false)
   }
 
   test(name: 'a method added to a record reads the current instance') {
     ada = Account(name: 'Ada')
     lin = Account(name: 'Lin')
-    expect(value: $ada->greeting(), same: 'Hello, Ada!')
-    expect(value: $lin->greeting(prefix: 'Welcome'), same: 'Welcome, Lin!')
-    expect(value: $lin->label(), same: 'LIN')
+    expect($ada->greeting(), same: 'Hello, Ada!')
+    expect($lin->greeting(prefix: 'Welcome'), same: 'Welcome, Lin!')
+    expect($lin->label(), same: 'LIN')
   }
 }

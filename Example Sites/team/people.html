@@ -4,7 +4,7 @@
   value="($request.query.min_age ?? '0')->to_number(default: 0)" />
 <let
   name="matches"
-  value="$people |> filter(fn(p) => $p.age ge $min) |> sort_by(fn(p) => $p.name)" />
+  value="$people |> filter(fn(p) => $p.age ge $min) |> sort_by(.name)" />
 
 <layout path="_layout.html" title="People">
   <h1>People aged {$min} and over</h1>

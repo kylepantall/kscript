@@ -311,14 +311,14 @@ namespace KScript.Language.Tests
         public void PagesOnlyCheckFunctionLocals()
         {
             const string page = "<let name=\"title\" value=\"'x'\" />\n<fn name=\"f\" params=\"p\"><let name=\"local\" value=\"1\" /><return value=\"$p\" /></fn>\n"
-                + "<live id=\"c\"><state name=\"q\" value=\"''\" /><input bind=\"q\" /></live>";
+                + "<live id=\"c\"><state name=\"q\" value=\"''\" /><input bind=\"$q\" /></live>";
             Assert.Equal(new[] { "KS6003:local" }, Unused(Check(page, "page.html")));
         }
 
         [Fact]
         public void BoundVariablesAreRead()
         {
-            const string window = "<KScript.Window title=\"T\">\n  <let name=\"draft\" value=\"''\" />\n  <TextBox bind=\"draft\" />\n</KScript.Window>";
+            const string window = "<KScript.Window title=\"T\">\n  <let name=\"draft\" value=\"''\" />\n  <TextBox bind=\"$draft\" />\n</KScript.Window>";
             Assert.Empty(Unused(Check(window)));
         }
 

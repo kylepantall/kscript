@@ -133,7 +133,7 @@ namespace KScript.Language.Formatting
 
             // A byte order mark is kept as it was and not seen by the parser.
             string bom = text.Length > 0 && text[0] == '\uFEFF' ? "\uFEFF" : string.Empty;
-            MarkupDocument document = MarkupParser.Parse(text.Substring(bom.Length), kind);
+            MarkupDocument document = MarkupParser.Parse(text.Substring(bom.Length), kind, wrapDirectives: false);
             Diagnostic error = document.Diagnostics.FirstOrDefault(d => d.Severity == DiagnosticSeverity.Error);
             if (error != null)
             {

@@ -377,7 +377,7 @@ namespace KScript.Language.Tests
                 <live id="board">
                   <span title="live-action" @live-action('move-note') on-action="@skip_render()" hidden></span>
                   <button live-action="restore" on-action="@skip_render()" live-disable>live-disable</button>
-                  <input @bind('draft') @bind-on('blur')>
+                  <input @bind($draft, on: blur)>
                   <button @on-click(count += (')'->count() + (1 + 2))) @live-disable()>Run</button>
                 </live>
                 """;
@@ -394,7 +394,7 @@ namespace KScript.Language.Tests
             var analysis = Service.Analyze(text, path);
             var tokens = Service.GetSemanticTokens(analysis);
             string[] directiveNames = { "@live-action", "on-action", "live-action", "on-action", "live-disable",
-                "@bind", "@bind-on", "@on-click", "@live-disable" };
+                "@bind", "@on-click", "@live-disable" };
             Assert.Equal(directiveNames, tokens.Where(t => t.Type == SemanticTokenType.Keyword
                 && t.Modifiers.HasFlag(SemanticTokenModifiers.DefaultLibrary) && analysis.Source[t.Span] != "live")
                 .Select(t => analysis.Source[t.Span]));

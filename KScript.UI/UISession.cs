@@ -143,6 +143,13 @@ namespace KScript.UI
         public void SetBound(UINode node, object value)
         {
             if (node.Bind == null) return;
+            (value, string problem) = BoundValues.Read(value, node.Binding, node.Bind);
+            if (problem != null)
+            {
+                Error = problem;
+                Redrawn?.Invoke();
+                return;
+            }
             try
             {
                 node.BindScope.Assign(node.Bind, value);

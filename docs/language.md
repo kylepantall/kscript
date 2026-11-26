@@ -159,6 +159,16 @@ spawn(fn: @background_job)
 
 Functions can be called before they are declared, recurse, and be passed around: `@square` is the function itself. Lambdas are values too, and declare their parameters the same bare way: `by_age = fn(a, b) => $a.age - $b.age`.
 
+A short function reads a field or calls a method on each item. It starts with `.` or `->`, which stands for the item, and works anywhere a function goes:
+
+```kscript
+urgent = $orders->sort_by(.priority)->filter(.paid)
+by_shop = $orders->group_by(.shop.name)
+lines = $lines->map(->trim()->upper())
+```
+
+`.priority` is `fn(order) => $order.priority`, and `->trim()` is `fn(line) => $line->trim()`. A short function is one chain of fields and method calls. For anything more, such as `$order.price > 10`, write `fn(order) => …`.
+
 A parameter declared as `any` accepts any value. A method call on it uses the value's actual type. For example, `$key->trim()` trims a string, raises an error for a number, and calls the type's own `trim()` when one exists. Write `fn trim_key(key: string) => $key->trim()` for a string normalizer. The editor can then infer a string return type.
 
 ### Named arguments
@@ -314,8 +324,8 @@ Values are strings, numbers, bools, lists, maps, dates, functions and null, plus
 
 ```kscript
 echo "{ $name->trim()->upper() }"
-echo "{ $people->filter(fn(p) => $p.age >= 18)->map(fn(p) => $p.name)->join(', ') }"
-echo "{ $people |> sort_by(fn(p) => $p.name) |> first() }"
+echo "{ $people->filter(fn(p) => $p.age >= 18)->map(.name)->join(', ') }"
+echo "{ $people |> sort_by(.name) |> first() }"
 echo "{ @now()->add_days(7)->format(pattern: 'd MMMM yyyy') }"
 ```
 

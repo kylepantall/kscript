@@ -19,7 +19,7 @@ $db->create_table(User)
 
 joan = User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
 adults = User->where(fn(u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
-echo $adults->map(fn(u) => $u.name)
+echo $adults->map(.name)
 echo $joan.id
 ```
 
@@ -180,7 +180,7 @@ paid = Order->where(status: 'paid')
 echo $paid->count()
 echo $paid->sum(total)
 echo Order->where(fn(o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
-echo Order->where(fn(o) => $o.customer->starts_with('A'))->latest()->first().total
+echo Order->where(.customer->starts_with('A'))->latest()->first().total
 ```
 
 ### Conditions
@@ -262,7 +262,7 @@ $post->tags()->attach($maths)
 
 echo $post.author.name
 echo $ada.profile.bio
-echo $ada.posts->map(fn(p) => $p.title)
+echo $ada.posts->map(.title)
 echo $maths.posts->count()
 ```
 
@@ -600,12 +600,12 @@ import "../models/post.kscript"
 
 test(name: "a post starts with no views") {
   post = Post->fake(title: 'Hello')
-  expect(value: $post.views, equals: 0)
-  expect(value: Post->count(), equals: 1)
+  expect($post.views, equals: 0)
+  expect(Post->count(), equals: 1)
 }
 
 test(name: "each test starts empty") {
-  expect(value: Post->count(), equals: 0)
+  expect(Post->count(), equals: 0)
 }
 ```
 
@@ -628,7 +628,7 @@ posts = Post->fake_many(3, author: $joan)
 test(name: "the post list loads authors at once") {
   Post->fake_many(10)
   Post->with(author)->get()
-  expect(value: @queries(), count_at_most: 2)
+  expect(@queries(), count_at_most: 2)
 }
 ```
 

@@ -107,7 +107,7 @@ A page imports the same declaration. The `data_type:` filter selects routes carr
 
 <nav aria-label="Main navigation">
   <ul>
-    <for each="entry" in="@routes(data_type: NavigationData)->sort_by(fn(r) => $r.data.order)">
+    <for each="entry" in="@routes(data_type: NavigationData)->sort_by(.data.order)">
       <li>
         <a href="{ @route($entry.name) }"
            data-icon="{ $entry.data.icon }">{ $entry.label }</a>
