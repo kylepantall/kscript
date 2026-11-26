@@ -26,12 +26,17 @@ namespace KScript.Syntax.Markup
         #region Handlers
 
         private static readonly System.Text.RegularExpressions.Regex LabelledValue =
-            new(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\$[A-Za-z_][A-Za-z0-9_]*)\s*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            new(@"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\$\.?[A-Za-z_][A-Za-z0-9_]*)\s*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>The named shorthands a handler takes: <c>@on-click(toggle: $open)</c> flips a bool field.</summary>
+        public const string Toggle = "toggle";
+
+        /// <summary>Every handler shorthand, for completion and the "did you mean" in messages.</summary>
+        public static IReadOnlyList<string> HandlerShorthands { get; } = new[] { Toggle };
 
         /// <summary>
-        /// A handler written as a label and one value, <c>@on-click(toggle: $open)</c>: handlers take no named
-        /// arguments, and one value is enough (a bool flips, a function is called). Null for any other handler.
-        /// <c>Value</c> is the offset and length of the value in <paramref name="handler"/>.
+        /// A handler written as a shorthand name and one value, <c>@on-click(toggle: $open)</c>. Null for any other
+        /// handler. <c>ValueStart</c> is the offset of the value in <paramref name="handler"/>.
         /// </summary>
         public static (string Label, string Value, int ValueStart)? LabelledHandler(string handler)
         {
@@ -40,9 +45,17 @@ namespace KScript.Syntax.Markup
             return m.Success ? (m.Groups[1].Value, m.Groups[2].Value, m.Groups[2].Index) : null;
         }
 
-        /// <summary>What to say about a <see cref="LabelledHandler"/>, at run time and in the editor.</summary>
-        public static string LabelledHandlerMessage(string label, string value) =>
-            $"A handler takes no named arguments, so drop '{label}:' and write just {value}. One value is enough: a bool flips and a function is called.";
+        /// <summary>What to say about a shorthand name a handler doesn't take.</summary>
+        public static string UnknownShorthandMessage(string label) =>
+            $"A handler has no '{label}:' shorthand. It takes {string.Join(", ", HandlerShorthands.Select(h => h + ":"))}, a function to call, or statements.";
+
+        /// <summary>What to say when <c>toggle:</c> is given something that isn't a bool.</summary>
+        public static string ToggleNeedsBoolMessage(string value, string type) =>
+            $"toggle: flips a bool, and {value} is {type}. Write statements instead, such as {value.TrimStart('$', '.')} = ….";
+
+        /// <summary>What to say about a page handler that is a bare bool: the positional argument is an action, so flipping is toggle:.</summary>
+        public static string BareBoolMessage(string value) =>
+            $"A handler's value is an action to run, and {value} is a bool. Write toggle: {value} to flip it.";
 
         #endregion
 

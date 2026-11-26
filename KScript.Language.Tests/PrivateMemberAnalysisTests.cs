@@ -102,7 +102,7 @@ namespace KScript.Language.Tests
 
                   fn render() => ```html
                     <p>{$this.open} {$this->label()}</p>
-                    <button @on-click($open)>Toggle</button>
+                    <button @on-click(toggle: $open)>Toggle</button>
                     ```
                 }
                 """;

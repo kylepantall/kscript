@@ -138,14 +138,27 @@ namespace KScript.Runtime
         }
 
         /// <summary>
-        /// Runs an event handler. A handler is statements (<c>count += 1</c>) or one variable: a bool flips
-        /// (<c>on_click: $open</c>) and a function is called (<c>on_click: $toggle</c>).
+        /// Runs an event handler: statements (<c>count += 1</c>), a function or method to call (<c>$save</c>), or a
+        /// shorthand (<c>toggle: $open</c> flips a bool). In a window a lone bool flips too (<c>on_click: $open</c>);
+        /// on a page, with <paramref name="bareBool"/> false, it is an error that names toggle:.
         /// </summary>
-        public void RunHandler(DecodedText text, Scope scope, Module module)
+        public void RunHandler(DecodedText text, Scope scope, Module module, bool bareBool = true)
         {
-            if (KScript.Syntax.Markup.ComponentScript.LabelledHandler(text?.Value) is (string label, string labelled, _))
+            if (KScript.Syntax.Markup.ComponentScript.LabelledHandler(text?.Value) is (string label, string labelled, int valueStart))
             {
-                throw new KScriptException(KScript.Syntax.Markup.ComponentScript.LabelledHandlerMessage(label, labelled), "Syntax") { Offset = text.ToSource(0), OffsetModule = module };
+                if (label != KScript.Syntax.Markup.ComponentScript.Toggle)
+                {
+                    throw new KScriptException(KScript.Syntax.Markup.ComponentScript.UnknownShorthandMessage(label), "Syntax") { Offset = text.ToSource(0), OffsetModule = module };
+                }
+                var value = new DecodedText(labelled, Enumerable.Range(valueStart, labelled.Length + 1).Select(text.ToSource).ToArray());
+                var field = (VariableNode)GetParse(module, value, ParseMode.Statements).Nodes[0];
+                if (!scope.TryGet(field.Name, out object current) || current is not bool on)
+                {
+                    throw Fail(field, new EvalContext(module, value), KScript.Syntax.Markup.ComponentScript.ToggleNeedsBoolMessage(labelled,
+                        scope.TryGet(field.Name, out object other) ? Values.Describe(other) : "not defined"), "Type");
+                }
+                scope.Assign(field.Name, !on);
+                return;
             }
             ParseResult parsed = GetParse(module, text, ParseMode.Statements);
             if (parsed.Nodes.Count == 1 && parsed.Nodes[0] is VariableNode variable)
@@ -166,6 +179,10 @@ namespace KScript.Runtime
                 }
                 if (value is bool flag)
                 {
+                    if (!bareBool)
+                    {
+                        throw Fail(variable, new EvalContext(module, text), KScript.Syntax.Markup.ComponentScript.BareBoolMessage("$" + variable.Name), "Syntax");
+                    }
                     scope.Assign(variable.Name, !flag);
                     return;
                 }

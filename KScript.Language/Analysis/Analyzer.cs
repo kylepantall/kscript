@@ -13,6 +13,9 @@ namespace KScript.Language.Analysis
     /// </summary>
     public sealed partial class Analyzer
     {
+        /// <summary>The handler shorthand (toggle) whose value is being checked, or null.</summary>
+        private string handlerShorthand;
+
         private static readonly HashSet<string> TemplateRawTextElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "title", "textarea" };
 
         private readonly LanguageCatalog catalog;
@@ -1028,11 +1031,24 @@ namespace KScript.Language.Analysis
                     handlerScope.Declare(BuiltIn("event"), e.Span.Start);
                     if (ComponentScript.LabelledHandler(attr.ValueText) is (string label, string value, int valueStart))
                     {
-                        // @on-click(toggle: $open): one value is the whole handler, so the label goes.
-                        TextSpan labelled = attr.Value.ToSource(TextSpan.FromBounds(attr.ValueText.Length - attr.ValueText.TrimStart().Length, valueStart + value.Length));
-                        Report(labelled, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax, ComponentScript.LabelledHandlerMessage(label, value),
-                            new[] { new QuickFix($"Change to {value}", new TextChange(labelled, value)) });
-                        AnalyzeStatements(new DecodedText(value, Enumerable.Range(valueStart, value.Length + 1).Select(attr.Value.ToSource).ToArray()), e, attr, handlerScope, declare: false, requireEffect: true);
+                        // @on-click(toggle: $open): a shorthand name and the field it works on.
+                        int labelStart = attr.ValueText.Length - attr.ValueText.TrimStart().Length;
+                        if (label != ComponentScript.Toggle)
+                        {
+                            TextSpan labelSpan = attr.Value.ToSource(new TextSpan(labelStart, label.Length));
+                            string closest = Suggestions.Closest(label, ComponentScript.HandlerShorthands);
+                            Report(labelSpan, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax, ComponentScript.UnknownShorthandMessage(label),
+                                closest != null ? new[] { new QuickFix($"Change to {closest}", new TextChange(labelSpan, closest)) } : null);
+                        }
+                        handlerShorthand = label;
+                        try
+                        {
+                            AnalyzeStatements(new DecodedText(value, Enumerable.Range(valueStart, value.Length + 1).Select(attr.Value.ToSource).ToArray()), e, attr, handlerScope, declare: false, requireEffect: true);
+                        }
+                        finally
+                        {
+                            handlerShorthand = null;
+                        }
                         continue;
                     }
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
@@ -1624,8 +1640,26 @@ namespace KScript.Language.Analysis
                         }
                         AnalyzeExpr(node, region, scope, ExprContext.Value);
                         string type = Infer(node, region).Type;
+                        if (handlerShorthand != null)
+                        {
+                            // toggle: $open, or a shorthand name already reported as unknown.
+                            if (type is KType.Bool or KType.Any || handlerShorthand != ComponentScript.Toggle)
+                                ReferenceVariable(toggled.Name, name, scope, isWrite: true, mustBeMutable: true, offset: name.Start);
+                            else if (variable != null)
+                                Report(name, DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch, ComponentScript.ToggleNeedsBoolMessage("$" + toggled.Name, type));
+                            continue;
+                        }
                         if (type is KType.Bool)
+                        {
                             ReferenceVariable(toggled.Name, name, scope, isWrite: true, mustBeMutable: true, offset: name.Start);
+                            if (!attr.IsArgument)
+                            {
+                                // A page handler's value is an action: flipping a bool is toggle: $open.
+                                TextSpan whole = region.Source.ToSource(node.Span);
+                                Report(whole, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax, ComponentScript.BareBoolMessage("$" + toggled.Name),
+                                    new[] { new QuickFix($"Change to toggle: ${toggled.Name}", new TextChange(new TextSpan(whole.Start, 0), ComponentScript.Toggle + ": ")) });
+                            }
+                        }
                         else if (variable != null && type is not (KType.Fn or KType.Any))
                             Report(name, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
                                 $"A handler that is one value flips a bool or calls a function, and ${toggled.Name} is {type}. Write statements instead, such as {toggled.Name} = ….");

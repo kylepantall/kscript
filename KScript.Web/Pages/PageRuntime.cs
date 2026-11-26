@@ -223,7 +223,7 @@ namespace KScript.Pages
         public void RunHandler(string handler, Scope scope, Module module) =>
             Run(module, () =>
             {
-                Interpreter.RunHandler(Text(module, 2, handler), scope, module);
+                Interpreter.RunHandler(Text(module, 2, handler), scope, module, bareBool: false);
                 return null;
             });
 

@@ -25,11 +25,13 @@ public class ValueHandlerTests
           fn render(): Component {
             return ```html
             <p>{$open} {$count}</p>
-            <button @on-click($open)>Toggle</button>
+            <button @on-click(toggle: $open)>Toggle</button>
             <button on-click="$add">Add</button>
             <button on-click="$label">Bad</button>
             <button on-click="$missing">Missing</button>
-            <button @on-click(toggle: $open)>Labelled</button>
+            <button @on-click($open)>Bare</button>
+            <button @on-click(flip: $open)>Unknown</button>
+            <button @on-click(toggle: $label)>Text</button>
             ```
           }
         }
@@ -75,13 +77,15 @@ public class ValueHandlerTests
         Assert.Contains("missing", Event(site, 3, site.Render("index.html").Body).Body);
     }
 
-    [Fact]
-    public void A_page_handler_with_a_label_says_to_drop_it()
+    [Theory]
+    [InlineData(4, "Write toggle: $open to flip it.")]
+    [InlineData(5, "no 'flip:' shorthand")]
+    [InlineData(6, "toggle: flips a bool, and $label is")]
+    public void A_page_handler_names_toggle_for_a_bool_and_checks_shorthands(int handler, string message)
     {
         using var site = Site();
-        PageResult failed = Event(site, 4, site.Render("index.html").Body);
-        Assert.Contains("A handler takes no named arguments", failed.Body);
-        Assert.Contains("write just $open", failed.Body);
+        PageResult failed = Event(site, handler, site.Render("index.html").Body);
+        Assert.Contains(message, failed.Body);
     }
 
     [Fact]
