@@ -37,6 +37,12 @@ namespace KScript.Http
             Dictionary<string, object> current = RequestContext.Current(host)?.Request
                 ?? (host != null && host.Items.TryGetValue(Translator.RequestKey, out object r) ? r as Dictionary<string, object> : null);
             if (current != null) Forward(current, request);
+            // A test's @acting_as() reaches the routes it calls, as the test database's transaction does.
+            if (!request.ContainsKey(KScript.Auth.Policies.ActingKey) && host != null && host.Items.TryGetValue(KScript.Auth.Policies.ActingKey, out object acting))
+                request[KScript.Auth.Policies.ActingKey] = acting;
+            // A Cookie header the call sends itself is read into $request.cookies, as a server does.
+            if (!request.ContainsKey("cookies") && ((Dictionary<string, object>)request["headers"]).GetValueOrDefault("cookie") is object cookieHeader)
+                request["cookies"] = ParseCookies(Values.ToStr(cookieHeader));
 
             PageResult result = app.Handle(request) ?? new PageResult
             {
@@ -50,7 +56,8 @@ namespace KScript.Http
                 ["Server"] = HttpIdentity.Product,
             };
             foreach (var kv in result.Headers) headers[kv.Key] = kv.Value;
-            if (result.Cookies.Count > 0) headers["Set-Cookie"] = string.Join(", ", result.Cookies);
+            // Each cookie is a Set-Cookie header of its own on the wire, so a response that sets two shows a list.
+            if (result.Cookies.Count > 0) headers["Set-Cookie"] = result.Cookies.Count == 1 ? result.Cookies[0] : result.Cookies.Select(c => (object)c).ToList();
             return new LocalResponse { Status = result.Status, Reason = ReasonFor(result.Status), Body = result.Body ?? string.Empty, BodyBytes = result.BodyBytes, Headers = headers };
         }
 
@@ -108,6 +115,22 @@ namespace KScript.Http
             if (!ownCookies && from.GetValueOrDefault("cookies") is Dictionary<string, object> cookies)
                 to["cookies"] = new Dictionary<string, object>(cookies, StringComparer.Ordinal);
             if (from.GetValueOrDefault("ip") is object ip) to["ip"] = ip;
+            if (from.TryGetValue(KScript.Auth.Policies.ActingKey, out object acting)) to.TryAdd(KScript.Auth.Policies.ActingKey, acting);
+        }
+
+        /// <summary>A Cookie header (<c>a=1; b=two</c>) as a map of names to values. The first of a repeated name wins.</summary>
+        internal static Dictionary<string, object> ParseCookies(string header)
+        {
+            var cookies = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach (string part in header.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int eq = part.IndexOf('=');
+                if (eq <= 0) continue;
+                string value = part.Substring(eq + 1).Trim();
+                if (value.Length >= 2 && value[0] == '"' && value[^1] == '"') value = value.Substring(1, value.Length - 2);
+                cookies.TryAdd(part.Substring(0, eq).Trim(), value);
+            }
+            return cookies;
         }
 
         private static string ReasonFor(int status) => Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(status);

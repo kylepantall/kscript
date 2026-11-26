@@ -69,7 +69,7 @@ namespace KScript.Http
             switch (name)
             {
                 case "header":
-                    result = Headers.TryGetValue(call.Str(0), out object h) ? h : null;
+                    result = Headers.TryGetValue(call.Str(0), out object h) ? (Values.Unwrap(h) is List<object> all ? all.FirstOrDefault() : h) : null;
                     return true;
                 case "json":
                     result = Values.ParseJson(Body);
@@ -79,7 +79,11 @@ namespace KScript.Http
                     result = this;
                     return true;
                 case "with_header":
-                    Headers[call.Str(0)] = Values.ToStr(call.Arg(1));
+                    string header = call.Str(0), text = Values.ToStr(call.Arg(1));
+                    // Set-Cookie is the header that repeats: each call adds a cookie rather than replacing the last.
+                    if (string.Equals(header, "Set-Cookie", StringComparison.OrdinalIgnoreCase) && Headers.TryGetValue(header, out object set))
+                        Headers[header] = Values.Unwrap(set) is List<object> list ? new List<object>(list) { text } : new List<object> { set, text };
+                    else Headers[header] = text;
                     result = this;
                     return true;
                 case "with_etag":
@@ -112,10 +116,10 @@ namespace KScript.Http
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
-            ("header", "name", "One header (or null).", KType.String),
+            ("header", "name", "One header (or null). For Set-Cookie set more than once, the first; .headers has them all.", KType.String),
             ("json", "", "The body read as JSON.", KType.Any),
             ("with_status", "code", "Changes the status code and returns the response.", KType.HttpResponse),
-            ("with_header", "name, value", "Sets a header and returns the response: $next($request)->with_header('X-Frame-Options', 'DENY').", KType.HttpResponse),
+            ("with_header", "name, value", "Sets a header and returns the response: $next($request)->with_header('X-Frame-Options', 'DENY'). Set-Cookie adds a cookie each time instead of replacing the last.", KType.HttpResponse),
             ("with_type", "type", "Changes the Content-Type and returns the response.", KType.HttpResponse),
             ("with_etag", "value?, weak?: bool", "Sets the ETag: a hash of the value, or of the body without one. Add the etag middleware (or etag=\"true\") to answer If-None-Match with 304.", KType.HttpResponse),
             ("with_cache", "directives", "Sets Cache-Control: ->with_cache('public, max-age=300'), or a number of seconds: ->with_cache(300).", KType.HttpResponse),

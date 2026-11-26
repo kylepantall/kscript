@@ -42,6 +42,7 @@ namespace KScript.Net
                 "is_ok" => Ok,
                 "url" => Url,
                 "headers" => Headers,
+                "cookies" => Cookies(),
                 "text" => Body,
                 "bytes" => Base64Type.EncodeBytes(BinaryBody),
                 _ => null,
@@ -56,6 +57,8 @@ namespace KScript.Net
                 case "header":
                     string key = call.Str(0);
                     result = Headers.FirstOrDefault(kv => string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
+                    // A header sent more than once (Set-Cookie) is a list in .headers; ->header() gives the first.
+                    if (Values.Unwrap(result) is List<object> repeated) result = repeated.FirstOrDefault();
                     return true;
                 case "json":
                     object data;
@@ -80,6 +83,44 @@ namespace KScript.Net
             }
         }
 
+        /// <summary>The cookies the response sets: each Set-Cookie header's name and value, without its attributes.</summary>
+        private Dictionary<string, object> Cookies()
+        {
+            var cookies = new Dictionary<string, object>(StringComparer.Ordinal);
+            object header = Headers.FirstOrDefault(kv => string.Equals(kv.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase)).Value;
+            IEnumerable<object> lines = Values.Unwrap(header) switch
+            {
+                List<object> list => list,
+                null => Enumerable.Empty<object>(),
+                object one => new[] { one },
+            };
+            foreach (object line in lines)
+            {
+                string text = Values.ToStr(line);
+                string pair = text.Split(';')[0];
+                int eq = pair.IndexOf('=');
+                if (eq > 0) cookies[pair.Substring(0, eq).Trim()] = pair.Substring(eq + 1).Trim();
+            }
+            return cookies;
+        }
+
+        /// <summary>
+        /// Response headers as the map <c>.headers</c> shows: one value per name, except a header sent more than once
+        /// (Set-Cookie), which is a list of its values, the way a repeated query value is a list.
+        /// </summary>
+        internal static void AddHeader(Dictionary<string, object> headers, string name, IEnumerable<string> values)
+        {
+            List<string> all = values.ToList();
+            if (string.Equals(name, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            {
+                if (headers.TryGetValue(name, out object existing))
+                    all.InsertRange(0, Values.Unwrap(existing) is List<object> list ? list.Select(Values.ToStr) : new[] { Values.ToStr(existing) });
+                headers[name] = all.Count == 1 ? all[0] : all.Select(v => (object)v).ToList();
+                return;
+            }
+            headers[name] = string.Join(", ", all);
+        }
+
         internal static readonly (string Name, string Type, string Description)[] Fields =
         {
             ("status", KType.Number, "The HTTP status code, such as 200 or 404."),
@@ -88,13 +129,14 @@ namespace KScript.Net
             ("url", KType.String, "The address that was fetched."),
             ("text", KType.String, "The body as text."),
             ("bytes", "base64", "The bytes of the response body, held as a base64 value."),
-            ("headers", KType.Map, "The response headers as a map."),
+            ("headers", KType.Map, "The response headers as a map. A header sent more than once, such as Set-Cookie, is a list of its values."),
+            ("cookies", KType.Map, "The cookies the response sets (its Set-Cookie headers), as a map of names to values: $reply.cookies.session."),
         };
 
         internal static readonly (string Name, string Params, string Description, string Returns)[] Methods =
         {
             ("json", "as?: type", "The body read as JSON. With as: a <type> (or 'Repo[]'), the data is checked and turned into records; a list is mapped item by item.", KType.Any),
-            ("header", "name", "One response header (or null).", KType.String),
+            ("header", "name", "One response header (or null). For a header sent more than once, such as Set-Cookie, the first; .headers has them all.", KType.String),
             ("check", "", "Throws a Network error unless the status is 2xx; otherwise returns the response.", KType.Response),
         };
     }
@@ -286,7 +328,7 @@ namespace KScript.Net
                 byte[] bytes = response.Content.ReadAsByteArrayAsync(stop).GetAwaiter().GetResult();
                 string text = response.Content.ReadAsStringAsync(stop).GetAwaiter().GetResult();
                 var responseHeaders = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-                foreach (var header in response.Headers.Concat(response.Content.Headers)) responseHeaders[header.Key] = string.Join(", ", header.Value);
+                foreach (var header in response.Headers.Concat(response.Content.Headers)) ResponseValue.AddHeader(responseHeaders, header.Key, header.Value);
                 return new ResponseValue(uri.OriginalString, (int)response.StatusCode, response.ReasonPhrase, text, responseHeaders, bytes);
             }
             catch (HttpRequestException ex)

@@ -21,6 +21,26 @@ internal static class DockerServe
 
     internal static bool IsContainer(string marker) => marker == "1";
 
+    /// <summary>
+    /// A warning for a container whose app folders aren't on a volume: Docker files made before 0.27 don't set
+    /// KSCRIPT_STORAGE_ROOT, so KScript.Auth's users and sessions and @storage() files stay in the container's home
+    /// folder and are lost when it is recreated. Null when both folders are set.
+    /// </summary>
+    internal static string StorageWarning(Func<string, string> environment)
+    {
+        var missing = new[] { AppFoldersRoot, ProjectDataRoot }.Where(name => string.IsNullOrWhiteSpace(environment(name))).ToArray();
+        if (missing.Length == 0) return null;
+        return $"Warning: {string.Join(" and ", missing)} {(missing.Length == 1 ? "isn't" : "aren't")} set in this container, so " +
+            (missing.Contains(AppFoldersRoot)
+                ? "signed-up users, sessions and @storage() files are kept inside the container and are lost when it is recreated. "
+                : "relative auth and SQLite paths are kept inside the container and are lost when it is recreated. ") +
+            "Set KSCRIPT_STORAGE_ROOT=/var/lib/kscript/storage and KSCRIPT_PROJECT_DATA_ROOT=/var/lib/kscript/project and mount a volume at /var/lib/kscript. " +
+            "See \"Docker files from before 0.27\" in docs/projects.md.";
+    }
+
+    internal const string AppFoldersRoot = "KSCRIPT_STORAGE_ROOT";
+    internal const string ProjectDataRoot = "KSCRIPT_PROJECT_DATA_ROOT";
+
     internal static bool ShouldLaunch(string root, DockerServeSettings settings, bool? requested, string environment, bool auto)
     {
         if (requested.HasValue) return requested.Value;

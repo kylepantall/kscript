@@ -243,6 +243,18 @@ namespace KScript.Auth
         public Dictionary<string, object> User => SessionUser ?? TokenUser;
 
         /// <summary>
+        /// Whether a test's <c>@acting_as()</c> names who this request is from (an in-process <c>@api()</c> call made
+        /// while acting as someone). That user stands in for both the session's and the token's user; null is a guest.
+        /// </summary>
+        private bool Acting(out Dictionary<string, object> user)
+        {
+            user = null;
+            if (!Request.TryGetValue(Policies.ActingKey, out object acting)) return false;
+            user = Values.Unwrap(acting) as Dictionary<string, object>;
+            return true;
+        }
+
+        /// <summary>
         /// The session's user, read again from the users so changes show at once. A user who isn't in the app's
         /// users (one signed in with @login() from a store of your own) is the copy made at sign-in.
         /// </summary>
@@ -250,6 +262,7 @@ namespace KScript.Auth
         {
             get
             {
+                if (Acting(out Dictionary<string, object> acting)) return acting;
                 if (freshLoaded) return freshUser;
                 freshLoaded = true;
                 Dictionary<string, object> s = Session(create: false);
@@ -279,6 +292,7 @@ namespace KScript.Auth
         {
             get
             {
+                if (Acting(out Dictionary<string, object> acting)) return acting;
                 if (tokenLoaded) return tokenUser;
                 tokenLoaded = true;
                 string token = BearerToken;

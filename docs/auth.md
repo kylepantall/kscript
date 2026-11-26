@@ -306,7 +306,7 @@ In a script, `@authorize()` throws `Forbidden` or `Unauthorized`, which a `try` 
 
 ### Testing a policy
 
-`@acting_as()` sets who is asking until the test ends. Pass `null` for a guest.
+`@acting_as()` sets who is asking until the test ends, in the test and in the routes it calls with `@api(/...)`. Pass `null` for a guest.
 
 ```kscript
 // tests/post-policy.test.kscript

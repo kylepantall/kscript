@@ -121,7 +121,9 @@ The `config` statement does the same for one script: `config(user: true)`. Envir
 
 - Storage works in scripts, desktop apps, and the controllers of `kscript serve` (where it is the one place outside the site folder a controller can write, and only inside the app's folders).
 - Pages are read-only, so they can read from storage but not write.
-- `KSCRIPT_STORAGE_ROOT` moves every app's folders to `<root>/<app>/<kind>`. Tests use it to keep their files apart, and it makes a portable install that keeps everything next to the program.
+- `KSCRIPT_STORAGE_ROOT` moves every app's folders to `<root>/<app>/<kind>`, such as `<root>/notes/data`. It needs an absolute path. Tests use it to keep their files apart, it makes a portable install that keeps everything next to the program, and a container uses it to keep the folders on a volume.
+- `KSCRIPT_PROJECT_DATA_ROOT` is the folder for relative auth and SQLite paths in `kscript.json`, instead of the project folder. It needs an absolute path, and a path that leaves it is an error.
+- In Docker, put both on a volume, or users, sessions and stored files are lost when the container is recreated. The files `kscript make docker` writes do this (see [Where a container keeps its data](projects.md#where-a-container-keeps-its-data)).
 - The docs' "try it" boxes don't run KScript.Storage, because it writes outside the example's own folder.
 
 KScript.Cache keeps its file cache in the `cache` folder (see [Caching](cache.md)).

@@ -193,7 +193,13 @@ namespace KScript.Documents
                 new A("notes", K.Template, "Payment details or terms, under the table."),
                 new A("title", K.Template, "The heading (default Invoice).")), DocumentElements.Invoice);
 
-            FencedFile.RegisterDocumentMethods(p);
+            FencedFile.RegisterDocumentMethods(p, DocumentValue.SaveFence);
+            // A Markdown fence is a document already: $notes->html() needs no @document($notes) first.
+            foreach (var m in DocumentValue.Methods.Where(m => DocumentValue.MarkdownOutputs.Contains(m.Name)))
+            {
+                string name = m.Name;
+                p.Method(KType.Markdown, name, m.Params, m.Description, m.Returns, (t, c) => DocumentValue.FromFence(t, c).Invoke(c, name));
+            }
             p.Command("document", "text, as?: markdown|latex",
                 "Makes a document from Markdown or LaTeX source. A fenced value supplies the format. A plain string defaults to Markdown.",
                 KType.Document, DocumentValue.FromSource, "@document('# Notes')->save('notes.pdf')");
