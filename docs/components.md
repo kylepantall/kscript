@@ -467,11 +467,11 @@ A handler can name what it does instead of spelling out the statement. Each shor
 })>{$todo.title}</li>
 ```
 
-A condition is a bool, or a list of bools that must all be true. With the condition first, the value is a class name or a list of them. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
+A condition is a bool, or a list of bools that must all be true. With the condition first, the value is a class name or a list of them. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable. `$event.x` and `$event.y` are where the pointer is inside the handler's own element, counting how far that element is scrolled, so `@on-dblclick(call: $add, with: [$event.x, $event.y])` on a scrolling board gives the spot in the board's content.
 
 | Interaction | Attributes |
 | --- | --- |
-| Buttons and forms | `on-click`, `on-submit` |
+| Buttons and forms | `on-click`, `on-dblclick`, `on-submit` |
 | Input changes | `on-input`, `on-change` |
 | Keyboard and focus | `on-keydown`, `on-keyup`, `on-enter`, `on-escape`, `on-focusin`, `on-focusout` |
 | Dialog and pointer events | `on-cancel`, `on-close`, `on-pointerdown`, `on-pointerup`, `on-pointercancel` |
@@ -486,7 +486,17 @@ Emit an event from an action with `@emit_event('notes-changed', data: $note.id, 
 
 ### Drag, drop and sorting
 
-For a drop target, put `draggable="true" drag-value="{$item.id}"` on the source and `on-drop` on the destination. The action reads `$event.drag_value`.
+For a drop target, put `draggable="true" drag-value="{$item.id}"` on the source and `on-drop` on the destination. The action reads `$event.drag_value`, and `$event.x` and `$event.y` give the drop point inside the destination. `@drop-class('over')` on the destination adds the class while something it takes is dragged over it.
+
+To take files dropped on an element, give it `@drop-files('upload')` and put a `live-upload` file input named `upload` inside it. Dropped files go through that input and its `on-change` action, the same as files picked by hand:
+
+```html
+<article class="note" @drop-files('upload') @drop-class('file-over')>
+  <label>Attach <input type="file" name="upload" multiple hidden live-upload @on-change($this->attach($event.files.upload))></label>
+</article>
+```
+
+`kscript check` reports a `@drop-files` name with no matching `live-upload` input inside the element.
 
 For sortable siblings, give each item a unique `sort-item="{$item.id}"` and put `on-sort` on their container. The handler gets the item ID, the old and new zero-based indexes, and the proposed order. Users can drag an item or focus it and use Alt+Up or Alt+Down. Set `sort-axis="horizontal"` for left-to-right lists. Validate the item IDs before persisting a new order.
 

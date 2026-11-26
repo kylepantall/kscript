@@ -53,6 +53,9 @@ namespace KScript.Language.Tests
                   <button @on-click($delete)>Delete</button>
                 </article>
                 <p @pending(['busy', 'dim'])>Saving</p>
+                <div @drop-files('upload') @drop-class('file-over') @on-dblclick(title = $event.x)>
+                  <label><input type="file" name="upload" live-upload @on-change(title = '')></label>
+                </div>
                 """));
         }
 
@@ -64,6 +67,7 @@ namespace KScript.Language.Tests
         [InlineData("<p @pending('busy', when: 'delete')>x</p>", "@pending: @pending has no when: option.")]
         [InlineData("<p @pending('busy', for: $delete)>x</p>", "@pending: for: takes the method's name in quotes, for: 'delete'.")]
         [InlineData("<p @pending(for: 'delete')>x</p>", "@pending needs a class before for:")]
+        [InlineData("<div @drop-files('upload')><input type=\"file\" name=\"other\" live-upload></div>", "@drop-files('upload') needs a file input named upload with live-upload inside this element.")]
         public void A_mistake_is_reported(string markup, string message)
         {
             Assert.Contains(message, Messages(Check(markup)));

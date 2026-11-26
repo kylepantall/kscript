@@ -3,8 +3,8 @@
 // returns the block's new HTML. Pages never contain JavaScript of their own.
 (function () {
   "use strict";
-  var EVENTS = ["click", "input", "change", "submit", "keydown", "keyup", "focusin", "focusout", "cancel", "close",
-    "pointerdown", "pointerup", "pointercancel", "dragstart", "dragover", "drop", "dragend",
+  var EVENTS = ["click", "dblclick", "input", "change", "submit", "keydown", "keyup", "focusin", "focusout", "cancel", "close",
+    "pointerdown", "pointerup", "pointercancel", "dragstart", "dragenter", "dragover", "dragleave", "drop", "dragend",
     "compositionstart", "compositionend"];
   var DRAG_VALUE = "application/x-kscript-drag";
   var timers = Object.create(null);
@@ -93,6 +93,51 @@
 
   function autogrow() {
     for (const area of document.querySelectorAll("textarea[data-ks-autogrow]")) grow(area);
+  }
+
+  function localPoint(el, e) {
+    if (!el?.getBoundingClientRect || typeof e?.clientX !== "number") return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: Math.round(e.clientX - r.left - el.clientLeft + el.scrollLeft),
+      y: Math.round(e.clientY - r.top - el.clientTop + el.scrollTop),
+    };
+  }
+
+  // @drop-class('file-over'): classes on while something the element takes is dragged over it.
+  function setDropClass(el, on) {
+    const classes = el?.getAttribute("data-ks-drop-class")?.split(" ").filter(Boolean);
+    if (!classes?.length) return;
+    if (on) el.classList.add(...classes);
+    else el.classList.remove(...classes);
+  }
+
+  // @drop-files('upload'): files dropped on the element go through its live-upload input of that name, so they
+  // travel with that input's on-change action like files picked by hand.
+  function dropFiles(e, type, block) {
+    if (!e.dataTransfer?.types.includes("Files")) return false;
+    const zone = e.target.closest?.("[data-ks-drop-files]");
+    if (!zone || blockOf(zone) !== block) return false;
+    if (type === "dragleave") {
+      if (!zone.contains(e.relatedTarget)) setDropClass(zone, false);
+      return true;
+    }
+    e.preventDefault();
+    if (type !== "drop") {
+      setDropClass(zone, true);
+      return true;
+    }
+    setDropClass(zone, false);
+    const name = zone.getAttribute("data-ks-drop-files");
+    const input = Array.from(zone.querySelectorAll("input[type=file][data-ks-live-upload]"))
+      .find(el => el.name === name && blockOf(el) === block);
+    if (!input) {
+      console.error("KScript: @drop-files('" + name + "') has no live-upload input named " + name + " inside it.");
+      return true;
+    }
+    input.files = e.dataTransfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
   }
 
   function showError(block, message) {
@@ -321,8 +366,13 @@
       button: domEvent?.button ?? null,
       pointer_id: domEvent?.pointerId ?? null,
       pointer_type: domEvent?.pointerType ?? null,
-      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData(DRAG_VALUE) || null) : null,
+      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData(DRAG_VALUE) || null) : domEvent?.dragValue ?? null,
     };
+    // $event.x and $event.y: where the pointer is in the handler's element, counting its scroll, so a position
+    // inside a scrolled board is the same number the board's content is laid out in.
+    const local = localPoint(domEvent?.handlerElement, domEvent);
+    eventInfo.x = local?.x ?? null;
+    eventInfo.y = local?.y ?? null;
     if (domEvent?.type === "component") {
       eventInfo.name = domEvent.name;
       eventInfo.data = domEvent.data;
@@ -570,9 +620,17 @@
       }
       return;
     }
-    if (type === "dragover") {
+    if ((type === "dragenter" || type === "dragover" || type === "dragleave" || type === "drop") && dropFiles(e, type, block)) return;
+    if (type === "dragenter" || type === "dragover" || type === "dragleave") {
       var drop = target.closest?.("[data-ks-on-drop]");
-      if (drop && blockOf(drop) === block && e.dataTransfer?.types.includes(DRAG_VALUE)) e.preventDefault();
+      if (drop && blockOf(drop) === block && e.dataTransfer?.types.includes(DRAG_VALUE)) {
+        if (type === "dragleave") {
+          if (!drop.contains(e.relatedTarget)) setDropClass(drop, false);
+        } else {
+          e.preventDefault();
+          setDropClass(drop, true);
+        }
+      }
       return;
     }
     var el = target.closest ? target.closest("[data-ks-on-" + type + "]") : null;
@@ -593,6 +651,8 @@
         e.preventDefault();
         return;
       }
+      if (type === "drop") setDropClass(el, false);
+      e.handlerElement = el;
       var handler = parseInt(el.getAttribute("data-ks-on-" + type), 10);
       var args = handlerArgs(el, handler);
       if (type === "input") {
