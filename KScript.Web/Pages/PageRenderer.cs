@@ -1135,7 +1135,7 @@ namespace KScript.Pages
                     bool previousCanWrite = host.CanWriteFiles;
                     ctx.InLiveAction = true;
                     host.CanWriteFiles = ctx.CanWriteLiveFiles;
-                    try { ctx.Runtime.Execute(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module, declare: false); }
+                    try { ctx.Runtime.RunHandler(handlers[ctx.Live.Handler].Value ?? string.Empty, handlerScope, state.Module); }
                     finally
                     {
                         host.CanWriteFiles = previousCanWrite;

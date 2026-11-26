@@ -150,7 +150,7 @@
     + "|(:\\s*)(" + TYPES + "|[A-Z]\\w*)(?![\\w-])"
     + "|^(\\s*)(min|max|pattern|one_of|not|validate|normalize|parse)(?=\\s*:\\s*(?![A-Za-z_][\\w.\\[\\]?]*\\s*(?:=|$)))"
     + "|\\b(type|enum)(\\s+)([A-Za-z_]\\w*)(?:(\\s+with\\s*\\[)([^\\]\\n]*)(\\]))?"
-    + "|\\b(if|elif|else|for|in|at|while|match|when|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null|type|enum|with)\\b"
+    + "|\\b(if|elif|else|for|in|at|while|match|when|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null|type|enum|with|construct(?=\\())\\b"
     + "|\\b([A-Z][\\w.]*|[a-z_][\\w-]*)(?=\\s*[({])", 'gm');
   // ```lang ... ``` blocks: text up to a closing fence of the same length, with the language or <Type> after the fence.
   var FENCE = /(`{3,})([^\n`]*)\n[\s\S]*?\n[ \t]*\1(?!`)/g;

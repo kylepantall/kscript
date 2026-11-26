@@ -91,6 +91,9 @@ public sealed class DocsConventionTests
                 return d.Message.StartsWith("File not found", StringComparison.Ordinal) || Regex.IsMatch(d.Message, "^Unknown type '[A-Z]");
             case DiagnosticCodes.UnknownCommand:
                 return Regex.IsMatch(d.Message, @"^Unknown (function|command) ");
+            case DiagnosticCodes.UnknownElement:
+                // A component drawn as a statement (NoteCard(title: "Milk")) comes from a file the example imports.
+                return Regex.IsMatch(d.Message, "^Unknown statement '[A-Z]") && body.Contains("import \"");
             case DiagnosticCodes.UnknownErrorType:
                 return d.Message.StartsWith("Unknown error type", StringComparison.Ordinal);
             case DiagnosticCodes.BareIdentifier:

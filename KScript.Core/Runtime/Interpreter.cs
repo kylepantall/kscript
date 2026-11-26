@@ -286,8 +286,17 @@ namespace KScript.Runtime
             if (owner != null)
                 throw Located(new KScriptException($"{module.ElementHint(name)} is part of {owner.Name}. Add {module.ImportHint(owner.Name)} at the top of the script.", "Import"), module, e.NameSpan.Start);
 
-            throw Located(new KScriptException(Wording.Of($"Unknown element <{name}>.") + SuggestElement(name, module.Elements.Keys), "Syntax"), module, e.NameSpan.Start);
+            // NoteCard(note: $note): a component drawn as an element. Whether the name is one is known when it runs.
+            if (ComponentElements.MayBeComponent(module, name))
+                return module.Resolved[e] = componentElement ??= new ElementDefinition(ComponentElements.Info, ComponentElements.Run, Packages.Get("KScript.Core"));
+
+            throw Located(new KScriptException(UnknownElement(module, name), "Syntax"), module, e.NameSpan.Start);
         }
+
+        private ElementDefinition componentElement;
+
+        internal Wording UnknownElement(Module module, string name) =>
+            Wording.Of($"Unknown element <{name}>.") + SuggestElement(name, module.Elements.Keys);
 
         /// <summary>Checks an element, its attributes, its expressions and (for statement blocks) its children.</summary>
         private void CheckElement(Module module, MarkupElement e, bool isRoot = false)

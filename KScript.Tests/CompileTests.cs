@@ -753,11 +753,11 @@ public sealed class CompileTests : IDisposable
         CompileEnvironment Release()
         {
             CompileEnvironment env = Env(releases);
-            env.Version = "0.10.0";
+            env.Version = "0.26.0";
             env.Repository = KScript.Updates.SelfUpdater.DefaultRepository;
             return env;
         }
-        string cached = Path.Combine(dir, "cache", "0.10.0", "linux-arm64", "kscript");
+        string cached = Path.Combine(dir, "cache", "0.26.0", "linux-arm64", "kscript");
 
         // The wrong file: refused, and nothing is kept.
         sums = new string('0', 64) + "  kscript-runtime-linux-arm64.tar.gz\n";
@@ -770,9 +770,9 @@ public sealed class CompileTests : IDisposable
         sums = $"{sha}  kscript-runtime-win-x64.zip\n";
         Assert.Contains("SHA256SUMS doesn't list kscript-runtime-linux-arm64.tar.gz", Compile(Release(), script, "--target", "linux-arm64").Err);
         sumsStatus = HttpStatusCode.NotFound;
-        Assert.Contains("Release v0.10.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.", Compile(Release(), script, "--target", "linux-arm64").Err);
+        Assert.Contains("Release v0.26.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.", Compile(Release(), script, "--target", "linux-arm64").Err);
         sumsStatus = HttpStatusCode.BadGateway;
-        Assert.Contains("Couldn't download the checksums of kscript 0.10.0 (502)", Compile(Release(), script, "--target", "linux-arm64").Err);
+        Assert.Contains("Couldn't download the checksums of kscript 0.26.0 (502)", Compile(Release(), script, "--target", "linux-arm64").Err);
         Assert.False(File.Exists(cached));
 
         // The listed file is used. sha256sum marks a file read as binary with a star.

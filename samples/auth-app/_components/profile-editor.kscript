@@ -4,7 +4,7 @@ import "../models/profile.kscript"
 type ProfileEditor extends Component {
   record: Profile
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <live id="profile-{$.record.id}">
       <state name="automatic" value="false" />
@@ -17,7 +17,7 @@ type ProfileEditor extends Component {
         <p><label>Bio<br><input name="bio" value="{$.record.bio}" maxlength="160"></label></p>
         <button>Save profile</button>
       </form>
-      <p><button type="button" on-click="preview = not $.preview">{$.preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
+      <p><button type="button" on-click="$.preview">{$.preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
       <if test="$.preview"><p>Saved bio: {$.record.bio}</p></if>
     </live>
     ```

@@ -134,8 +134,8 @@ public sealed class SelfUpdaterRunTests : IDisposable
 
     private const string Sums = "https://example.test/SHA256SUMS";
 
-    /// <summary>A release that lists its checksums, as every release from 0.10.0 does.</summary>
-    private (FakeGitHub GitHub, UpdateEnvironment Env) SetupListed(string sums, string tag = "v0.10.0")
+    /// <summary>A release that lists its checksums, as every release from 0.26.0 does.</summary>
+    private (FakeGitHub GitHub, UpdateEnvironment Env) SetupListed(string sums, string tag = "v0.26.0")
     {
         var (github, env) = Setup(tag);
         github.Routes[Latest] = () => new HttpResponseMessage(HttpStatusCode.OK)
@@ -161,7 +161,7 @@ public sealed class SelfUpdaterRunTests : IDisposable
         var (_, env) = SetupListed($"{new string('1', 64)}  kscript-win-x64.zip\n{sha}  kscript-linux-x64.tar.gz\n");
         var (code, output, error) = Update(env);
         Assert.True(code == 0, error);
-        Assert.Contains("Updated kscript 0.1.0 -> 0.10.0", output);
+        Assert.Contains("Updated kscript 0.1.0 -> 0.26.0", output);
         Assert.DoesNotContain("wasn't checked", output);
         Assert.Equal("new binary", File.ReadAllText(env.TargetPath));
     }
@@ -172,7 +172,7 @@ public sealed class SelfUpdaterRunTests : IDisposable
         string sha = Sha(Release);
         var (_, env) = SetupListed($"{new string('0', 64)}  kscript-linux-x64.tar.gz\n");
         bool ran = false;
-        env.RunVersion = _ => { ran = true; return "kscript 0.10.0"; };
+        env.RunVersion = _ => { ran = true; return "kscript 0.26.0"; };
         var (code, _, error) = Update(env);
         Assert.Equal(1, code);
         Assert.Equal($"The checksum of kscript-linux-x64.tar.gz is wrong: SHA256SUMS lists {new string('0', 64)} but the download is {sha}. It may be damaged or not the released file. Nothing was installed.\n", error);
@@ -194,16 +194,16 @@ public sealed class SelfUpdaterRunTests : IDisposable
         var (github, env) = SetupListed(null);
         var (code, _, error) = Update(env);
         Assert.Equal(1, code);
-        Assert.Equal("Release v0.10.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.\n", error);
+        Assert.Equal("Release v0.26.0 has no SHA256SUMS file, so the download can't be checked. Nothing was installed.\n", error);
         Assert.DoesNotContain(github.Requests, r => r.RequestUri!.ToString() == Download);
         Assert.Equal("old binary", File.ReadAllText(env.TargetPath));
 
-        // Releases before 0.10.0 never had the list: they install, and the output says they weren't checked.
-        (_, env) = SetupListed(null, "v0.9.0");
+        // Releases before 0.26.0 never had the list: they install, and the output says they weren't checked.
+        (_, env) = SetupListed(null, "v0.25.0");
         string output;
         (code, output, error) = Update(env);
         Assert.True(code == 0, error);
-        Assert.Contains("Release v0.9.0 was published before releases listed checksums, so the download wasn't checked.", output);
+        Assert.Contains("Release v0.25.0 was published before releases listed checksums, so the download wasn't checked.", output);
         // Another repository's releases are named.
         Assert.Contains("Using releases from me/ks (KSCRIPT_REPO).", output);
     }
@@ -220,12 +220,12 @@ public sealed class SelfUpdaterRunTests : IDisposable
     public void Reads_a_checksum_list(string sums, string name, string expected) => Assert.Equal(expected, Checksums.Listed(sums, name));
 
     [Theory]
-    [InlineData("0.10.0", true)]
+    [InlineData("0.26.0", true)]
     [InlineData("v1.2.0", true)]
-    [InlineData("v0.9.0", false)]
-    [InlineData("0.9.12", false)]
+    [InlineData("v0.25.0", false)]
+    [InlineData("0.25.9", false)]
     [InlineData("nonsense", false)]
-    public void Releases_from_0_10_must_list_checksums(string version, bool required) => Assert.Equal(required, Checksums.Required(version));
+    public void Releases_from_0_26_must_list_checksums(string version, bool required) => Assert.Equal(required, Checksums.Required(version));
 
     [Fact]
     public void Installs_a_newer_release()

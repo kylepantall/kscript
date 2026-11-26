@@ -73,6 +73,12 @@ namespace KScript.Language.Analysis
                 if (argument.Name != null)
                 {
                     if (instance == null || !instance.Fields.TryGetValue(argument.Name, out FieldInfo field)) continue;
+                    if (field.OwnState)
+                    {
+                        Report(region.Source.ToSource(argument.NameSpan), DiagnosticSeverity.Error, DiagnosticCodes.UnknownParameter,
+                            $"'{argument.Name}' is {id.Name}'s own state and can't be passed in. construct takes: {string.Join(", ", instance.Fields.Values.Where(f => !f.OwnState).Select(f => f.Name))}.");
+                        continue;
+                    }
                     expected = field.ValueType;
                     if (expected != null && !ExpectsShapeError(region.Element))
                         CheckTypedLiteral(argument.Value, expected, region.Source, scope, span.Start);

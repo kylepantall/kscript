@@ -12,7 +12,7 @@ import KScript.Web
 type ClickCounter extends Component {
   count: int = 0
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <button type="button" @on-click(count += 1)>Count is {$count}</button>
     ```
@@ -36,18 +36,18 @@ An explicit `<live>` block lets you choose the root element with `as`, defer ren
 
 ## Component styles
 
-A component can implement the optional `fn style(): ComponentStyle` method to keep its stylesheet beside its
-`render(): Component` method. The renderer validates the HTML returned by `render()` as a KScript page fragment.
+A component can implement the optional `fn style()` method to keep its stylesheet beside its
+`render()` method. The renderer validates the HTML returned by `render()` as a KScript page fragment.
 
 ````kscript
 type Badge extends Component {
   label: string
 
-  fn render(): Component => ```html
+  fn render() => ```html
   <span class="note-badge">{$label}</span>
   ```
 
-  override fn style(): ComponentStyle => ```css
+  override fn style() => ```css
   .note-badge {
     padding: 0.25rem;
   }
@@ -69,7 +69,7 @@ import KScript.Web
 type HelloCard extends Component {
   name: string
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <p>Hello, {$name}!</p>
     ```
@@ -82,7 +82,7 @@ Add `<hello-card name="Sam" />` to `index.html` to render **Hello, Sam!**. Use k
 | Part | How it works |
 | --- | --- |
 | Discovery | KScript resolves `<item-card />` to a component such as `_components/item-card.kscript` or `_components/item-card.html`. |
-| Class contract | A script component extends `Component` from `KScript.Web` and defines `fn render(): Component`. |
+| Class contract | A script component extends `Component` and defines `fn render()`. The `html` block it returns shows that it draws a page, so the method needs no return type. |
 | Inputs | The caller can initialize stored fields using attributes. A field initializer supplies a default. Simple field types also have built-in initial values. |
 | Render-time values | HTML can read a field as `$title` or `$.title`. Computed fields and component methods can prepare display values. |
 | Children | Put `<slot />` in the template to render the caller's child markup. |
@@ -112,7 +112,7 @@ type NoteEditor extends Component {
   descriptions: string[]
   color: color = 'yellow'
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <label>Title <input @bind('title') @bind-on('blur')></label>
     <label><input type="checkbox" @bind('done')> Done</label>
@@ -148,9 +148,222 @@ Number defaults let normal numeric input update the state as a number. For query
 
 For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#reading), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
 
+### Inputs and state with construct
+
+By default a page can set every stored field of a component. Add a `construct` block to list the attributes a page may pass. Every other field is then the component's own state, and passing it from a page is an error.
+
+````kscript
+import KScript.Web
+
+type NoteCard extends Component {
+  construct({
+    title: string,
+    open: bool = false,
+  }) {
+    heading = $title->upper()
+  }
+
+  heading: string
+  clicks: int
+
+  fn render() {
+    return ```html
+    <article>
+      <h3>{$heading}</h3>
+      <button type="button" @on-click($open)>{$open ? 'Hide' : 'Show'}</button>
+      <button type="button" @on-click(clicks += 1)>Clicked {$clicks}</button>
+    </article>
+    ```
+  }
+}
+````
+
+`<note-card title="Shopping" />` works, and `<note-card clicks="{5}" />` is reported by `kscript check`. The block after the list is optional. It runs each time the page builds the component, before saved state is restored, so keep it free of writes. See [constructors](types.md#constructors) for the rules shared with every type.
+
+### Types that belong to a component
+
+A type, enum, error or model that only one component uses can live inside that component's block. The component file then holds everything it needs.
+
+````kscript
+import KScript.Web
+import KScript.Data
+
+type CommentThread extends Component {
+  model Comment(timestamps) {
+    post_id: int
+    body: string(min: 1, max: 2000)
+  }
+
+  type Draft {
+    body: string = ''
+  }
+
+  enum Order { newest, oldest }
+
+  construct({ post_id: int, order: Order = 'newest' })
+
+  draft: Draft = Draft({ })
+
+  fn add() {
+    Comment->create(post_id: $post_id, body: $draft.body)
+    draft = Draft({ })
+  }
+
+  fn render() {
+    return ```html
+    <section>
+      <p>{Comment->where(post_id: $post_id)->count()} comments, {$order} first</p>
+      <input @bind('draft.body')>
+      <button type="button" @on-click($add)>Add</button>
+    </section>
+    ```
+  }
+}
+````
+
+A declaration inside a component belongs to that file. The component's fields and methods use it by name, and no other file can, even one that imports the component. When a second file needs it, move it to its own file (`types/draft.kscript`, `models/comment.kscript`) and import it in both. `kscript check` says so when a file names a type that is inside a component it imports.
+
+Only a component can hold declarations this way. A nested declaration doesn't see the component's fields, and it doesn't count as a second type in the file, so the [one type per file](projects.md#where-files-go-the-recommended-layout) rule still holds. `kscript db diff` and `kscript db status` read the models inside components along with the models folder.
+
+## Components in windows and the terminal
+
+A component isn't tied to pages. Every place it can be drawn has its own `render`, and the content of each shows which one it is.
+
+| What `render` holds | Where it draws |
+| --- | --- |
+| A returned `html` block | A page |
+| [KScript.UI](desktop.md) elements such as `Column`, `Text` and `Button` | A window |
+| `echo` or [KScript.Terminal](language.md#terminal-output) elements | The terminal |
+| [KScript.Document](documents.md) elements such as `Section` and `Paragraph`, or a returned `md` or `latex` block | [A document](#components-in-documents) |
+
+A component has at most one `render` for each place. The fields, `construct` block and methods are shared by all of them.
+
+```kscript
+import KScript.UI
+
+type NoteCard extends Component {
+  construct({ title: string, body: string = '' })
+
+  open: bool
+
+  fn render() {
+    Box(padding: 8, border: "#334155") {
+      Row(gap: 8) {
+        Text(weight: bold) "{$title}"
+        Button(on_click: $open) "{ $open ? 'Hide' : 'Show' }"
+      }
+      if $open {
+        Text(wrap) "{$body}"
+        slot
+      }
+    }
+  }
+
+  fn render(terminal) {
+    echo "* {$title}: {$body}"
+    slot
+  }
+}
+```
+
+A script draws a component by writing it as a statement, with its inputs as arguments. Import the component's file first.
+
+```kscript
+import KScript.UI
+import "components/note-card.kscript"
+
+Window(title: "Notes", width: 420, height: 320) {
+  notes = [
+    { title: 'Milk', body: 'Two pints' },
+    { title: 'Eggs', body: 'Six, free range' },
+  ]
+
+  for note in $notes {
+    NoteCard(title: $note.title, body: $note.body, id: $note.title) {
+      Text(color: "#94a3b8") "From the shopping list"
+    }
+  }
+}
+```
+
+- Inside `Window`, the component draws with its window `render`. Written on its own in a script, it draws with its terminal `render`. `kscript check` reports a component drawn where it has no `render`.
+- `slot` in a `render` draws what the caller wrote inside the component.
+- In a window each component keeps its own state between draws, so `$open` above belongs to one card. What the caller passes follows the caller on every draw, and every other field stays as the component left it.
+- Components drawn in a loop are told apart by their turn. Pass `id:` to keep a component's state with its item when the list changes order or loses items.
+- A component that is no longer drawn is gone. It starts fresh if it is drawn again.
+- When a `render` holds only other components, `if`, `for` or `slot`, its content doesn't show where it draws. Name the place: `fn render(window)`, `fn render(terminal)` or `fn render(document)`.
+
+In XML the place is the `surface` attribute, `<fn name="render" surface="terminal">`, and a component is an element named after its type, `<NoteCard title="Milk" />`.
+
+## Components in documents
+
+A component can be a part of a [document](documents.md): a finding, a method, a signature block. Its `render` holds document elements, or returns the part written in Markdown or LaTeX.
+
+````kscript
+import KScript.Document
+
+type Panel extends Component {
+  construct({ heading: string })
+
+  fn render() {
+    Section(title: "{$heading}") {
+      slot
+    }
+  }
+}
+
+type Finding extends Component {
+  construct({ title: string, count: int })
+
+  fn render() => ```md
+    ## {$title}
+
+    We saw **{$count}** of them in \( 10^{3} \) generations.
+    ```
+}
+
+type Method extends Component {
+  construct({ name: string, share: string })
+
+  fn render() => ```latex
+    \subsection{Method: {$name}}
+    We used \textbf{$name} on {$share} of the runs.
+    \begin{equation}
+      N(t) = N_0 e^{rt}
+    \end{equation}
+    ```
+}
+
+Document(title: "Gliders", into: report) {
+  Panel(heading: "Results") {
+    Finding(title: "Gliders", count: 3)
+    Method(name: "counting", share: "50%")
+  }
+}
+
+echo $report->markdown()
+````
+
+- Inside `Document`, a component draws with its document `render`. What it adds goes where it is written, so a heading in a part that sits inside a `Section` becomes a subsection.
+- `slot` works in a `render` that holds elements. A block is all text, so it has nowhere to put the caller's content.
+- A document is drawn once, so a component in it keeps no state between draws.
+- In a `md` block, `{ }` holds a value, as it does in a `Paragraph`. Maths is written `\( x^{2} \)` and `\[ x^{2} \]`, and keeps its braces.
+- In a `latex` block the braces are LaTeX's. A group that holds only a value, such as `{$name}` or `{@today()}`, is filled in and keeps its braces, so `\textbf{$name}` is the name in bold. The value is escaped, so a `%`, `&` or `_` in it is shown as text.
+- A `latex` block reads the LaTeX a part is usually written in:
+
+| LaTeX | What it reads |
+| --- | --- |
+| Structure | `\section`, `\subsection`, `\subsubsection` (with `*` for no number) and `\label` |
+| Text | `\textbf`, `\textit`, `\emph`, `\texttt`, `\underline`, `\href`, `\url`, `\footnote`, `\cite`, `\ref`, `\\`, `~`, ` `` ` and `''`, `--` and `---`, and `%` comments |
+| Maths | `$...$`, `\( \)`, `\[ \]`, `$$ $$`, and the `equation`, `equation*`, `displaymath`, `align` and `align*` environments |
+| Blocks | `itemize`, `enumerate`, `quote`, `quotation`, `center`, `verbatim` and `figure` (with `\includegraphics`, `\caption` and `\label`) |
+| Layout | `\newpage`, `\clearpage`, `\tableofcontents`, `\hrule`, `\smallskip`, `\medskip`, `\bigskip` and `\par` |
+
+A command it doesn't read is an error that names it, so nothing is left out without a word. Write that part with document elements instead.
+
 ## Actions and browser events
 
-Handlers contain KScript statements and can call imported functions. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
+Handlers contain KScript statements and can call imported functions. A handler can also be a single value. A bool field flips, so `@on-click($open)` is the same as `@on-click(open = not $open)`. A function or one of the component's methods is called, so `@on-click($save)` runs `fn save()`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
 
 | Interaction | Attributes |
 | --- | --- |

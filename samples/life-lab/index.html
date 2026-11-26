@@ -41,7 +41,7 @@
 
           <section class="controls">
             <div class="group">
-              <button class="primary" on-click="playing = not $playing">{ $playing ? 'Pause' : 'Play' }</button>
+              <button class="primary" on-click="$playing">{ $playing ? 'Pause' : 'Play' }</button>
               <button on-click="world = @advance($world, generations: 1); playing = false">Step</button>
               <button on-click="world = @advance($world, generations: 10)">+10</button>
               <button on-click="world = @advance($world, generations: 50)">+50</button>

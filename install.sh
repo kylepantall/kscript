@@ -81,7 +81,7 @@ if download "${url%/*}/SHA256SUMS" "$tmp/SHA256SUMS" 2>/dev/null; then
     fail "the checksum of $asset is wrong: SHA256SUMS lists $expected but the download is $actual. It may be damaged or not the released file. Nothing was installed"
   fi
 else
-  say "This release has no SHA256SUMS file (releases before 0.10 don't), so the download wasn't checked."
+  say "This release has no SHA256SUMS file (releases before 0.26 don't), so the download wasn't checked."
 fi
 mkdir -p "$BIN_DIR"
 package_dir="$(mktemp -d "$BIN_DIR/.kscript-install.XXXXXX")"

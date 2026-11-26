@@ -58,7 +58,7 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
             }
             Write-Host "Checked $asset against the release's SHA256SUMS."
         } else {
-            Write-Host "This release has no SHA256SUMS file (releases before 0.10 don't), so the download wasn't checked."
+            Write-Host "This release has no SHA256SUMS file (releases before 0.26 don't), so the download wasn't checked."
         }
         $pkg = Join-Path $tmp 'pkg'
         Expand-Archive -Path $zip -DestinationPath $pkg -Force

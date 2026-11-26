@@ -731,6 +731,8 @@ namespace KScript.Language.Analysis
                 CheckTemplateInputs(e, ResolvePath(e.GetAttributeValue("path")));
             if (Kind != DocumentKind.Script && info.Name == "prop" && e.Parent != null)
                 Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, "Declare props at the top level of the layout or component.");
+            if (Kind == DocumentKind.Script && info.Name == ComponentScript.SlotElement && !e.Ancestors().Any(ComponentScript.IsRender))
+                Report(e.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, Wording.Prose(ComponentScript.SlotOutsideRender));
             ReportDeprecatedElement(e, info);
             CheckPlacement(e, info, previous);
             if (info.Name == "guard" && !GuardLeaves(e))
@@ -959,6 +961,11 @@ namespace KScript.Language.Analysis
 
             if (!markupMode)
             {
+                if (ComponentDrawnBy(e) is MarkupElement drawn)
+                {
+                    WalkComponentElement(e, drawn, scope, inner);
+                    return;
+                }
                 ReportUnknownElement(e);
 
                 // Keep going inside, but don't pile up knock-on errors: a retired <def id="x"> still declares $x,
@@ -1267,6 +1274,11 @@ namespace KScript.Language.Analysis
                     return;
                 }
                 if (ComponentScript.StyleBlock(fn, attr.Value) is { Error: null }) return;
+                if (ComponentScript.SourceBlock(fn, attr.Value) is { Error: null } part)
+                {
+                    AnalyzeComponentSource(part, attr, scope);
+                    return;
+                }
             }
             switch (a.Kind)
             {
@@ -1584,6 +1596,29 @@ namespace KScript.Language.Analysis
                 }
                 else
                 {
+                    if (attr != null && requireEffect && region.Parse.Nodes.Count == 1 && node is VariableNode toggled)
+                    {
+                        // A handler that is one value: on_click: $open flips a bool, on_click: $save calls a function or method.
+                        TextSpan name = VariableNameSpan(toggled, region);
+                        Symbol variable = scope.Lookup(toggled.Name, name.Start);
+                        Symbol called = scope.Lookup(toggled.Name, int.MaxValue, includeMethods: true);
+                        if (called?.Kind != SymbolKind.Function && scope.Lookup("this", name.Start)?.Shape is TypeShape self)
+                            self.Methods.TryGetValue(toggled.Name, out called);
+                        if ((variable == null || variable.Kind == SymbolKind.Function) && called?.Kind == SymbolKind.Function)
+                        {
+                            result.References.Add(new SymbolReference(called, name, false, false));
+                            ReportIfDeprecated(called, name);
+                            continue;
+                        }
+                        AnalyzeExpr(node, region, scope, ExprContext.Value);
+                        string type = Infer(node, region).Type;
+                        if (type is KType.Bool)
+                            ReferenceVariable(toggled.Name, name, scope, isWrite: true, mustBeMutable: true, offset: name.Start);
+                        else if (variable != null && type is not (KType.Fn or KType.Any))
+                            Report(name, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
+                                $"A handler that is one value flips a bool or calls a function, and ${toggled.Name} is {type}. Write statements instead, such as {toggled.Name} = ….");
+                        continue;
+                    }
                     if (requireEffect)
                     {
                         AnalyzeExpr(node, region, scope, ExprContext.Value);
@@ -1704,6 +1739,19 @@ namespace KScript.Language.Analysis
             inComponentHtml = true;
             try { WalkChildren(fragment.Children, scope, markupMode: true); }
             finally { inComponentHtml = false; }
+        }
+
+        /// <summary>Checks the values in the Markdown or LaTeX a component's render returns for a document.</summary>
+        private void AnalyzeComponentSource(StringBlock block, MarkupAttribute attribute, Scope scope)
+        {
+            DecodedText text = ComponentScript.BlockText(block, attribute.Value);
+            if (StringBlock.ValueType(block.Tag) != KType.Latex)
+            {
+                AnalyzeTemplate(text, scope, attribute.Owner, attribute, allowBare: false, TextLiterals.Maths);
+                return;
+            }
+            foreach ((_, _, DecodedText value) in ComponentScript.LatexValues(text))
+                AnalyzeExpressionRegion(value, RegionKind.Expression, scope, attribute.Owner, attribute);
         }
 
         private void AnalyzeFn(MarkupElement e, Scope outer, bool markupMode)

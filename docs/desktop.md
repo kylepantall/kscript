@@ -20,10 +20,12 @@ Window(title: "Counter", width: 320, height: 200) {
 
 - `import KScript.UI` goes at the top of the file with the other imports. Variables and `fn` functions directly inside `Window` run once and hold the window's state.
 - Everything else is the layout. After every `on_click`, `on_change`, `on_enter` or `on_tick`, the layout is drawn again from the variables. `if`, `for` and `{ }` work as they do anywhere else. Controls stay the same object from one draw to the next, so typing and focus aren't lost.
+- A handler holds statements, or a single value: `on_click: $open` flips a bool, and `on_click: $save` calls the function `save`.
 - `bind: name` ties a `TextBox`, `CheckBox`, `Select` or `Slider` to a state variable. `$event.value` holds the new value in `on_change`.
 - `Timer(every: 100ms, when: $playing, on_tick: …)` runs on a timer while `when` is true.
 - If a handler fails, the error is shown at the top of the window and the window carries on.
 - `@close_window()` in a handler closes the window.
+- A [component](components.md#components-in-windows-and-the-terminal) with a window `render` is drawn by writing it as a statement: `NoteCard(title: "Milk")`. Each one keeps its own state.
 - `Window` can also go in the middle of a script. The script waits while the window is open, then carries on with the window's changes.
 
 | Element | What it is |
