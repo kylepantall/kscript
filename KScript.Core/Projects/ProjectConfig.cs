@@ -539,6 +539,7 @@ namespace KScript.Projects
             ["errors"] = "errors",
             ["storage"] = "lib",
             ["jobs"] = "jobs",
+            ["policies"] = "policies",
             ["windows"] = ".",
             ["documents"] = "documents",
             ["config"] = "config",

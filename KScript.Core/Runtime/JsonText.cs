@@ -63,13 +63,21 @@ namespace KScript.Runtime
                 case Dictionary<string, object> map:
                 {
                     string inner = indent + "  ";
+                    // A record's hidden and private fields are left out, as they are from its compact JSON.
+                    HashSet<string> unlisted = (map as Record)?.Type.Unlisted;
+                    var shown = unlisted == null ? map.ToList() : map.Where(kv => !unlisted.Contains(kv.Key)).ToList();
+                    if (shown.Count == 0)
+                    {
+                        sb.Append("{}");
+                        break;
+                    }
                     sb.Append("{\n");
                     int n = 0;
-                    foreach (KeyValuePair<string, object> kv in map)
+                    foreach (KeyValuePair<string, object> kv in shown)
                     {
                         sb.Append(inner).Append(Values.ToJson(kv.Key)).Append(": ");
                         Write(sb, kv.Value, inner, depth + 1);
-                        sb.Append(++n < map.Count ? ",\n" : "\n");
+                        sb.Append(++n < shown.Count ? ",\n" : "\n");
                     }
                     sb.Append(indent).Append('}');
                     break;

@@ -328,6 +328,7 @@ namespace KScript.Runtime
                         if (member.NullSafe) return null;
                         throw Fail(member, ctx, $"Can't read .{member.Name} of null{Where(member.Target, ctx)}. Use ?. if it may be missing: {SourceOf(member.Target, ctx)}?.{member.Name}", "Null");
                     }
+                    GuardPrivate(target, member.Name, method: false, scope, member, ctx);
                     return GetMember(target, member.Name, member, ctx);
                 }
 
@@ -335,6 +336,7 @@ namespace KScript.Runtime
                 {
                     object target = Evaluate(index.Target, scope, ctx);
                     object key = Evaluate(index.Index, scope, ctx);
+                    if (key is string field) GuardPrivate(target, field, method: false, scope, index, ctx);
                     return GetIndex(target, key, index, ctx);
                 }
 
@@ -662,6 +664,17 @@ namespace KScript.Runtime
         /// ($maybe ?? 'default', $user.address.city ?? '-'). A call in the chain runs as usual, so an error
         /// inside the function it calls is still reported.
         /// </summary>
+        /// <summary>
+        /// Refuses a private field or method of a record to code outside the type that declares it. Inside one of
+        /// the type's own methods <c>$this</c> is a record of that type, and that is how the caller is known.
+        /// </summary>
+        internal void GuardPrivate(object target, string name, bool method, Scope scope, ExprNode node, EvalContext ctx)
+        {
+            if (target is not Record record || record.Type.PrivateOwner(name, method) is not RecordType owner) return;
+            if (scope.TryGet("this", out object self) && self is Record inside && inside.Type.IsA(owner)) return;
+            throw Fail(node, ctx, TypeBody.PrivateMessage(name, owner.Name), "Context");
+        }
+
         private object EvaluateOrNull(ExprNode node, Scope scope, EvalContext ctx)
         {
             ExprNode root = node;
@@ -674,6 +687,7 @@ namespace KScript.Runtime
                     {
                         object target = EvaluateOrNull(member.Target, scope, ctx);
                         if (target == null) return null;
+                        GuardPrivate(target, member.Name, method: false, scope, member, ctx);
                         try
                         {
                             return GetMember(target, member.Name, member, ctx);
@@ -907,6 +921,7 @@ namespace KScript.Runtime
                     object container = Values.Unwrap(Evaluate(AssignedThrough(member.Target), scope, ctx));
                     if (container is not Dictionary<string, object> map)
                         throw Fail(member, ctx, $"Only map fields can be set, but {ReadSourceOf(member.Target, ctx)} is {Values.Describe(container)}.", "Type");
+                    GuardPrivate(map, member.Name, method: false, scope, member, ctx);
                     if (node.Operator != "=") value = Combine(map.TryGetValue(member.Name, out object cur) ? cur : null, node.Operator, value, node, ctx);
                     SetKey(map, member.Name, value, member, ctx);
                     return;
@@ -920,6 +935,7 @@ namespace KScript.Runtime
                         case Dictionary<string, object> map:
                         {
                             string k = Values.ToStr(key);
+                            GuardPrivate(map, k, method: false, scope, index, ctx);
                             if (node.Operator != "=") value = Combine(map.TryGetValue(k, out object cur) ? cur : null, node.Operator, value, node, ctx);
                             SetKey(map, k, value, index, ctx);
                             return;
@@ -1294,6 +1310,7 @@ namespace KScript.Runtime
             // A <type>'s own methods: fn inside the type, with the record's fields (and $this) as variables.
             if (target is Record record && record.Type.OwnMethods.TryGetValue(name, out MarkupElement methodElement))
             {
+                GuardPrivate(record, name, method: true, scope, node, ctx);
                 RecordType methodOwner = record.Type.MethodOwner(name, methodElement);
                 Scope methodScope = CatchClauses.BindReceiver(methodOwner.Closure, record, recordFields: true);
                 var fn = DeclareFunction(methodElement, methodScope, methodOwner.Module, record.Type.Catches, record);

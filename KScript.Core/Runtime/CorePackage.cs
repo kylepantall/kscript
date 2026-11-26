@@ -149,7 +149,8 @@ namespace KScript.Runtime
                 new A("pattern", K.Text, "A regular expression the value's text must match."),
                 new A("one_of", K.Text, "The only values allowed: `gb, ie` or `['gb', 'ie']`."),
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names."),
-                new A("description", K.Text, "What the field holds, shown on hover and completion."))
+                new A("description", K.Text, "What the field holds, shown on hover and completion."),
+                new A(TypeBody.PrivateWord, K.Bool, "true keeps the field to the type's own methods: other code can't read, set or pass it. In a .kscript file, `private count: int`."))
             {
                 MustBeInside = new[] { "type", "error", "model", "job", "construct" },
             }, run => throw run.Error($"<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
@@ -315,6 +316,7 @@ namespace KScript.Runtime
                 new A("signature", K.Text, "Declares a method signature without an implementation."),
                 new A("optional", K.Text, "The method may be omitted by a type implementing this signature."),
                 new A("surface", K.Enum, "For a component's render: where it draws, when its content doesn't show it.", false, ComponentScript.Surfaces.ToArray()),
+                new A(TypeBody.PrivateWord, K.Bool, "Inside a <type> or <model>: true keeps the method to the type's own methods. In a .kscript file, `private fn tally()`."),
                 new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
@@ -871,6 +873,9 @@ namespace KScript.Runtime
             p.Command("min", "values...", "The smallest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: true));
             p.Command("max", "values...", "The largest of the arguments (or of one list).", KType.Any, c => MinMax(c, min: false));
             p.Command("char_of", "code: number", "The character with this character code: @char_of(65) is A.", KType.String, c => char.ConvertFromUtf32(c.Int(0)));
+            p.Command("inject", "model?, from?, can?",
+                "The record of a model that the route being answered holds. As the default of an input, post: Post = @inject(), it reads the model from the input's type and takes the route's {post}; from: names another route parameter. On its own it is given the model: @inject(Post). can: names an ability the model's policy must allow, @inject(can: read), and answers 403 when it doesn't. What a caller passes always wins over the default.",
+                KType.Any, Injection.Inject, "<import package=\"KScript.Data\" /><model name=\"Post\"><field name=\"title\" type=\"string\" /></model><type name=\"PostCard\"><construct><field name=\"post\" type=\"Post\" default=\"@inject()\" /></construct></type>").Info.KeepsBareWords = true;
             p.Command("env", "name, default?", "An environment variable, or default when it isn't set.", KType.String, c =>
             {
                 string name = c.Str(0);

@@ -100,7 +100,7 @@
       }
     },
     "fn": {
-      "match": "\\b(?:(override)\\s+)?(fn)\\s+([A-Za-z_][\\w-]*)",
+      "match": "\\b(?:(override|private)\\s+)?(fn)\\s+([A-Za-z_][\\w-]*)",
       "captures": {
         "1": {
           "name": "storage.modifier.kscript"
@@ -133,6 +133,14 @@
     },
     "declaration": {
       "patterns": [
+        {
+          "match": "^\\s*(private)(?=\\s+[A-Za-z_])",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.kscript"
+            }
+          }
+        },
         {
           "match": "\\b(const)\\s+([A-Za-z_][\\w-]*)",
           "captures": {
@@ -440,6 +448,20 @@
               "include": "#typeName"
             }
           ]
+        },
+        {
+          "match": "\\b(policy)[ \\t]+(for)[ \\t]+([A-Za-z_]\\w*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.kscript"
+            },
+            "2": {
+              "name": "keyword.other.kscript"
+            },
+            "3": {
+              "name": "entity.name.type.kscript"
+            }
+          }
         },
         {
           "match": "\\b(type|model|enum|extend|error|job)\\s+([A-Za-z_]\\w*)",

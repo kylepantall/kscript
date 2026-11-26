@@ -422,6 +422,40 @@ public sealed class MakeGeneratorTests : IDisposable
     }
 
     [Fact]
+    public void PoliciesGoInThePoliciesFolderAndAnswerForTheirModel()
+    {
+        string app = Project();
+        Assert.Equal(0, Make(app, "model", "BlogPost").Code);
+        var (code, output, err) = Make(app, "policy", "BlogPost");
+        Assert.True(code == 0, err);
+        Assert.Contains("Created policies/blog-post.kscript", output);
+        Assert.Contains("@can(update, $blog_post)", output);
+        Assert.Equal("BlogPost", Scaffolder.Example("policy"));
+        string made = Read(app, "policies/blog-post.kscript");
+        Assert.StartsWith("import KScript.Auth\nimport \"../models/blog-post.kscript\"\n", made);
+        Assert.Contains("policy for BlogPost {", made);
+        Assert.Contains("  fn update(user: map?, blog_post: BlogPost) => $user != null\n", made);
+        File.WriteAllText(Path.Combine(app, "try.kscript"),
+            "import KScript.Auth\nimport \"models/blog-post.kscript\"\n\necho @can(create, BlogPost)\n@acting_as({ id: 1 })\necho @can(create, BlogPost)\n");
+        AssertNoErrors(app);
+        var o = new StringWriter { NewLine = "\n" };
+        new KScript.Runtime.Interpreter(KScript.Runtime.KScriptHost.ForText(o, string.Empty)).RunFile(Path.Combine(app, "try.kscript"));
+        Assert.Equal("false\ntrue\n", o.ToString());
+
+        // A User's policy is given the signed-in user, then the other one.
+        Assert.Equal(0, Make(app, "model", "User").Code);
+        Assert.Equal(0, Make(app, "policy", "User").Code);
+        Assert.Contains("  fn read(user: map?, other: User) => true\n", Read(app, "policies/user.kscript"));
+        AssertNoErrors(app);
+
+        string xml = Project("xml", "xml-app");
+        Assert.Equal(0, Make(xml, "model", "Post").Code);
+        Assert.Equal(0, Make(xml, "policy", "Post").Code);
+        Assert.Contains("<policy for=\"Post\"", Read(xml, "policies/post.ks.xml"));
+        AssertNoErrors(xml);
+    }
+
+    [Fact]
     public void GeneratedScriptsRun()
     {
         string app = Project();

@@ -132,6 +132,9 @@ namespace KScript.Syntax
         /// <summary>A script statement can let a known error escape its outermost calling code.</summary>
         public const string UnhandledError = "KS5016";
 
+        /// <summary>@inject() takes a record of a model that has a policy without asking the policy.</summary>
+        public const string UncheckedInjection = "KS5017";
+
         /// <summary>An else or elif in a script, where an early return, continue or break reads better.</summary>
         public const string PreferEarlyExit = "KS6001";
 

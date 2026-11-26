@@ -180,6 +180,77 @@ type NoteCard extends Component {
 
 `<note-card title="Shopping" />` works, and `<note-card clicks="{5}" />` is reported by `kscript check`. The block after the list is optional. It runs each time the page builds the component, before saved state is restored, so keep it free of writes. See [constructors](types.md#constructors) for the rules shared with every type.
 
+Mark a field or method `private` to keep it to the component: `private clicks: int`, `private fn tally()`. A page can't pass it, and no other code can read or call it. See [private fields and methods](types.md#private-fields-and-methods).
+
+### Take the route's record with @inject()
+
+A component that shows a model's record can take it from the route, so the page doesn't pass it along. Give the input `@inject()` as its default:
+
+````kscript
+// _components/post-card.kscript
+import KScript.Web
+import "../models/post.kscript"
+
+type PostCard extends Component {
+  construct({ post: Post = @inject() })
+
+  fn render() => ```html
+    <h2>{$post.title}</h2>
+    ```
+}
+````
+
+```kscript
+// routes.kscript
+import KScript.Http
+
+Routes {
+  Get(path: /posts/{post}, view: 'posts/show')
+}
+```
+
+```html
+<!-- views/posts/show.html -->
+<post-card />
+```
+
+A request for `/posts/42` finds post 42 once, or answers `404`, and the component gets that record. The same works when the route calls a controller that takes the post, `fn show(post: Post) => @view('posts/show')`: the controller and the component share the one record.
+
+| What the page writes | What the component gets |
+| --- | --- |
+| `<post-card post="{$post}" />` | That record. What a page passes always wins. |
+| `<post-card />` on `/posts/{post}` | The record the route's `{post}` names. |
+| `<post-card />` on a route with one `Post` under another name | That record, for example `fn show(article: Post)`. |
+| `<post-card />` anywhere else | An error that names the missing input. |
+
+- `@inject()` reads the model from the input's type and the route parameter from the input's name.
+- `@inject(from: article)` takes the route's `{article}` when the path names it differently.
+- A route that holds only a number, such as `/posts/{id}` with `fn show(id: int)`, has no `Post` to give. Name the parameter for the model, or pass the record: `<post-card post="{Post->find($id)}" />`. A key is never turned into a record for you, so every query is written where it runs.
+- `@inject(can: read)` asks the model's [policy](auth.md#policies) as it takes the record, and answers `403` when the user may not read it. Any ability works: `@inject(can: update)`.
+- On its own, `@inject(Post)` gives the route's post anywhere a route is being answered, such as a page or a function a controller calls.
+- A live component finds the record again on each update, so the browser is never sent the record.
+- In a window, a document or the terminal there is no route, so the caller passes the record.
+
+When the model has a policy, ask it as the record is taken:
+
+````kscript
+// _components/post-card.kscript
+import KScript.Web
+import "../models/post.kscript"
+
+type PostCard extends Component {
+  construct({ post: Post = @inject(can: read) })
+
+  fn render() => ```html
+    <h2>{$post.title}</h2>
+    ```
+}
+````
+
+An `@inject()` that takes a model with a policy and asks nothing is a warning in the editor ([KS5017](errors.md#ks5017)).
+
+`@inject()` works as the default of an input in any type, not only a component. See [constructors](types.md#constructors).
+
 ### Types that belong to a component
 
 A type, enum, error or model that only one component uses can live inside that component's block. The component file then holds everything it needs.

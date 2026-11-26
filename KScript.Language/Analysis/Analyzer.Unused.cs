@@ -333,7 +333,8 @@ namespace KScript.Language.Analysis
             foreach ((MarkupElement fn, List<Symbol> parameters) in functionParameters)
             {
                 // An unused function is reported once, not once more for each of its parameters.
-                if (fn.GetAttribute("signature") != null || unusedFunctions.Any(f => f.DeclaringElement == fn))
+                // A policy's abilities are always handed the user and the record, whichever of them one reads.
+                if (fn.GetAttribute("signature") != null || fn.Parent?.Name == "policy" || unusedFunctions.Any(f => f.DeclaringElement == fn))
                 {
                     continue;
                 }

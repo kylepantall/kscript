@@ -290,6 +290,7 @@
         "models": { "type": "string", "default": "models", "description": "Database models (kscript make model)." },
         "storage": { "type": "string", "default": "lib", "description": "JSON file stores (kscript make storage)." },
         "jobs": { "type": "string", "default": "jobs", "description": "Jobs (kscript make job)." },
+        "policies": { "type": "string", "default": "policies", "description": "Policies, one per model, that @can and @authorize ask (kscript make policy)." },
         "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
         "documents": { "type": "string", "default": "documents", "description": "Document scripts that write PDF and Word files (kscript make document)." },
         "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },

@@ -278,6 +278,13 @@ namespace KScript.Http
         public Module Module { get; init; }
         public Scope Scope { get; init; }
 
+        /// <summary>The ability the model's policy must allow before the controller runs (<c>can: update</c>), or null.</summary>
+        public string Can { get; init; }
+
+        /// <summary>For a Resource with a model: the model the ability is asked about, and the path parameter that holds its key.</summary>
+        public RecordType CanModel { get; init; }
+        public string CanParameter { get; init; }
+
         /// <summary>True for routes from an API route file: errors are JSON.</summary>
         public bool Api { get; init; }
 

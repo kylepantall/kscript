@@ -734,7 +734,18 @@ namespace KScript.Syntax.Markup
                             WriteBlock("extend " + extended.Trim(), e, indent, chained);
                             return;
                         }
-                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional", "surface") && Attr("name") != null
+                    case "policy" when Only("for", "description") && Attr("for") is string model && IsName(model.Trim())
+                        && e.Children.All(n => n is MarkupComment || (n is MarkupText t && t.IsWhitespace) || n is MarkupElement { Name: "fn" }):
+                        {
+                            if (!chained)
+                            {
+                                WriteDoc(e, indent);
+                            }
+                            WriteBlock("policy for " + model.Trim(), e, indent, chained);
+                            return;
+                        }
+                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional", "surface", TypeBody.PrivateWord) && Attr("name") != null
+                        && (Attr(TypeBody.PrivateWord) == null || (TypeBody.IsPrivate(e) && e.Parent?.Name is "type" or "model"))
                         && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override"))))
                         && (Attr("surface") == null || (Attr("params") == null && ComponentScript.IsRender(e) && ComponentScript.Surfaces.Contains(Attr("surface").Trim()))):
                         {
@@ -742,7 +753,7 @@ namespace KScript.Syntax.Markup
                             {
                                 WriteDoc(e, indent);
                             }
-                            string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim()
+                            string header = (TypeBody.IsPrivate(e) ? "private " : string.Empty) + (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim()
                                 + (Attr("optional") != null ? "?" : "") + "(" + (Attr("surface")?.Trim() ?? Attr("params")?.Trim() ?? string.Empty) + ")";
                             if (Attr("returns") is string returns) header += ": " + returns.Trim();
                             if (Attr("signature") != null)
@@ -1105,7 +1116,11 @@ namespace KScript.Syntax.Markup
                 {
                     return false;
                 }
-                if (f.Attributes.Any(a => a.Name is not ("name" or "type" or "from" or "default" or "optional" or "value" or "description")))
+                if (f.Attributes.Any(a => a.Name is not ("name" or "type" or "from" or "default" or "optional" or "value" or "description" or TypeBody.PrivateWord)))
+                {
+                    return false;
+                }
+                if (f.GetAttribute(TypeBody.PrivateWord) != null && !(TypeBody.IsPrivate(f) && f.Parent?.Name is "type" or "model"))
                 {
                     return false;
                 }
@@ -1128,7 +1143,7 @@ namespace KScript.Syntax.Markup
                 {
                     name += "?";
                 }
-                var line = new StringBuilder(name);
+                var line = new StringBuilder(TypeBody.IsPrivate(f) ? "private " + name : name);
                 if (Attr("type") is string type)
                 {
                     line.Append(": ").Append(type);

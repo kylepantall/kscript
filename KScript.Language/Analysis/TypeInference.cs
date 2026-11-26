@@ -47,6 +47,12 @@ namespace KScript.Language.Analysis
             {
                 return json;
             }
+            if (command.Name == KScript.Runtime.Injection.Command && c.Arguments.FirstOrDefault(a => a.Name == null || a.Name == "model")?.Value is ExprNode injected
+                && Infer(injected, region) is { Kind: KType.Model, Instance: TypeShape record })
+            {
+                // @inject(Post) is a Post.
+                return record;
+            }
             if (command.Package == "KScript.Data" && command.Name == "db")
             {
                 // @db('users') is a query on the table; @db() and @db(connection: reports) are the database.

@@ -246,6 +246,8 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 **An argument takes one of a fixed set of words, and this isn't one of them.** The message lists them.
 
+The same code reports an ability a [policy](auth.md#policies) doesn't have, as in `@can(publsh, $post)`.
+
 ## KS5010
 
 **A field the value doesn't have.** The records of a `type` only have the fields it declares.
@@ -259,6 +261,8 @@ echo $person.email ?? '-'    // fine: not close to a field, so it may be optiona
 ```
 
 Text and numbers have no fields at all, so `$name.upper` stops the script. Call the method instead: `$name->upper()`.
+
+The same code reports a [private](types.md#private-fields-and-methods) field or method used outside its type. Use one of the type's other methods, or take `private` off the member.
 
 ## KS5011
 
@@ -287,6 +291,28 @@ A built-in type that was renamed is an error, with a fix that writes the new nam
 **A known error can escape the script.** The checker reports the error types at the top-level statement that can raise them. A helper may pass an error to its caller. Add a matching `catch` at the level that can handle it. A catch on a function, method or type propagates the error when it falls through or returns `null`. Ordinary `try` blocks can handle an error and continue.
 
 The checker follows resolved function and method calls and their documented `@throws` types. Calls through dynamically selected callbacks may raise additional errors. Test bodies run under the test runner, and `expect_error` handles errors while checking the expected outcome.
+
+## KS5017
+
+**An `@inject()` takes a record of a model that has a [policy](auth.md#policies), and nothing asks the policy.** The record reaches the component or type whoever is asking. Write the ability to ask, or check where the record is used:
+
+```kscript wrong KS5017
+import KScript.Data
+import KScript.Auth
+
+model Post {
+  title: string
+  published: bool = false
+}
+
+policy for Post {
+  fn read(user: map?, post: Post) => $post.published or $user != null
+}
+
+fn heading() => @inject(Post).title    // warning: Post has a policy
+```
+
+`@inject(Post, can: read)` asks the policy as the record is taken, and answers `403` when it says no. As an input's default it is `construct({ post: Post = @inject(can: read) })`.
 
 ## Style
 

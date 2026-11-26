@@ -136,6 +136,7 @@ namespace KScript.Http
                 new A("except", K.Text, "All actions but these: [destroy].") { NameList = true },
                 new A("name", K.Text, "The route name prefix (people gives people.index, people.show...). The default is the controller's name."),
                 new A("param", K.Text, "The name of the path parameter, id by default."),
+                new A("model", K.Text, "The model the resource is about. Each action then asks the model's policy first: show asks read, store asks create, update asks update and destroy asks delete. index isn't asked, since it has no one record.") { IsName = true },
                 Middleware("Middleware for these routes, comma separated."))
             {
                 Context = ElementContext.Script,
@@ -188,6 +189,7 @@ namespace KScript.Http
                 }, "<a href=\"{ @route('people.show', id: $p.id) }\">{ $p.name }</a>");
 
             RouteCatalog.Register(p);
+            Injection.AddSource(RequestContext.Inject);
 
             foreach (var f in HttpResponse.Fields)
                 p.Field(KType.HttpResponse, f.Name, f.Type, f.Description);
@@ -210,6 +212,7 @@ namespace KScript.Http
             new A("label_key", K.Text, "A translation key for the route's display label."),
             new A("data", K.Expression, "Optional route metadata made from a declared record type.") { RequiresDeclaredRecord = true },
             Middleware("Middleware for this route, comma separated."),
+            new A("can", K.Text, "An ability the model's policy must allow before the controller runs: can: update. It is asked about the record the controller's typed path parameter names, fn update(post: Post). A no answers 403, and a guest the ability turns away is sent to sign in (401 for an API).") { IsName = true },
             new A("where", K.Text, "Rules for the parameters: where: { id: int, slug: slug } (XML: where=\"id: int, slug: slug\"). Rules: number, int, alpha, alnum, slug, uuid or a regular expression.") { Literal = true },
             new A("etag", K.Bool, "true tags GET answers with an ETag (a hash of the body) and answers If-None-Match with 304 Not Modified when the client already has that version."),
             new A("cache", K.Text, "The Cache-Control header for GET answers: public, max-age=300, or just a number of seconds (300 is public for 5 minutes), private, no-store...") { Literal = true },
@@ -261,6 +264,9 @@ namespace KScript.Http
             AddCsrf(run, ctx, middleware);
             middleware.AddRange(ResolveMiddleware(run, run.Raw("middleware")));
             AddCaching(run, middleware);
+            string can = run.Raw("can")?.Trim();
+            if (can != null && to == null)
+                throw run.Error($"can: {can} needs a controller that takes the model, such as to: @posts.update with fn update(post: Post). In a view, use @inject(can: {can}) or @authorize().", "can", "Http");
             string name = run.Raw("name")?.Trim();
             object data = run.Has("data") ? Values.Unwrap(run.Eval("data")) : null;
             if (run.Has("data") && data is not Record { Type.Kind: null })
@@ -275,6 +281,7 @@ namespace KScript.Http
                 Middleware = middleware,
                 Controller = to != null ? ResolveFunction(run, to, "to") : null,
                 ControllerName = to,
+                Can = can,
                 View = view,
                 RedirectTo = redirect,
                 RedirectStatus = run.Has("status") ? (int)run.Number("status", 302) : 302,
@@ -337,6 +344,10 @@ namespace KScript.Http
                 throw run.Error($"'{action}' isn't a resource action. Actions: {string.Join(", ", ResourceActions.Select(r => r.Action))}.", only.Contains(action) ? "only" : "except", "Http");
 
             string param = run.Raw("param")?.Trim() ?? "id";
+            string modelName = run.Raw("model")?.Trim();
+            RecordType model = null;
+            if (modelName != null && (!run.Scope.TryGet(modelName, out object declared) || (model = declared as RecordType)?.Tag is not IRecordKind))
+                throw run.Error($"There is no model called {modelName} here. Import the file that declares it.", "model", "Http");
             string prefix = (run.Raw("name")?.Trim() ?? to) + ".";
             var middleware = ctx.MiddlewareFor(run).ToList();
             AddCsrf(run, ctx, middleware);
@@ -359,6 +370,9 @@ namespace KScript.Http
                     Middleware = middleware,
                     Controller = callable,
                     ControllerName = to + "." + action,
+                    Can = model != null ? ResourceAbilities.GetValueOrDefault(action) : null,
+                    CanModel = model,
+                    CanParameter = member ? param : null,
                     Module = run.Module,
                     Scope = run.Scope,
                     Api = ctx.Api,
@@ -368,6 +382,12 @@ namespace KScript.Http
             }
             return null;
         }
+
+        /// <summary>The ability each action of a Resource with a model asks its policy for.</summary>
+        internal static readonly IReadOnlyDictionary<string, string> ResourceAbilities = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["show"] = "read", ["store"] = "create", ["update"] = "update", ["destroy"] = "delete",
+        };
 
         private static HashSet<string> Names(string list) =>
             new HashSet<string>(NameList.Names(list), StringComparer.Ordinal);

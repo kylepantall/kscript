@@ -1,6 +1,9 @@
 using KScript.Metadata;
 using KScript.Runtime;
 
+using A = KScript.Metadata.AttributeInfo;
+using K = KScript.Metadata.AttributeKind;
+
 namespace KScript.Auth
 {
     /// <summary>
@@ -110,8 +113,38 @@ namespace KScript.Auth
                 "The request's session: values kept between requests by a cookie. $session->set('cart', $items), $session->get('cart'), and $session->flash('status', 'Saved') for a message after a redirect.",
                 (i, m) => new SessionValue(AuthRequest.Current(i.Host)));
 
+            p.Element(new ElementInfo("policy", "Says who may do what to a model's records. Each <fn> inside is an ability, named for what it allows (create, read, update, delete, or your own), that takes the user and then the record and returns true or false: `policy for Post { fn update(user: User, post: Post) => $user.id == $post.author_id }`. A user typed `User?` lets a guest reach the function with null; any other type turns a guest away first. `fn before(user)` runs ahead of every ability: true or false decides, null carries on. Keep one policy per model, in the project's policies folder, where @can finds it by the model's name.",
+                ContentKind.Statements,
+                new A("for", K.Text, "The model, or type, the policy is for.", true) { IsName = true },
+                new A("description", K.Text, "What the policy is for, shown on hover."))
+            {
+                Context = ElementContext.Script,
+                Example = "<import package=\"KScript.Data\" /><model name=\"Note\"><field name=\"owner_id\" type=\"int\" /></model>\n<policy for=\"Note\">\n  <fn name=\"read\" params=\"user, note: Note\" value=\"$user != null and $user.id == $note.owner_id\" />\n</policy>",
+            }, run =>
+            {
+                Policies.Declare(run);
+                return null;
+            });
+
+            Injection.Authorizer = Policies.Authorize;
+
+            p.Command("can", "ability, target", "True when the model's policy lets the user use the ability on a record: @can(update, $post). For an ability with no record yet, name the model: @can(create, Post). The user is the signed-in one, or null for a guest.",
+                KType.Bool, c => Policies.Ask(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"), out _) == Verdict.Allowed,
+                "<if test=\"@can(update, $post)\"><echo>Edit</echo></if>").Info.KeepsBareWords = true;
+            p.Command("cannot", "ability, target", "The opposite of @can: true when the policy doesn't let the user use the ability.",
+                KType.Bool, c => Policies.Ask(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"), out _) != Verdict.Allowed,
+                "<if test=\"@cannot(update, $post)\"><echo>Read only</echo></if>").Info.KeepsBareWords = true;
+            p.Command("authorize", "ability, target", "Stops unless the model's policy lets the user use the ability: a Forbidden error (403 in a route), or Unauthorized (401, or the sign-in page) for a guest the ability turns away. Returns the target, so it can be chained.",
+                KType.Any, c =>
+                {
+                    Policies.Authorize(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"));
+                    return c.Arg(1, "target");
+                }, "<do>@authorize(update, $post)</do>").Info.KeepsBareWords = true;
+            p.Command("acting_as", "user", "In a test, sets who @can, @authorize and @user() ask about until the test ends: @acting_as($editor). Pass null to act as a guest.",
+                KType.Any, c => Policies.ActAs(c.Host, Values.Unwrap(c.Arg(0, "user"))), "<do>@acting_as({ id: 1, role: 'editor' })</do>");
+
             p.Command("user", "", "The signed-in user (a map with id, email and the fields they registered with), or null for a guest. It comes from the session cookie, or from an API token (Authorization: Bearer).",
-                KType.Map, c => AuthRequest.Current(c.Host)?.User,
+                KType.Map, c => Policies.User(c.Host),
                 "<if test=\"@user() != null\"><echo>Hello { @user().email }</echo></if>");
             p.Command("has_passkeys", "", "True when this site has a configured passkey origin.", KType.Bool,
                 c => App(c).Settings.PasskeyOrigin != null,
@@ -123,7 +156,7 @@ namespace KScript.Auth
                 c => Passkeys.Revoke(Need(c), c.Str(0)),
                 "<do>@revoke_passkey($id)</do>");
             p.Command("is_signed_in", "", "True when someone is signed in (by the session or an API token).", KType.Bool,
-                c => AuthRequest.Current(c.Host)?.User != null,
+                c => Policies.User(c.Host) != null,
                 "<if test=\"@is_signed_in()\"><echo>Welcome back</echo></if>");
             p.Command("login", "user, remember?: bool",
                 "Signs a user in: the session gets a new id and the user. remember keeps them signed in for http.auth.remember (30 days) after the browser closes. The user is a map with an id: from @register(), @users()->find(), or a store of your own.",

@@ -101,6 +101,46 @@ A path parameter typed as a [KScript.Data](data.md) model is the record with tha
 fn show(post: Post) => $post
 ```
 
+Anything the route runs can ask for that record with `@inject()`, so it doesn't have to be handed down. A [component](components.md#take-the-routes-record-with-inject) takes it as an input's default, so `<post-card />` in the view needs no `post="..."`:
+
+````kscript
+// _components/post-card.kscript
+import KScript.Web
+import "../models/post.kscript"
+
+type PostCard extends Component {
+  construct({ post: Post = @inject() })
+
+  fn render() => ```html
+    <h2>{$post.title}</h2>
+    ```
+}
+````
+
+A function the controller calls takes it by naming the model:
+
+```kscript
+fn word_count() => @inject(Post).body->split(' ')->count()
+```
+
+`@inject()` looks for the path parameter with the input's name (`{post}` for `post`), then for the route's one record of that model. `@inject(from: article)` names the parameter. A route answered with `view:` has only the key, so the record is found when it is first asked for, and a key with no record gets `404` there too. A route with no record of the model, such as `/posts/{id}` with `id: int`, is an error that says to pass one: `Post->find($id)`.
+
+A route can ask the model's [policy](auth.md#policies) before its controller runs. `can: update` asks about the one record the controller's typed path parameters name, and answers `403` when the policy says no:
+
+```kscript
+// routes/api.kscript
+import KScript.Http
+import KScript.Auth
+import "../models/post.kscript"
+import "../controllers/posts.kscript" as posts
+
+Routes {
+  Put(path: /posts/{post}, to: @posts.update, can: update)
+}
+```
+
+A guest the ability turns away is sent to sign in, or gets `401` on an API route. A route that holds two records can't tell which one is meant, so its controller calls `@authorize(update, $post)` for the one it means. A route answered with `view:` has no controller to type the record, so its components ask with `@inject(can: read)`.
+
 Data that doesn't fit is the client's mistake, so the controller doesn't run. A body, query or form that doesn't fit gets `422 Unprocessable Entity`. API routes answer with JSON that lists every problem: `{ "error": "...", "status": 422, "problems": [{ "path": "$.age", "field": "age", "message": "..." }] }`. A path parameter that doesn't fit, such as `/people/abc` for `id: int`, gets `404`.
 
 ```kscript
@@ -311,6 +351,30 @@ Group(middleware: auth) {
   Resource(path: /people, to: people, only: [store, update, destroy])
 }
 ```
+
+With `model:`, each action asks the model's [policy](auth.md#policies) before the controller runs:
+
+```kscript
+// routes/api.kscript
+import KScript.Http
+import KScript.Auth
+import "../models/post.kscript"
+import "../controllers/posts.kscript" as posts
+
+Routes {
+  Resource(path: /posts, to: posts, model: Post)
+}
+```
+
+| Action | Ability asked | About |
+| --- | --- | --- |
+| `index` | None | A list has no single record. |
+| `store` | `create` | The model. |
+| `show` | `read` | The record `{id}` names. |
+| `update` | `update` | The same record. |
+| `destroy` | `delete` | The same record. |
+
+A key with no record gets `404` before the policy is asked.
 
 ## The request
 

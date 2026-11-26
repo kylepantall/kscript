@@ -49,6 +49,55 @@ namespace KScript.Http
         /// <summary>Headers for the controller's answer, set before it exists: @etag() puts the ETag here.</summary>
         public Dictionary<string, object> ResponseHeaders { get; } = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>The records the route's path parameters name, once found: a typed controller parameter or @inject() finds each once.</summary>
+        public Dictionary<string, Record> Bound { get; } = new Dictionary<string, Record>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The route's source for <see cref="Injection"/>: the record already found under the name, else the record
+        /// the path parameter of that name is the key of, else (when no name was written) the route's one record of
+        /// the model.
+        /// </summary>
+        public static bool Inject(InjectRequest request, out object record)
+        {
+            record = null;
+            RequestContext ctx = Current(request.Call.Host);
+            if (ctx?.Route == null) return false;
+            string model = request.Type.Name;
+            string name = request.Name;
+            var parameters = (Dictionary<string, object>)ctx.Request["params"];
+            if (ctx.Bound.TryGetValue(name, out Record held) && !SameModel(held.Type, request.Type))
+                throw request.Call.Error($"The route's {{{name}}} is a {held.Type.Name}, not a {model}.", "Context");
+            if (held == null && !parameters.ContainsKey(name))
+            {
+                if (request.Named)
+                    throw request.Call.Error($"The route {ctx.Route.Pattern} has no {{{name}}} to take a {model} from.", "Context");
+                var same = ctx.Bound.Where(b => SameModel(b.Value.Type, request.Type)).ToList();
+                if (same.Count != 1)
+                {
+                    throw request.Call.Error(same.Count > 1
+                        ? $"The route {ctx.Route.Pattern} holds more than one {model} ({string.Join(", ", same.Select(b => b.Key))}). Say which with @inject(from: {same[0].Key})."
+                        : $"The route {ctx.Route.Pattern} holds no {model}: it has no {{{name}}}, and no parameter typed {model}. Pass one, such as {model}->find($id).", "Context");
+                }
+                (name, held) = (same[0].Key, same[0].Value);
+            }
+            // A view runs apart from its controller, so there the model is declared again: the record is found for it.
+            if (held != null && held.Type.IsA(request.Type)) record = held;
+            else if (ctx.found.TryGetValue((name, request.Type), out Record again)) record = again;
+            else
+            {
+                record = request.Find(parameters[name]);
+                ctx.found[(name, request.Type)] = (Record)record;
+                ctx.Bound.TryAdd(name, (Record)record);
+            }
+            return true;
+        }
+
+        private readonly Dictionary<(string, RecordType), Record> found = new Dictionary<(string, RecordType), Record>();
+
+        /// <summary>True for one model, also when a view's own run declared it again from the same file.</summary>
+        private static bool SameModel(RecordType held, RecordType wanted) =>
+            held.IsA(wanted) || (held.Name == wanted.Name && held.Module?.Path != null && held.Module.Path == wanted.Module?.Path);
+
         /// <summary>The route being answered, once one matched.</summary>
         public Route Route { get; set; }
 
