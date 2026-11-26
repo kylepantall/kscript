@@ -16,8 +16,16 @@ namespace KScript.UI
         [ThreadStatic]
         private static Stack<UINode> drawing;
 
+        [ThreadStatic]
+        private static UISession current;
+
         private readonly ElementRun run;
         private readonly List<MarkupNode> layout;
+
+        /// <summary>The components drawn as elements, kept between draws so each keeps its state.</summary>
+        private readonly Dictionary<(MarkupElement Element, string Key), Record> components = new();
+        private readonly HashSet<(MarkupElement Element, string Key)> drawn = new();
+        private readonly Dictionary<MarkupElement, int> counts = new();
 
         private UISession(ElementRun run)
         {
@@ -44,6 +52,21 @@ namespace KScript.UI
         /// <summary>The node new elements are added to while the window is being drawn, or null outside a draw.</summary>
         internal static UINode CurrentParent => drawing != null && drawing.Count > 0 ? drawing.Peek() : null;
 
+        /// <summary>The window being drawn on this thread, or null outside a draw.</summary>
+        internal static UISession Current => CurrentParent != null ? current : null;
+
+        /// <summary>
+        /// The component an element draws. It is the one that element drew last time: told apart by its id, or by
+        /// its turn when the element is drawn several times.
+        /// </summary>
+        internal Record Component(MarkupElement element, object id, Func<Record, Record> make)
+        {
+            counts[element] = counts.GetValueOrDefault(element) + 1;
+            var key = (element, id != null ? "id " + Values.ToStr(id) : "#" + counts[element]);
+            if (!drawn.Add(key)) throw new KScriptException($"Two <{element.Name}> components here have the id {Values.ToStr(id)}. Give each its own.", "Argument");
+            return components[key] = make(components.GetValueOrDefault(key));
+        }
+
         internal static void Push(UINode node) => drawing.Push(node);
 
         internal static void Pop() => drawing.Pop();
@@ -66,14 +89,20 @@ namespace KScript.UI
         {
             var root = new UINode("Window", run.Element);
             Stack<UINode> previous = drawing;
+            UISession outer = current;
             drawing = new Stack<UINode>();
             drawing.Push(root);
+            current = this;
+            drawn.Clear();
+            counts.Clear();
             try
             {
                 UIElements.ReadProps(run, root, State);
                 Interpreter.ExecuteNodes(layout, State.Child(), Module);
                 Tree = root;
                 Error = null;
+                // A component that is no longer drawn is gone, and starts fresh if it comes back.
+                foreach (var gone in components.Keys.Where(k => !drawn.Contains(k)).ToList()) components.Remove(gone);
             }
             catch (KScriptException ex) when (!throwErrors)
             {
@@ -82,6 +111,7 @@ namespace KScript.UI
             finally
             {
                 drawing = previous;
+                current = outer;
             }
             if (notify) Redrawn?.Invoke();
         }
@@ -94,7 +124,7 @@ namespace KScript.UI
             {
                 Scope scope = h.Scope.Child();
                 scope.Declare("event", evt ?? new Dictionary<string, object>());
-                Interpreter.ExecuteStatements(h.Statements, scope, h.Module, declare: false);
+                Interpreter.RunHandler(h.Statements, scope, h.Module);
             }
             catch (KScriptException ex)
             {

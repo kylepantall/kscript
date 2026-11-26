@@ -734,15 +734,16 @@ namespace KScript.Syntax.Markup
                             WriteBlock("extend " + extended.Trim(), e, indent, chained);
                             return;
                         }
-                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional") && Attr("name") != null
-                        && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override")))):
+                    case "fn" when Only("name", "params", "value", "description", "override", "returns", "signature", "optional", "surface") && Attr("name") != null
+                        && (Attr("override") == null || (e.Parent?.Name == "extend" && IsYes(Attr("override"))))
+                        && (Attr("surface") == null || (Attr("params") == null && ComponentScript.IsRender(e) && ComponentScript.Surfaces.Contains(Attr("surface").Trim()))):
                         {
                             if (!chained)
                             {
                                 WriteDoc(e, indent);
                             }
                             string header = (Attr("override") != null ? "override fn " : "fn ") + Attr("name").Trim()
-                                + (Attr("optional") != null ? "?" : "") + "(" + (Attr("params")?.Trim() ?? string.Empty) + ")";
+                                + (Attr("optional") != null ? "?" : "") + "(" + (Attr("surface")?.Trim() ?? Attr("params")?.Trim() ?? string.Empty) + ")";
                             if (Attr("returns") is string returns) header += ": " + returns.Trim();
                             if (Attr("signature") != null)
                             {
@@ -843,6 +844,14 @@ namespace KScript.Syntax.Markup
                                 else if (node is MarkupElement { Name: "fn" } method)
                                 {
                                     WriteElement(method, indent + 1, false);
+                                }
+                                else if (node is MarkupElement { Name: CodeParser.ConstructWord } construct)
+                                {
+                                    WriteConstruct(construct, indent + 1);
+                                }
+                                else if (node is MarkupElement nested && ComponentScript.IsNestedDeclaration(nested))
+                                {
+                                    WriteElement(nested, indent + 1, false);
                                 }
                             }
                             scopes.Pop();
@@ -1028,6 +1037,16 @@ namespace KScript.Syntax.Markup
                 {
                     return true;
                 }
+                if (node is MarkupElement nested && ComponentScript.IsNestedDeclaration(nested))
+                {
+                    // A component's own type, model, enum or error is written the way it is at the top of a file.
+                    return nested.Name is "type" or "model" ? nested.Children.All(IsTypeLine) : !nested.ChildElements.Any(c => c.Name != "field");
+                }
+                if (node is MarkupElement { Name: CodeParser.ConstructWord } construct)
+                {
+                    return construct.Attributes.All(a => a.Name == "description")
+                        && construct.ChildElements.Where(c => c.Name == "field").All(f => IsFieldLine(f) && f.GetAttribute("value") == null);
+                }
                 if (!(node is MarkupElement e) || e.Children.Any(c => !(c is MarkupText t && t.IsWhitespace)))
                 {
                     return node is MarkupElement fn && fn.Name == "fn";
@@ -1040,6 +1059,39 @@ namespace KScript.Syntax.Markup
                     "fn" => true,
                     _ => false,
                 };
+            }
+
+            /// <summary>
+            /// &lt;construct&gt; is <c>construct({ x: number, y: number = 0 }) { ... }</c>: its fields one per line in the
+            /// braces, then its statements as the block.
+            /// </summary>
+            private void WriteConstruct(MarkupElement construct, int indent)
+            {
+                WriteDoc(construct, indent);
+                int start = sb.Length;
+                Line(indent, CodeParser.ConstructWord + "({");
+                int fields = sb.Length;
+                foreach (MarkupNode node in construct.Children)
+                {
+                    if (node is not MarkupElement { Name: "field" } field) continue;
+                    WriteField(field, indent + 1);
+                    sb.Insert(sb.Length - 1, ',');
+                }
+                string close = "})";
+                // A few short fields fit on the line: construct({ name: string, done: bool = false }).
+                string[] lines = sb.ToString(fields, sb.Length - fields).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToArray();
+                if (lines.Length is > 0 and <= 3 && lines.Sum(l => l.Length) <= 60 && !lines.Any(l => l.StartsWith('/')))
+                {
+                    sb.Length = start;
+                    close = CodeParser.ConstructWord + "({ " + string.Join(" ", lines).TrimEnd(',') + " })";
+                }
+                List<MarkupNode> body = construct.Children.Where(n => n is not MarkupElement { Name: "field" }).ToList();
+                if (body.All(n => n is MarkupText { IsWhitespace: true }))
+                {
+                    Line(indent, close);
+                    return;
+                }
+                WriteBlock(close, construct, indent, chained: false, children: body);
             }
 
             /// <summary>A &lt;field&gt; the one-line form can hold, a comment, or layout.</summary>
@@ -1370,6 +1422,12 @@ namespace KScript.Syntax.Markup
                         if (info?.IsName == true && IsSafeBare(trimmed))
                         {
                             return trimmed;
+                        }
+                        // An argument the element doesn't list (a component's input) that is one { value } is that value.
+                        if (info == null && trimmed.Length > 2 && trimmed[0] == '{' && trimmed.IndexOf('}') == trimmed.Length - 1
+                            && trimmed.Substring(1, trimmed.Length - 2).Trim() is { Length: > 0 } lone && lone[0] is '$' or '@' && IsSafeBare(lone))
+                        {
+                            return lone;
                         }
                         return IsNumber(trimmed) ? trimmed : Quote(value);
                     default:
@@ -1751,6 +1809,13 @@ namespace KScript.Syntax.Markup
                         break;
                     case "catch":
                         scopes.Declare(e.GetAttributeValue("as"));
+                        break;
+                    case "type":
+                        // A type's methods and its construct block change its fields: field = ... is a <set>.
+                        foreach (MarkupElement field in TypeBody.Fields(e))
+                        {
+                            scopes.Declare(field.GetAttributeValue("name")?.Trim().TrimEnd('?'));
+                        }
                         break;
                 }
                 foreach (MarkupNode node in e.Children)

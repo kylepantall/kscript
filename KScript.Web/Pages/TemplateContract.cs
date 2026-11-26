@@ -16,21 +16,7 @@ namespace KScript.Pages
         public static bool HasImplicitFieldDefault(TypeRef type) => FieldInitializer(type) != null;
 
         // A factory keeps mutable defaults local to one mounted instance.
-        internal static Func<object> FieldInitializer(TypeRef type)
-        {
-            if (type == null) return null;
-            if (type.Optional) return () => null;
-            if (type.ListDepth > 0) return () => new List<object>();
-            return (type.IsBuiltIn ? type.Name : null) switch
-            {
-                "int" or "float" or "number" => () => 0d,
-                "string" or "text" => () => string.Empty,
-                "bool" => () => false,
-                "list" => () => new List<object>(),
-                "map" => () => new Dictionary<string, object>(StringComparer.Ordinal),
-                _ => null,
-            };
-        }
+        internal static Func<object> FieldInitializer(TypeRef type) => ShapeMapper.Initializer(type);
 
         public static bool IsPropName(string name) => !string.IsNullOrEmpty(name) &&
             Lexer.IsIdentStart(name[0]) && name.Skip(1).All(c => Lexer.IsIdentChar(c) || c == '-');

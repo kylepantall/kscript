@@ -3,6 +3,8 @@ using System.Globalization;
 
 using KScript.Projects;
 using KScript.Runtime;
+using KScript.Syntax.Markup;
+using KScript.Syntax.Text;
 
 namespace KScript.Data.Migrations
 {
@@ -77,6 +79,23 @@ namespace KScript.Data.Migrations
                 .Where(ProjectConfig.IsExtensionFileName)
                 .OrderBy(f => ProjectConfig.ScriptName(f), StringComparer.Ordinal).ThenBy(f => f, StringComparer.Ordinal)
                 .ToList();
+
+        /// <summary>The project's components folder, where a component may hold the models only it uses.</summary>
+        public string ComponentsFolder => System.IO.Path.GetFullPath(System.IO.Path.Combine(
+            Project?.SiteRoot ?? Directory, Project?.PathFor("components") ?? ProjectConfig.DefaultPaths["components"]));
+
+        /// <summary>
+        /// The files that declare the project's models: the models folder, and the components that keep a model
+        /// inside their own block.
+        /// </summary>
+        internal List<string> ModelScripts() =>
+            Scripts(ModelsFolder).Concat(Scripts(ComponentsFolder).Where(HoldsModel)).ToList();
+
+        private static bool HoldsModel(string path)
+        {
+            var document = MarkupParser.Parse(new SourceText(File.ReadAllText(path)), MarkupParser.KindFromPath(path), path);
+            return document.DescendantElements().Any(e => e.Name == "model" && ComponentScript.IsNestedDeclaration(e));
+        }
 
         /// <summary>The migration files, read once: each is run to collect its steps.</summary>
         public List<MigrationFile> Files()
@@ -407,7 +426,7 @@ namespace KScript.Data.Migrations
         public List<ModelInfo> Models()
         {
             var interpreter = NewInterpreter();
-            foreach (string path in Scripts(ModelsFolder))
+            foreach (string path in ModelScripts())
             {
                 Module module = interpreter.Load(path);
                 try

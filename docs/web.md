@@ -74,7 +74,7 @@ type NoteCard extends Component {
   record: Note
   heading: string => $.record.title
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <article>
       <h2>{$.heading}</h2>
@@ -86,7 +86,7 @@ type NoteCard extends Component {
 }
 ````
 
-The tag passes attributes into fields, which `render()` reads as `$record` or `$.record`. Computed fields such as `$.heading`, local constants, and methods called with `$this->method()` are available to the HTML. The editor completes props on the tag and model fields inside the fence. `Component` requires `fn render(): Component`. Existing HTML and Markdown components also work, and the editor recognises `$record` as an input when a legacy template uses it.
+The tag passes attributes into fields, which `render()` reads as `$record` or `$.record`. Computed fields such as `$.heading`, local constants, and methods called with `$this->method()` are available to the HTML. The editor completes props on the tag and model fields inside the fence. `Component` requires `fn render()`. Existing HTML and Markdown components also work, and the editor recognises `$record` as an input when a legacy template uses it.
 
 A component can save edits directly to a [KScript.Data model](data.md). Declare the writable fields and the ownership rule once in the web routes. For example, a `Profile` model in `models/profile.kscript` holds a `user_id` and a `bio`. Its `bio` field can declare a length limit such as `string(max: 500)`.
 

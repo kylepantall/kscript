@@ -127,7 +127,8 @@ namespace KScript.Language.Analysis
 
             List<Symbol> candidates = result.Symbols
                 .Where(s => s.Kind == SymbolKind.Function && s.SourcePath == null && s.DeclaringElement?.Name == "fn" && s.DeclaringElement.Parent?.Name != "extend"
-                    && !(KScript.Runtime.MethodSignature.Component.Any(m => m.Name == s.Name) && s.DeclaringElement.Parent?.GetAttributeValue("extends") == ComponentScript.Contract)
+                    // A component's render and style are called by whatever draws it.
+                    && !(KScript.Runtime.MethodSignature.Component.Any(m => m.Name == s.Name) && ComponentScript.IsComponentType(s.DeclaringElement.Parent))
                     && !Ignored(s) && s.Doc?.IsPublic != true && !IsRead(s))
                 .ToList();
             if (candidates.Count == 0)

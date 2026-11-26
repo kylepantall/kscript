@@ -58,7 +58,7 @@ namespace KScript.Language.Tests
         [Theory]
         [InlineData("<fn value=\"1\" />", DiagnosticCodes.MissingAttribute, "<fn> needs the 'name' attribute")]
         [InlineData("!<echo>hi</echo>", DiagnosticCodes.MisplacedElement, "Scripts start with <kscript>.")]
-        [InlineData("<import package=\"KScript.Web\" /><slot />", DiagnosticCodes.MisplacedElement, "<slot> only works in pages served by kscript serve.")]
+        [InlineData("<slot />", DiagnosticCodes.MisplacedElement, "<slot> only works in a component's render, where it draws what was written inside the component.")]
         [InlineData("<for each=\"i\" in=\"[1]\"><break>x</break></for>", DiagnosticCodes.StrayText, "<break> doesn't take any content")]
         [InlineData("<echo hidden>x</echo>", DiagnosticCodes.UnknownAttribute, "<echo> has no 'hidden' attribute")]
         [InlineData("<import package=\"KScript.AI\" /><fn name=\"f\" value=\"1\" /><llm into=\"r\" tools=\"f, @nope\">q</llm><echo>{$r}</echo>", DiagnosticCodes.UndefinedFunction, "No function named 'nope'")]

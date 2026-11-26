@@ -262,10 +262,13 @@ namespace KScript.Runtime
 
         internal RecordType Owner { get; set; }
 
+        /// <summary>Listed in the type's <c>construct({ ... })</c>: a caller may pass it.</summary>
+        public bool Input { get; internal set; }
+
         internal bool HasDefault => DefaultNode != null || DefaultText != null;
 
         internal FieldDefinition WithType(TypeRef type, bool optional) =>
-            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional) { Owner = Owner };
+            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional) { Owner = Owner, Input = Input };
 
         /// <summary>Parses a path such as <c>owner.login</c> or <c>items[0].name</c> into keys and indexes, or null.</summary>
         internal static List<object> ParsePath(string text)
@@ -387,6 +390,17 @@ namespace KScript.Runtime
         internal Dictionary<string, MethodSignature> Signatures { get; } = new(StringComparer.Ordinal);
 
         internal Dictionary<string, MarkupElement> OwnMethods { get; } = new Dictionary<string, MarkupElement>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The type's <c>construct({ ... }) { ... }</c> blocks, its bases' first. With one, a caller may pass only the
+        /// fields it lists, the other fields are the value's own state, and each block runs once when a value is made.
+        /// </summary>
+        internal List<(RecordType Owner, MarkupElement Element)> Constructors { get; } = new();
+
+        public bool HasConstructor => Constructors.Count > 0;
+
+        /// <summary>True for a type that extends Component, or joins one that does.</summary>
+        public bool IsComponent { get; internal set; }
 
         /// <summary>Inherited record methods evaluate their bodies, defaults and catches in the defining module.</summary>
         internal RecordType MethodOwner(string name, MarkupElement declaration)
@@ -898,6 +912,10 @@ namespace KScript.Runtime
                     throw run.Error("Method signatures and extends require a record type.", "extends", "Type");
                 return DeclareRefined(run, name, with[0]);
             }
+            // A component's own types, enums, errors and models are declared first, beside it: its fields and
+            // methods name them, and the rest of the file can too. Only top-level declarations are exported.
+            List<MarkupNode> nested = run.ChildElements.Where(ComponentScript.IsNestedDeclaration).Cast<MarkupNode>().ToList();
+            if (nested.Count > 0) run.Interpreter.ExecuteNodes(nested, run.Scope, run.Module);
             foreach (string b in with)
             {
                 string baseName = TypeRef.Parse(b).Name;
@@ -956,8 +974,12 @@ namespace KScript.Runtime
                     : run.Scope.TryGet(contract, out object target) && target is RecordType parent && parent.Signatures.Count > 0
                         ? parent.Signatures.Values
                         : throw run.Error($"'{contract}' does not declare method signatures. Declare it before {name} or import its file.", "extends", "Type");
+                type.IsComponent = contract == ComponentScript.Contract;
                 foreach (var signature in signatures)
                 {
+                    // Any render makes a component: one for a window or the terminal stands in for the page's.
+                    if (type.IsComponent && signature == MethodSignature.Render && !type.OwnMethods.ContainsKey(signature.Name)
+                        && type.OwnMethods.Keys.Any(k => k.StartsWith(ComponentScript.RenderMethod + "(", StringComparison.Ordinal))) continue;
                     if (signature.Problem(type.OwnMethods.GetValueOrDefault(signature.Name)) is string problem)
                         throw run.Error($"{name} must {problem} to extend {contract}.", "extends", "Type");
                 }
@@ -991,12 +1013,37 @@ namespace KScript.Runtime
             var own = new TypeRules();
             foreach (MarkupElement e in run.ChildElements)
             {
-                if (rulesAndMethods && (e.Name == "catch" || own.TryAddChild(e, run, allowNormalize: false))) continue;
+                if (rulesAndMethods && (e.Name == "catch" || ComponentScript.IsNestedDeclaration(e) || own.TryAddChild(e, run, allowNormalize: false))) continue;
+                if (ComponentScript.NestedDeclarations.Contains(e.Name)) throw run.Error(ComponentScript.NestedOnlyInComponent(e), null, "Syntax");
+                if (rulesAndMethods && e.Name == CodeParser.ConstructWord)
+                {
+                    if (type.Constructors.Any(c => c.Owner == type)) throw run.Error($"{name} has two construct blocks. Keep one.", null, "Syntax");
+                    foreach (MarkupElement input in e.ChildElements.Where(c => c.Name == "field"))
+                    {
+                        FieldDefinition listed = ParseFieldElement(input, run);
+                        if (listed.Computed) throw run.Error($"construct lists what a caller may pass, so '{listed.Name}' can't be worked out with =>. Declare it below construct.", null, "Syntax");
+                        if (!seen.Add(listed.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{listed.Name}' twice.", null, "Syntax");
+                        listed.Input = true;
+                        SetOwnField(type, listed, run);
+                    }
+                    type.Constructors.Add((type, e));
+                    continue;
+                }
                 if (rulesAndMethods && e.Name == "fn")
                 {
                     string method = e.GetAttributeValue("name")?.Trim().TrimStart('@');
                     if (string.IsNullOrEmpty(method)) throw run.Error($"A method needs a name: <fn name=\"area\" value=\"$width * $height\" />.", null, "Syntax");
                     if (type.Field(method) != null && !type.Bases.Any(b => b.Field(method) != null)) throw run.Error($"{name} has a field and a method both called '{method}'.", null, "Syntax");
+                    if (ComponentScript.IsRender(e))
+                    {
+                        // A component has one render for each place it is drawn; its content shows which.
+                        string surface = ComponentScript.SurfaceOf(e, element => run.Module.Elements.TryGetValue(element, out ElementDefinition d) ? d.Package?.Name : null)
+                            ?? throw run.Error(ComponentScript.NameTheSurface(name), null, "Syntax");
+                        if (!seen.Add("fn " + ComponentScript.RenderKey(surface)))
+                            throw run.Error(ComponentScript.TwoRenders(name, surface), null, "Syntax");
+                        type.OwnMethods[ComponentScript.RenderKey(surface)] = e;
+                        continue;
+                    }
                     if (!seen.Add("fn " + method))
                         throw run.Error($"{name} declares the method '{method}' twice.", null, "Syntax");
                     if (e.GetAttribute("signature") != null)
@@ -1011,7 +1058,7 @@ namespace KScript.Runtime
                 }
                 if (e.Name != "field")
                 {
-                    throw run.Error(rulesAndMethods ? Wording.Of($"<type> can only hold <field>, <validate>, <normalize> and <fn> elements, not <{e.Name}>.") : Wording.Of($"<{run.Name}> can only hold <field> elements, not <{e.Name}>."), null, "Syntax");
+                    throw run.Error(rulesAndMethods ? Wording.Of($"<type> can only hold <field>, <construct>, <validate>, <normalize> and <fn> elements, not <{e.Name}>.") : Wording.Of($"<{run.Name}> can only hold <field> elements, not <{e.Name}>."), null, "Syntax");
                 }
                 FieldDefinition field = ParseFieldElement(e, run);
                 if (!seen.Add(field.Name)) throw run.Error($"<{run.Name} name=\"{name}\"> lists the field '{field.Name}' twice.", null, "Syntax");
@@ -1092,6 +1139,8 @@ namespace KScript.Runtime
                 }
                 if (b.IsA(type) || type.Bases.Contains(b)) throw run.Error($"<type name=\"{type.Name}\"> joins {b.Name} twice.", "with", "Syntax");
                 type.AddBase(b);
+                foreach (var constructor in b.Constructors)
+                    if (!type.Constructors.Contains(constructor)) type.Constructors.Add(constructor);
                 foreach (Validator validator in b.Validators)
                     if (!type.Validators.Contains(validator)) type.Validators.Add(validator);
                 foreach (KeyValuePair<string, MarkupElement> m in b.OwnMethods)
@@ -1620,6 +1669,39 @@ namespace KScript.Runtime
             return mapper.Problems.Count == 0 ? converted : item;
         }
 
+        /// <summary>
+        /// What makes the value a field starts with when nothing gives it one (0, '', false, an empty list or map, or
+        /// null for an optional field), or null when its type has no such value. Each call of the result makes a new
+        /// value, so two records never share a list. The one rule for a type's own state and a component's fields.
+        /// </summary>
+        internal static Func<object> Initializer(TypeRef type)
+        {
+            if (type == null) return null;
+            if (type.Optional) return () => null;
+            if (type.ListDepth > 0) return () => new List<object>();
+            return (type.IsBuiltIn ? type.Name : null) switch
+            {
+                "int" or "float" or "number" => () => 0d,
+                "string" or "text" => () => string.Empty,
+                "bool" => () => false,
+                "list" => () => new List<object>(),
+                "map" => () => new Dictionary<string, object>(StringComparer.Ordinal),
+                _ => null,
+            };
+        }
+
+        /// <summary>Runs the type's construct blocks, its bases' first, with the fields as variables that can be set.</summary>
+        private void Construct(Record record)
+        {
+            foreach ((RecordType owner, MarkupElement element) in record.Type.Constructors)
+            {
+                Scope scope = owner.Closure.Child();
+                foreach (string field in record.Keys.ToList()) scope.BindField(record, field, interpreter);
+                scope.Declare("this", record);
+                interpreter.ExecuteNodes(element.Children.Where(c => c is not MarkupElement { Name: "field" }).ToList(), scope.Child(), owner.Module);
+            }
+        }
+
         internal Record MapRecord(object value, RecordType type, string path, int depth,
             Func<FieldDefinition, object> missingField = null)
         {
@@ -1653,6 +1735,19 @@ namespace KScript.Runtime
                 bool found = TryRead(source, f.Path, out object raw, out string at, out string key);
                 if (key != null) used.Add(key);
                 string fieldPath = path + at;
+                bool own = type.HasConstructor && !f.Input;
+                if (own && found)
+                {
+                    // construct lists what may be passed; every other field is the value's own state.
+                    Problem(fieldPath, f.Name, $"is {type.Name}'s own state and can't be passed in. construct takes: {string.Join(", ", type.Fields.Where(i => i.Input).Select(i => i.Name))}.");
+                    continue;
+                }
+                if (own && !found && !f.HasDefault)
+                {
+                    // Until construct sets it, a field of the value's own starts empty: 0, '', false, [] or null.
+                    record[f.Name] = f.Optional ? null : Initializer(f.Type)?.Invoke();
+                    continue;
+                }
                 if (raw == null && f.HasDefault)
                 {
                     RecordType owner = f.Owner ?? type;
@@ -1665,6 +1760,8 @@ namespace KScript.Runtime
             }
             Problems.AddRange(mapper.Problems);
             mapper.Problems.Clear();
+            if (type.HasConstructor && !Problems.Any(p => p.Path.StartsWith(path, StringComparison.Ordinal)))
+                Construct(record);
 
             foreach (KeyValuePair<string, object> kv in source)
             {

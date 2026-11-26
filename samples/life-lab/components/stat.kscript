@@ -1,0 +1,14 @@
+// One figure under the board: a small label over its value. The desktop
+// window draws one for each number it shows.
+import KScript.UI
+
+type Stat extends Component {
+  construct({ label: string, value: any })
+
+  fn render() {
+    Column(gap: 2) {
+      Text(size: 11, color: "#64748b") "{ $label->upper() }"
+      Text(size: 16, weight: bold, color: "#e2e8f0") "{$value}"
+    }
+  }
+}

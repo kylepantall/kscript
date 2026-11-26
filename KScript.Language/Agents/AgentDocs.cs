@@ -318,7 +318,7 @@ namespace KScript.Language.Agents
         {
             MarkupElement type = s.DeclaringElement;
             var fields = new List<string>();
-            foreach (MarkupElement field in type.ChildElements.Where(f => f.Name == "field"))
+            foreach (MarkupElement field in TypeBody.Fields(type))
             {
                 string name = field.GetAttributeValue("name")?.Trim();
                 if (string.IsNullOrEmpty(name)) continue;
@@ -673,7 +673,7 @@ namespace KScript.Language.Agents
         {
             w.Append($"\n## Components and live blocks\n\nSee the [components guide]({Guides}components.md).\n");
             w.Append("""
-                - Put reusable UI in `_components`. In a `.kscript` file, `type Counter extends Component` has typed fields for props and per-instance state. Return KScript HTML from `fn render(): Component`. An optional `override fn style(): ComponentStyle` returns a `css` or `ks.css` fence.
+                - Put reusable UI in `_components`. In a `.kscript` file, `type Counter extends Component` has typed fields for props and per-instance state. Return KScript HTML from `fn render()`. An optional `override fn style()` returns a `css` or `ks.css` fence.
                 - Keep writes in actions. For example, `<button @on-click(count += 1)>Add</button>` updates an instance's `count`. Use `<input @bind('title')>` to send a field back to the server.
                 - For a small interaction in a page, wrap the controls in `<live>` and declare values with `<state name="count" value="0" />`.
                 - Expose a named action with `<span hidden @live-action('save') @on-action(@save($event.data))></span>`. Validate inputs and authorize writes in the handler.

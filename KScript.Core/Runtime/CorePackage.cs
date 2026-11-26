@@ -151,8 +151,16 @@ namespace KScript.Runtime
                 new A("not", K.Text, "Values that aren't allowed, such as reserved names."),
                 new A("description", K.Text, "What the field holds, shown on hover and completion."))
             {
-                MustBeInside = new[] { "type", "error", "model", "job" },
+                MustBeInside = new[] { "type", "error", "model", "job", "construct" },
             }, run => throw run.Error($"<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
+
+            p.Element(new ElementInfo("construct", "A type's constructor. Its fields are what a caller may pass, as `Point(x: 1)` or as a component's attributes, and every other field of the type is the value's own state. The statements run once when a value is made, with the fields as variables they can set. In a .kscript file: `construct({ x: number, y: number = 0 }) { ... }`.",
+                ContentKind.Statements,
+                new A("description", K.Text, "What the constructor does, shown on hover."))
+            {
+                MustBeInside = new[] { "type" },
+                Example = "<type name=\"Point\">\n  <construct>\n    <field name=\"x\" type=\"number\" />\n    <field name=\"y\" type=\"number\" default=\"0\" />\n    <set name=\"sum\" value=\"$x + $y\" />\n  </construct>\n  <field name=\"sum\" type=\"number\" />\n</type>\n<echo>{ Point(x: 3, y: 4).sum }</echo>",
+            }, run => throw run.Error($"<construct> must be directly inside <type>.", null, "Syntax"));
 
             p.Element(new ElementInfo("validate", "A rule a <type> checks: the test must be true. In a type made from one other type, the value is `$value`. In a type with fields, each field is a variable (`$end > $start`). Every rule that fails is reported, with its message.", ContentKind.Empty,
                 new A("test", K.Expression, "What must be true: `$value % 5 == 0`, `$end > $start`.", true),
@@ -306,6 +314,7 @@ namespace KScript.Runtime
                 new A("returns", K.Text, "The declared return type."),
                 new A("signature", K.Text, "Declares a method signature without an implementation."),
                 new A("optional", K.Text, "The method may be omitted by a type implementing this signature."),
+                new A("surface", K.Enum, "For a component's render: where it draws, when its content doesn't show it.", false, ComponentScript.Surfaces.ToArray()),
                 new A("override", K.Bool, "Inside <extend>: true replaces the type's built-in method of the same name. Without it, reusing a built-in method's name is an error."),
                 new A("description", K.Text, "What the function does. Shown in hover, and to a model when used as an <llm> tool."))
             {
@@ -316,6 +325,8 @@ namespace KScript.Runtime
                 if (!run.Scope.HasOwn(run.VariableName("name"))) run.Interpreter.DeclareFunction(run.Element, run.Scope, run.Module);
                 return null;
             });
+
+            p.Element(ComponentElements.SlotInfo, ComponentElements.Slot);
 
             p.Element(new ElementInfo("return", "Ends the function with a value.", ContentKind.Empty,
                 new A("value", K.Expression, "The result. Without it the function returns null."))
@@ -329,6 +340,8 @@ namespace KScript.Runtime
                     throw new ReturnSignal(new ComponentTemplate(html, run.Scope, run.Module, origin));
                 if (ComponentScript.StyleBlock(fn, origin) is { Error: null } style)
                     throw new ReturnSignal(new ComponentStyle(style.Value, style.Language, run.Module));
+                if (ComponentSource.From(fn, origin, run.Scope, run.Module) is ComponentSource source)
+                    throw new ReturnSignal(source);
                 throw new ReturnSignal(run.Eval("value", null));
             });
 

@@ -259,7 +259,7 @@ namespace KScript.Language.Tests
         [InlineData("<type name=\"T\" fields=\"1a\" />", DiagnosticCodes.InvalidAttributeValue, "'1a' isn't a field.")]
         [InlineData("<type name=\"T\" fields=\"a = (\" />", DiagnosticCodes.ExpressionSyntax, "The default of 'a' isn't a valid expression")]
         [InlineData("<type name=\"T\" />", DiagnosticCodes.MissingAttribute, "<type name=\"T\"> needs fields")]
-        [InlineData("<type name=\"T\"><echo>x</echo></type>", DiagnosticCodes.MisplacedElement, "<type> can only hold <field>, <validate>, <normalize>, <fn> and <catch> elements, not <echo>.")]
+        [InlineData("<type name=\"T\"><echo>x</echo></type>", DiagnosticCodes.MisplacedElement, "<type> can only hold <field>, <construct>, <validate>, <normalize>, <fn> and <catch> elements, not <echo>.")]
         [InlineData("<type name=\"T\"><field name=\"1a\" /></type>", DiagnosticCodes.InvalidAttributeValue, "'1a' can't be a field name")]
         [InlineData("<type name=\"T\"><field name=\"a\" from=\"a..b\" /></type>", DiagnosticCodes.InvalidAttributeValue, "'a..b' isn't a path.")]
         [InlineData("<type name=\"T\"><field name=\"a\" value=\"1\" from=\"b\" /></type>", DiagnosticCodes.InvalidAttribute, "A field with a value is worked out from the others")]

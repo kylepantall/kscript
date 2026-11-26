@@ -215,7 +215,7 @@ namespace KScript.Language.Analysis
                     yield return (name.TrimEnd('?').TrimEnd(), type, eq >= 0 || name.EndsWith("?", StringComparison.Ordinal) || type.EndsWith("?", StringComparison.Ordinal));
                 }
             }
-            foreach (MarkupElement field in e.ChildElements.Where(c => IsKScriptElementName(c, "field")))
+            foreach (MarkupElement field in TypeBody.Inputs(e))
             {
                 string name = field.GetAttributeValue("name")?.Trim();
                 string type = field.GetAttributeValue("type")?.Trim();
@@ -343,7 +343,7 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            foreach (MarkupElement field in e.ChildElements.Where(c => IsKScriptElementName(c, "field")))
+            foreach (MarkupElement field in TypeBody.Fields(e))
             {
                 MarkupAttribute nameAttr = field.GetAttribute("name");
                 string name = nameAttr?.ValueText?.Trim().TrimEnd('?').TrimEnd();
@@ -357,7 +357,8 @@ namespace KScript.Language.Analysis
                 string detail = from != null ? $"Read from {from}." : field.GetAttribute("value") != null ? "Worked out from the other fields." : null;
                 description = description != null && detail != null ? description + " " + detail : description ?? detail;
                 bool optional = nameAttr.ValueText.TrimEnd().EndsWith('?') || IsYes(field.GetAttributeValue("optional")) || field.GetAttribute("default") != null;
-                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional);
+                bool own = field.GetAttribute("value") == null && !TypeBody.IsInput(field);
+                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional) { OwnState = own };
             }
         }
 
@@ -462,15 +463,36 @@ namespace KScript.Language.Analysis
                 if (!IsModelMixin(e)) CheckDrift(e);
             }
             bool refined = instance?.RefinementBase != null;
-            foreach (MarkupElement child in e.ChildElements)
+            bool constructed = false;
+            foreach (MarkupElement child in e.ChildElements.SelectMany(c => c.Name == CodeParser.ConstructWord ? c.ChildElements.Where(f => f.Name == "field").Prepend(c) : new[] { c }))
             {
                 if (IsKScriptElementName(child, "validate") || IsKScriptElementName(child, "normalize") || IsKScriptElementName(child, "fn") || IsKScriptElementName(child, "catch"))
                 {
                     continue;
                 }
+                if (child.Name == CodeParser.ConstructWord && IsKScriptElementName(e, "type") && !refined)
+                {
+                    if (constructed)
+                        Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"{e.GetAttributeValue("name")?.Trim()} has two construct blocks. Keep one.");
+                    constructed = true;
+                    continue;
+                }
+                // A component may keep the types only it uses beside its fields.
+                if (ComponentScript.IsNestedDeclaration(child)) continue;
+                if (ComponentScript.NestedDeclarations.Contains(child.Name) && child.Parent == e)
+                {
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, ComponentScript.NestedOnlyInComponent(child));
+                    continue;
+                }
                 if (!IsKScriptElementName(child, "field"))
                 {
-                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement, $"<type> can only hold <field>, <construct>, <validate>, <normalize>, <fn> and <catch> elements, not <{child.Name}>.");
+                    continue;
+                }
+                if (child.Parent != e && child.GetAttribute("value") != null)
+                {
+                    Report(child.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MisplacedElement,
+                        $"construct lists what a caller may pass, so '{child.GetAttributeValue("name")?.Trim()}' can't be worked out with =>. Declare it below construct.");
                     continue;
                 }
                 if (refined)
@@ -525,7 +547,9 @@ namespace KScript.Language.Analysis
                 DeclareImplicit(parseScope, "match", new TypeShape(KType.Map), "The pattern's match: { text, index, groups, captures }.", e);
                 AnalyzeExpressionRegion(parse.Value, RegionKind.Expression, parseScope, e, parse);
             }
-            WalkChildren(e.Children, typeScope, markupMode);
+            // Nested declarations stand beside the component, so they don't see its fields.
+            WalkChildren(e.Children.Where(c => c is MarkupElement m && ComponentScript.IsNestedDeclaration(m)).ToList(), inner, markupMode);
+            WalkChildren(e.Children.Where(c => !(c is MarkupElement m && ComponentScript.IsNestedDeclaration(m))).ToList(), typeScope, markupMode);
             if (e.ChildElements.Any(c => c.Name == "catch"))
             {
                 // A type handler can supply the result of any call to one of these methods.
@@ -567,10 +591,37 @@ namespace KScript.Language.Analysis
             foreach (var signature in signatures)
             {
                 shape.Methods.TryGetValue(signature.Name, out Symbol method);
-                if (signature.Problem(method?.DeclaringElement) is string problem)
-                    Report(method?.DeclaringElement?.NameSpan ?? span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                MarkupElement implementation = method?.DeclaringElement;
+                if (contract == ComponentScript.Contract && signature == KScript.Runtime.MethodSignature.Render)
+                {
+                    // A component has one render for each place it is drawn; any of them makes it a component.
+                    if (!CheckRenders(type, shape.Name, out implementation)) continue;
+                }
+                if (signature.Problem(implementation) is string problem)
+                    Report(implementation?.NameSpan ?? span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"{shape.Name} must {problem} to extend {contract}.");
             }
+        }
+
+        /// <summary>
+        /// Checks a component's render methods: each shows or names where it draws, and no two draw the same place.
+        /// Gives the page's render, and false when the component only draws elsewhere, so it needs none for a page.
+        /// </summary>
+        private bool CheckRenders(MarkupElement type, string name, out MarkupElement page)
+        {
+            page = null;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (MarkupElement render in type.ChildElements.Where(ComponentScript.IsRender))
+            {
+                string surface = ComponentScript.SurfaceOf(render, element => catalog.GetElement(element)?.Package);
+                if (surface == null)
+                    Report(render.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, ComponentScript.NameTheSurface(name));
+                else if (!seen.Add(surface))
+                    Report(render.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, ComponentScript.TwoRenders(name, surface));
+                else if (surface == ComponentScript.Page)
+                    page = render;
+            }
+            return page != null || !type.ChildElements.Any(ComponentScript.IsRender);
         }
 
         private void DeclareImplicit(Scope scope, string name, TypeShape shape, string description, MarkupElement e, TextSpan? declaration = null)
@@ -779,6 +830,11 @@ namespace KScript.Language.Analysis
             if (TypeNamed(text, offset) == null)
             {
                 IEnumerable<string> known = BuiltInTypes.Concat(SemanticTypeNames).Concat(TypeNames());
+                if (NestedElsewhere(name) is { Length: > 0 } nested)
+                {
+                    Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{name}'.{nested}");
+                    return false;
+                }
                 Report(span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                     $"Unknown type '{name}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <type name=\"{name}\" fields=\"...\" /> or <enum name=\"{name}\" values=\"...\" />.",
                     SuggestFix(span, name, known, n => n));

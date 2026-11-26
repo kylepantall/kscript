@@ -618,6 +618,36 @@ echo "{ @welcome($admin) } { User->is($admin) } { $admin.level }"
 
 When two bases have a field with the same name but different types, the joined type must declare that field itself. The same goes for a method two bases both have: declare it in the joined type to choose. In the editor, the lightbulb on a joined type offers to override each method it gets from its bases, and writes the stub. `User->is($admin)` says whether a value is a User, and `User->is(Admin)` whether a type is built on User. A `validate:` rule in a type with fields sees the fields as `$name`, `$email` and so on.
 
+## Constructors
+
+A type with fields takes any of them when a value is made. A `construct` block narrows that: it lists what a caller may pass, and every other field becomes the value's own state.
+
+```kscript
+import KScript.Math
+
+type Point {
+  construct({
+    x: number,
+    y: number = 0,
+  }) {
+    length = ($x * $x + $y * $y)->sqrt()
+  }
+
+  length: number
+}
+
+point = Point(x: 3, y: 4)
+echo "{$point.x}, {$point.y} is {$point.length} from the origin"
+```
+
+- The fields in the braces are written like any other field, separated by commas. A short list fits on one line: `construct({ name: string })`.
+- The block after them is optional. It runs once each time a value is made, after the passed fields are checked, and can set any field of the type.
+- A field outside `construct` starts with its default. Without one it starts empty: `0`, `''`, `false`, `[]`, `{ }` or null.
+- Passing a field that `construct` doesn't list is an error that names the fields it takes. The editor reports it as you type.
+- A joined type runs its bases' `construct` blocks first, then its own.
+
+A [component](components.md#inputs-and-state-with-construct) uses the same block to separate the attributes a page may set from the state it keeps.
+
 ## Types read from text
 
 A type with fields and a `pattern` can be made from text. The pattern's named groups fill the fields of the same name, and each one is converted to its field's type. `fn` inside a type adds a method, which sees the fields:
@@ -685,9 +715,16 @@ In XML, the same types are attributes and elements of `<type>`:
   <field name="level" type="int" default="1" />
 </type>
 <let name="who" type="Username" value="@joan" />
+<type name="Point">
+  <construct>
+    <field name="x" type="number" />
+    <set name="doubled" value="$x * 2" />
+  </construct>
+  <field name="doubled" type="number" />
+</type>
 ```
 
-`kscript convert` turns either form into the other.
+A `<construct>` holds the fields a caller may pass, then the statements to run. `kscript convert` turns either form into the other.
 
 ## Ideas for later
 

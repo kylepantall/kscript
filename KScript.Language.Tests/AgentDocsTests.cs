@@ -323,8 +323,8 @@ namespace KScript.Language.Tests
 
             string web = notes[".kscript/agents/packages/KScript.Web.md"];
             Assert.Contains("type Counter extends Component", web);
-            Assert.Contains("fn render(): Component", web);
-            Assert.Contains("override fn style(): ComponentStyle", web);
+            Assert.Contains("fn render()", web);
+            Assert.Contains("override fn style()", web);
             Assert.Contains("@live-action('save')", web);
             Assert.Contains("`@on-drop`", web);
             foreach (string method in new[] { "directive", "action", "call", "on" })

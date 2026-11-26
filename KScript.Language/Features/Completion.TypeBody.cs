@@ -157,6 +157,43 @@ namespace KScript.Language.Features
                 items.Add(BodyRuleItem(rule, replace, "0"));
             }
             items.Add(BodyFnItem(replace));
+            if (!refined && TypeBody.Constructor(type) == null)
+            {
+                items.Add(new CompletionItem
+                {
+                    Label = CodeParser.ConstructWord,
+                    Kind = CompletionKind.Keyword,
+                    Detail = "constructor",
+                    Documentation = Catalog.GetElement(CodeParser.ConstructWord)?.Description,
+                    InsertText = "construct({\n  ${1:name}: ${2:string},\n}) {\n  $0\n}",
+                    IsSnippet = true,
+                    ReplaceSpan = replace,
+                    SortText = "1construct",
+                });
+            }
+            if (ComponentScript.IsComponentType(type))
+            {
+                // A component keeps the types only it uses inside its own block.
+                foreach (string word in ComponentScript.NestedDeclarations)
+                {
+                    items.Add(new CompletionItem
+                    {
+                        Label = word,
+                        Kind = CompletionKind.Keyword,
+                        Detail = $"a {word} only this component uses",
+                        Documentation = Catalog.GetElement(word)?.Description,
+                        InsertText = word switch
+                        {
+                            "enum" => "enum ${1:Name} { ${2:first}, ${3:second} }",
+                            "error" => "error ${1:Name}(message: \"${2:What went wrong}\")",
+                            _ => word + " ${1:Name} {\n  ${2:name}: ${3:string}\n}",
+                        },
+                        IsSnippet = true,
+                        ReplaceSpan = replace,
+                        SortText = "2" + word,
+                    });
+                }
+            }
             return items;
         }
 

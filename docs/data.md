@@ -572,7 +572,7 @@ Rollback undoes each step the other way round: a created table is dropped, an ad
 
 In the production environment (`config.environment` in `kscript.json`), `migrate`, `rollback` and `seed` ask first, and `fresh` won't run without `--force`.
 
-`diff` and `status` see the models in the models folder that use the default connection. Models on another connection, and what a `Sql` step changes, are left out, so after a `Sql` step that changes a table `diff` may suggest changing it back.
+`diff` and `status` see the models that use the default connection, in the models folder and [inside components](components.md#types-that-belong-to-a-component). Models on another connection, and what a `Sql` step changes, are left out, so after a `Sql` step that changes a table `diff` may suggest changing it back.
 
 ### Seeders
 

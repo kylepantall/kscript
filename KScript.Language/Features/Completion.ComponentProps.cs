@@ -16,8 +16,7 @@ public sealed partial class LanguageService
         var component = path == caller.Path ? caller : Analyzer.AnalyzeFile(source, path, Files, Catalog);
         var declaration = ComponentScript.FindType(component.Markup, cursor.TagElement.Name);
         string propName = TemplateContract.VariableName(attribute.Name);
-        if (declaration == null || !declaration.ChildElements.Any(field => field.Name == "field" && field.GetAttribute("value") == null &&
-                field.GetAttributeValue("name")?.TrimEnd('?') == propName))
+        if (declaration == null || !TypeBody.Inputs(declaration).Any(field => field.GetAttributeValue("name")?.TrimEnd('?') == propName))
             return null;
         var componentType = component.RootScope.Lookup(declaration.GetAttributeValue("name"), int.MaxValue)?.Shape.Instance;
         if (componentType == null || !componentType.Fields.TryGetValue(propName, out var prop) || prop.ValueType is not string type)

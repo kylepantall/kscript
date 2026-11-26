@@ -1,7 +1,7 @@
 import KScript.Web
 
 type SiteNav extends Component {
-  fn render(): Component {
+  fn render() {
     return ```html
     <nav class="site-nav">
       <a href="/">Home</a>

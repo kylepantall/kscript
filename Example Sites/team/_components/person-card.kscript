@@ -3,7 +3,7 @@ import KScript.Web
 type PersonCard extends Component {
   person: map
 
-  fn render(): Component {
+  fn render() {
     return ```html
     <article class="card">
       <h2><a href="/people/{$.person.id}">{$.person.name}</a></h2>
