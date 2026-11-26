@@ -70,24 +70,37 @@ echo "{ $doc->pages() } pages, { $doc->words() } words"
 
 ## Documents from source
 
-Import `KScript.Document` to work with Markdown and LaTeX fences. Use `@document(source)` to turn a fence into a
-document, or pass a string with `as: latex` for LaTeX source. A plain string defaults to Markdown.
+A Markdown or LaTeX fence makes a `markdown` or `latex` value, with no import: `.text` is its source and `.extension`
+its file extension. Import `KScript.Document` for the methods below. `@document(source)` turns a fence into a document,
+or a string with `as: latex` for LaTeX source. A plain string defaults to Markdown.
 
 ````kscript
 import KScript.Document
+
+fn notes() => ```md
+  # Notes
+  Ship *soon*.
+  ```
 
 fn paper() => ```latex
   \section{Draft}
   ```
 
-@document(@paper())->replace('Draft', 'Final')->save('paper', as: latex)
-@document('# Notes')->save('notes', as: pdf)
+echo @notes()->html()
+@notes()->save('notes.pdf')
+@paper()->replace('Draft', 'Final')->save('paper')
 ````
 
-Use `->find(text)` for the first source offset, `->replace(search, replacement)` for every literal match, and
-`->insert(content, at?)` to insert text or a same-format document. Offsets are zero-based and an omitted offset
-appends. These methods return a new value for each edit. Markdown can be rendered as PDF, Word, LaTeX or HTML.
-LaTeX source saves as `.tex` for use with a LaTeX engine.
+Both kinds of fence have `->find(text)` for the first source offset, `->replace(search, replacement)` for every literal
+match, and `->insert(content, at?)` to insert text or a same-format fence. Offsets are zero-based and an omitted offset
+appends. These methods return a new value for each edit. `->save(path, as?)` writes the source when the path ends in
+`.md` or `.tex` or has no extension.
+
+A Markdown fence is a document already. It has the document's `->html()`, `->latex()`, `->words()` and `->pages()`, and
+`->save()` renders it as PDF, Word, LaTeX or HTML by the path's extension or `as:`.
+
+KScript doesn't render LaTeX. A LaTeX fence saves as `.tex` for a LaTeX engine such as pdflatex, and asking it for
+another format, such as `->html()` or `->save('paper.pdf')`, is an error (KS5005 in the editor and `kscript check`).
 
 ## Templates
 
