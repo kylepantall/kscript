@@ -10,7 +10,7 @@
     <form
       class="add-task"
       on-submit="tasks = @add_task($tasks, title: $draft); draft = ''">
-      <input bind="draft" placeholder="What needs doing?" autocomplete="off">
+      <input @bind($draft) placeholder="What needs doing?" autocomplete="off">
       <button>Add</button>
     </form>
 

@@ -47,14 +47,14 @@
               <button on-click="world = @advance($world, generations: 50)">+50</button>
             </div>
             <label>Speed
-              <select bind="speed">
+              <select @bind($speed)>
                 <option value="0.4" selected="{$speed eq '0.4'}">Slow</option>
                 <option value="0.15" selected="{$speed eq '0.15'}">Normal</option>
                 <option value="0.04" selected="{$speed eq '0.04'}">Fast</option>
               </select>
             </label>
             <label>Pattern
-              <select bind="pattern" on-change="world = @select_pattern($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
+              <select @bind($pattern) on-change="world = @select_pattern($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
                 <for each="name" in="$patterns->keys()">
                   <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
                 </for>
@@ -67,7 +67,7 @@
                 min="5"
                 max="80"
                 step="5"
-                bind="soup"
+                @bind($soup)
                 aria-label="How full the soup is">
               <span class="muted">{$soup}%</span>
             </div>

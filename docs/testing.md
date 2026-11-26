@@ -250,7 +250,7 @@ Each test file also gets temporary app folders for file-backed auth, including c
 import KScript.Net
 
 test(name: "a note is saved") {
-  added = @api(/api/notes, options: { method: 'POST', body: { title: 'Ship it' } })
+  added = @api(/api/notes, post: { title: 'Ship it' })
   expect(value: $added.status, equals: 201)
   expect(value: @api(/api/notes/$added->json().id)->json().title, equals: 'Ship it')
 }

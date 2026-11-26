@@ -21,7 +21,7 @@ fn list_notes() {
 /// Adds a note. Gives what was wrong as text when the API turns it away (a
 /// blank title), or null when it was added.
 fn add_note(title: string) {
-  answer = @api(/api/notes, options: { method: 'POST', body: { title: $title->trim() } })
+  answer = @api(/api/notes, post: { title: $title->trim() })
   if $answer.status == 422 {
     return 'Give the note a title.'
   }
@@ -32,12 +32,12 @@ fn add_note(title: string) {
 /// Ticks a note, or unticks it.
 fn toggle_note(note: map) {
   changed = { title: $note.title, body: $note.body, done: not $note.done }
-  @api(/api/notes/$note.id, options: { method: 'PUT', body: $changed })->check()
+  @api(/api/notes/$note.id, put: $changed)->check()
 }
 
 /// Deletes a note.
 fn delete_note(id: int) {
-  @api(/api/notes/$id, options: { method: 'DELETE' })->check()
+  @api(/api/notes/$id, delete: true)->check()
 }
 
 /// How many notes are not done yet, as text: '1 note left'.

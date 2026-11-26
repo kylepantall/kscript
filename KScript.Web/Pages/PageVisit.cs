@@ -99,6 +99,21 @@ namespace KScript.Pages
                 case "change":
                     Fire(call, "change", Label(call));
                     return true;
+                case "press":
+                {
+                    // press('enter', in: 'Search') or press([ctrl, s]) sends a keydown, as typing it would.
+                    var keys = (call.Arg(0) is List<object> list ? list : new List<object> { call.Arg(0) }).Select(k => Values.ToStr(k).ToLowerInvariant()).ToList();
+                    string key = keys.LastOrDefault(k => !KScript.Syntax.Markup.HandlerShorthands.ModifierKeys.Contains(k))
+                        ?? throw call.Error("->press() needs a key, such as press('enter') or press(['ctrl', 's']).", "Argument");
+                    var ev = new Dictionary<string, object>(StringComparer.Ordinal)
+                    {
+                        ["type"] = "keydown",
+                        ["key"] = KScript.Syntax.Markup.HandlerShorthands.KeyNames.TryGetValue(key, out string browser) ? browser : key,
+                    };
+                    foreach (string m in KScript.Syntax.Markup.HandlerShorthands.ModifierKeys) ev[m] = keys.Contains(m);
+                    Fire(call, "keydown", call.Arg(1, "in") is string target && target.Trim().Length > 0 ? target.Trim() : null, ev);
+                    return true;
+                }
                 case "submit":
                     Fire(call, "submit", call.Has(0) ? Label(call) : null);
                     return true;
@@ -123,7 +138,7 @@ namespace KScript.Pages
             call.Arg(0) is string label && label.Trim().Length > 0 ? label.Trim() : throw call.Error($"{call.Display} needs the text of a button or link on the page, such as 'Add'.", "Argument");
 
         /// <summary>Runs the live handler of the element whose text is <paramref name="label"/> and puts its block's new HTML in the page.</summary>
-        private void Fire(CallContext call, string eventName, string label)
+        private void Fire(CallContext call, string eventName, string label, Dictionary<string, object> ev = null)
         {
             string attribute = "data-ks-on-" + eventName;
             var candidates = new List<(int Start, string Handler, string Args)>();
@@ -135,13 +150,13 @@ namespace KScript.Pages
                 string text = Text(Html[tag.Index..end]);
                 // An input has no text of its own: the label around it names it.
                 if (text.Length == 0 && EnclosingLabel(tag.Index) is string around) text = around;
-                if (label == null || text == label || (eventName == "submit" && text.Contains(label, StringComparison.Ordinal)) || Attribute(tag, "aria-label") == label || Attribute(tag, "title") == label)
+                if (label == null || text == label || (eventName == "submit" && text.Contains(label, StringComparison.Ordinal)) || Attribute(tag, "aria-label") == label || Attribute(tag, "title") == label || Attribute(tag, "placeholder") == label)
                     candidates.Add((tag.Index, handler.Groups[1].Value, Attribute(tag, "data-ks-args-" + handler.Groups[1].Value) ?? Attribute(tag, "data-ks-args")));
             }
             if (candidates.Count == 0)
             {
                 throw call.Error(label == null
-                    ? $"{call.Display}: the page has no form with on-{eventName}."
+                    ? (eventName == "submit" ? $"{call.Display}: the page has no form with on-{eventName}." : $"{call.Display}: nothing on the page has on-{eventName}.")
                     : $"{call.Display}: nothing on the page with the text '{label}' has on-{eventName}.", "NotFound");
             }
             (int start, string number, string args) = candidates[0];
@@ -159,7 +174,7 @@ namespace KScript.Pages
                 ["state"] = System.Net.WebUtility.HtmlDecode(Attribute(block, "data-ks-state") ?? string.Empty),
                 ["args"] = args == null ? null : System.Net.WebUtility.HtmlDecode(args),
                 ["binds"] = blockBinds,
-                ["event"] = new Dictionary<string, object>(),
+                ["event"] = ev ?? new Dictionary<string, object> { ["type"] = eventName },
             });
             PageResult result = PageServer.HandleLive(site, json, new Dictionary<string, object>());
             Status = result.Status;

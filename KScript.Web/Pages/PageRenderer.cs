@@ -811,6 +811,7 @@ namespace KScript.Pages
                     if (state.LiveScope == null || a.HandlerIndex < 0)
                         throw new PageException($"{a.Name} only works inside a <live> block, e.g. <live id=\"counter\">…</live>.");
                     sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(a.HandlerIndex).Append('"');
+                    AppendModifiers(sb, a, scope, state);
                     if (state.ActionScope != null)
                     {
                         var locals = LocalVariables(scope, state.LiveScope);
@@ -832,7 +833,9 @@ namespace KScript.Pages
                 if (a.Name == "bind")
                 {
                     if (state.LiveScope == null) throw new PageException("bind only works inside a <live> block.");
-                    string name = (a.Value ?? string.Empty).Trim().TrimStart('$');
+                    BindDirective.Reading binding = BindDirective.Read(a.Value);
+                    if (binding.Problems.Count > 0) throw new PageException(binding.Problems[0].Message);
+                    string name = binding.Path;
                     string[] path = name.Split('.');
                     if (state.LockedFields?.Contains(path[0]) == true)
                         throw new PageException($"State ${name} is locked. A browser input cannot bind to it.");
@@ -853,6 +856,28 @@ namespace KScript.Pages
                         sb.Append(" value=\"").Append(Values.HtmlEscape(Values.ToStr(bound))).Append('"');
                     }
                     if (!el.HasAttr("name")) sb.Append(" name=\"").Append(Values.HtmlEscape(name)).Append('"');
+                    if (binding.Word("on") is string on) sb.Append(" data-ks-bind-on=\"").Append(on).Append('"');
+                    if (binding.Get("debounce") is KScript.Syntax.ExprNode debounce)
+                    {
+                        double wait = Duration.Seconds(Eval(a.Value.Substring(debounce.Span.Start, debounce.Span.Length), scope, state), "debounce") * 1000;
+                        sb.Append(" data-ks-bind-debounce=\"").Append(Values.ToStr(Math.Max(0, Math.Round(wait)))).Append('"');
+                    }
+                    continue;
+                }
+                if (a.Name == "show")
+                {
+                    // @show($open): the tag stays in the page, hidden while the value is false.
+                    if (!Values.Truthy(Eval(a.Value ?? "false", scope, state)) && !el.HasAttr("hidden")) sb.Append(" hidden");
+                    continue;
+                }
+                if (a.Name == "live-disable" && !string.IsNullOrWhiteSpace(a.Value))
+                {
+                    // @live-disable(while: $saving): disabled while the condition holds, as well as while an action runs.
+                    if (state.LiveScope == null) throw new PageException("live-disable only works inside a <live> block.");
+                    (KScript.Syntax.Text.TextSpan? condition, string problem) = LiveAttributes.DisableCondition(a.Value);
+                    if (problem != null) throw new PageException(problem);
+                    sb.Append(" data-ks-live-disable");
+                    if (condition is { } span && Values.Truthy(Eval(a.Value.Substring(span.Start, span.Length), scope, state)) && !el.HasAttr("disabled")) sb.Append(" disabled");
                     continue;
                 }
                 if (a.Name == "bind-on")
@@ -983,6 +1008,81 @@ namespace KScript.Pages
             RenderNodes(el.Children, scope.Child(), sb, childrenState);
             sb.Append("</").Append(el.SourceName ?? el.Name).Append('>');
             if (passkeyButton) sb.Append("<span role=\"status\" data-ks-passkey-status></span>");
+        }
+
+        /// <summary>The binding with options (@bind($age, as: int)) of a control in a live block's template, or null.</summary>
+        private static BindDirective.Reading BindingOf(PageElement block, string path)
+        {
+            foreach (PageElement element in Descendants(block))
+            {
+                if (element.Attr("bind") is not string text || !text.Contains(',')) continue;
+                BindDirective.Reading reading = BindDirective.Read(text);
+                if (reading.Path == path) return reading;
+            }
+            return null;
+        }
+
+        private static IEnumerable<PageElement> Descendants(PageElement element)
+        {
+            foreach (PageElement child in element.Children.OfType<PageElement>())
+            {
+                yield return child;
+                foreach (PageElement below in Descendants(child)) yield return below;
+            }
+        }
+
+        /// <summary>A bound value read as as: says (string, int, number, bool), with what is wrong when it can't be.</summary>
+        private static (object Value, string Problem) ReadBound(object value, string type, string field)
+        {
+            string text = Values.ToStr(value)?.Trim() ?? string.Empty;
+            switch (type)
+            {
+                case "string":
+                    return (Values.ToStr(value), null);
+                case "bool":
+                    return value is bool b ? (b, null) : Values.ParseBool(text) is bool parsed ? (parsed, null) : (null, $"{field} takes true or false, and '{text}' is neither.");
+                case "int":
+                    return Values.TryNumber(text, out double whole) && whole == Math.Floor(whole) ? (whole, null) : (null, $"{field} takes a whole number, and '{text}' isn't one.");
+                default:
+                    return Values.TryNumber(text, out double number) ? (number, null) : (null, $"{field} takes a number, and '{text}' isn't one.");
+            }
+        }
+
+        /// <summary>
+        /// A handler's modifiers (confirm:, key:, prevent:, debounce:, throttle:, once:) as data-ks-mods-click for the
+        /// browser to apply; disable: is the block's own data-ks-live-disable.
+        /// </summary>
+        private static void AppendModifiers(StringBuilder sb, PageAttribute a, Scope scope, RenderState state)
+        {
+            string handler = a.Value ?? string.Empty;
+            if (!HandlerShorthands.IsShorthand(handler)) return;
+            HandlerShorthands.Reading reading = HandlerShorthands.Read(handler);
+            if (reading.Modifiers.Count == 0) return;
+            var mods = new Dictionary<string, object>(StringComparer.Ordinal);
+            foreach ((HandlerShorthands.Modifier modifier, KScript.Syntax.ArgumentNode argument) in reading.Modifiers)
+            {
+                string valueText = handler.Substring(argument.Value.Span.Start, argument.Value.Span.Length);
+                switch (modifier.Value)
+                {
+                    case HandlerShorthands.ModifierValue.Keys:
+                        (string key, IReadOnlyList<string> with) = HandlerShorthands.Keys(argument.Value);
+                        mods["key"] = key;
+                        mods["with"] = with.Cast<object>().ToList();
+                        break;
+                    case HandlerShorthands.ModifierValue.Duration:
+                        mods[modifier.Name] = Math.Max(0, Math.Round(Duration.Seconds(Eval(valueText, scope, state), modifier.Name) * 1000));
+                        break;
+                    case HandlerShorthands.ModifierValue.Flag:
+                        if (argument.Value is KScript.Syntax.LiteralNode { Value: "true" }) mods[modifier.Name] = true;
+                        break;
+                    default:
+                        mods[modifier.Name] = Values.ToStr(Eval(valueText, scope, state));
+                        break;
+                }
+            }
+            if (mods.Remove("disable")) sb.Append(" data-ks-live-disable");
+            if (mods.Count > 0)
+                sb.Append(" data-ks-mods-").Append(a.Name["on-".Length..]).Append("=\"").Append(Values.HtmlEscape(Values.ToJson(mods))).Append('"');
         }
 
         /// <summary>
@@ -1268,6 +1368,16 @@ namespace KScript.Pages
                             Body = $"The value sent for {kv.Key} isn't one a form control sends: text, a number, true or false, or a list of those.",
                         });
                     object next = !typed && kv.Value is string text && old is double && Values.TryNumber(text, out double number) ? number : kv.Value;
+                    if (BindingOf(el, kv.Key) is { } binding)
+                    {
+                        // @bind($age, as: int, trim: true): read the value before it reaches the field.
+                        if (binding.Trim && next is string untrimmed) next = untrimmed.Trim();
+                        if (binding.Word("as") is string type && ReadBound(next, type, kv.Key) is var (converted, problem))
+                        {
+                            if (problem != null) throw new PageResponseSignal(new PageResult { Status = 422, ContentType = "text/plain; charset=utf-8", Body = problem });
+                            next = converted;
+                        }
+                    }
                     try
                     {
                         if (owner == null) liveScope.Assign(path[0], next);
@@ -1290,6 +1400,16 @@ namespace KScript.Pages
                     foreach (var kv in ctx.Live.Args) handlerScope.Declare(kv.Key, kv.Value);
                     ctx.Live.Event["files"] = ctx.Live.Files ?? new Dictionary<string, object>();
                     handlerScope.Declare("event", ctx.Live.Event);
+                    // reset: puts a <state> back to its value attribute, worked out again now.
+                    var starts = el.Children.OfType<PageElement>().Where(c => c.Name == "state" && c.Attr("name") != null)
+                        .ToDictionary(c => c.Attr("name").TrimStart('$'), c => c.Attr("value"), StringComparer.Ordinal);
+                    handlerScope.Declare(HandlerShorthands.DefaultsVariable, new FieldDefault((string name, out object value) =>
+                    {
+                        value = null;
+                        if (!starts.TryGetValue(name, out string expr)) return false;
+                        value = string.IsNullOrWhiteSpace(expr) ? null : Eval(expr, liveScope, state);
+                        return true;
+                    }));
                     KScriptHost host = ctx.Runtime.Interpreter.Host;
                     bool previousCanWrite = host.CanWriteFiles;
                     ctx.InLiveAction = true;

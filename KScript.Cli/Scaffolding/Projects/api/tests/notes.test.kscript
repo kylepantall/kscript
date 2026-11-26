@@ -8,7 +8,7 @@ import KScript.Net
 fn sign_up() {
   email = 'test-' + @uuid() + '@example.com'
   body = { name: 'Test', email: $email, password: 'correct horse battery staple' }
-  account = @api(/api/register, options: { method: 'POST', body: $body })->check()->json()
+  account = @api(/api/register, post: $body)->check()->json()
   return { Authorization: 'Bearer ' + $account.token }
 }
 {{/if}}
@@ -37,7 +37,7 @@ describe(name: "notes") {
 {{#if auth}}
 
   after_each {
-    @api(/api/me, options: { method: 'DELETE', headers: $me })
+    @api(/api/me, delete: true, options: { headers: $me })
   }
 {{/if}}
 
@@ -74,7 +74,7 @@ describe(name: "notes") {
     other = @sign_up()
     expect(value: @notes_api(/$note.id, as: $other).status, equals: 404)
     expect(value: @notes_api(/, as: $other)->json(), equals: [])
-    @api(/api/me, options: { method: 'DELETE', headers: $other })
+    @api(/api/me, delete: true, options: { headers: $other })
   }
 {{/if}}
 {{#if cache}}

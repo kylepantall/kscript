@@ -249,6 +249,22 @@
     }, every);
   }
 
+  var debounced = new WeakMap();
+  var throttled = new WeakMap();
+
+  function modifiers(el, type) {
+    var text = el.getAttribute("data-ks-mods-" + type);
+    if (!text) return {};
+    try { return JSON.parse(text); } catch (err) { return {}; }
+  }
+
+  // key: enter or key: [ctrl, s]: the key (KeyboardEvent.key, lower case) and exactly the modifier keys named.
+  function keyMatches(mods, e) {
+    if (!e.key || e.key.toLowerCase() !== mods.key) return false;
+    var withKeys = mods.with || [];
+    return ["ctrl", "alt", "shift", "meta"].every(function (m) { return withKeys.includes(m) === !!e[m + "Key"]; });
+  }
+
   function handlerArgs(el, handler) {
     return el.getAttribute("data-ks-args-" + handler) || el.getAttribute("data-ks-args");
   }
@@ -626,6 +642,19 @@
     }
 
     if (el && blockOf(el) === block) {
+      // A handler's modifiers (key:, prevent:, once:, confirm:, debounce:, throttle:), from its shorthands.
+      var mods = modifiers(el, type);
+      if (mods.self && e.target !== el) return;
+      if (mods.key && !keyMatches(mods, e)) return;
+      if (mods.prevent) e.preventDefault();
+      if (mods.once) {
+        if (el.hasAttribute("data-ks-ran-" + type)) return;
+        el.setAttribute("data-ks-ran-" + type, "");
+      }
+      if (mods.confirm != null && !window.confirm(mods.confirm)) {
+        e.preventDefault();
+        return;
+      }
       var prevent = el.getAttribute("prevent-default");
       if (type === "submit" || type === "enter" || type === "drop" || (type === "click" && el.tagName === "A") ||
           (prevent !== null && (prevent === "" || prevent.split(/[,\s]+/).includes(e.type)))) e.preventDefault();
@@ -638,7 +667,17 @@
       e.handlerElement = el;
       var handler = parseInt(el.getAttribute("data-ks-on-" + type), 10);
       var args = handlerArgs(el, handler);
-      if (type === "input") {
+      if (mods.throttle) {
+        var last = throttled.get(el)?.[type] || 0;
+        if (Date.now() - last < mods.throttle) return;
+        throttled.set(el, Object.assign(throttled.get(el) || {}, { [type]: Date.now() }));
+      }
+      if (mods.debounce) {
+        var waiting = debounced.get(el) || {};
+        clearTimeout(waiting[type]);
+        waiting[type] = setTimeout(function () { send(blockOf(el) || block, handler, args, target, e); }, mods.debounce);
+        debounced.set(el, waiting);
+      } else if (type === "input") {
         clearTimeout(timers[block.getAttribute("data-ks-live")]);
         timers[block.getAttribute("data-ks-live")] = setTimeout(function () { send(blockOf(target) || block, handler, args, target, e); }, 120);
       } else {
@@ -655,7 +694,8 @@
       if (type !== (mode === "blur" ? "focusout" : mode)) return;
       var key = block.getAttribute("data-ks-live");
       clearTimeout(timers[key]);
-      timers[key] = setTimeout(function () { send(blockOf(target) || block, -1, null, target, e); }, type === "input" ? 120 : 0);
+      var wait = Number(target.getAttribute("data-ks-bind-debounce") || (type === "input" ? 120 : 0));
+      timers[key] = setTimeout(function () { send(blockOf(target) || block, -1, null, target, e); }, wait);
     }
     if (type === "submit") e.preventDefault();
   }

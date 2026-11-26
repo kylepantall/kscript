@@ -31,7 +31,7 @@ namespace KScript.Pages
         public static bool NeedsLiveOwner(string name) =>
             name.StartsWith("on-", StringComparison.OrdinalIgnoreCase) ||
             LiveAttributes.Get(name) is { Name: var directive } && directive is not ("live-id" or "live-navigate" or "live-navigate-once"
-                or "sort-axis" or "every" or "event-name" or "prevent-default" or KScript.Syntax.Markup.ClassDirective.Attribute);
+                or "sort-axis" or "every" or "event-name" or "prevent-default" or "show" or KScript.Syntax.Markup.ClassDirective.Attribute);
 
         public static string CompanionPath(string template) => template != null &&
             string.Equals(Path.GetFileName(Path.GetDirectoryName(template)), "_components", StringComparison.OrdinalIgnoreCase)

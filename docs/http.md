@@ -404,11 +404,23 @@ A key with no record gets `404` before the policy is asked.
 import KScript.Net
 
 notes = @api(/api/notes)->check()->json()
-added = @api(/api/notes, options: { method: 'POST', body: { title: 'Ship it' } })
+added = @api(/api/notes, post: { title: 'Ship it' })
 echo $added.status   // 201
 ```
 
 It works from pages, tests and scripts in the project (the folder with `kscript.json`), and from routes. The options and the response are the same as for an address: `method`, `headers` and `body` (a map or list is sent as JSON), then `.status`, `->json()`, `->header(name)` and the rest. A path with no route is a 404.
+
+Named shorthands cover the options set most. Each is the same as its long form:
+
+| Shorthand | Same as |
+| --- | --- |
+| `post: { title: 'Ship it' }`, `put: $note`, `patch: $changes` | `options: { method: 'POST', body: … }` with that method |
+| `delete: true` | `options: { method: 'DELETE' }` (anything but `true` is sent as the body) |
+| `bearer: $token` | `options: { headers: { Authorization: 'Bearer …' } }` |
+| `timeout: 5s`, `retries: 3` | the same fields in `options` |
+| `as: Note` | `->check()->json(as: Note)`: the response must succeed, and its JSON becomes `Note` records |
+
+An option given both ways is an error, so a request says each thing once.
 
 `@api()` sends `User-Agent: kscript` by default for both remote and local requests. To identify a particular client, pass `options: { headers: { 'User-Agent': 'my-app' } }`. That override applies to one request.
 

@@ -189,7 +189,15 @@ namespace KScript.Net
                             new ParameterInfo("retry_delay", optional: true, type: Duration.TypeName, description: "Time between retry attempts.")
                                 { DefaultValue = "100ms", Example = "250ms" },
                         },
-                    }) })
+                    },
+                    new ParameterInfo("post", optional: true, type: KType.Any, description: "Shorthand: sends this body with POST. `@api('/notes', post: { title: 'Ship it' })` is `options: { method: 'POST', body: { ... } }`."),
+                    new ParameterInfo("put", optional: true, type: KType.Any, description: "Shorthand: sends this body with PUT."),
+                    new ParameterInfo("patch", optional: true, type: KType.Any, description: "Shorthand: sends this body with PATCH."),
+                    new ParameterInfo("delete", optional: true, type: KType.Any, description: "Shorthand: sends a DELETE. `delete: true` sends no body; anything else is sent as the body."),
+                    new ParameterInfo("bearer", optional: true, type: KType.String, description: "Shorthand: an Authorization: Bearer header with this token."),
+                    new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "Shorthand for options.timeout: 5s."),
+                    new ParameterInfo("retries", optional: true, type: KType.Number, description: "Shorthand for options.retries: 3."),
+                    new ParameterInfo("as", optional: true, type: KType.Type, description: "Shorthand: checks the response succeeded and reads its JSON as this type. `@api($url, as: Note)` is `@api($url)->check()->json(as: Note)`.")) })
             {
                 ReturnType = KType.Response,
                 Example = """
@@ -237,10 +245,54 @@ namespace KScript.Net
 
             p.AgentNotes(
                 ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.",
-                    prefer: "@api($url)->check()->json(as: Type) to fail fast and check the data's shape.")));
+                    prefer: "@api($url, as: Type) (the same as ->check()->json(as: Type)) to fail fast and check the data's shape.")));
         }
 
-        private static object Api(CallContext c) => Api(c, c.Str(0), c.Arg(1) == null ? new Dictionary<string, object>() : c.Map(1));
+        /// <summary>The named shorthands of @api, after url and options, in their places in the signature.</summary>
+        private static readonly string[] ApiShorthands = { "post", "put", "patch", "delete", "bearer", "timeout", "retries", "as" };
+
+        private static object Api(CallContext c)
+        {
+            var options = c.Arg(1) == null ? new Dictionary<string, object>(StringComparer.Ordinal) : new Dictionary<string, object>(c.Map(1), StringComparer.Ordinal);
+            object Named(string name) => c.Arg(2 + Array.IndexOf(ApiShorthands, name), name);
+            bool Given(string name) => c.Has(2 + Array.IndexOf(ApiShorthands, name), name);
+            void Set(string option, object value, string shorthand)
+            {
+                if (options.ContainsKey(option)) throw c.Error($"@api() was given {option} twice: in options and as {shorthand}:. Give it once.", "Argument");
+                options[option] = value;
+            }
+            string[] methods = new[] { "post", "put", "patch", "delete" }.Where(Given).ToArray();
+            if (methods.Length > 1) throw c.Error($"@api() takes one of post:, put:, patch: and delete:, and was given {string.Join(" and ", methods.Select(m => m + ":"))}.", "Argument");
+            foreach (string method in methods)
+            {
+                Set("method", method.ToUpperInvariant(), method);
+                object body = Named(method);
+                if (!(method == "delete" && body is bool)) Set("body", body, method);
+            }
+            if (Given("bearer"))
+            {
+                var headers = options.GetValueOrDefault("headers") is Dictionary<string, object> given ? new Dictionary<string, object>(given, StringComparer.Ordinal) : new Dictionary<string, object>(StringComparer.Ordinal);
+                if (headers.Keys.Any(k => k.Equals("Authorization", StringComparison.OrdinalIgnoreCase)))
+                    throw c.Error("@api() was given an Authorization header and bearer:. Give it once.", "Argument");
+                headers["Authorization"] = "Bearer " + Values.ToStr(Named("bearer"));
+                options["headers"] = headers;
+            }
+            if (Given("timeout")) Set("timeout", Named("timeout"), "timeout");
+            if (Given("retries")) Set("retries", Named("retries"), "retries");
+            ResponseValue response = Api(c, c.Str(0), options);
+            if (!Given("as")) return response;
+            if (!response.Ok) throw new KScriptException($"{response.Url} answered {response.Status} {response.Reason}.", "Network") { Fields = { ["status"] = (double)response.Status } };
+            object data;
+            try
+            {
+                data = Values.ParseJson(response.Body);
+            }
+            catch (KScriptException ex)
+            {
+                throw new KScriptException($"The response from {response.Url} isn't JSON ({ex.Message}).", "Format");
+            }
+            return Shapes.MapAs(c.Interpreter, data, Named("as"), $"The response from {response.Url}", c.Scope, c.Module);
+        }
 
         private static ResponseValue Api(CallContext c, string url, Dictionary<string, object> options)
         {

@@ -100,12 +100,12 @@ type ApiTokens extends Component {
       <for each="t" in="@api_tokens(@user())">
         <li>
           {$t.name}, made {$t.created_at}
-          <button type="button" @on-click($this->revoke($t.id)) live-confirm="Revoke {$t.name}?">Revoke</button>
+          <button type="button" @on-click(call: $revoke, with: [$t.id], confirm: "Revoke {$t.name}?")>Revoke</button>
         </li>
       </for>
     </ul>
     <form @on-submit($make)>
-      <p><label>Name<br><input @bind('name') bind-on="action" required></label></p>
+      <p><label>Name<br><input @bind($name, on: action) required></label></p>
       <p><button live-disable>Make a token</button></p>
     </form>
     ```

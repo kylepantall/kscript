@@ -60,10 +60,26 @@ namespace KScript.UI
         internal static void ReadProps(ElementRun run, UINode node, Scope scope)
         {
             ElementInfo info = run.Definition.Info;
+            var shorthand = new System.Text.StringBuilder();
+            var map = new List<int>();
             foreach (MarkupAttribute attr in run.Element.Attributes)
             {
                 AttributeInfo a = info.GetAttribute(attr.Name);
                 if (a == null || attr.Value == null) continue;
+                if (HandlerShorthands.WindowNames.Contains(attr.Name) && info.GetAttribute("on_click") != null)
+                {
+                    // Button(toggle: $open): the shorthands, in order, are the element's on_click.
+                    if (shorthand.Length > 0)
+                    {
+                        shorthand.Append(", ");
+                        map.AddRange(Enumerable.Repeat(attr.Value.ToSource(0), 2));
+                    }
+                    string head = attr.Name + ": ";
+                    shorthand.Append(head).Append(attr.Value.Value);
+                    map.AddRange(Enumerable.Repeat(attr.Value.ToSource(0), head.Length));
+                    map.AddRange(Enumerable.Range(0, attr.Value.Value.Length).Select(attr.Value.ToSource));
+                    continue;
+                }
                 switch (a.Kind)
                 {
                     case AttributeKind.Statements:
@@ -90,6 +106,13 @@ namespace KScript.UI
                         node.Props[attr.Name] = run.Interpreter.Interpolate(attr.Value, scope, run.Module, bareReferences: true);
                         break;
                 }
+            }
+            if (shorthand.Length > 0)
+            {
+                if (node.Handlers.ContainsKey("on_click"))
+                    throw run.Error("Use on_click or shorthands such as toggle: $open here, not both.", "on_click", "Syntax");
+                map.Add(map[^1] + 1);
+                node.Handlers["on_click"] = new UIHandler(new DecodedText(shorthand.ToString(), map.ToArray()), scope, run.Module);
             }
         }
     }

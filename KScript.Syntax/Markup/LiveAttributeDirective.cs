@@ -6,6 +6,17 @@ namespace KScript.Syntax.Markup;
 /// <summary>A live attribute written as a directive in an HTML start tag, with ranges in the original source.</summary>
 public readonly record struct LiveAttributeDirective(string Name, TextSpan NameSpan, TextSpan? Value, char Quote, int End, string Error)
 {
+    /// <summary>What to say about a directive written with nothing between its parentheses, or null when that is fine.</summary>
+    private static string EmptyMessage(string name) => name switch
+    {
+        ClassDirective.Attribute => "@class needs classes and conditions, such as @class(done: $todo.done).",
+        "live-disable" => null,
+        "bind" => "@bind needs the field it binds, such as @bind($draft).",
+        "show" => "@show needs a condition, such as @show($open).",
+        PendingDirective.Attribute => "@pending needs a class, such as @pending('saving') or @pending('crumple', for: 'delete').",
+        _ => $"@{name} needs a handler.",
+    };
+
     public static bool TryRead(string text, int start, out LiveAttributeDirective directive)
     {
         directive = default;
@@ -20,6 +31,12 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
         if (pos == text.Length || text[pos] != '(') return false;
         int argument = pos + 1;
         pos = SkipSpace(text, argument);
+        // @bind($query, on: blur) and @live-disable(while: $saving) take a field or named arguments, read like code.
+        if (name == "bind" && pos < text.Length && text[pos] == '$'
+            || name == "live-disable" && text.AsSpan(pos).StartsWith("while", StringComparison.Ordinal))
+        {
+            kind = LiveDirectiveArgument.Statements;
+        }
 
         if (kind is LiveDirectiveArgument.Statements or LiveDirectiveArgument.OptionalExpression)
         {
@@ -85,13 +102,6 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
             : $"@{name} needs a quoted value.");
         return true;
     }
-
-    private static string EmptyMessage(string name) => name switch
-    {
-        ClassDirective.Attribute => "@class needs classes and conditions, such as @class(done: $todo.done).",
-        PendingDirective.Attribute => "@pending needs a class, such as @pending('saving') or @pending('crumple', for: 'delete').",
-        _ => $"@{name} needs a handler.",
-    };
 
     private static int SkipSpace(string text, int pos)
     {
