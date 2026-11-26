@@ -1019,6 +1019,10 @@ namespace KScript.Language.Analysis
                         Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                             "Use bind-on with bind and choose input, change, blur or action.");
                 }
+                if (attr.Name == "autogrow" && Kind != DocumentKind.Script && component == null && !e.Name.Equals("textarea", StringComparison.OrdinalIgnoreCase))
+                {
+                    Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, "Use @autogrow() on a textarea.");
+                }
                 if (attr.Value == null)
                 {
                     continue;
@@ -1043,6 +1047,14 @@ namespace KScript.Language.Analysis
                 else if (attr.Name is "show" or "live-disable" && Kind != DocumentKind.Script && attr.Value != null)
                 {
                     AnalyzeConditionDirective(attr, e, scope);
+                }
+                else if (component == null && attr.Name == "focus" && Kind != DocumentKind.Script)
+                {
+                    AnalyzeFocusDirective(attr, e, scope);
+                }
+                else if (component == null && attr.Name == PendingDirective.Attribute && Kind != DocumentKind.Script)
+                {
+                    AnalyzePendingDirective(attr, e, scope);
                 }
                 else if (component == null && attr.Name.Equals("bind", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {

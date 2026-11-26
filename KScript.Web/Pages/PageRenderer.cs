@@ -158,6 +158,9 @@ namespace KScript.Pages
             public HashSet<string> LockedFields;
             public bool InPlaceholder;
 
+            /// <summary>Inside a &lt;live&gt; block: its on-* handlers, numbered as the browser sends them.</summary>
+            public List<PageAttribute> Handlers;
+
             /// <summary>The file's packages and imported scripts.</summary>
             public Module Module;
 
@@ -170,7 +173,7 @@ namespace KScript.Pages
                 Ctx = Ctx, File = File, Markdown = markdown ?? Markdown, Slot = Slot, LiveScope = liveScope ?? LiveScope, Module = Module, Imports = Imports,
                 ActionScope = ActionScope, BoundFields = BoundFields, VisibleActions = VisibleActions,
                 SelectedOptions = SelectedOptions, UploadFields = UploadFields, StreamTargets = StreamTargets,
-                LockedFields = LockedFields, InPlaceholder = InPlaceholder,
+                LockedFields = LockedFields, InPlaceholder = InPlaceholder, Handlers = Handlers,
             };
         }
 
@@ -915,6 +918,21 @@ namespace KScript.Pages
                     sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(Values.HtmlEscape(directiveValue)).Append('"');
                     continue;
                 }
+                if (a.Name is "focus" or "autogrow" or PendingDirective.Attribute)
+                {
+                    if (state.LiveScope == null) throw new PageException($"@{a.Name} only works in a live component or a <live> block.");
+                    if (a.Name == "focus")
+                    {
+                        if (FocusCondition(a, scope, state)) sb.Append(" data-ks-focus");
+                    }
+                    else if (a.Name == "autogrow")
+                    {
+                        if (el.Name != "textarea") throw new PageException("Use @autogrow() on a textarea.");
+                        sb.Append(" data-ks-autogrow");
+                    }
+                    else AppendPending(a, scope, sb, state);
+                    continue;
+                }
                 if (a.Name.StartsWith("live-use-", StringComparison.Ordinal) && state.LiveScope == null)
                     throw new PageException($"{a.Name} needs a live component or a <live> block.");
                 if (a.Name is "live-loading" or "live-offline" or "live-disable" or "live-confirm" or "live-key" or "live-replace"
@@ -1080,6 +1098,54 @@ namespace KScript.Pages
                 }
             }
             return string.Join(" ", classes.Distinct(StringComparer.Ordinal));
+        }
+
+        /// <summary>
+        /// <c>@focus()</c> focuses the element when it appears; <c>@focus($cond)</c> while the condition is true. The
+        /// HTML spelling takes <c>focus</c> or <c>focus="{$cond}"</c>.
+        /// </summary>
+        private static bool FocusCondition(PageAttribute a, Scope scope, RenderState state)
+        {
+            if (a.Value == null || a.Value.Trim().Length == 0) return true;
+            string text = TryWholeExpression(a.Value, out string whole, out _) ? whole : a.Value;
+            object value = Eval(text, scope, state);
+            if (value is not bool on) throw new PageException($"@focus: {text.Trim()} must be true or false, and it is {Values.Describe(value)}.");
+            return on;
+        }
+
+        /// <summary>
+        /// <c>@pending('crumple', for: 'delete')</c>: the classes, and the numbers of the block's handlers that run the
+        /// named methods, which the browser matches against the action it sends.
+        /// </summary>
+        private static void AppendPending(PageAttribute a, Scope scope, StringBuilder sb, RenderState state)
+        {
+            string text = a.Value ?? string.Empty;
+            if (TryWholeExpression(text, out string whole, out _)) text = whole;
+            PendingDirective.Reading reading = PendingDirective.Read(text);
+            if (reading.Problems.Count > 0) throw new PageException("@pending: " + reading.Problems[0].Message);
+            TextSpan classSpan = reading.Classes.Value;
+            object named = Eval(text.Substring(classSpan.Start, classSpan.Length), scope, state);
+            var classes = new List<string>();
+            foreach (object name in named is List<object> list ? list : new List<object> { named })
+            {
+                if (name is not string className || !ClassDirective.IsClassName(className))
+                    throw new PageException($"@pending: {Values.ToStr(name)} isn't a class name.");
+                classes.Add(className);
+            }
+            sb.Append(" data-ks-pending=\"").Append(Values.HtmlEscape(string.Join(" ", classes.Distinct(StringComparer.Ordinal)))).Append('"');
+            if (reading.For is not TextSpan forSpan) return;
+            object methods = Eval(text.Substring(forSpan.Start, forSpan.Length), scope, state);
+            var handlers = new List<int>();
+            foreach (object method in methods is List<object> names ? names : new List<object> { methods })
+            {
+                if (method is not string methodName || methodName.Length == 0)
+                    throw new PageException($"@pending: for: takes a method name, such as for: 'delete', and {Values.Describe(method)} isn't one.");
+                var calling = (state.Handlers ?? new List<PageAttribute>()).Where(h => PendingDirective.HandlerCalls(h.Value, methodName)).ToList();
+                if (calling.Count == 0)
+                    throw new PageException($"@pending: no handler in this component runs {methodName}. Call it from a handler, such as @on-click(${methodName}).");
+                handlers.AddRange(calling.Select(h => h.HandlerIndex));
+            }
+            sb.Append(" data-ks-pending-for=\"").Append(string.Join(" ", handlers.Distinct())).Append('"');
         }
 
         private static string InputChoiceValue(PageElement element, Scope scope, RenderState state) =>
@@ -1320,6 +1386,7 @@ namespace KScript.Pages
             var body = new StringBuilder();
             var inner = state.With(liveScope: liveScope);
             inner.ActionScope = actionScope;
+            inner.Handlers = handlers;
             inner.BoundFields = boundFields;
             inner.VisibleActions = null;
             inner.UploadFields = null;
@@ -1506,6 +1573,7 @@ namespace KScript.Pages
             }
             var probe = state.With(liveScope: probeScope);
             probe.ActionScope = actionScope;
+            probe.Handlers = PageLive.Handlers(el);
             probe.BoundFields = new Dictionary<string, object>();
             probe.VisibleActions = new HashSet<string>(StringComparer.Ordinal);
             probe.UploadFields = new HashSet<string>(StringComparer.Ordinal);
