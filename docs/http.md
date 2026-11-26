@@ -415,9 +415,14 @@ It works from pages, tests and scripts in the project (the folder with `kscript.
 A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. A `Cookie` header you give is read into the route's `$cookies`, as `kscript serve` reads it; cookies a response sets are never carried over to a later request.
 
 ```kscript
-reply = @api(/, options: { headers: { Cookie: 'sb_guest=0f8f' } })   // the route's $cookies.sb_guest is '0f8f'
-echo $reply.cookies          // the cookies the response set: { ks_session: '...', sb_guest: '...' }
-echo $reply.headers['Set-Cookie']   // a list when the response set more than one
+import KScript.Net
+
+// The route reads $cookies.sb_guest as '0f8f'.
+reply = @api(/board, options: { headers: { Cookie: 'sb_guest=0f8f' } })
+// The cookies the response set, such as { ks_session: '...', sb_guest: '...' }.
+echo $reply.cookies
+// A list when the response set more than one.
+echo $reply.headers['Set-Cookie']
 ```
 
 A header sent more than once, such as `Set-Cookie`, is a list in `.headers`; `->header(name)` gives the first. `.cookies` has the name and value of each cookie the response set. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
