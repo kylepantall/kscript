@@ -170,7 +170,7 @@ type NoteCard extends Component {
     return ```html
     <article>
       <h3>{$heading}</h3>
-      <button type="button" @on-click($open)>{$open ? 'Hide' : 'Show'}</button>
+      <button type="button" @on-click(toggle: $open)>{$open ? 'Hide' : 'Show'}</button>
       <button type="button" @on-click(clicks += 1)>Clicked {$clicks}</button>
     </article>
     ```
@@ -434,7 +434,7 @@ A command it doesn't read is an error that names it, so nothing is left out with
 
 ## Actions and browser events
 
-Handlers contain KScript statements and can call imported functions. A handler can also be a single value. A bool field flips, so `@on-click($open)` is the same as `@on-click(open = not $open)`. A function or one of the component's methods is called, so `@on-click($save)` runs `fn save()`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
+Handlers contain KScript statements and can call imported functions. A handler can also be a function or one of the component's methods, which is called, so `@on-click($save)` runs `fn save()`. To flip a bool field, use the `toggle:` shorthand: `@on-click(toggle: $open)` is the same as `@on-click(open = not $open)`. A bare bool such as `@on-click($open)` is an error with a quick fix to `toggle:`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
 
 | Interaction | Attributes |
 | --- | --- |

@@ -119,7 +119,7 @@ public class PrivateMemberTests
 
           fn render() => ```html
             <p>{$title} {$open} {$clicks}</p>
-            <button @on-click($open)>Toggle</button>
+            <button @on-click(toggle: $open)>Toggle</button>
             <button @on-click($count)>Count</button>
             <button @on-click(clicks += 10)>Ten</button>
             ```

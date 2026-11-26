@@ -41,7 +41,7 @@ type {{ pascal }}{{ component_suffix }} extends Component {
 {{#if live}}
     <live>
       <state name="expanded" value="false" />
-      <button type="button" on-click="$.expanded" aria-expanded="{$.expanded ? 'true' : 'false'}">{{ title }}</button>
+      <button type="button" on-click="toggle: $.expanded" aria-expanded="{$.expanded ? 'true' : 'false'}">{{ title }}</button>
       <if test="$.expanded">
 {{else}}
     <section class="{{ kebab }}">

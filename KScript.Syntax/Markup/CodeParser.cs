@@ -1154,6 +1154,17 @@ namespace KScript.Syntax.Markup
             return !named;
         }
 
+        /// <summary>
+        /// True when <paramref name="word"/> at <c>pos</c> starts a declaration (<c>fn name</c>, <c>type Name</c>,
+        /// <c>private fn</c>, <c>policy for Post</c>), which no value can start. A lambda (<c>fn($x) =&gt;</c>) isn't one.
+        /// </summary>
+        private bool StartsDeclarationLine(string word) => word switch
+        {
+            "fn" or "override" or "extend" or "type" or "model" or "enum" or "error" or "job" or "private" => StartsDeclaration(word.Length),
+            "policy" => StartsPolicy(),
+            _ => false,
+        };
+
         private bool StartsDeclaration(int keywordLength)
         {
             int p = pos + keywordLength;
@@ -2472,6 +2483,11 @@ namespace KScript.Syntax.Markup
                 string word = PeekName();
                 int after = pos + word.Length;
                 bool spaced = after >= text.Length || char.IsWhiteSpace(text[after]);
+                if (StartsDeclarationLine(word))
+                {
+                    // @paper()-> left unfinished above fn paper() { }: the fn is its own statement, not the method's name.
+                    return true;
+                }
                 return spaced && word is "echo" or "if" or "for" or "while" or "return" or "import" or "const" or "break" or "continue" or "try" or "throw";
             }
             finally
