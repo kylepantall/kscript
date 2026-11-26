@@ -89,6 +89,31 @@ public class BrowserDirectiveTests
         Assert.Contains(message, System.Net.WebUtility.HtmlDecode(ex.Message));
     }
 
+    [Fact]
+    public void Drag_hands_its_options_to_the_browser()
+    {
+        string html = Render("""
+            <article @drag(front: true, scroll: '.surface', skip: '.thumb', threshold: 6) @on-dragend(title = "{$event.x}")>a</article>
+            <button @drag(copy: true, value: 'pink', ghost: "note-ghost c-pink")>pad</button>
+            <p @drag()>b</p>
+            """);
+        Assert.Contains("data-ks-drag=\"{&quot;front&quot;:true,&quot;scroll&quot;:&quot;.surface&quot;,&quot;skip&quot;:&quot;.thumb&quot;,&quot;threshold&quot;:6}\" data-ks-on-dragend=", html);
+        Assert.Contains("data-ks-drag=\"{&quot;copy&quot;:true,&quot;value&quot;:&quot;pink&quot;,&quot;ghost&quot;:&quot;note-ghost c-pink&quot;}\"", html);
+        Assert.Contains("<p data-ks-drag=\"{}\">b</p>", html);
+    }
+
+    [Theory]
+    [InlineData("<p @drag(front: 'yes')>x</p>", "@drag: front: takes a bool")]
+    [InlineData("<p @drag(sideways: true)>x</p>", "@drag has no sideways: option.")]
+    [InlineData("<p @drag(value: 'pink')>x</p>", "value: goes with copy: true")]
+    [InlineData("<p @drag(copy: true, ghost: 'a.b')>x</p>", "ghost: a.b isn't a class name.")]
+    [InlineData("<p @drag(true)>x</p>", "@drag takes named options")]
+    public void A_drag_mistake_says_what_to_write(string tag, string message)
+    {
+        var ex = Assert.ThrowsAny<Exception>(() => Render(tag));
+        Assert.Contains(message, System.Net.WebUtility.HtmlDecode(ex.Message));
+    }
+
     [Theory]
     [InlineData("$delete", true)]
     [InlineData("call: $delete", true)]

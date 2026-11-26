@@ -880,6 +880,12 @@ namespace KScript.Pages
                     if (!el.HasAttr("tabindex")) sb.Append(" tabindex=\"0\"");
                     continue;
                 }
+                if (a.Name == DragDirective.Attribute)
+                {
+                    if (state.LiveScope == null) throw new PageException("@drag only works in a live component or a <live> block.");
+                    sb.Append(" data-ks-drag=\"").Append(Values.HtmlEscape(DragOptions(a, scope, state))).Append('"');
+                    continue;
+                }
                 if (a.Name is "drop-files" or "drop-class")
                 {
                     if (state.LiveScope == null) throw new PageException($"@{a.Name} only works in a live component or a <live> block.");
@@ -1058,6 +1064,33 @@ namespace KScript.Pages
                 handlers.AddRange(calling.Select(h => h.HandlerIndex));
             }
             sb.Append(" data-ks-pending-for=\"").Append(string.Join(" ", handlers.Distinct())).Append('"');
+        }
+
+        /// <summary><c>@drag(front: true, copy: true, value: $c)</c>: the options as JSON for the browser runtime.</summary>
+        private static string DragOptions(PageAttribute a, Scope scope, RenderState state)
+        {
+            string text = a.Value ?? string.Empty;
+            if (TryWholeExpression(text, out string whole, out _)) text = whole;
+            DragDirective.Reading reading = DragDirective.Read(text);
+            if (reading.Problems.Count > 0) throw new PageException("@drag: " + reading.Problems[0].Message);
+            var options = new Dictionary<string, object>();
+            foreach ((DragDirective.Option option, KScript.Syntax.ArgumentNode argument) in reading.Values)
+            {
+                string expression = text.Substring(argument.Value.Span.Start, argument.Value.Span.Length);
+                object value = Eval(expression, scope, state);
+                bool fits = option.Type switch
+                {
+                    KScript.Metadata.KType.Bool => value is bool,
+                    KScript.Metadata.KType.Number => value is not (string or bool or null) && Values.TryNumber(value, out _),
+                    KScript.Metadata.KType.String => value is string,
+                    _ => true,
+                };
+                if (!fits) throw new PageException($"@drag: {option.Name}: takes a {option.Type}, and {expression.Trim()} is {Values.Describe(value)}.");
+                if (option.Name == "ghost" && ((string)value).Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(n => !ClassDirective.IsClassName(n)) is string bad)
+                    throw new PageException($"@drag: ghost: {bad} isn't a class name.");
+                options[option.Name] = option.Name == "value" ? Values.ToStr(value) : value;
+            }
+            return Values.ToJson(options);
         }
 
         private static string InputChoiceValue(PageElement element, Scope scope, RenderState state) =>

@@ -20,7 +20,7 @@ namespace KScript.Pages
         {
             null => null,
             { Name: "live-use-" or "live-dirty" or "prevent-default" } => LiveDirectiveArgument.OptionalText,
-            { Name: "focus" } => LiveDirectiveArgument.OptionalExpression,
+            { Name: "focus" or "drag" } => LiveDirectiveArgument.OptionalExpression,
             { Kind: AttributeKind.Statements or AttributeKind.Expression } => LiveDirectiveArgument.Statements,
             { Kind: AttributeKind.Bool } => LiveDirectiveArgument.Flag,
             _ => LiveDirectiveArgument.Text,
@@ -29,7 +29,7 @@ namespace KScript.Pages
         private static IEnumerable<AttributeInfo> Describe()
         {
             foreach (string name in "click dblclick input change submit keydown keyup enter escape focusin focusout cancel close pointerdown pointerup pointercancel drop dragend".Split(' '))
-                yield return new("on-" + name, AttributeKind.Statements, $"Run server-side statements on {name}.");
+                yield return new("on-" + name, AttributeKind.Statements, name == "dragend" ? "Run server-side statements when a drag of this element ends. After @drag, $event.x and $event.y are where it landed." : $"Run server-side statements on {name}.");
             yield return new("on-init", AttributeKind.Statements, "Run when the component is initialized.");
             yield return new("on-visible", AttributeKind.Statements, "Run when the element becomes visible.");
             yield return new("on-tick", AttributeKind.Statements, "Run periodically. Set the interval with every.");
@@ -59,9 +59,9 @@ namespace KScript.Pages
             yield return new("live-navigate-once", AttributeKind.Bool, "Run this script only once across in-page visits.");
             yield return new("sort-item", AttributeKind.Template, "Identify a sortable item within an on-sort container.");
             yield return new("sort-axis", AttributeKind.Enum, "Set the direction of the sortable items.", false, "vertical", "horizontal");
+            yield return new(Syntax.Markup.DragDirective.Attribute, AttributeKind.Expression, "Move this element with the pointer, and run its on-dragend handler where it lands: @drag(front: true). With copy: true, drag a ghost onto an on-drop target.");
             yield return new("drop-files", AttributeKind.Text, "Send files dropped on this element through the named live-upload input inside it: @drop-files('upload').");
             yield return new("drop-class", AttributeKind.Text, "Add classes while something this element accepts is dragged over it: @drop-class('file-over').");
-            yield return new("drag-value", AttributeKind.Template, "Send this draggable element's value to the drop handler.");
             yield return new("every", AttributeKind.Template, "Set the on-tick interval, for example 1s.");
             yield return new("event-name", AttributeKind.Text, "Filter on-event by the emitted event name.");
             yield return new(Syntax.Markup.ClassDirective.Attribute, AttributeKind.Expression, "Switch classes on by conditions: @class(done: $todo.done) or @class({ $todo.done: ['done', 'struck'] }).");

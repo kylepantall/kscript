@@ -110,7 +110,7 @@ namespace KScript.Pages
 
         private static readonly Lazy<string> BrowserRuntime = new Lazy<string>(() =>
             "(function () {\n" + ReadScript("live-portals.js") + "\n" + ReadScript("live-hooks.js") + "\n"
-                + ReadScript("model-forms.js") + "\n" + ReadScript("live-dom.js") + "\n" + ReadScript("live-sort.js") + "\n"
+                + ReadScript("model-forms.js") + "\n" + ReadScript("live-dom.js") + "\n" + ReadScript("live-sort.js") + "\n" + ReadScript("live-drag.js") + "\n"
                 + ReadScript("live-navigation.js") + "\n" + ReadScript("live-stream.js") + "\n" + ReadScript("live.js")
                 + "\n}());\n" + ReadScript("passkeys.js"));
 

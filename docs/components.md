@@ -486,7 +486,53 @@ Emit an event from an action with `@emit_event('notes-changed', data: $note.id, 
 
 ### Drag, drop and sorting
 
-For a drop target, put `draggable="true" drag-value="{$item.id}"` on the source and `on-drop` on the destination. The action reads `$event.drag_value`, and `$event.x` and `$event.y` give the drop point inside the destination. `@drop-class('over')` on the destination adds the class while something it takes is dragged over it.
+To drag one element onto another, put `@drag(copy: true, value: $item.id)` on the source and `on-drop` on the destination (see the next section). The action reads `$event.drag_value`, and `$event.x` and `$event.y` give the drop point inside the destination. `@drop-class('over')` on the destination adds the class while something it takes is dragged over it.
+
+### Move an element with @drag
+
+`@drag()` lets the visitor move an absolutely positioned element with the pointer. When the drag ends, the element's `on-dragend` handler runs with where it landed, so the action can save it:
+
+```html
+<article class="note" style="left: {$note.x}px; top: {$note.y}px; z-index: {$note.z}"
+  @drag(front: true, skip: '.thumb')
+  @on-dragend(call: $move, with: [$event.x, $event.y, $event.z, $event.vx])>
+  …
+</article>
+```
+
+| `$event` field | Value |
+| --- | --- |
+| `x`, `y` | The element's new `left` and `top`, in pixels inside its positioned parent. |
+| `vx`, `vy` | How fast it was moving when it was let go, in pixels per frame. |
+| `moved` | `false` when the press was a click. The handler still runs, so a click can bring an element to the front. |
+| `z` | With `front: true`, the z-index it was raised to above its siblings. |
+
+| Option | What it does |
+| --- | --- |
+| `front: true` | Raises the element above the other `@drag` elements in its positioned parent. |
+| `scroll: '.surface'` | The container that scrolls when the pointer nears its edges. Defaults to the nearest scrolling ancestor. |
+| `skip: '.thumb'` | Presses on these belong to them, not to dragging. Fields, buttons, links and labels are always skipped. |
+| `threshold: 6` | How far the pointer moves before a press becomes a drag. Defaults to 4 pixels, so a click stays a click. |
+| `copy: true` | Drags a ghost copy instead of the element, onto an `on-drop` target. A plain click still runs the element's `on-click`. |
+| `value: $color` | With `copy:`, what the drop handler reads as `$event.drag_value`. |
+| `ghost: 'note-ghost'` | With `copy:`, the classes of the ghost. Its top centre follows the pointer. Defaults to the element's own classes. |
+
+While it moves, the element (or the ghost) has the `dragging` class and the CSS variables `--drag-vx`, `--drag-vy` and `--drag-speed`, so a stylesheet can tilt it with the movement. After a drop it has `drag-settled` until its animation ends.
+
+```css
+.note.dragging {
+  --tilt-y: clamp(-28deg, calc(var(--drag-vx) * 1.6deg), 28deg);
+  transform: perspective(900px) rotateY(var(--tilt-y));
+}
+.note.drag-settled { animation: settle 0.5s ease-out; }
+```
+
+A tray item that drops a new note on a board uses `copy:`:
+
+```html
+<button type="button" class="pad" @drag(copy: true, value: $color, ghost: "note-ghost c-$color") @on-click($this->add($color))></button>
+<div class="surface" @on-drop(call: $add, with: [$event.drag_value, $event.x, $event.y]) @drop-class('over')>…</div>
+```
 
 To take files dropped on an element, give it `@drop-files('upload')` and put a `live-upload` file input named `upload` inside it. Dropped files go through that input and its `on-change` action, the same as files picked by hand:
 

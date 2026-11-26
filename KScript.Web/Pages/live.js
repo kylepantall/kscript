@@ -6,7 +6,6 @@
   var EVENTS = ["click", "dblclick", "input", "change", "submit", "keydown", "keyup", "focusin", "focusout", "cancel", "close",
     "pointerdown", "pointerup", "pointercancel", "dragstart", "dragenter", "dragover", "dragleave", "drop", "dragend",
     "compositionstart", "compositionend"];
-  var DRAG_VALUE = "application/x-kscript-drag";
   var timers = Object.create(null);
   var ticks = Object.create(null);
   var restoringFocus = false;
@@ -366,13 +365,14 @@
       button: domEvent?.button ?? null,
       pointer_id: domEvent?.pointerId ?? null,
       pointer_type: domEvent?.pointerType ?? null,
-      drag_value: domEvent?.type === "drop" ? (domEvent.dataTransfer?.getData(DRAG_VALUE) || null) : domEvent?.dragValue ?? null,
+      drag_value: domEvent?.type === "drop" ? (domEvent.dragValue ?? null) : null,
     };
     // $event.x and $event.y: where the pointer is in the handler's element, counting its scroll, so a position
     // inside a scrolled board is the same number the board's content is laid out in.
     const local = localPoint(domEvent?.handlerElement, domEvent);
     eventInfo.x = local?.x ?? null;
     eventInfo.y = local?.y ?? null;
+    if (domEvent?.drag) Object.assign(eventInfo, domEvent.drag);
     if (domEvent?.type === "component") {
       eventInfo.name = domEvent.name;
       eventInfo.data = domEvent.data;
@@ -608,31 +608,14 @@
         return;
       }
     }
+    if (type === "pointerdown" && liveDrag.start(e, block)) return;
     if (type === "input" || type === "change") updateDirty(block, lifecycle.get(block)?.baseline);
     if (liveSort.handle(e, block, (container, details) => {
       const handler = Number(container.getAttribute("data-ks-on-sort"));
       send(block, handler, handlerArgs(container, handler), container, details);
     })) return;
-    if (type === "dragstart") {
-      var source = target.closest?.("[drag-value]");
-      if (source && blockOf(source) === block && e.dataTransfer) {
-        e.dataTransfer.setData(DRAG_VALUE, source.getAttribute("drag-value").slice(0, 4096));
-      }
-      return;
-    }
     if ((type === "dragenter" || type === "dragover" || type === "dragleave" || type === "drop") && dropFiles(e, type, block)) return;
-    if (type === "dragenter" || type === "dragover" || type === "dragleave") {
-      var drop = target.closest?.("[data-ks-on-drop]");
-      if (drop && blockOf(drop) === block && e.dataTransfer?.types.includes(DRAG_VALUE)) {
-        if (type === "dragleave") {
-          if (!drop.contains(e.relatedTarget)) setDropClass(drop, false);
-        } else {
-          e.preventDefault();
-          setDropClass(drop, true);
-        }
-      }
-      return;
-    }
+    if (type === "dragenter" || type === "dragover" || type === "dragleave") return;
     var el = target.closest ? target.closest("[data-ks-on-" + type + "]") : null;
     if (type === "keydown" && !el) {
       var shortcut = e.key === "Enter" ? "enter" : e.key === "Escape" ? "escape" : null;
@@ -678,6 +661,7 @@
   }
 
   EVENTS.forEach(function (type) { document.addEventListener(type, handle, true); });
+  liveDrag.install({ send, handlerArgs, blockOf, setDropClass, hold: liveDom.hold });
 
   function stopComponent(block) {
     const state = lifecycle.get(block);
