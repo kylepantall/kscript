@@ -394,6 +394,7 @@ A key with no record gets `404` before the policy is asked.
 - `@response($answer)` given a response returns it as it is, with its status; `@response($answer, status: 410)` changes the status.
 - Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
+- `->with_header('Set-Cookie', ...)` adds a cookie each time it is called, rather than replacing the last, and each cookie is sent as a `Set-Cookie` header of its own.
 
 ## Calling your own API
 
@@ -411,7 +412,15 @@ It works from pages, tests and scripts in the project (the folder with `kscript.
 
 `@api()` sends `User-Agent: kscript` by default for both remote and local requests. To identify a particular client, pass `options: { headers: { 'User-Agent': 'my-app' } }`. That override applies to one request.
 
-A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
+A request made while answering another one, such as a page calling the API, or a route calling another route, sends on the `Cookie` and `Authorization` headers of the request being answered, so the API sees the same signed-in person. Give your own `headers` to send others. A `Cookie` header you give is read into the route's `$cookies`, as `kscript serve` reads it; cookies a response sets are never carried over to a later request.
+
+```kscript
+reply = @api(/, options: { headers: { Cookie: 'sb_guest=0f8f' } })   // the route's $cookies.sb_guest is '0f8f'
+echo $reply.cookies          // the cookies the response set: { ks_session: '...', sb_guest: '...' }
+echo $reply.headers['Set-Cookie']   // a list when the response set more than one
+```
+
+A header sent more than once, such as `Set-Cookie`, is a list in `.headers`; `->header(name)` gives the first. `.cookies` has the name and value of each cookie the response set. Requests inside one another stop after 8, so a route that calls itself is an error rather than a hang.
 
 The Notes example in the [fullstack project template](projects.md#a-web-app-with-its-api---template-fullstack) uses this: its pages get their notes from `/api/notes`, so the pages and other clients share one API.
 
