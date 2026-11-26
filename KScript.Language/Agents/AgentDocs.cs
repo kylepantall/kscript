@@ -688,7 +688,7 @@ namespace KScript.Language.Agents
             }
             w.Append($"\n## Browser extensions\n\nRegister browser behavior on `kscript:init`. See [client-side extensions]({Guides}components.md#client-side-extensions).\n");
             w.Append("""
-                - `KScriptLive.directive('focus', ({ element }) => element.focus())` attaches behavior to `live-use-focus`.
+                - `KScriptLive.directive('select', ({ element }) => element.select())` attaches behavior to `live-use-select`.
                 - `KScriptLive.action('copy', ({ element }) => navigator.clipboard.writeText(element.dataset.text))` handles `live-client="copy"`.
                 - `KScriptLive.call(component, 'save', payload)` invokes the component's named server action.
                 - `KScriptLive.on('commit', ({ component }) => console.log(component))` subscribes to updates after the DOM changes.

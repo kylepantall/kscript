@@ -21,7 +21,7 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
         int argument = pos + 1;
         pos = SkipSpace(text, argument);
 
-        if (kind == LiveDirectiveArgument.Statements)
+        if (kind is LiveDirectiveArgument.Statements or LiveDirectiveArgument.OptionalExpression)
         {
             // KScript's lexer keeps parentheses in strings, interpolations, paths and regexes inside their token.
             var lexer = new Lexer(text, argument);
@@ -34,8 +34,13 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
                 if (token.Is("(")) depth++;
                 if (token.Is(")") && --depth == 0)
                 {
+                    if (at == pos && kind == LiveDirectiveArgument.OptionalExpression)
+                    {
+                        directive = new(name, nameSpan, null, '\0', token.Span.End, null); // @focus(): a flag
+                        return true;
+                    }
                     directive = new(name, nameSpan, TextSpan.FromBounds(argument, at), '\0', token.Span.End,
-                        at == pos ? (name == ClassDirective.Attribute ? "@class needs classes and conditions, such as @class(done: $todo.done)." : $"@{name} needs a handler.") : null);
+                        at == pos ? EmptyMessage(name) : null);
                     return true;
                 }
             }
@@ -80,6 +85,13 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
             : $"@{name} needs a quoted value.");
         return true;
     }
+
+    private static string EmptyMessage(string name) => name switch
+    {
+        ClassDirective.Attribute => "@class needs classes and conditions, such as @class(done: $todo.done).",
+        PendingDirective.Attribute => "@pending needs a class, such as @pending('saving') or @pending('crumple', for: 'delete').",
+        _ => $"@{name} needs a handler.",
+    };
 
     private static int SkipSpace(string text, int pos)
     {

@@ -48,6 +48,53 @@
     }
   }
 
+  // @pending('crumple', for: 'delete'): classes on while one of the block's actions runs. data-ks-pending-for lists
+  // the handlers that count; without it every action does. They come off when the action finishes or fails.
+  function markPending(block, handler) {
+    const added = [];
+    if (handler < 0) return added;
+    for (const el of owned(block, "[data-ks-pending]")) {
+      const only = el.getAttribute("data-ks-pending-for");
+      if (only !== null && !only.split(" ").includes(String(handler))) continue;
+      const classes = el.getAttribute("data-ks-pending").split(" ").filter(name => name && !el.classList.contains(name));
+      el.classList.add(...classes);
+      added.push([el, classes]);
+    }
+    return added;
+  }
+
+  function clearPending(added) {
+    for (const [el, classes] of added) el.classList.remove(...classes);
+  }
+
+  // @focus() gives an element focus when it appears, and @focus($cond) each time its condition turns true.
+  var focused = new Set();
+  function applyFocus() {
+    let target = null;
+    for (const el of focused) if (!el.isConnected || !el.hasAttribute("data-ks-focus")) focused.delete(el);
+    for (const el of document.querySelectorAll("[data-ks-focus]")) {
+      if (focused.has(el)) continue;
+      focused.add(el);
+      target = target || el;
+    }
+    target?.focus({ preventScroll: true });
+  }
+
+  // @autogrow(): a textarea as tall as its text. CSS field-sizing does it where the browser has it.
+  var fieldSizing = typeof CSS !== "undefined" && CSS.supports?.("field-sizing", "content");
+  function grow(area) {
+    if (fieldSizing) {
+      area.style.fieldSizing = "content";
+      return;
+    }
+    area.style.height = "auto";
+    area.style.height = area.scrollHeight + "px";
+  }
+
+  function autogrow() {
+    for (const area of document.querySelectorAll("textarea[data-ks-autogrow]")) grow(area);
+  }
+
   function showError(block, message) {
     for (const el of owned(block, "[data-ks-live-error]")) {
       el.textContent = message || "";
@@ -309,6 +356,7 @@
       if (targetBind) b[targetBind] = targetValue;
       showError(current);
       setBusy(current, true);
+      const pendingClasses = markPending(current, handler);
       var route = current.getAttribute("data-ks-route");
       var headers = { "Content-Type": "application/json" };
       if (route) {
@@ -392,6 +440,7 @@
         return false;
       } finally {
         activeRequests.delete(controller);
+        clearPending(pendingClasses);
       }
     }).catch(error => {
       console.error("KScript:", error);
@@ -483,7 +532,11 @@
       try { if (keep.start != null) el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text input */ }
     } finally {
       restoringFocus = false;
-      if (committed) liveHooks.emit("commit", { component: fresh, renderless: false });
+      if (committed) {
+        autogrow();
+        applyFocus();
+        liveHooks.emit("commit", { component: fresh, renderless: false });
+      }
     }
   }
 
@@ -492,6 +545,7 @@
     var target = e.target;
     var block = blockOf(target);
     if (restoringFocus && (type === "focusin" || type === "focusout")) return;
+    if (type === "input" && !fieldSizing && target.matches?.("textarea[data-ks-autogrow]")) grow(target);
     if (modelForms.handle(e, block)) return;
     if (type === "compositionend") setTimeout(function () { Object.keys(pending).forEach(flush); }, 0);
     if (type === "compositionstart" || type === "compositionend" || e.isComposing) return;
@@ -586,6 +640,8 @@
     });
     liveHooks.sync();
     updateOnline();
+    autogrow();
+    applyFocus();
   }
 
   function call(component, name, data) {
