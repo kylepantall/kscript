@@ -49,7 +49,8 @@ internal static class DockerMaker
         {
             string path = Path.Combine(root, file);
             if (Directory.Exists(path) || File.Exists(path) && !force)
-                throw new StubException($"Cannot create {file}: the path already exists. Move it first, or use --force to replace files.");
+                throw new StubException($"Cannot create {file}: the path already exists. Move it first, or use --force to replace files. " +
+                    "To update Docker files made before 0.27 by hand, see \"Docker files from before 0.27\" in docs/projects.md.");
         }
         if (!dryRun)
             foreach (var (file, content) in files) File.WriteAllText(Path.Combine(root, file), content);
