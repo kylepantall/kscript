@@ -4,7 +4,7 @@ import "../lib/strings.kscript"
 
 describe(name: "slugify") {
   test(name: "lower-cases and joins words with dashes") {
-    expect(value: @slugify('Hello World'), equals: 'hello-world')
+    expect(@slugify('Hello World'), equals: 'hello-world')
   }
 
   for case in [
@@ -13,7 +13,7 @@ describe(name: "slugify") {
     { text: 'ALREADY-SLUG', slug: 'already-slug' },
   ] {
     test(name: "slug of '{$case.text}'") {
-      expect(value: @slugify($case.text), equals: $case.slug)
+      expect(@slugify($case.text), equals: $case.slug)
     }
   }
 }
@@ -21,6 +21,6 @@ describe(name: "slugify") {
 // @titlecase is deprecated: the method it names is what new code calls.
 describe(name: "upper") {
   test(name: "upper-cases") {
-    expect(value: 'abc'->upper(), equals: 'ABC')
+    expect('abc'->upper(), equals: 'ABC')
   }
 }

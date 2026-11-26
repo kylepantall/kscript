@@ -4,14 +4,14 @@ import "../types/repo.kscript"
 describe(name: "Repo") {
   test(name: "maps the saved response") {
     repos = @read_json('../data/repos.json', as: Repo)
-    expect(value: $repos->count(), equals: 2)
-    expect(value: $repos[0].stars, equals: 12)
-    expect(value: $repos[0].license, equals: 'MIT License')
-    expect(value: $repos[1].license, equals: null)
-    expect(value: $repos[0]->type(), equals: 'Repo')
+    expect($repos->count(), equals: 2)
+    expect($repos[0].stars, equals: 12)
+    expect($repos[0].license, equals: 'MIT License')
+    expect($repos[1].license, equals: null)
+    expect($repos[0]->type(), equals: 'Repo')
   }
 
   test(name: "reports every problem") {
-    expect(value: Repo->check({ stargazers_count: 'lots' })->count(), equals: 5)
+    expect(Repo->check({ stargazers_count: 'lots' })->count(), equals: 5)
   }
 }

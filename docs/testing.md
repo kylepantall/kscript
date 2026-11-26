@@ -20,7 +20,7 @@ kscript {
 
   describe(name: "slugify") {
     test(name: "lower-cases and joins words with dashes") {
-      expect(value: @slugify('Hello World'), equals: 'hello-world')
+      expect(@slugify('Hello World'), equals: 'hello-world')
     }
 
     cases = [
@@ -29,7 +29,7 @@ kscript {
     ]
     for case in $cases {
       test(name: "slug of '{$case.text}'") {
-        expect(value: @slugify($case.text), equals: $case.slug)
+        expect(@slugify($case.text), equals: $case.slug)
       }
     }
   }
@@ -91,23 +91,23 @@ describe(name: "a shopping cart") {
   }
 
   test(name: "starts with one item") {
-    expect(value: $cart, count: 1)
+    expect($cart, count: 1)
   }
 
   test(name: "adds items") {
     cart = $cart->push('pear')
-    expect(value: $cart, equals: ['apple', 'pear'])
+    expect($cart, equals: ['apple', 'pear'])
   }
 }
 ```
 
 ## Checks
 
-`expect` takes the value to check and one check. Every check's value is an expression, so text needs quotes: `equals: 'hello'`.
+`expect` takes the value to check first, without a name, and one check: `expect($total, equals: 3)`. Every check's value is an expression, so text needs quotes: `equals: 'hello'`.
 
 | Check | Passes when |
 | --- | --- |
-| `expect(value: $x, equals: 5)` | The values are equal, as `==` compares them: `'5'` equals `5`. Lists and maps are compared item by item, and a failure says where they differ. |
+| `expect($x, equals: 5)` | The values are equal, as `==` compares them: `'5'` equals `5`. Lists and maps are compared item by item, and a failure says where they differ. |
 | `not_equals: 5` | They aren't equal. |
 | `same: 5` | They are strictly equal (`===`): same type and value. |
 | `contains: 'Joan'` | A list has the item, text has the text, or a map has the key. |
@@ -136,7 +136,7 @@ Expected $order.total == 30 to be true.
 expect_error(type: Validation, contains: "positive", as: err) {
   @set_age(-1)
 }
-expect(value: $err.line, type: number)
+expect($err.line, type: number)
 ```
 
 For one expression, `throws` is shorter: it passes when working out the value stops with an error of that type.
@@ -148,8 +148,8 @@ fn find_person(id: int) {
   throw PersonNotFound "No person with id {$id}"
 }
 
-expect(value: @find_person(99), throws: PersonNotFound)
-expect(value: 'nope'->json(), throws: Format) // Json extends Format
+expect(@find_person(99), throws: PersonNotFound)
+expect('nope'->json(), throws: Format) // Json extends Format
 ```
 
 A failed check inside the body is still reported as a failure, not taken as the expected error.
@@ -162,7 +162,7 @@ A failed check inside the body is still reported as a failure, not taken as the 
 capture(into: out, input: ['Joan', 'yes']) {
   @sign_up()
 }
-expect(value: $out, contains: 'Welcome, Joan')
+expect($out, contains: 'Welcome, Joan')
 ```
 
 ### Whole scripts
@@ -172,8 +172,8 @@ expect(value: $out, contains: 'Welcome, Joan')
 ```kscript
 test(name: "hello.kscript greets the name it is given") {
   run = @run_script('../scripts/hello.kscript', options: { args: ['Ellie'] })
-  expect(value: $run.code, equals: 0)
-  expect(value: $run.output, equals: 'Hello, Ellie!')
+  expect($run.code, equals: 0)
+  expect($run.output, equals: 'Hello, Ellie!')
 }
 ```
 
@@ -195,8 +195,8 @@ import KScript.Web
 
 test(name: "adding a task clears the box") {
   page = @visit('/tasks')->fill('draft', 'Write the docs')->submit()
-  expect(value: $page.text, contains: 'Write the docs')
-  expect(value: $page->classes('Write the docs'), not_contains: 'done')
+  expect($page.text, contains: 'Write the docs')
+  expect($page->classes('Write the docs'), not_contains: 'done')
 }
 ```
 
@@ -251,8 +251,8 @@ import KScript.Net
 
 test(name: "a note is saved") {
   added = @api(/api/notes, post: { title: 'Ship it' })
-  expect(value: $added.status, equals: 201)
-  expect(value: @api(/api/notes/$added->json().id)->json().title, equals: 'Ship it')
+  expect($added.status, equals: 201)
+  expect(@api(/api/notes/$added->json().id)->json().title, equals: 'Ship it')
 }
 ```
 
@@ -266,7 +266,7 @@ import KScript.Net
 
 test(name: "the dashboard greets me") {
   @acting_as(@register('ada@example.test', 'correct-horse-battery-9'))
-  expect(value: @api(/dashboard).status, equals: 200)
+  expect(@api(/dashboard).status, equals: 200)
 }
 ```
 
@@ -282,10 +282,10 @@ test(name: "only the author may update a post") {
   post = Post->create(title: 'Mine', author_id: 1)
 
   @acting_as({ id: 1 })
-  expect(value: @can(update, $post), equals: true)
+  expect(@can(update, $post), equals: true)
 
   @acting_as({ id: 2 })
-  expect(value: @can(update, $post), equals: false)
+  expect(@can(update, $post), equals: false)
 }
 ```
 

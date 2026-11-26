@@ -1,30 +1,30 @@
 describe(name: 'Boolean negation') {
   test(name: 'prefix and method negation work inside interpolation') {
-    expect(value: "{ null->is_null() }", same: 'true')
-    expect(value: "{ null->!is_null() }", same: 'false')
-    expect(value: "{ not null->is_null() }", same: 'false')
-    expect(value: "{ ! null->is_null() }", same: 'false')
+    expect("{ null->is_null() }", same: 'true')
+    expect("{ null->!is_null() }", same: 'false')
+    expect("{ not null->is_null() }", same: 'false')
+    expect("{ ! null->is_null() }", same: 'false')
   }
 
   test(name: 'prefix negation works on a property and a full condition') {
     state = { enabled: false }
     if !$state.enabled {
-      expect(value: !($state.enabled or false), same: true)
+      expect(!($state.enabled or false), same: true)
     } else {
-      expect(value: $state.enabled, same: true)
+      expect($state.enabled, same: true)
     }
   }
 
   test(name: 'method negation applies before the rest of the chain') {
-    expect(value: null->!is_null()->!is_null(), same: true)
-    expect(value: !false and 1 != 2 and 1 !== '1', same: true)
+    expect(null->!is_null()->!is_null(), same: true)
+    expect(!false and 1 != 2 and 1 !== '1', same: true)
   }
 
   test(name: 'a statement can start with negation') {
     capture(into: output) {
       !@report_enabled()
     }
-    expect(value: $output->trim(), same: 'checked')
+    expect($output->trim(), same: 'checked')
   }
 }
 

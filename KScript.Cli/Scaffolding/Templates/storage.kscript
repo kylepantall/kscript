@@ -29,7 +29,7 @@ fn save(record: map) {
     @write_json($file, $records->map(fn(r) => $r.id == $record.id ? $record : $r))
     return $record
   }
-  saved = $record->set('id', ($records->map(fn(r) => $r.id)->max() ?? 0) + 1)
+  saved = $record->set('id', ($records->map(.id)->max() ?? 0) + 1)
   @write_json($file, $records->push($saved))
   return $saved
 }

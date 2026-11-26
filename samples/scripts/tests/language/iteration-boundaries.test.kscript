@@ -1,15 +1,15 @@
 describe(name: 'Iteration boundaries') {
   test(name: 'descending ranges stop before the end even when a step lands on it') {
-    expect(value: 3..0, equals: [3, 2, 1])
-    expect(value: 6..0 step -2, equals: [6, 4, 2])
-    expect(value: 5..0 step -2, equals: [5, 3, 1])
+    expect(3..0, equals: [3, 2, 1])
+    expect(6..0 step -2, equals: [6, 4, 2])
+    expect(5..0 step -2, equals: [5, 3, 1])
   }
 
   test(name: 'equal endpoints and steps facing away yield no values') {
-    expect(value: 2..2, equals: [])
-    expect(value: 2..8 step -1, equals: [])
-    expect(value: 8..2 step 1, equals: [])
-    expect(value: 2..8 step 0, throws: Argument)
+    expect(2..2, equals: [])
+    expect(2..8 step -1, equals: [])
+    expect(8..2 step 1, equals: [])
+    expect(2..8 step 0, throws: Argument)
   }
 
   test(name: 'a map supplies each key alongside its value') {
@@ -18,7 +18,7 @@ describe(name: 'Iteration boundaries') {
     for item, price in $prices {
       discounted[$item] = $price - 1
     }
-    expect(value: $discounted, equals: { pencil: 2, book: 11 })
+    expect($discounted, equals: { pencil: 2, book: 11 })
   }
 
   test(name: 'a nested loop restores the outer loop metadata after each row') {
@@ -32,7 +32,7 @@ describe(name: 'Iteration boundaries') {
       }
       labels = $labels->push($loop.index)
     }
-    expect(value: $labels, equals: ['B', 0, 'C', 1])
+    expect($labels, equals: ['B', 0, 'C', 1])
   }
 
   test(name: 'loop else handles empty input even when a populated loop exits early') {
@@ -46,7 +46,7 @@ describe(name: 'Iteration boundaries') {
       }
       return $found
     }
-    expect(value: @first_item([]), same: 'empty')
-    expect(value: @first_item(['first', 'second']), same: 'first')
+    expect(@first_item([]), same: 'empty')
+    expect(@first_item(['first', 'second']), same: 'first')
   }
 }

@@ -15,7 +15,7 @@ hint: Run it: kscript test {{ paths.tests }}/{{ dir }}{{ kebab }}.test{{ ext }}
 describe(name: "{{ title }}") {
   // TODO: Replace these examples with tests of your own code.
   test(name: "adds numbers") {
-    expect(value: 1 + 2, equals: 3)
+    expect(1 + 2, equals: 3)
   }
 
   test(name: "joins text") {

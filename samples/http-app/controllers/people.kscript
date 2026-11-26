@@ -17,7 +17,7 @@ fn list(query: map) {
   min = ($query.min_age ?? '0')->to_number(default: 0)
   people = @all()
     |> filter(fn(p) => $p.age >= $min)
-    |> sort_by(fn(p) => $p.name)
+    |> sort_by(.name)
   return @view('people/index', people: $people, min: $min)
 }
 
@@ -59,7 +59,7 @@ fn store(json: NewPerson) {
   }
   people = @all()
   person = {
-    id: $people->map(fn(p) => $p.id)->max() + 1,
+    id: $people->map(.id)->max() + 1,
     name: $json.name,
     age: $json.age ?? 0,
     role: $json.role ?? 'Member'

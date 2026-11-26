@@ -143,6 +143,9 @@ namespace KScript.Syntax.Markup
         /// </summary>
         public bool IsShorthand { get; internal set; }
 
+        /// <summary>True when written as a directive, <c>@each(...)</c>, rather than as <c>name="..."</c>.</summary>
+        public bool IsDirective { get; internal set; }
+
         /// <summary>True for a value written in the argument list of a .kscript statement: <c>name(key: value)</c>.</summary>
         public bool IsArgument { get; internal set; }
 
@@ -175,6 +178,9 @@ namespace KScript.Syntax.Markup
         public bool StartTagClosed { get; internal set; }
 
         public bool SelfClosing { get; internal set; }
+
+        /// <summary>True for the &lt;if&gt; or &lt;for&gt; that an @if or @each on a tag stands for; it has no tags of its own in the source.</summary>
+        public bool IsDirectiveWrapper { get; internal set; }
 
         /// <summary>The name in the end tag, if there is one.</summary>
         public TextSpan? EndNameSpan { get; internal set; }

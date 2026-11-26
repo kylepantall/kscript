@@ -1014,10 +1014,10 @@ namespace KScript.Language.Analysis
                     if (attr.Name.Equals("live-action", StringComparison.OrdinalIgnoreCase) && e.GetAttribute("on-action") == null)
                         Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.MissingAttribute,
                             "A live-action name needs an on-action handler.");
-                    if (attr.Name.Equals("bind-on", StringComparison.OrdinalIgnoreCase) && (e.GetAttribute("bind") == null ||
-                        !global::KScript.Pages.LiveAttributes.Get("bind-on").Options.Contains(attr.ValueText)))
-                        Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                            "Use bind-on with bind and choose input, change, blur or action.");
+                }
+                if (component == null && Kind != DocumentKind.Script && global::KScript.Pages.LiveAttributes.Retired.TryGetValue(attr.Name, out string retired))
+                {
+                    ReportRetired(e, attr, retired);
                 }
                 if (attr.Name == "autogrow" && Kind != DocumentKind.Script && component == null && !e.Name.Equals("textarea", StringComparison.OrdinalIgnoreCase))
                 {

@@ -10,11 +10,11 @@ test(name: 'a record maps nested JSON and converts source field names') {
     visibility: 'public',
     updated_at: '2026-01-01'
   })
-  expect(value: $repo.owner.id, same: 42)
-  expect(value: $repo.stars, same: 7)
-  expect(value: $repo.label, equals: 'demo (7 stars)')
-  expect(value: $repo.topics, equals: [])
-  expect(value: $repo.license, equals: null)
+  expect($repo.owner.id, same: 42)
+  expect($repo.stars, same: 7)
+  expect($repo.label, equals: 'demo (7 stars)')
+  expect($repo.topics, equals: [])
+  expect($repo.license, equals: null)
 }
 
 test(name: 'shape errors retain the path into a nested record') {
@@ -25,30 +25,30 @@ test(name: 'shape errors retain the path into a nested record') {
     visibility: 'public',
     updated_at: '2026-01-01'
   })
-  expect(value: $problems, count: 1)
-  expect(value: $problems[0].path, equals: '$.owner.id')
+  expect($problems, count: 1)
+  expect($problems[0].path, equals: '$.owner.id')
 }
 
 fn account_label(account: Account) => $account->label()
 
 test(name: 'a derived record satisfies a base parameter') {
   person = Staff(name: 'Ada')
-  expect(value: @account_label($person), equals: 'ADA')
-  expect(value: $person.level, same: 1)
-  expect(value: Account->is($person), equals: true)
+  expect(@account_label($person), equals: 'ADA')
+  expect($person.level, same: 1)
+  expect(Account->is($person), equals: true)
 }
 
 test(name: 'assigning a convertible field keeps the declared field type') {
   person = Staff(name: 'Ada')
   person.level = '4'
-  expect(value: $person.level, same: 4)
+  expect($person.level, same: 4)
 }
 
 test(name: 'mapping a list checks every row and preserves its order') {
   people: Account[] = '[{"name":"Lin"},{"name":"Bo"}]'->json(as: Account)
-  expect(value: $people->map(fn(a) => $a->label()), equals: ['LIN', 'BO'])
+  expect($people->map(->label()), equals: ['LIN', 'BO'])
 }
 
 test(name: 'a missing required field raises a Shape error at conversion') {
-  expect(value: Account({}), throws: Shape)
+  expect(Account({}), throws: Shape)
 }

@@ -27,6 +27,12 @@ namespace KScript.UI
         public string Bind { get; set; }
         internal Scope BindScope { get; set; }
 
+        /// <summary>The binding's options (on:, trim:, as:), read by the same reader as @bind on a page.</summary>
+        public KScript.Syntax.Markup.BindDirective.Reading Binding { get; set; }
+
+        /// <summary>When the value is stored: input (as you type, the default), change or blur (when focus leaves).</summary>
+        public string BindOn => Binding?.Word("on") ?? "input";
+
         public object Prop(string name) => Props.TryGetValue(name, out object v) ? v : null;
 
         public bool Has(string name) => Props.ContainsKey(name) && Props[name] != null;

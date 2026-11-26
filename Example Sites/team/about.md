@@ -8,7 +8,7 @@ layout: _layout.html
 
 We are { $people->count() } people. In alphabetical order:
 
-<for each="p" in="$people->sort_by(fn(p) => $p.name)">
+<for each="p" in="$people->sort_by(.name)">
 - **{$p.name}**, {$p.role}
 </for>
 

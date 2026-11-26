@@ -61,33 +61,33 @@ public sealed class DataTestingTests : DataFixture
         TestFileResult file = RunTests("""
             test(name: 'one') {
               post = Post->fake()
-              expect(value: $post.author.name->count(), equals: 30)
-              expect(value: Author->count(), equals: 1)
-              expect(value: @queries(), count_at_most: 4)
+              expect($post.author.name->count(), equals: 30)
+              expect(Author->count(), equals: 1)
+              expect(@queries(), count_at_most: 4)
             }
 
             test(name: 'two') {
-              expect(value: Post->count(), equals: 0)
-              expect(value: @queries(), count: 1)
+              expect(Post->count(), equals: 0)
+              expect(@queries(), count: 1)
               $db->transaction(fn() => Author->fake())
-              expect(value: Author->count(), equals: 1)
+              expect(Author->count(), equals: 1)
             }
 
             test(name: 'three') {
-              expect(value: Author->count(), equals: 0)
+              expect(Author->count(), equals: 0)
               joan = Author->fake(name: 'Joan Joan Joan Joan Joan Joan Joan', nickname: 'Jo')
               posts = Post->fake_many(2, author: $joan)
-              expect(value: $posts, count: 2)
-              expect(value: $posts[1].title->count() <= 12, equals: true)
-              expect(value: $joan.level, equals: 'reader')
-              expect(value: $joan.score >= 5, equals: true)
-              expect(value: $joan.email->ends_with('@example.com'), equals: true)
-              expect(value: Author->fake().verified, equals: false)
+              expect($posts, count: 2)
+              expect($posts[1].title->count() <= 12, equals: true)
+              expect($joan.level, equals: 'reader')
+              expect($joan.score >= 5, equals: true)
+              expect($joan.email->ends_with('@example.com'), equals: true)
+              expect(Author->fake().verified, equals: false)
             }
 
             test(name: 'fails') {
               Post->fake_many(5)
-              expect(value: @queries(), count_at_most: 2)
+              expect(@queries(), count_at_most: 2)
             }
             """);
         Assert.Null(file.Error);
@@ -105,8 +105,8 @@ public sealed class DataTestingTests : DataFixture
         FileOf("database/migrations/2026_01_01_000000_notes.kscript", "import KScript.Data\n\nMigration {\n  CreateTable(name: 'notes') {\n    Field(name: 'id', type: int, key, auto)\n    Field(name: 'body', type: string)\n  }\n}\n");
         TestFileResult file = RunTests("""
             test(name: 'the migrations ran') {
-              expect(value: $db->tables(), contains: 'notes')
-              expect(value: $db->tables(), not_contains: 'posts')
+              expect($db->tables(), contains: 'notes')
+              expect($db->tables(), not_contains: 'posts')
             }
             """);
         Passed(file);
@@ -123,15 +123,15 @@ public sealed class DataTestingTests : DataFixture
 
             test(name: 'adds') {
               Author->fake()
-              expect(value: Author->count(), equals: 1)
+              expect(Author->count(), equals: 1)
               expect_error(type: UniqueViolation) {
                 $db->sql("INSERT INTO authors (id, name, email, handle, level, born, score, tags, code, secret, verified) SELECT id, name, email, handle, level, born, score, tags, code, secret, verified FROM authors")
               }
-              expect(value: Author->count(), equals: 1)
+              expect(Author->count(), equals: 1)
             }
 
             test(name: 'sees nothing') {
-              expect(value: Author->count(), equals: 0)
+              expect(Author->count(), equals: 0)
             }
             """, "{ \"name\": \"testing\", \"config\": { \"files\": [\"config.yaml?\"] }, \"test\": { \"database\": \"config\" } }");
         Passed(file);
@@ -162,17 +162,17 @@ public sealed class DataTestingTests : DataFixture
 
         test(name: 'the API sees what the test made') {
           Post->fake(title: 'By the test')
-          expect(value: @api(/api/posts)->json().titles, equals: ['By the test'])
+          expect(@api(/api/posts)->json().titles, equals: ['By the test'])
         }
 
         test(name: 'the test sees what the API made') {
-          expect(value: @api(/api/posts, options: { method: 'PUT' })->json().count, equals: 1)
-          expect(value: Post->pluck(title), equals: ['By the API'])
+          expect(@api(/api/posts, put: {})->json().count, equals: 1)
+          expect(Post->pluck(title), equals: ['By the API'])
         }
 
         test(name: 'and each test starts with neither') {
-          expect(value: @api(/api/posts)->json().titles, equals: [])
-          expect(value: Post->count(), equals: 0)
+          expect(@api(/api/posts)->json().titles, equals: [])
+          expect(Post->count(), equals: 0)
         }
         """;
 
@@ -204,8 +204,8 @@ public sealed class DataTestingTests : DataFixture
               expect_error(contains: "count") {
                 Post->fake_many(1, 'x')
               }
-              expect(value: Post->fake_many(0), count: 0)
-              expect(value: Post->fake_many(1, { title: 'Mapped' })[0].title, equals: 'Mapped')
+              expect(Post->fake_many(0), count: 0)
+              expect(Post->fake_many(1, { title: 'Mapped' })[0].title, equals: 'Mapped')
               expect_error(contains: "needs") {
                 Post->create(title: 'x', author: Post->fake())
               }
@@ -236,7 +236,7 @@ public sealed class DataTestingTests : DataFixture
         FileOf("database/migrations/2026_01_01_000000_bad.kscript", "import KScript.Data\n\nMigration {\n  DropTable(name: 'nothing_here')\n}\n");
         TestFileResult file = RunTests("""
             test(name: 'never runs') {
-              expect(value: Post->count(), equals: 0)
+              expect(Post->count(), equals: 0)
             }
             """);
         Assert.NotNull(file.Error ?? file.Tests.FirstOrDefault(t => t.Outcome != TestOutcome.Passed)?.Message);

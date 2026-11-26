@@ -262,8 +262,10 @@ namespace KScript.UI
                 case "TextBox":
                 {
                     var t = new TextBox();
-                    t.TextChanged += (s, e) => { if (!patching) session.SetBound(NodeOf(t), t.Text ?? string.Empty); };
-                    t.KeyDown += (s, e) => { if (e.Key == Key.Enter && !NodeOf(t).Flag("multiline")) Fire(t, "on_enter", new Dictionary<string, object> { ["value"] = t.Text ?? string.Empty }); };
+                    t.TextChanged += (s, e) => { if (!patching && NodeOf(t).BindOn == "input") session.SetBound(NodeOf(t), t.Text ?? string.Empty); };
+                    t.LostFocus += (s, e) => { if (!patching && NodeOf(t).BindOn != "input") session.SetBound(NodeOf(t), t.Text ?? string.Empty); };
+                    t.KeyDown += (s, e) => { if (e.Key == Key.Enter && !NodeOf(t).Flag("multiline") && NodeOf(t).BindOn != "input") session.SetBound(NodeOf(t), t.Text ?? string.Empty);
+                        if (e.Key == Key.Enter && !NodeOf(t).Flag("multiline")) Fire(t, "on_enter", new Dictionary<string, object> { ["value"] = t.Text ?? string.Empty }); };
                     return t;
                 }
                 case "CheckBox":

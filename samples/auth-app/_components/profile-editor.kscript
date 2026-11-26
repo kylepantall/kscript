@@ -16,6 +16,6 @@ type ProfileEditor extends Component {
       <button>Save profile</button>
     </form>
     <p><button type="button" @on-click(toggle: $preview)>{$preview ? 'Hide saved bio' : 'Show saved bio'}</button></p>
-    <if test="$preview"><p>Saved bio: {$record.bio}</p></if>
+    <p @if($preview)>Saved bio: {$record.bio}</p>
     ```
 }

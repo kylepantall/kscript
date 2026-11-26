@@ -528,7 +528,7 @@ namespace KScript.Data
                     return RunSql(c, Database.For(c, connection), c.Str(0), c.Arg(1, "as"));
                 }).Info.KeepsBareWords = true;
 
-            p.Command("queries", "", "The SQL statements this run has sent, oldest first (the last 1000), each as { sql, bindings, database }. In a test, only the test's own: `expect(value: @queries(), count_at_most: 4)` catches a page that makes a query per row.", KType.List,
+            p.Command("queries", "", "The SQL statements this run has sent, oldest first (the last 1000), each as { sql, bindings, database }. In a test, only the test's own: `expect(@queries(), count_at_most: 4)` catches a page that makes a query per row.", KType.List,
                 c => QueryLog.Of(c.Interpreter));
 
             p.Element(new ElementInfo("transaction", "Runs its statements in a transaction: what they save is kept when the block ends, and undone if anything in it fails (the error then carries on). A transaction inside another is a savepoint, so only its own changes are undone.",

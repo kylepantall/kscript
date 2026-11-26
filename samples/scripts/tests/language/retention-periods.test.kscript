@@ -10,31 +10,31 @@ describe(name: 'Native durations as retention periods') {
   test(name: 'equivalent accepted spellings have equal billing lengths') {
     first: RetentionPeriod = 90m
     second: RetentionPeriod = 'PT1H30M'
-    expect(value: $first->billing_hours(), same: 1.5)
-    expect(value: $second->billing_hours(), same: $first->billing_hours())
+    expect($first->billing_hours(), same: 1.5)
+    expect($second->billing_hours(), same: $first->billing_hours())
   }
 
   test(name: 'the lower and upper limits both count as valid periods') {
-    expect(value: RetentionPeriod(1h)->billing_hours(), same: 1)
-    expect(value: RetentionPeriod(7d)->billing_hours(), same: 168)
+    expect(RetentionPeriod(1h)->billing_hours(), same: 1)
+    expect(RetentionPeriod(7d)->billing_hours(), same: 168)
   }
 
   test(name: 'a valid duration may still fall a second outside the retention policy') {
     expect_error(type: Shape, contains: 'between one hour and one week') {
       echo RetentionPeriod(59m59s)
     }
-    expect(value: RetentionPeriod(7d + 1s), throws: Shape)
+    expect(RetentionPeriod(7d + 1s), throws: Shape)
   }
 
   test(name: 'a typed duration parameter can move a date across the year boundary') {
     start = '2025-12-31T23:30:00'->to_date()
     end = @deadline($start, '90m')
-    expect(value: $end->format('yyyy-MM-dd HH:mm'), same: '2026-01-01 01:00')
+    expect($end->format('yyyy-MM-dd HH:mm'), same: '2026-01-01 01:00')
   }
 
   test(name: 'a malformed duration is rejected before computing a deadline') {
     start = '2025-04-01'->to_date()
     period = 'soon'
-    expect(value: @deadline($start, $period), throws: Shape)
+    expect(@deadline($start, $period), throws: Shape)
   }
 }

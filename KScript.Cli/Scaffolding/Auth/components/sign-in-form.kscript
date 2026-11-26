@@ -22,7 +22,7 @@ type SignInForm extends Component {
 
   fn render() => ```html
     <status-message />
-    <if test="$error != null"><p class="error">{$error}</p></if>
+    <p class="error" @if($error != null)>{$error}</p>
     <form method="post" action="/login">
       {! @csrf_field() }
       <p><label>Email<br><input type="email" name="email" value="{$email}" required autocomplete="email"></label></p>

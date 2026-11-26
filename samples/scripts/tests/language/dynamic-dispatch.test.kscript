@@ -6,23 +6,23 @@ type Quantity {
 fn trim_dynamic(key: any) => $key->trim()
 
 test(name: 'an any parameter can receive text and use its string methods') {
-  expect(value: @trim_dynamic('  passkey_Login  '), same: 'passkey_Login')
+  expect(@trim_dynamic('  passkey_Login  '), same: 'passkey_Login')
 }
 
 test(name: 'a type can define trim with its own return type') {
   quantity = Quantity(units: 7)
-  expect(value: $quantity->trim(), same: 7)
-  expect(value: @trim_dynamic($quantity), same: $quantity->trim())
+  expect($quantity->trim(), same: 7)
+  expect(@trim_dynamic($quantity), same: $quantity->trim())
 }
 
 test(name: 'string methods on any do not convert numbers implicitly') {
-  expect(value: @trim_dynamic(42), throws: Name)
+  expect(@trim_dynamic(42), throws: Name)
 }
 
 test(name: 'calling a method on null reports a null receiver') {
-  expect(value: @trim_dynamic(null), throws: Null)
+  expect(@trim_dynamic(null), throws: Null)
 }
 
 test(name: 'text conversion can be requested before dispatch') {
-  expect(value: @trim_dynamic(42->to_string()), same: '42')
+  expect(@trim_dynamic(42->to_string()), same: '42')
 }

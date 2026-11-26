@@ -108,7 +108,7 @@ public sealed class ServeRequestTests
     public async Task A_live_block_takes_only_what_a_form_control_sends_for_untyped_state()
     {
         using var site = new TempSite(("index.html", """
-            <live id="search"><state name="q" value="''" /><input bind="q"><p>q={$q}</p></live>
+            <live id="search"><state name="q" value="''" /><input bind="$q"><p>q={$q}</p></live>
             """));
         await Serve(site, async http =>
         {

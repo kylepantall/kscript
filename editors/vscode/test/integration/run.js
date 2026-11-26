@@ -22,7 +22,7 @@ const { runTests } = require('@vscode/test-electron');
   fs.writeFileSync(path.join(workspace, 'writes.kscript'), "import KScript.IO\n@write_text('ran.txt', 'it ran')\n");
   fs.writeFileSync(path.join(workspace, 'stops here.kscript'), "import KScript.IO\n@files('missing folder')\n");
   fs.writeFileSync(path.join(workspace, 'cart.test.kscript'),
-    "test(name: \"starts empty\") {\n  expect(value: 0, equals: 0)\n}\ntest(name: \"fails\") {\n  expect(value: 1, equals: 2)\n}\n");
+    "test(name: \"starts empty\") {\n  expect(0, equals: 0)\n}\ntest(name: \"fails\") {\n  expect(1, equals: 2)\n}\n");
   for (const folder of ['tools', 'lib']) {
     fs.cpSync(path.join(__dirname, '../fixtures/diagnostics', folder), path.join(workspace, folder), { recursive: true });
   }

@@ -469,7 +469,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         using var site = new TempSite(
             ("kscript.json", "{ \"name\": \"local\" }"),
             ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/echo\") {\n    return { query: $request.query, auth: $request.headers.authorization ?? '', cookie: $request.cookies.sid ?? '' }\n  }\n  Post(path: \"/echo\") {\n    return @response({ body: $request.body, type: $request.headers['content-type'] }, status: 201)\n  }\n  Get(path: \"/loop\") {\n    return @api('/api/loop')->json()\n  }\n  Get(path: \"/again\") {\n    return @api('/api/echo')->json()\n  }\n}\n"),
-            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r.status\necho $r->json().query\necho @api('/api/echo', options: { method: 'post', body: 'plain' })->json()\necho @api('/api/echo', options: { method: 'POST', body: { x: 1 }, headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing').status\necho @api('/api/missing').status\n"),
+            ("scripts/ask.kscript", "import KScript.Net\nr = @api('/api/echo?a=1&b=two+words&flag')\necho $r.status\necho $r->json().query\necho @api('/api/echo', post: 'plain')->json()\necho @api('/api/echo', post: { x: 1 }, options: { headers: { 'Content-Type': 'application/merge+json' } })->json().type\necho @api('/nothing').status\necho @api('/api/missing').status\n"),
             ("scripts/loop.kscript", "import KScript.Net\necho @api('/api/loop').status\n"));
         var (output, error) = RunScript(Path.Combine(site.Root, "scripts", "ask.kscript"));
         Assert.Null(error);
@@ -611,7 +611,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
             ("kscript.json", "{ \"config\": { \"root\": \"config\", \"files\": [\"config.yaml\"] }, \"test\": { \"env\": \"test\" } }"),
             ("config/config.yaml", "where: dev\n"),
             ("config/config.test.yaml", "where: test\n"),
-            ("tests/env.test.kscript", "test(name: \"env\") {\n  expect(value: $config.where, equals: 'test')\n  expect(value: @env('KSCRIPT_ENV'), equals: 'test')\n}\n"));
+            ("tests/env.test.kscript", "test(name: \"env\") {\n  expect($config.where, equals: 'test')\n  expect(@env('KSCRIPT_ENV'), equals: 'test')\n}\n"));
         var (code, report) = Test(site.Root);
         Assert.True(code == 0, report);
         Assert.Null(Environment.GetEnvironmentVariable("KSCRIPT_ENV"));

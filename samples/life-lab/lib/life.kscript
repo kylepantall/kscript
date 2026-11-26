@@ -67,7 +67,7 @@ fn height(grid: string[]) => $grid->count()
 fn is_alive(grid: string[], x: int, y: int) => $grid[$y][$x] == $alive_cell
 
 /// How many cells are alive.
-fn population(grid: string[]) => $grid->sum(fn(row) => $row->count_of($alive_cell))
+fn population(grid: string[]) => $grid->sum(->count_of($alive_cell))
 
 /// A copy of the grid with one cell made alive or dead.
 fn set_cell(grid: string[], x: int, y: int, alive: bool) {
@@ -105,12 +105,12 @@ fn random_grid(width: int, height: int, density = 30) {
 
 /// Reads a pattern in the plaintext .cells format: lines of O and ., with ! comment lines. Any of O, o, *, # or X counts as alive.
 fn parse_cells(text: string) {
-  lines = $text->lines()->map(fn(l) => $l->trim_end())->reject(fn(l) => $l->starts_with('!'))
-  w = $lines->map(fn(l) => $l->count())->max() ?? 0
+  lines = $text->lines()->map(->trim_end())->reject(->starts_with('!'))
+  w = $lines->map(->count())->max() ?? 0
   if $w == 0 {
     throw Pattern "That pattern has no cells in it."
   }
-  return $lines->map(fn(l) => $l->pad_right($w, char: '.')->replace_pattern(pattern: '[oO*#X]', replacement: $alive_cell)->replace_pattern(pattern: '[^O]', replacement: $dead_cell))
+  return $lines->map(->pad_right($w, char: '.')->replace_pattern(pattern: '[oO*#X]', replacement: $alive_cell)->replace_pattern(pattern: '[^O]', replacement: $dead_cell))
 }
 
 // The rules
@@ -193,7 +193,7 @@ fn edit_world(world: map, grid: string[]) {
 
 /// The world with one cell flipped, where is "column,row" from 0 (what a board button sends). Anything else leaves the world as it is.
 fn flip(world: map, where: string?) {
-  xy = ($where ?? '')->split(',')->map(fn(p) => $p->trim()->to_int(default: -1))
+  xy = ($where ?? '')->split(',')->map(->trim()->to_int(default: -1))
   if $xy->count() != 2 or $xy[0] < 0 or $xy[1] < 0 or $xy[0] >= @width($world.grid) or $xy[1] >= @height($world.grid) {
     return $world
   }
@@ -263,5 +263,5 @@ fn summary(world: map) {
 
 /// The grid as lines of text, for terminals and tests.
 fn to_text(grid: string[], alive = '█', dead = '·') {
-  return $grid->map(fn(row) => $row->replace(old: $alive_cell, new: $alive)->replace(old: $dead_cell, new: $dead))->join(@char_of(10))
+  return $grid->map(->replace(old: $alive_cell, new: $alive)->replace(old: $dead_cell, new: $dead))->join(@char_of(10))
 }

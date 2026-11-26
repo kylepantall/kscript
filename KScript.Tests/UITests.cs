@@ -124,6 +124,41 @@ public class UITests
     }
 
     [Fact]
+    public void TextBoxBindingOptionsTrimAndReadTheValueAsTheyDoOnAPage()
+    {
+        const string xml = """
+            <KScript.Window>
+              <let name="name" value="''" />
+              <let name="age" value="0" />
+              <TextBox bind="$name" trim="true" on="blur" />
+              <TextBox bind="age" as="int" />
+              <Text>{$name} is {$age}</Text>
+            </KScript.Window>
+            """;
+        RunWindow(xml, s =>
+        {
+            Assert.Equal("blur", s.FindAll("TextBox")[0].BindOn);
+            Assert.Equal("input", s.FindAll("TextBox")[1].BindOn);
+            s.SetBound(s.FindAll("TextBox")[0], "  Ada  ");
+            s.SetBound(s.FindAll("TextBox")[1], "36");
+            Assert.Equal("Ada is 36", s.FindAll("Text")[0].Text);
+            s.SetBound(s.FindAll("TextBox")[1], "old");
+            Assert.Contains("age takes a whole number, and 'old' isn't one.", s.Error);
+            Assert.Equal("Ada is 36", s.FindAll("Text")[0].Text);
+        });
+    }
+
+    [Theory]
+    [InlineData("<TextBox bind=\"name\" on=\"action\" />", "on=\"action\" isn't one")]
+    [InlineData("<TextBox bind=\"$name, trim: true\" />", "the binding's options are the element's own: TextBox(bind: $name, trim: true)")]
+    [InlineData("<TextBox bind=\"name\" as=\"date\" />", "as=\"date\" isn't one")]
+    public void TextBoxBindingOptionsAreChecked(string box, string message)
+    {
+        var ex = Assert.ThrowsAny<Exception>(() => RunWindow($"<KScript.Window><let name=\"name\" value=\"''\" />{box}</KScript.Window>", _ => { }));
+        Assert.Contains(message, ex.ToString());
+    }
+
+    [Fact]
     public void BoundInputsRunOnChangeWithTheValue()
     {
         const string xml = """

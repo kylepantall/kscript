@@ -34,9 +34,7 @@
         autocomplete="off">
       <p class="note">{$found->count()} of {$people->count()} people</p>
       <ul>
-        <for each="p" in="$found">
-          <li><b>{$p.name}</b> · {$p.role}</li>
-        </for>
+        <li @each($found, as: p)><b>{$p.name}</b> · {$p.role}</li>
         <else>
           <li>Nobody matches “{$query}”.</li>
         </else>
@@ -72,8 +70,8 @@
       </ul>
       <p class="note">{$todos->count_of(fn(t) => not $t.done)} left</p>
       <button
-        on-click="todos = $todos->reject(fn(t) => $t.done)"
-        disabled="{ not $todos->any(fn(t) => $t.done) }">Clear done</button>
+        on-click="todos = $todos->reject(.done)"
+        disabled="{ not $todos->any(.done) }">Clear done</button>
     </live>
   </section>
 

@@ -27,6 +27,16 @@ namespace KScript.Syntax.Markup
             $"<type name=\"{name}\"> needs fields or methods. Declare <field> or <fn> elements, give fields=\"name: string, age?: int\", or use path=\"sample.json\".",
             $"type {name} needs fields or methods. Declare fields in the body or with fields: [name: string, age?: int], declare a method with fn, or use path: \"sample.json\".");
 
+        /// <summary>
+        /// The argument an element takes first without its name in a .kscript file (<c>expect($total, equals: 3)</c>),
+        /// or null. XML writes it as an attribute (<c>&lt;expect value="$total" equals="3" /&gt;</c>).
+        /// </summary>
+        public static string Positional(string element) => ElementInfo.BareName(element ?? string.Empty) switch
+        {
+            "expect" => "value",
+            _ => null,
+        };
+
         public const string NormalizerArity = "A normalize callback takes exactly one parameter.";
 
         /// <summary>Applies the rule to every argument of every element in a .kscript document.</summary>

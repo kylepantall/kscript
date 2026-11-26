@@ -4,8 +4,8 @@ namespace KScript.Syntax.Markup
 {
     /// <summary>
     /// <c>@bind($query, on: blur, debounce: 300ms, as: int, trim: true)</c> on a form control: the field it binds, and
-    /// optional named arguments for when the value is sent and how it is read. <c>@bind('query')</c> and
-    /// <c>bind="query"</c> are the same binding with no options. One reader for the renderer and the checker.
+    /// optional named arguments for when the value is sent and how it is read. <c>bind="$query"</c> is the same
+    /// binding. One reader for the renderer and the checker.
     /// </summary>
     public static class BindDirective
     {
@@ -26,6 +26,9 @@ namespace KScript.Syntax.Markup
         {
             public string Path { get; internal set; } = string.Empty;
             public TextSpan PathSpan { get; internal set; }
+
+            /// <summary>Where the field is written, quotes and all, when it isn't written <c>$draft</c>; null when it is.</summary>
+            public TextSpan? OldPathSpan { get; internal set; }
             public List<ArgumentNode> Options { get; } = new List<ArgumentNode>();
             public List<(TextSpan Span, string Message)> Problems { get; } = new List<(TextSpan, string)>();
 
@@ -44,7 +47,7 @@ namespace KScript.Syntax.Markup
             public bool Trim => Get("trim") is LiteralNode { Kind: LiteralKind.Bool, Value: "true" };
         }
 
-        /// <summary>Reads a binding's text: <c>query</c>, <c>$query</c>, <c>'query'</c>, or <c>$query, on: blur</c>.</summary>
+        /// <summary>Reads a binding's text: <c>$query</c> or <c>$query, on: blur</c>. <c>query</c> and <c>'query'</c> are read, and reported.</summary>
         public static Reading Read(string text)
         {
             var reading = new Reading();
@@ -53,12 +56,19 @@ namespace KScript.Syntax.Markup
             int start = 0, end = comma < 0 ? text.Length : comma;
             while (start < end && char.IsWhiteSpace(text[start])) start++;
             while (end > start && char.IsWhiteSpace(text[end - 1])) end--;
+            int written = start, writtenEnd = end;
             if (end - start >= 2 && text[start] is '\'' or '"' && text[end - 1] == text[start])
             {
                 start++;
                 end--;
             }
-            if (start < end && text[start] == '$') start++;
+            if (start < end && text[start] == '$' && written == start) start++;
+            else if (start < end)
+            {
+                reading.OldPathSpan = TextSpan.FromBounds(written, writtenEnd);
+                reading.Problems.Add((TextSpan.FromBounds(written, writtenEnd), $"@bind names its field with $: @bind(${text[start..end].TrimStart('$')})."));
+                if (text[start] == '$') start++;
+            }
             reading.PathSpan = TextSpan.FromBounds(start, end);
             reading.Path = text[start..end];
             if (comma < 0) return reading;

@@ -421,18 +421,18 @@ public class ErrorTypeTests
                   expect_error(type: NotFound, as: e) {
                     @find(1)
                   }
-                  expect(value: $e.id, equals: 1)
-                  expect(value: $e, type: error)
+                  expect($e.id, equals: 1)
+                  expect($e, type: error)
                 }
                 test(name: "throws") {
-                  expect(value: @find(2), throws: PersonNotFound)
-                  expect(value: 'nope'->json(), throws: Format)
+                  expect(@find(2), throws: PersonNotFound)
+                  expect('nope'->json(), throws: Format)
                 }
                 test(name: "throws the wrong type") {
-                  expect(value: @find(3), throws: IO)
+                  expect(@find(3), throws: IO)
                 }
                 test(name: "throws nothing") {
-                  expect(value: 1 + 1, throws: IO)
+                  expect(1 + 1, throws: IO)
                 }
                 test(name: "expect_error the wrong type") {
                   expect_error(type: IO) {
@@ -440,10 +440,10 @@ public class ErrorTypeTests
                   }
                 }
                 test(name: "a failed check is not the error") {
-                  expect(value: @fail('inner'), throws: Error)
+                  expect(@fail('inner'), throws: Error)
                 }
                 test(name: "unless it asks for Assertion") {
-                  expect(value: @fail('inner'), throws: Assertion)
+                  expect(@fail('inner'), throws: Assertion)
                 }
                 """);
             var output = new StringWriter();

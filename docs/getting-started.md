@@ -57,9 +57,9 @@ people = [
 ]
 
 echo "{ $people->count() } people"
-echo "Oldest: { $people->max_by(fn(p) => $p.age).name }"
-echo "Names: { $people->map(fn(p) => $p.name)->join(', ') }"
-echo "Over 35: { $people->filter(fn(p) => $p.age > 35)->map(fn(p) => $p.name) }"
+echo "Oldest: { $people->max_by(.age).name }"
+echo "Names: { $people->map(.name)->join(', ') }"
+echo "Over 35: { $people->filter(fn(p) => $p.age > 35)->map(.name) }"
 ```
 
 `fn(p) => $p.age` is a lambda: a small function you pass to a method. `|>` pipes a value into the next call, which reads well for longer chains:

@@ -51,7 +51,7 @@ type SignInForm extends Component {
 
   fn render() => ```html
     <status-message />
-    <if test="$error != null"><p class="error">{$error}</p></if>
+    <p class="error" @if($error != null)>{$error}</p>
     <form method="post" action="/login">
       {! @csrf_field() }
       <p><label>Email<br><input type="email" name="email" value="{$email}" required autocomplete="email"></label></p>
@@ -143,7 +143,7 @@ fn sign_up(form: map) {
 fn sign_in(form: map) {
   user = @attempt($form.email, $form.password, remember: $form.remember == 'yes')
   if $user == null {
-    return @view('auth/login', data: { error: "That email and password don't match an account." })->with_status(422)
+    return @view('auth/login', data: { error: "That email and password don't match an account." }, status: 422)
   }
   return @redirect(@intended())
 }
@@ -171,7 +171,7 @@ fn sign_in(form: map) {
   try {
     user = @attempt($form.email, $form.password)
   } catch err when $err.type == 'TooManyRequests' {
-    return @view('auth/login', data: { error: $err.message })->with_status(429)
+    return @view('auth/login', data: { error: $err.message }, status: 429)
   }
   return @redirect(@intended())
 }
@@ -408,10 +408,10 @@ test(name: "only the author may update a post") {
   post = Post->create(title: 'Mine', author_id: 1)
 
   @acting_as(User(id: 1))
-  expect(value: @can(update, $post), equals: true)
+  expect(@can(update, $post), equals: true)
 
   @acting_as(User(id: 2))
-  expect(value: @can(update, $post), equals: false)
+  expect(@can(update, $post), equals: false)
 }
 ```
 

@@ -62,7 +62,7 @@ public class UnhandledErrorTests
             fn fetch() { throw Network "offline" }
             test(name: 'test runner handles failures') { @fetch() }
             expect_error(type: Network) { @fetch() }
-            expect(value: @fetch(), throws: Network)
+            expect(@fetch(), throws: Network)
             """;
         Assert.Empty(Warnings(source));
     }

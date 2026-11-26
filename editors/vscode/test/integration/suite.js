@@ -191,7 +191,7 @@ async function liveAttributeScopes(folder) {
     '<live id="actions">',
     '  <span title="live-action" @live-action(\'move-note\') on-action="@skip_render()">on-action</span>',
     '  <button live-action="save" on-action="@skip_render()" live-disable>Save</button>',
-    '  <input @bind(\'draft\') @bind-on(\'blur\')>',
+    '  <input @bind($draft, on: blur)>',
     "  <button @on-click(count += (')'->count() + (1 + 2))) @live-disable()>Run</button>",
     '</live>',
   ];
@@ -209,7 +209,7 @@ async function liveAttributeScopes(folder) {
     const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', doc.uri);
     const directives = tokens.filter(token => /keyword\.control\.directive\.kscript/.test(token.t)).map(token => token.c);
     assert.deepStrictEqual(directives, ['@live-action', 'on-action', 'live-action', 'on-action', 'live-disable',
-      '@bind', '@bind-on', '@on-click', '@live-disable'], file);
+      '@bind', '@on-click', '@live-disable'], file);
     assert.ok(tokens.some(token => token.c === 'title' && /entity\.other\.attribute-name\.html/.test(token.t)), file);
     assert.ok(tokens.some(token => token.c === 'count' && /meta\.embedded\.expression\.kscript.*support\.function\.kscript/.test(token.t)), file);
   }

@@ -73,8 +73,7 @@ namespace KScript.Language.Analysis
                     ParseResult fieldParse = ExpressionParser.ParseExpression(fieldText.Value);
                     var probe = new ExpressionRegion { Kind = RegionKind.Expression, Source = fieldText, Parse = fieldParse, Scope = scope, Element = e, Attribute = attr };
                     string type = fieldParse.Success ? Infer(fieldParse.Root, probe).Type : KType.Any;
-                    bool fits = type == KType.Any || type == wanted || wanted == KType.Number && type is "int" or "float"
-                        || wanted == KType.List && (type == KType.List || type.EndsWith("[]", StringComparison.Ordinal));
+                    bool fits = Features.LanguageService.FitsShorthand(type, wanted);
                     if (!fits)
                     {
                         Report(text.ToSource(step.Field.Span), DiagnosticSeverity.Error, DiagnosticCodes.TypeMismatch,
@@ -215,6 +214,32 @@ namespace KScript.Language.Analysis
             if (end - start >= 3 && value[start] == '{' && value[end - 1] == '}' && value[start + 1] != '{')
                 return Slice(text, TextSpan.FromBounds(start + 1, end - 1));
             return text;
+        }
+
+        /// <summary>
+        /// live-confirm, prevent-default and bind-on, which shorthands replaced: an error saying what to write, with a
+        /// fix that moves the value into the handler or the binding when there is one to take it.
+        /// </summary>
+        private void ReportRetired(MarkupElement e, MarkupAttribute attr, string message)
+        {
+            string value = attr.ValueText?.Trim();
+            int start = attr.Span.Start;
+            while (start > 0 && source.Text[start - 1] is ' ' or '\t') start--;
+            var remove = new TextChange(TextSpan.FromBounds(start, attr.Span.End), string.Empty);
+            QuickFix fix = null;
+            if (attr.Name.Equals("bind-on", StringComparison.OrdinalIgnoreCase) && e.GetAttribute("bind") is { Value: not null } bind && !string.IsNullOrEmpty(value))
+            {
+                fix = new QuickFix("Move into @bind", new TextChange(new TextSpan(bind.Value.ToSource(bind.Value.Value.Length), 0), $", on: {value}"), remove);
+            }
+            else if (e.Attributes.Where(a => a.Name.StartsWith("on-", StringComparison.Ordinal) && a.Value != null && HandlerShorthands.IsShorthand(a.Value.Value)).ToList() is { Count: 1 } handlers)
+            {
+                string modifier = attr.Name.Equals("live-confirm", StringComparison.OrdinalIgnoreCase)
+                    ? (string.IsNullOrEmpty(value) ? null : $", confirm: '{value.Replace("'", "\\'")}'")
+                    : ", prevent: true";
+                DecodedText handler = handlers[0].Value;
+                if (modifier != null) fix = new QuickFix("Move into the handler", new TextChange(new TextSpan(handler.ToSource(handler.Value.Length), 0), modifier), remove);
+            }
+            Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.OneSpelling, message, fix == null ? null : new[] { fix });
         }
 
         /// <summary>Part of a decoded text, keeping each character's place in the source.</summary>

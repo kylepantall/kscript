@@ -11,15 +11,15 @@ fn round_trip(folder: any) {
   table = $folder->join('tickets.csv')
   @write_csv($table, [{ title: "A, { @char_of(10) }B", number: 7 }])
   rows = @read_csv($table, as: TicketRow)
-  expect(value: $rows->first().number, same: 7)
-  expect(value: $rows->first().title, same: "A, { @char_of(10) }B")
+  expect($rows->first().number, same: 7)
+  expect($rows->first().title, same: "A, { @char_of(10) }B")
 
   payload: base64 = 'AAH/AA=='
   binary = $folder->join('payload.bin')
   @write_bytes($binary, $payload)
-  expect(value: @read_bytes($binary)->to_string(), same: 'AAH/AA==')
+  expect(@read_bytes($binary)->to_string(), same: 'AAH/AA==')
   @write_atomic($binary, 'done')
-  expect(value: @read_text($binary), same: 'done')
+  expect(@read_text($binary), same: 'done')
   return $folder
 }
 
@@ -30,50 +30,50 @@ fn fail_in_temp(file: any) {
 
 describe(name: 'Built-in collection and text APIs') {
   test(name: 'transforms and searches preserve order and original indexes') {
-    expect(value: [1, 2]->flat_map(fn(x) => [$x, -$x]), same: [1, -1, 2, -2])
+    expect([1, 2]->flat_map(fn(x) => [$x, -$x]), same: [1, -1, 2, -2])
     expect(
-      value: [1, 2, 3]->partition(fn(x) => $x->is_odd()),
+      [1, 2, 3]->partition(->is_odd()),
       same: [[1, 3], [2]]
     )
     expect(
-      value: ['alpha', 'apple', 'beta']->unique_by(fn(x) => $x->first()),
+      ['alpha', 'apple', 'beta']->unique_by(->first()),
       same: ['alpha', 'beta']
     )
-    expect(value: ['a', 'b', 'c']->find_last(fn(_x, i) => $i < 2), same: 'b')
+    expect(['a', 'b', 'c']->find_last(fn(_x, i) => $i < 2), same: 'b')
   }
 
   test(name: 'map projection and recursive merge retain intentional nulls') {
     meta = { title: 'Note', views: 2, hidden: true }
     expect(
-      value: $meta->pick(['views', 'title']),
+      $meta->pick(['views', 'title']),
       same: { title: 'Note', views: 2 }
     )
-    expect(value: $meta->omit(['hidden']), same: { title: 'Note', views: 2 })
+    expect($meta->omit(['hidden']), same: { title: 'Note', views: 2 })
     settings = { nav: { title: 'Home', priority: 2 }, flags: [1] }
     expect(
-      value: $settings->deep_merge({ nav: { title: null }, flags: [2] }),
+      $settings->deep_merge({ nav: { title: null }, flags: [2] }),
       same: { nav: { title: null, priority: 2 }, flags: [2] },
     )
   }
 
   test(name: 'text and signed durations have explicit contracts') {
     expect(
-      value: 'pre/pre/file.txt.txt'->strip_prefix('pre/')->strip_suffix('.txt'),
+      'pre/pre/file.txt.txt'->strip_prefix('pre/')->strip_suffix('.txt'),
       same: 'pre/file.txt'
     )
-    expect(value: ('e' + @char_of(769))->normalize_unicode(), same: 'é')
+    expect(('e' + @char_of(769))->normalize_unicode(), same: 'é')
     start = '2025-04-01T09:00:00Z'->to_date()
     finish = $start + 20m
-    expect(value: $start->duration_since($finish).minutes, same: -20)
+    expect($start->duration_since($finish).minutes, same: -20)
   }
 }
 
 describe(name: 'Scoped files, HTTP and settings') {
   test(name: 'binary bytes and CSV round-trip with cleanup') {
     removed = @with_temp_folder(@round_trip)
-    expect(value: @exists($removed), same: false)
+    expect(@exists($removed), same: false)
     failed = @with_temp_file(@fail_in_temp) catch Validation => $err.message
-    expect(value: @exists($failed), same: false)
+    expect(@exists($failed), same: false)
   }
 
   test(name: 'an HTTP client retries a stub and supports response assertions') {
@@ -91,7 +91,7 @@ describe(name: 'Scoped files, HTTP and settings') {
       },
       fn() => $client('tickets'),
     )
-    expect(value: $hits->get('calls'), same: 2)
+    expect($hits->get('calls'), same: 2)
     @assert_response(
       $result,
       status: 200,
@@ -99,7 +99,7 @@ describe(name: 'Scoped files, HTTP and settings') {
       as: TicketRow
     )
     expect(
-      value: @parse_query('?label=a+b&label=c%2Bd&empty'),
+      @parse_query('?label=a+b&label=c%2Bd&empty'),
       same: { label: ['a b', 'c+d'], empty: '' }
     )
   }
@@ -110,11 +110,11 @@ describe(name: 'Scoped files, HTTP and settings') {
       { KSCRIPT_API_TEST_MODE: 'demo' },
       fn() => @env('KSCRIPT_API_TEST_MODE')
     )
-    expect(value: $mode, same: 'demo')
-    expect(value: @env('KSCRIPT_API_TEST_MODE'), same: $before)
+    expect($mode, same: 'demo')
+    expect(@env('KSCRIPT_API_TEST_MODE'), same: $before)
     time = '2025-01-02T12:01:00'->to_date()
     expect(
-      value: @with_clock($time, fn() => @today()->format()),
+      @with_clock($time, fn() => @today()->format()),
       same: '2025-01-02'
     )
   }
@@ -124,11 +124,11 @@ describe(name: 'Scoped files, HTTP and settings') {
     $store->clear()
     $store->clear_group('menu')
     menu = $store->group('menu')
-    expect(value: $menu->set_if_absent('links', ['Home']), same: true)
-    expect(value: $menu->set_if_absent('links', ['Other']), same: false)
+    expect($menu->set_if_absent('links', ['Home']), same: true)
+    expect($menu->set_if_absent('links', ['Other']), same: false)
     $store->set('outside', true)
-    expect(value: $store->clear_group('menu'), same: 1)
-    expect(value: $menu->has('links'), same: false)
-    expect(value: $store->get('outside'), same: true)
+    expect($store->clear_group('menu'), same: 1)
+    expect($menu->has('links'), same: false)
+    expect($store->get('outside'), same: true)
   }
 }

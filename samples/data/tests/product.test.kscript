@@ -6,12 +6,12 @@ import "../models/product.kscript"
 describe(name: 'Product') {
   test(name: 'is saved and found again') {
     tea = Product->create(sku: 'TEA-9', name: 'Black tea', price: 5)
-    expect(value: Product->find($tea.id).name, equals: 'Black tea')
-    expect(value: $tea.stock, equals: 0)
+    expect(Product->find($tea.id).name, equals: 'Black tea')
+    expect($tea.stock, equals: 0)
   }
 
   test(name: 'starts each test with no products') {
-    expect(value: Product->count(), equals: 0)
+    expect(Product->count(), equals: 0)
   }
 
   test(name: 'keeps skus unique') {
@@ -24,8 +24,8 @@ describe(name: 'Product') {
   test(name: 'lists products in one query') {
     Product->fake_many(3)
     names = Product->order_by(name)->pluck(name)
-    expect(value: $names, count: 3)
-    expect(value: @queries(), count_at_most: 4)
+    expect($names, count: 3)
+    expect(@queries(), count_at_most: 4)
   }
 
   test(name: 'upserts by sku and pages by a stable key') {
@@ -34,18 +34,18 @@ describe(name: 'Product') {
       { sku: 'MUG-1', name: 'Blue mug', price: 8 },
     ])
     Product->upsert({ sku: 'TEA-9', name: 'Green tea', price: 6 }, key: 'sku')
-    expect(value: Product->count(), same: 2)
-    expect(value: Product->where(sku: 'TEA-9')->first().name, same: 'Green tea')
+    expect(Product->count(), same: 2)
+    expect(Product->where(sku: 'TEA-9')->first().name, same: 'Green tea')
 
     first = Product->cursor_paginate(per_page: 1)
-    expect(value: $first.has_more, same: true)
+    expect($first.has_more, same: true)
     second = Product->cursor_paginate(per_page: 1, after: $first.next)
-    expect(value: $second.items->first().name, same: 'Blue mug')
-    expect(value: $second.has_more, same: false)
+    expect($second.items->first().name, same: 'Blue mug')
+    expect($second.has_more, same: false)
 
     description = @db()->describe_table(Product)
     expect(
-      value: $description.columns->pluck('name')->contains('sku'),
+      $description.columns->pluck('name')->contains('sku'),
       same: true
     )
   }

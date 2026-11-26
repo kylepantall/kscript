@@ -55,9 +55,7 @@
             </label>
             <label>Pattern
               <select @bind($pattern) on-change="world = @select_pattern($pattern, width: $cols, height: $rows, wrap: $world.wrap); playing = false">
-                <for each="name" in="$patterns->keys()">
-                  <option value="{$name}" selected="{$name eq $pattern}">{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
-                </for>
+                <option value="{$name}" selected="{$name eq $pattern}" @each($patterns->keys(), as: name)>{ $name->replace(old: '_', new: ' ')->capitalize() }</option>
               </select>
             </label>
             <div class="group">

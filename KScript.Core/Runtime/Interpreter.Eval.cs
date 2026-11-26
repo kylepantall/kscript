@@ -210,6 +210,20 @@ namespace KScript.Runtime
             return type != null && scope.TryGet(type, out object declared) && declared is EnumType e ? e.Names : null;
         }
 
+        /// <summary>
+        /// The smallest value a component's number field allows (<c>stock: int(min: 0)</c>, or a refinement type with
+        /// min:), for decrement:, which stops there. Null when it has none.
+        /// </summary>
+        private static double? MinOf(ExprNode field, Scope scope)
+        {
+            if (FieldName(field) is not string name || !scope.TryGet("this", out object self) || self is not Record record) return null;
+            TypeRef type = record.Type.Field(name)?.Type;
+            object min = null;
+            if (type?.Args != null && type.Args.TryGetValue("min", out object given)) min = given;
+            else if (type != null && scope.TryGet(type.Name, out object declared) && declared is RefinedType refined) refined.Rules.Options.TryGetValue("min", out min);
+            return min != null && Values.TryNumber(Values.ToStr(min), out double floor) ? floor : null;
+        }
+
         /// <summary>The name a variable is assigned by ($draft, $.draft), or null for anything else.</summary>
         private static string FieldName(ExprNode node) => node is VariableNode v ? v.Name : null;
 
@@ -328,6 +342,14 @@ namespace KScript.Runtime
                         string field = text.Value.Substring(step.Field.Span.Start, step.Field.Span.Length);
                         throw Fail(step.Field, ctx, HandlerShorthands.FieldTypeMessage(step.Action, field, Values.Describe(current)), "Type");
                     }
+                }
+                if (step.Action.Name == HandlerShorthands.Decrement && MinOf(step.Field, scope) is double floor)
+                {
+                    // decrement: never takes a field below its min:.
+                    double by = step.Companion == null ? 1 : Values.ToNumber(Evaluate(step.Companion.Value, scope, ctx), "by:");
+                    double next = Values.ToNumber(Evaluate(step.Field, scope, ctx), "decrement:") - by;
+                    Assign(step.Field, Math.Max(next, floor), scope, ctx);
+                    continue;
                 }
                 (string statement, int[] map) = HandlerShorthands.Statement(step, text.Value).Value;
                 ExecuteStatements(new DecodedText(statement, map.Select(text.ToSource).ToArray()), scope, module, declare: false);

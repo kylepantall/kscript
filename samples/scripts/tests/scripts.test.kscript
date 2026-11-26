@@ -2,17 +2,17 @@
 // its output and exit code.
 test(name: "oldest.kscript finds Joan") {
   result = @run_script('../oldest.kscript')
-  expect(value: $result.code, equals: 0)
+  expect($result.code, equals: 0)
   expect(
-    value: $result.output->lines(),
+    $result.output->lines(),
     equals: ['Joan is the oldest at 82 years old.', 'Joan again.']
   )
 }
 
 test(name: "imports.kscript prints the slug twice") {
   result = @run_script('../imports.kscript')
-  expect(value: $result.output->lines(), count: 2)
-  expect(value: $result.output, contains: 'hello-world')
+  expect($result.output->lines(), count: 2)
+  expect($result.output, contains: 'hello-world')
 }
 
 describe(name: "a shopping cart") {
@@ -26,19 +26,19 @@ describe(name: "a shopping cart") {
   }
 
   test(name: "starts with one item") {
-    expect(value: $cart, count: 1)
+    expect($cart, count: 1)
   }
 
   test(name: "adds items") {
     @add('pear')
-    expect(value: $cart, equals: ['apple', 'pear'])
+    expect($cart, equals: ['apple', 'pear'])
   }
 
   test(name: "rejects an empty item") {
     expect_error(type: Validation, contains: "empty", as: err) {
       throw Validation "An item can't be empty"
     }
-    expect(value: $err.type, equals: 'Validation')
+    expect($err.type, equals: 'Validation')
   }
 
   test(name: "prints the cart") {
@@ -47,6 +47,6 @@ describe(name: "a shopping cart") {
         echo "- {$item}"
       }
     }
-    expect(value: $out, equals: '- apple')
+    expect($out, equals: '- apple')
   }
 }

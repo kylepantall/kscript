@@ -4,99 +4,99 @@ import KScript.Web
 describe(name: "task board") {
   test(name: "the page starts with two open tasks") {
     page = @visit('/')
-    expect(value: $page.text, contains: 'Buy milk')
-    expect(value: $page.text, contains: 'Added 0 · Showing all')
-    expect(value: $page->classes('Buy milk'), not_contains: 'done')
+    expect($page.text, contains: 'Buy milk')
+    expect($page.text, contains: 'Added 0 · Showing all')
+    expect($page->classes('Buy milk'), not_contains: 'done')
   }
 
   test(name: "add: to: puts the draft on the list and set: to: clears it") {
     page = @visit('/')->fill('draft', 'Walk the dog')->submit()
-    expect(value: $page.text, contains: 'Remove Walk the dog')
-    expect(value: $page.text, contains: 'Added 1')
-    expect(value: $page.html, contains: 'value=""')
+    expect($page.text, contains: 'Remove Walk the dog')
+    expect($page.text, contains: 'Added 1')
+    expect($page.html, contains: 'value=""')
   }
 
   test(name: "call: with: runs a method, and @class marks the task done") {
     page = @visit('/')->click('Finish Buy milk')
-    expect(value: $page->classes('Buy milk'), equals: ['done', 'struck'])
-    expect(value: $page.text, contains: 'Finished Buy milk')
+    expect($page->classes('Buy milk'), equals: ['done', 'struck'])
+    expect($page.text, contains: 'Finished Buy milk')
   }
 
   test(name: "remove: from: takes a task off the list") {
     page = @visit('/')->click('Remove Call the bank')
-    expect(value: $page.text, not_contains: 'Call the bank')
+    expect($page.text, not_contains: 'Call the bank')
   }
 
   test(name: "toggle: flips a bool, and @class follows it") {
     page = @visit('/')
-    expect(value: $page.html, not_contains: 'class="compact"')
+    expect($page.html, not_contains: 'class="compact"')
     $page->click('Compact')
-    expect(value: $page.html, contains: 'class="compact"')
+    expect($page.html, contains: 'class="compact"')
     $page->click('Compact')
-    expect(value: $page.html, not_contains: 'class="compact"')
+    expect($page.html, not_contains: 'class="compact"')
   }
 
   test(name: "set: to: picks the filter") {
     page = @visit('/')->click('Finish Buy milk')->click('Open')
-    expect(value: $page.text, contains: 'Showing open')
-    expect(value: $page.text, not_contains: 'Remove Buy milk')
-    expect(value: $page.html, contains: 'class="is-filtered"')
+    expect($page.text, contains: 'Showing open')
+    expect($page.text, not_contains: 'Remove Buy milk')
+    expect($page.html, contains: 'class="is-filtered"')
     $page->click('All')
-    expect(value: $page.text, contains: 'Remove Buy milk')
+    expect($page.text, contains: 'Remove Buy milk')
   }
 
   test(name: "a page the site doesn't have is NotFound") {
-    expect(value: @visit('/nope'), throws: NotFound)
+    expect(@visit('/nope'), throws: NotFound)
   }
 
   test(name: "trim: tidies the draft, and reset: puts it back to ''") {
     page = @visit('/')->fill('draft', '  Walk the dog  ')->submit()
-    expect(value: $page.text, contains: 'Remove Walk the dog')
-    expect(value: $page.html, contains: 'value=""')
+    expect($page.text, contains: 'Remove Walk the dog')
+    expect($page.html, contains: 'value=""')
   }
 
   test(name: "@live-disable(while:) disables Add until there is a draft") {
     expect(
-      value: @visit('/').html,
+      @visit('/').html,
       matches: '<button data-ks-live-disable disabled>Add'
     )
   }
 
   test(name: "key: escape clears the search, and other keys don't") {
     page = @visit('/')->fill('search', 'milk')->press('enter', in: 'Search')
-    expect(value: $page.text, not_contains: 'Call the bank')
+    expect($page.text, not_contains: 'Call the bank')
     $page->press('escape', in: 'Search')
-    expect(value: $page.text, contains: 'Call the bank')
+    expect($page.text, contains: 'Call the bank')
   }
 
   test(name: "cycle: goes round the views") {
     page = @visit('/')->click('View')
-    expect(value: $page.text, contains: '· grid ·')
-    expect(value: $page.html, contains: 'class="grid"')
-    expect(value: $page->click('View').text, contains: '· list ·')
+    expect($page.text, contains: '· grid ·')
+    expect($page.html, contains: 'class="grid"')
+    expect($page->click('View').text, contains: '· list ·')
   }
 
   test(name: "as: int reads the goal as a number, and refuses words") {
     expect(
-      value: @visit('/')->fill('goal', '7')->click('Compact').text,
+      @visit('/')->fill('goal', '7')->click('Compact').text,
       contains: 'Goal 7'
     )
     expect(
-      value: @visit('/')->fill('goal', 'seven')->click('Compact'),
+      @visit('/')->fill('goal', 'seven')->click('Compact'),
       throws: Http
     )
   }
 
   test(name: "@show hides the tips once they are dismissed") {
     page = @visit('/')
-    expect(value: $page.html, not_contains: '<p hidden>')
-    expect(value: $page->click('Hide tips').html, contains: '<p hidden>')
+    expect($page.html, not_contains: '<p hidden>')
+    expect($page->click('Hide tips').html, contains: '<p hidden>')
   }
 
   test(name: "modifiers reach the browser") {
     html = @visit('/').html
-    expect(value: $html, contains: 'Remove this task?')
-    expect(value: $html, contains: 'data-ks-mods-click')
-    expect(value: $html, contains: 'data-ks-bind-debounce="300"')
+    expect($html, contains: 'Remove this task?')
+    expect($html, contains: 'data-ks-mods-click')
+    expect($html, contains: 'data-ks-bind-debounce="300"')
   }
 }

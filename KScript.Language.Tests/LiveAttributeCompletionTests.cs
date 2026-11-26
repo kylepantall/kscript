@@ -61,15 +61,13 @@ namespace KScript.Language.Tests
         {
             const string begin = "<live id=\"board\"><state name=\"draft\" value=\"''\" /><state name=\"secret\" locked value=\"0\" />";
             Assert.Equal(new[] { "draft" }, At(begin + "<input bind=\"‸\"></live>", "\"", fenced).Select(i => i.Label));
-            Assert.Equal("'draft'", Assert.Single(At(begin + "<input @bind(‸)></live>", "(", fenced)).InsertText);
-            Assert.Equal("'draft'", Assert.Single(At(begin + "<input @bind(dr‸)></live>", fenced: fenced)).InsertText);
-            Assert.Equal(new[] { "input", "change", "blur", "action" },
-                At(begin + "<input bind=\"draft\" bind-on=\"‸\"></live>", "\"", fenced).Select(i => i.Label));
+            Assert.Equal("$draft", Assert.Single(At(begin + "<input @bind(‸)></live>", "(", fenced)).InsertText);
+            Assert.Equal("$draft", Assert.Single(At(begin + "<input @bind($dr‸)></live>", fenced: fenced)).InsertText);
+            Assert.Equal("$draft", Assert.Single(At(begin + "<input @bind($dr‸, on: blur)></live>", fenced: fenced)).InsertText);
             Assert.Equal(new[] { "inner" }, At(begin + "<live id=\"child\"><state name=\"inner\" value=\"1\" /><input bind=\"‸\"></live></live>",
                 "\"", fenced).Select(i => i.Label));
-            Assert.Empty(At(begin + "<input bind-on=\"‸\"></live>", "\"", fenced));
-            var invalid = Service.Analyze(begin + "<input bind=\"draft\" bind-on=\"click\"></live>", Path.Combine(Root, "index.html"));
-            Assert.Contains(invalid.Errors, e => e.Message.Contains("bind-on") && e.Message.Contains("change"));
+            var invalid = Service.Analyze(begin + "<input bind=\"$draft, on: click\"></live>", Path.Combine(Root, "index.html"));
+            Assert.Contains(invalid.Errors, e => e.Message.Contains("on:") && e.Message.Contains("change"));
         }
 
         [Fact]
@@ -83,7 +81,7 @@ namespace KScript.Language.Tests
                   caption: string => $title
                   fn render(): Component {
                     return ```html
-                    <input @bind('titel') @bind-on('blur')>
+                    <input @bind($titel, on: blur)>
                     ```
                   }
                 }
@@ -93,7 +91,7 @@ namespace KScript.Language.Tests
             Assert.Contains("Did you mean 'title'", error.Message);
             Assert.Equal("title", Assert.Single(Assert.Single(error.Fixes).Changes).NewText);
             var empty = Service.Analyze(editor.Replace("titel", ""), doc.Path);
-            var items = Service.GetCompletions(empty, empty.Source.Text.IndexOf("@bind('", StringComparison.Ordinal) + 7, "'");
+            var items = Service.GetCompletions(empty, empty.Source.Text.IndexOf("@bind($", StringComparison.Ordinal) + 7, "$");
             Assert.Equal(new[] { "done", "title" }, items.Select(i => i.Label).OrderBy(n => n));
             Assert.Empty(Service.Analyze(editor.Replace("titel", "title"), doc.Path).Errors);
         }

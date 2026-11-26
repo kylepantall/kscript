@@ -38,22 +38,22 @@ public sealed class ApiShorthandTests : StorageFixture
         using var site = Site("""
             test(name: 'post') {
               reply = @api('/api/echo', post: { title: 'Hi' }, bearer: 'tok')->json()
-              expect(value: $reply.method, equals: 'POST')
-              expect(value: $reply.body, equals: '{"title":"Hi"}')
-              expect(value: $reply.auth, equals: 'Bearer tok')
+              expect($reply.method, equals: 'POST')
+              expect($reply.body, equals: '{"title":"Hi"}')
+              expect($reply.auth, equals: 'Bearer tok')
             }
             test(name: 'put and patch') {
-              expect(value: @api('/api/echo', put: { a: 1 })->json().method, equals: 'PUT')
-              expect(value: @api('/api/echo', patch: { a: 1 })->json().method, equals: 'PATCH')
+              expect(@api('/api/echo', put: { a: 1 })->json().method, equals: 'PUT')
+              expect(@api('/api/echo', patch: { a: 1 })->json().method, equals: 'PATCH')
             }
             test(name: 'delete sends no body') {
               reply = @api('/api/echo', delete: true)->json()
-              expect(value: $reply.method, equals: 'DELETE')
-              expect(value: $reply.body, equals: '')
+              expect($reply.method, equals: 'DELETE')
+              expect($reply.body, equals: '')
             }
             test(name: 'as reads the reply into a type') {
               note = @api('/api/echo', post: 'x', as: Note)
-              expect(value: $note.method, equals: 'POST')
+              expect($note.method, equals: 'POST')
             }
             """);
         Assert.All(Run(site), test => Assert.True(test.Outcome == TestOutcome.Passed, test.Name + ": " + test.Message));
@@ -61,7 +61,9 @@ public sealed class ApiShorthandTests : StorageFixture
 
     [Theory]
     [InlineData("@api('/api/echo', post: 1, put: 2)", "one of post:, put:, patch: and delete:")]
-    [InlineData("@api('/api/echo', post: 1, options: { method: 'PUT' })", "was given method twice")]
+    [InlineData("@api('/api/echo', post: 1, options: { method: 'PUT' })", "takes the method and body as one argument")]
+    [InlineData("@api('/api/echo', options: { body: 1 })", "takes the method and body as one argument")]
+    [InlineData("@api('/api/echo', post: 1, options: { timeout: 2s }, timeout: 1s)", "was given timeout twice")]
     [InlineData("@api('/api/echo', bearer: 'a', options: { headers: { Authorization: 'b' } })", "an Authorization header and bearer:")]
     public void A_mixed_up_call_says_what_to_write(string call, string message)
     {

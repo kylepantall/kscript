@@ -282,7 +282,7 @@ namespace KScript.Language.Tests
             // Text already in backticks stays as it is; an example that isn't a script stays XML.
             Assert.Equal("`<if $x>` or `else`", LanguageService.TagsAsCode("`<if $x>` or <else />", code: true));
             Assert.Null(LanguageService.TagsAsCode(null, code: true));
-            Assert.Null(LanguageService.ExampleAsCode("<live id=\"search\"><input bind=\"query\"></live>"));
+            Assert.Null(LanguageService.ExampleAsCode("<live id=\"search\"><input bind=\"$query\"></live>"));
         }
 
         [Fact]

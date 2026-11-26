@@ -1,9 +1,7 @@
 <layout path="/_layout.html" title="People">
   <h1>People aged {$min} and over</h1>
   <ul>
-    <for each="p" in="$people">
-      <li><a href="/people/{$p.id}">{$p.name}</a> ({$p.age}, {$p.role})</li>
-    </for>
+    <li @each($people, as: p)><a href="/people/{$p.id}">{$p.name}</a> ({$p.age}, {$p.role})</li>
     <else>
       <li>Nobody matches.</li>
     </else>

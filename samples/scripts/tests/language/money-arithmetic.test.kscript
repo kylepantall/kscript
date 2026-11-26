@@ -3,39 +3,39 @@ describe(name: 'Money arithmetic') {
     refund: money = 'GBP -0.10'
     parts = $refund->split(3)
     expect(
-      value: $parts->map(fn(part) => $part->to_string()),
+      $parts->map(->to_string()),
       equals: ['GBP -0.04', 'GBP -0.03', 'GBP -0.03']
     )
-    expect(value: $parts->total(), same: $refund)
+    expect($parts->total(), same: $refund)
   }
 
   test(name: 'allocation gives the remaining unit to the largest fractional share') {
     budget: money = 'JPY 5'
     shares = $budget->allocate([1, 3, 0])
-    expect(value: $shares->map(fn(part) => $part.amount), equals: [1, 4, 0])
-    expect(value: $shares->total(), same: $budget)
+    expect($shares->map(.amount), equals: [1, 4, 0])
+    expect($shares->total(), same: $budget)
   }
 
   test(name: 'scaling rounds to the minor unit for each currency') {
     pounds: money = 'GBP 0.01'
     dinars: money = 'KWD 0.003'
-    expect(value: ($pounds / 2)->to_string(), same: 'GBP 0.01')
-    expect(value: ($dinars / 2)->to_string(), same: 'KWD 0.002')
+    expect(($pounds / 2)->to_string(), same: 'GBP 0.01')
+    expect(($dinars / 2)->to_string(), same: 'KWD 0.002')
   }
 
   test(name: 'combining prices requires a common currency') {
     first: money = 'GBP 4.25'
     second: money = 'EUR 0.75'
-    expect(value: $first + $second, throws: Type)
+    expect($first + $second, throws: Type)
     mixed: money[] = [$first, $second]
-    expect(value: $mixed->total(), throws: Type)
+    expect($mixed->total(), throws: Type)
   }
 
   test(name: 'invalid shares and a total with no currency have distinct outcomes') {
     price: money = 'GBP 1.00'
-    expect(value: $price->allocate([0, 0]), throws: Argument)
-    expect(value: $price->split(0), throws: Argument)
+    expect($price->allocate([0, 0]), throws: Argument)
+    expect($price->split(0), throws: Argument)
     prices: money[] = []
-    expect(value: $prices->total(), same: null)
+    expect($prices->total(), same: null)
   }
 }

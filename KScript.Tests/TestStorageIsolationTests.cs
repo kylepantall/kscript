@@ -32,15 +32,15 @@ public sealed class TestStorageIsolationTests : StorageFixture
             import KScript.Storage
 
             test(name: 'writes test data') {
-              expect(value: @users()->count(), equals: 0)
-              expect(value: @storage()->exists('note.txt'), equals: false)
+              expect(@users()->count(), equals: 0)
+              expect(@storage()->exists('note.txt'), equals: false)
               user = @register('tester@example.test', 'correct-horse-battery-9')
               token = @api_token($user, name: 'test')
               @storage()->write('note.txt', 'test')
               response = @api('/api/state', options: { headers: { authorization: "Bearer {$token}" } })->json()
-              expect(value: $response.signed_in, equals: true)
-              expect(value: $response.note, equals: 'test')
-              expect(value: @api_tokens($user)->count(), equals: 1)
+              expect($response.signed_in, equals: true)
+              expect($response.note, equals: 'test')
+              expect(@api_tokens($user)->count(), equals: 1)
             }
             """;
         string first = Path.Combine(Project, "first.test.kscript");
@@ -49,7 +49,7 @@ public sealed class TestStorageIsolationTests : StorageFixture
         File.WriteAllText(second, files + """
 
             test(name: 'fails after writing') {
-              expect(value: true, equals: false)
+              expect(true, equals: false)
             }
             """);
 
@@ -104,13 +104,13 @@ public sealed class TestStorageIsolationTests : StorageFixture
                 import "models/note.kscript"
                 test(name: 'shares the open transaction') {
                   Note->create(title: 'test')
-                  expect(value: @api('/api/notes')->json(), equals: 1)
-                  expect(value: @api('/api/notes', options: { method: 'POST' }).text, equals: 'route')
-                  expect(value: Note->count(), equals: 2)
+                  expect(@api('/api/notes')->json(), equals: 1)
+                  expect(@api('/api/notes', post: {}).text, equals: 'route')
+                  expect(Note->count(), equals: 2)
                 }
                 test(name: 'rolls back test and route writes') {
-                  expect(value: @api('/api/notes')->json(), equals: 0)
-                  expect(value: Note->count(), equals: 0)
+                  expect(@api('/api/notes')->json(), equals: 0)
+                  expect(Note->count(), equals: 0)
                 }
                 """));
 
@@ -139,9 +139,9 @@ public sealed class TestStorageIsolationTests : StorageFixture
         File.WriteAllText(path, """
             import KScript.Auth
             test(name: 'registers a model user') {
-              expect(value: @users()->count(), equals: 0)
+              expect(@users()->count(), equals: 0)
               @register('tester@example.test', 'correct-horse-battery-9')
-              expect(value: @users()->count(), equals: 1)
+              expect(@users()->count(), equals: 1)
             }
             """);
 

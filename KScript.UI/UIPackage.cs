@@ -49,6 +49,13 @@ namespace KScript.UI
         private static readonly A Align = new A("align", K.Enum, "How items line up across the container: start, center, end or stretch.", false, "start", "center", "end", "stretch");
         private static readonly A Disabled = new A("disabled", K.Expression, "true greys it out so it can't be used.");
         private static readonly A Bind = new A("bind", K.VariableReference, "The variable it shows and changes. Declare it with <let> directly inside <KScript.Window>.", true);
+        /// <summary>The binding's options on a TextBox, the same as @bind's on a page: on:, trim: and as:.</summary>
+        private static readonly A[] BindOptions =
+        {
+            new A("on", K.Enum, "When the typed value is stored: input (as you type, the default), change or blur (when focus leaves or Enter is pressed).", false, "input", "change", "blur"),
+            new A("trim", K.Bool, "true trims spaces from both ends before the value is stored."),
+            new A("as", K.Enum, "Reads the typed value as this type before it is stored, and refuses one that isn't: as: int.", false, "string", "int", "number", "bool"),
+        };
         private static readonly A OnChange = new A("on_change", K.Statements, "Runs after the person changes the value ($event.value), e.g. on_change=\"saved = false\".");
 
         /// <summary>A window draws the components written in it, and keeps each one between draws.</summary>
@@ -105,16 +112,16 @@ namespace KScript.UI
                 Example = "<Button variant=\"primary\" on_click=\"count += 1\">Add one</Button>",
             }, run => UIElements.Node(run, "Button", text: true));
 
-            p.Element(new ElementInfo("TextBox", "A box to type in, tied to a variable.", ContentKind.Empty, With(Box,
-                Bind,
+            p.Element(new ElementInfo("TextBox", "A box to type in, tied to a variable. on:, trim: and as: say when and how the typed value is stored, as with @bind on a page.", ContentKind.Empty, With(Box,
+                new[] { Bind }.Concat(BindOptions).Concat(new[] {
                 new A("placeholder", K.Template, "Grey text shown while it is empty."),
                 new A("on_enter", K.Statements, "Runs when Enter is pressed."),
                 OnChange,
                 new A("multiline", K.Bool, "true allows several lines."),
-                Disabled))
+                Disabled }).ToArray()))
             {
                 Context = ElementContext.Script,
-                Example = "<TextBox bind=\"name\" placeholder=\"Your name\" on_enter=\"greeting = 'Hi ' + $name\" />",
+                Example = "<TextBox bind=\"name\" trim=\"true\" placeholder=\"Your name\" on_enter=\"greeting = 'Hi ' + $name\" />",
             }, run => UIElements.Node(run, "TextBox", text: false));
 
             p.Element(new ElementInfo("CheckBox", "A tick box tied to a true/false variable. Its text is the label.", ContentKind.Template, With(Box, Bind, OnChange, Disabled))

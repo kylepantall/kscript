@@ -20,18 +20,18 @@ test(name: 'a null fallback logs once and the original error reaches the caller'
   expect_error(type: Network, as: original) {
     $probe->read(null)
   }
-  expect(value: $original['code'], same: 'denied')
-  expect(value: $original.message, same: 'The desktop refused this request')
+  expect($original['code'], same: 'denied')
+  expect($original.message, same: 'The desktop refused this request')
   entries = $log->entries()
-  expect(value: $entries->count(), same: 1)
-  expect(value: $entries[0].message, same: $original.message)
+  expect($entries->count(), same: 1)
+  expect($entries[0].message, same: $original.message)
 }
 
 test(name: 'false, zero and empty text are valid recovery values') {
   probe = StatusProbe()
-  expect(value: $probe->read(false), same: false)
-  expect(value: $probe->read(0), same: 0)
-  expect(value: $probe->read(''), same: '')
+  expect($probe->read(false), same: false)
+  expect($probe->read(0), same: 0)
+  expect($probe->read(''), same: '')
 }
 
 test(name: 'a caller can recover locally and continue') {
@@ -43,13 +43,13 @@ test(name: 'a caller can recover locally and continue') {
   } catch Network {
     status = 'offline'
   }
-  expect(value: $status, same: 'offline')
+  expect($status, same: 'offline')
 }
 
 test(name: 'a conditional rethrow reaches the type only when the fallback is blank') {
   with_fallback = Directory(fallback: 'guest')
   without_fallback = Directory(fallback: ' ')
-  expect(value: $without_fallback->lookup('member'), same: 'member')
-  expect(value: $with_fallback->lookup(''), same: 'guest')
-  expect(value: $without_fallback->lookup(''), same: 'A key is required')
+  expect($without_fallback->lookup('member'), same: 'member')
+  expect($with_fallback->lookup(''), same: 'guest')
+  expect($without_fallback->lookup(''), same: 'A key is required')
 }

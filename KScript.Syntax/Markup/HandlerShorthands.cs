@@ -32,6 +32,7 @@ namespace KScript.Syntax.Markup
         /// <summary>The hidden variable a value is assigned from when a shorthand sets a nested field.</summary>
         public const string ValueVariable = "shorthand_value";
         public const string Cycle = "cycle";
+        public const string Decrement = "decrement";
 
         /// <summary>Every action, in the order completion lists them.</summary>
         public static IReadOnlyList<Action> Actions { get; } = new[]
@@ -39,7 +40,7 @@ namespace KScript.Syntax.Markup
             new Action(Toggle, null, false, false, KType.Bool, "{field} = not {field}", "Flips a bool field: toggle: $open is open = not $open."),
             new Action(Call, "with", false, false, null, null, "Calls a function or one of the component's methods: call: $save, with: [$note.id]."),
             new Action("increment", "by", false, false, KType.Number, "{field} = {field} + {companion}", "Adds 1 (or by:) to a number field: increment: $count, by: 5."),
-            new Action("decrement", "by", false, false, KType.Number, "{field} = {field} - {companion}", "Takes 1 (or by:) from a number field: decrement: $stock."),
+            new Action(Decrement, "by", false, false, KType.Number, "{field} = {field} - {companion}", "Takes 1 (or by:) from a number field, never going below its min: (stock: int(min: 0)): decrement: $stock."),
             new Action("set", "to", true, false, null, "{field} = {companion}", "Sets a field to a value: set: $tab, to: 'notes'."),
             new Action("add", "to", true, true, KType.List, "{field} = {field}->push({value})", "Adds a value to a list field: add: $draft, to: $tags."),
             new Action("remove", "from", true, true, KType.List, "{field} = {field}->remove({value})", "Removes a value from a list field: remove: $tag, from: $tags."),

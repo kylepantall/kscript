@@ -27,14 +27,14 @@ fn fulfil(bin: map, count: int, allow_partial: bool) {
 describe(name: 'Fulfilling a stock reservation') {
   test(name: 'an exact reservation consumes the last unit without recovery') {
     bin = { units: 2 }
-    expect(value: @fulfil($bin, 2, false), same: 2)
-    expect(value: $bin.units, same: 0)
+    expect(@fulfil($bin, 2, false), same: 2)
+    expect($bin.units, same: 0)
   }
 
   test(name: 'partial fulfilment uses the available quantity reported by the error') {
     bin = { units: 3 }
-    expect(value: @fulfil($bin, 8, true), same: 3)
-    expect(value: $bin.units, same: 0)
+    expect(@fulfil($bin, 8, true), same: 3)
+    expect($bin.units, same: 0)
   }
 
   test(name: 'a filtered-out shortage reaches callers catching its parent type') {
@@ -42,10 +42,10 @@ describe(name: 'Fulfilling a stock reservation') {
     expect_error(type: Conflict, as: err) {
       @fulfil($bin, 8, false)
     }
-    expect(value: $err.type, same: 'StockShortage')
-    expect(value: $err['available'], same: 3)
-    expect(value: $err['requested'], same: 8)
-    expect(value: $bin.units, same: 3)
+    expect($err.type, same: 'StockShortage')
+    expect($err['available'], same: 3)
+    expect($err['requested'], same: 8)
+    expect($bin.units, same: 3)
   }
 
   test(name: 'the conditional rethrow retains the original shortage at zero stock') {
@@ -53,14 +53,14 @@ describe(name: 'Fulfilling a stock reservation') {
     expect_error(type: StockShortage, as: err) {
       @fulfil($bin, 2, true)
     }
-    expect(value: $err.message, same: 'Insufficient stock')
-    expect(value: $err['requested'], same: 2)
-    expect(value: $err['available'], same: 0)
+    expect($err.message, same: 'Insufficient stock')
+    expect($err['requested'], same: 2)
+    expect($err['available'], same: 0)
   }
 
   test(name: 'an invalid request bypasses partial fulfilment and leaves stock intact') {
     bin = { units: 3 }
-    expect(value: @fulfil($bin, 0, true), throws: Validation)
-    expect(value: $bin.units, same: 3)
+    expect(@fulfil($bin, 0, true), throws: Validation)
+    expect($bin.units, same: 3)
   }
 }

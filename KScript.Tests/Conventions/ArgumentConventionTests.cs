@@ -273,7 +273,7 @@ public class ArgumentConventionTests
         try
         {
             string file = Path.Combine(dir, "loop.test.kscript");
-            File.WriteAllText(file, "cases = [{ n: 1, want: 2 }, { n: 2, want: 5 }]\nfor case at i in $cases {\n  test(name: \"case {$i} doubles {$case.n}\") {\n    expect(value: $case.n * 2, equals: $case.want)\n  }\n}\n");
+            File.WriteAllText(file, "cases = [{ n: 1, want: 2 }, { n: 2, want: 5 }]\nfor case at i in $cases {\n  test(name: \"case {$i} doubles {$case.n}\") {\n    expect($case.n * 2, equals: $case.want)\n  }\n}\n");
             var result = KScript.Testing.TestRunner.RunFile(file, new KScript.Testing.TestRunSettings { BaseDirectory = dir });
             Assert.Null(result.Error);
             Assert.Equal(new[] { "case 0 doubles 1", "case 1 doubles 2" }, result.Tests.Select(t => t.Name));

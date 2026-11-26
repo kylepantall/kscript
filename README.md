@@ -86,7 +86,7 @@ echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
   <state name="draft" value="''" />
 
   <form on-submit="add: $draft, to: $todos, set: $draft, to: ''">
-    <input bind="draft" placeholder="What needs doing?">
+    <input @bind($draft) placeholder="What needs doing?">
     <button>Add</button>
   </form>
 
@@ -193,7 +193,7 @@ Tests are KScript too:
 
 ```kscript
 test(name: "greets by name") {
-  expect(value: @greeting('Joan'), equals: 'Hello, Joan!')
+  expect(@greeting('Joan'), equals: 'Hello, Joan!')
 }
 ```
 

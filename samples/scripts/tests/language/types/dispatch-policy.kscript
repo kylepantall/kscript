@@ -18,7 +18,7 @@ type DispatchPolicy {
 
   fn dispatch(orders: WorkOrder[]) {
     return $orders
-      |> sort_by(fn(order) => $order.priority, 'desc')
+      |> sort_by(.priority, 'desc')
       |> map(fn(order) => DispatchTicket(
         id: $order.id,
         queue: $this->route($order)

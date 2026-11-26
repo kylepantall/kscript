@@ -4,30 +4,30 @@ import "../lib/tasks{{ ext }}"
 describe(name: "tasks") {
   test(name: "adding gives each task the next id") {
     tasks = @add_task(@add_task([], title: 'Write'), title: 'Test')
-    expect(value: $tasks->map(fn(t) => $t.id), equals: [1, 2])
-    expect(value: $tasks[1], equals: { id: 2, title: 'Test', done: false })
+    expect($tasks->map(.id), equals: [1, 2])
+    expect($tasks[1], equals: { id: 2, title: 'Test', done: false })
   }
 
   for title in ['', '   '] {
     test(name: "a blank title adds nothing") {
-      expect(value: @add_task([], title: $title), count: 0)
+      expect(@add_task([], title: $title), count: 0)
     }
   }
 
   test(name: "titles are trimmed") {
-    expect(value: @add_task([], title: '  Ship it  ')[0].title, equals: 'Ship it')
+    expect(@add_task([], title: '  Ship it  ')[0].title, equals: 'Ship it')
   }
 
   test(name: "toggling ticks one task and leaves the others") {
     tasks = @toggle_task(@starter_tasks(), id: 1)
-    expect(value: $tasks->map(fn(t) => $t.done), equals: [true, false])
-    expect(value: @toggle_task($tasks, id: 1)[0].done, equals: false)
+    expect($tasks->map(.done), equals: [true, false])
+    expect(@toggle_task($tasks, id: 1)[0].done, equals: false)
   }
 
   test(name: "removing and clearing") {
     tasks = @toggle_task(@starter_tasks(), id: 2)
-    expect(value: @remove_task($tasks, id: 1)->map(fn(t) => $t.id), equals: [2])
-    expect(value: @clear_done($tasks)->map(fn(t) => $t.id), equals: [1])
+    expect(@remove_task($tasks, id: 1)->map(.id), equals: [2])
+    expect(@clear_done($tasks)->map(.id), equals: [1])
   }
 
   counts = [
@@ -42,7 +42,7 @@ describe(name: "tasks") {
       for id in [1, 2]->take($case.done) {
         tasks = @toggle_task($tasks, id: $id)
       }
-      expect(value: @tasks_left($tasks), equals: $case.text)
+      expect(@tasks_left($tasks), equals: $case.text)
     }
   }
 }

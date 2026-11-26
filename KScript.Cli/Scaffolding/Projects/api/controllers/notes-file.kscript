@@ -41,7 +41,7 @@ fn index() {
 /// POST /api/notes
 fn store(json: NoteInput) {
   notes = @all_notes()
-  id = $notes->count() == 0 ? 1 : $notes->map(fn(n) => $n.id)->max() + 1
+  id = $notes->count() == 0 ? 1 : $notes->map(.id)->max() + 1
   note = { id: $id, {{#if auth}}user_id: @user().id, {{/if}}title: $json.title, body: $json.body, done: $json.done }
   @save_notes($notes->push($note))
   return @response($note, status: 201)

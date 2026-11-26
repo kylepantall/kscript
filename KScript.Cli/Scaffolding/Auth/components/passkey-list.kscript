@@ -24,7 +24,7 @@ type PasskeyList extends Component {
           <li>
             Added {$key.created_at}
 {{#if passkeys}}
-            <if test="$keys->count() > 1"><button type="button" @on-click(call: $remove, with: [$key.id], confirm: 'Remove this passkey?')>Remove passkey</button></if>
+            <button type="button" @on-click(call: $remove, with: [$key.id], confirm: 'Remove this passkey?') @if($keys->count() > 1)>Remove passkey</button>
 {{else}}
             <button type="button" @on-click(call: $remove, with: [$key.id], confirm: 'Remove this passkey?')>Remove passkey</button>
 {{/if}}

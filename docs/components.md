@@ -126,7 +126,27 @@ Mount it with `<note-editor />` or give it an initial title with `<note-editor t
 
 KScript restores fields the instance changed on later actions. Fields the component only reads can pick up fresh values from the caller on each render. A browser can submit edits only for controls rendered with a matching binding. Use the current server session to authorize writes.
 
-Put KScript behavior in directives on the opening HTML tag. For example, `@bind($title, on: blur)` takes a field and options, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and checks each option's value. Existing HTML spellings such as `bind="title"` and `on-click="count += 1"` work too.
+Put KScript behavior in directives on the opening HTML tag. For example, `@bind($title, on: blur)` takes a field and options, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and checks each option's value. The HTML spellings `bind="$title"` and `on-click="count += 1"` work too. A binding names its field with `$`: `@bind('title')` and `bind="title"` are errors with a quick fix to `@bind($title)`.
+
+Each directive has one spelling. These older attributes are errors with a quick fix that moves them where they now go:
+
+| Was | Now |
+| --- | --- |
+| `@bind-on(blur)`, `bind-on="blur"` | `@bind($draft, on: blur)` |
+| `live-confirm="Delete this note?"` | `@on-click(delete: $note, confirm: 'Delete this note?')` |
+| `prevent-default="keydown"` | `@on-keydown(save: $note, key: [ctrl, s], prevent: true)` |
+
+### Show a tag only when it's needed, or once per item
+
+`@if` and `@each` go on the tag itself, so a single tag doesn't need a wrapping `<if>` or `<for>`:
+
+```html
+<p @if($note)>{$note}</p>
+<li @each($tasks, as: task, at: i)>{$i}. {$task.title}</li>
+<li @each($tasks, as: task) @if(not $task.done)>{$task.title}</li>
+```
+
+`@if($cond)` is `<if test="$cond">` around the tag: when it is false, the tag isn't in the page. `@show($cond)` keeps the tag and hides it, so focus and scroll survive. `@each($list, as: name)` repeats the tag for each item, and `at: i` names the position, as in `<for each="name" in="$list" at="i">`. With both on one tag, `@each` runs first, so `@if` can read the item. Keep `<if>` and `<for>` for several tags at once.
 
 Use `<state name="…" value="…" />` at the top level of a component template or directly inside a `<live>` block. Read it with `$name` and assign it with `name = …`. A normal state value survives actions on that rendered block.
 
@@ -482,7 +502,9 @@ Modifiers go with the actions and change when or how they run. The browser appli
 
 In a window, the actions go straight on a button or box: `Button(toggle: $open) "Details"` and `Button(increment: $count, by: 5) "+5"`. Modifiers need a browser, so a window handler that has one stops with an error saying so.
 
-`kscript check` and the editor check each field's type, complete the names (and `by:`, `to:`, `from:` or `with:` after the action they go with), and show the statement a shorthand stands for on hover.
+`decrement:` never takes a field below its `min:`: with `stock: int(min: 0)`, `decrement: $stock, by: 2` at 1 leaves it at 0.
+
+`kscript check` and the editor check each field's type, complete the names (and `by:`, `to:`, `from:` or `with:` after the action they go with), and show the statement a shorthand stands for on hover. After an action's name, completion lists only the fields it fits: `toggle:` offers the bool fields, `increment:` the numbers and `to:` after `add:` the lists.
 
 ### Switching classes
 
@@ -508,7 +530,7 @@ A condition is a bool, or a list of bools that must all be true. With the condit
 | Lifecycle | `on-init`, `on-visible`, `on-tick` with `every="1s"` |
 | Other components and client code | `on-event` and a named `on-action` |
 
-Use `prevent: true` in a handler (or `prevent-default="keydown"` on its element) to cancel a browser default synchronously. Use `confirm: 'Remove this note?'` in a handler (or `live-confirm` on its element) to confirm a destructive action before posting it. `@show($open)` keeps a tag in the page and hides it while the value is false, so focus and scroll survive, and `@live-disable(while: $saving)` disables a control while a condition holds as well as while an action runs. An action can call `@live_redirect('/notes')` for a same-site redirect or `@skip_render()` to save state without updating the current HTML.
+Use `prevent: true` in a handler to cancel a browser default synchronously, and `confirm: 'Remove this note?'` to confirm a destructive action before posting it. `@show($open)` keeps a tag in the page and hides it while the value is false, so focus and scroll survive, and `@live-disable(while: $saving)` disables a control while a condition holds as well as while an action runs. An action can call `@live_redirect('/notes')` for a same-site redirect or `@skip_render()` to save state without updating the current HTML.
 
 ### Events between components
 
@@ -585,7 +607,7 @@ A form with `on-submit` can send several bindings in one action. Paste this bloc
   <state name="name" value="''" />
   <state name="message" value="''" />
   <form on-submit="message = 'Hello, ' + $name + '!'">
-    <label>Name <input bind="name" bind-on="action" required></label>
+    <label>Name <input @bind($name, on: action) required></label>
     <button live-disable>Greet</button>
   </form>
   <p role="status">{$message}</p>
@@ -647,7 +669,7 @@ A live component can contain an independent child component. A parent update kee
 <live id="summary" lazy>
   <placeholder><p role="status">Loading summary…</p></placeholder>
   <state name="shown" value="true" />
-  <if test="$shown"><p>Ready</p></if>
+  <p @if($shown)>Ready</p>
 </live>
 ```
 
@@ -738,7 +760,7 @@ For a streamed action, wait for an intermediate value while the request is still
 | Symptom | Check |
 | --- | --- |
 | A tag renders without its content | Check the component filename, the page's component folder and the diagnostic from `kscript check`. |
-| An input keeps its old value | Declare its binding in the block's state. A dotted binding needs an existing map field. Check whether `bind-on` is waiting for a change, blur, or action. |
+| An input keeps its old value | Declare its binding in the block's state. A dotted binding needs an existing map field. Check whether its `on:` option is waiting for a change, blur, or action. |
 | A repeated block updates the wrong row | Use a stable live ID per instance and a stable `live-key` for reordered siblings. |
 | A live request expires | The registered route, session or visible action may have changed. Refresh the page. Set a stable `KSCRIPT_SECRET` if sessions must survive server restarts. |
 | A portal has no visible content | Check that the selector matches an HTML container outside any live block. The template stays inert while the destination is missing. |
@@ -754,7 +776,7 @@ KScript uses its own component syntax. These are the common workflows and their 
 | Livewire 4 | KScript |
 | --- | --- |
 | Component template and properties | `extends Component`, typed fields and `<state>` |
-| `wire:model` | `bind` and `bind-on` |
+| `wire:model` | `@bind($field, on: …)` |
 | `wire:click` and `wire:submit` | `on-click` and `on-submit` |
 | Dispatch and listeners | `@emit_event()` and `on-event` |
 | `wire:navigate` | `live-navigate` |

@@ -655,14 +655,7 @@
         e.preventDefault();
         return;
       }
-      var prevent = el.getAttribute("prevent-default");
-      if (type === "submit" || type === "enter" || type === "drop" || (type === "click" && el.tagName === "A") ||
-          (prevent !== null && (prevent === "" || prevent.split(/[,\s]+/).includes(e.type)))) e.preventDefault();
-      var confirmation = el.getAttribute("data-ks-live-confirm");
-      if (confirmation !== null && !window.confirm(confirmation)) {
-        e.preventDefault();
-        return;
-      }
+      if (type === "submit" || type === "enter" || type === "drop" || (type === "click" && el.tagName === "A")) e.preventDefault();
       if (type === "drop") setDropClass(el, false);
       e.handlerElement = el;
       var handler = parseInt(el.getAttribute("data-ks-on-" + type), 10);
