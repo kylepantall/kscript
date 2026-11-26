@@ -27,6 +27,7 @@
   "properties": {
     "$schema": { "type": "string" },
     "name": { "type": "string", "description": "The project's name." },
+    "timezone": { "type": "string", "default": "Europe/London", "description": "The time zone the project's stored dates are in, by its IANA name: Europe/London (the default), America/New_York, UTC. A database column holds a date as a clock time with no zone; this says which zone that clock is in, so a row means the same moment on every computer." },
     "libraries": {
       "type": "object",
       "description": "Installed source libraries by folder name. kscript lib add records the exact revision; kscript lib restore reinstalls it.",

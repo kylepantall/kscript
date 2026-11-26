@@ -32,16 +32,52 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ("kscript-install-" + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp | Out-Null
     try {
+        if ($repo -ne 'kylepantall/kscript') { Write-Host "Using releases from $repo (KSCRIPT_REPO)." }
         Write-Host "Downloading $asset ($version)..."
         $zip = Join-Path $tmp $asset
         Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+
+        # The release lists the SHA-256 of each of its files in SHA256SUMS: check the download before unpacking it.
+        $sums = Join-Path $tmp 'SHA256SUMS'
+        $listed = $true
+        try {
+            Invoke-WebRequest -Uri ($url.Substring(0, $url.LastIndexOf('/')) + '/SHA256SUMS') -OutFile $sums -UseBasicParsing
+        } catch {
+            $listed = $false
+        }
+        if ($listed) {
+            $expected = $null
+            foreach ($line in Get-Content $sums) {
+                $parts = @($line.Trim() -split '\s+', 2)
+                if ($parts.Count -eq 2 -and $parts[1].TrimStart('*') -eq $asset) { $expected = $parts[0].ToLowerInvariant() }
+            }
+            if (-not $expected) { throw "SHA256SUMS doesn't list $asset, so the download can't be checked" }
+            $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) {
+                throw "The checksum of $asset is wrong: SHA256SUMS lists $expected but the download is $actual. It may be damaged or not the released file. Nothing was installed."
+            }
+            Write-Host "Checked $asset against the release's SHA256SUMS."
+        } else {
+            Write-Host "This release has no SHA256SUMS file (releases before 0.10 don't), so the download wasn't checked."
+        }
         $pkg = Join-Path $tmp 'pkg'
         Expand-Archive -Path $zip -DestinationPath $pkg -Force
         $new = Join-Path $pkg 'kscript.exe'
         if (-not (Test-Path $new)) { throw "$asset has no kscript.exe inside" }
 
+        # Check the package before replacing an existing installation.
+        Get-ChildItem $pkg -File | ForEach-Object { Unblock-File $_.FullName -ErrorAction SilentlyContinue }
+        & $new --version | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "$asset could not run on this system" }
+
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
         $exe = Join-Path $installDir 'kscript.exe'
+        # The desktop UI's native libraries ship beside kscript.exe. They go in first, as install.sh does, so a
+        # library that is in use stops the install while the old kscript.exe is still in place.
+        Get-ChildItem $pkg -File | Where-Object { $_.Name -ne 'kscript.exe' } | ForEach-Object {
+            Move-Item $_.FullName (Join-Path $installDir $_.Name) -Force
+        }
+        $old = $null
         if (Test-Path $exe) {
             # A running kscript.exe can't be overwritten but can be renamed; it is deleted on the next start.
             $old = "$exe.old"
@@ -49,13 +85,12 @@ $ProgressPreference = 'SilentlyContinue'   # Invoke-WebRequest is far slower wit
             if (Test-Path $old) { $old = "$exe.$([Guid]::NewGuid().ToString('N')).old" }
             Move-Item $exe $old -Force
         }
-        Move-Item $new $exe -Force
-        Unblock-File $exe -ErrorAction SilentlyContinue
-        # The desktop UI's native libraries ship beside kscript.exe.
-        Get-ChildItem $pkg -File | ForEach-Object {
-            $dest = Join-Path $installDir $_.Name
-            Move-Item $_.FullName $dest -Force
-            Unblock-File $dest -ErrorAction SilentlyContinue
+        try {
+            Move-Item $new $exe -Force
+        } catch {
+            # Put the earlier kscript.exe back, so a failed install never leaves the folder without one.
+            if ($old -and -not (Test-Path $exe)) { Move-Item $old $exe -Force }
+            throw
         }
     } finally {
         Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue

@@ -24,6 +24,13 @@ namespace KScript.Language.Tests
         [InlineData("/blog/", TokenKind.Regex, 6)]
         [InlineData("/a/i", TokenKind.Regex, 4)]
         [InlineData("/^[a-z]+$/i", TokenKind.Regex, 11)]
+        [InlineData("/old, redirect: \"/x\")", TokenKind.SlashPath, 4)]
+        [InlineData("/old, to: '/sim')", TokenKind.SlashPath, 4)]
+        [InlineData("/a, \"x/i\"]", TokenKind.SlashPath, 2)]
+        [InlineData("/a, b/i", TokenKind.Regex, 7)]
+        [InlineData("/a,b\"/i, \"x\"", TokenKind.Regex, 7)]
+        [InlineData("/I can't/i, 'x')", TokenKind.Regex, 10)]
+        [InlineData("/a b/i)", TokenKind.Regex, 6)]
         public void TheLexerTellsSlashPathsFromRegexes(string text, TokenKind kind, int length)
         {
             Token first = Lexer.Tokenize(text)[0];
@@ -69,6 +76,21 @@ namespace KScript.Language.Tests
             const string routes = "import KScript.Http\n\nRoutes {\n  Get(path: /, view: \"home\")\n  Get(path: /people/{id}, view: \"person\", where: \"id: int\")\n  Get(path: \"/quoted\", view: \"home\")\n  Group(prefix: /admin) {\n    Resource(path: /users, to: users)\n  }\n  Get(path: /team, redirect: \"/people\", status: 301)\n}\n";
             DocumentAnalysis a = Code(routes, "routes.kscript");
             Assert.DoesNotContain(a.Diagnostics, d => d.Code == DiagnosticCodes.QuoteText || d.Severity == DiagnosticSeverity.Error && d.Code.StartsWith("KS1"));
+        }
+
+        [Fact]
+        public void ABarePathBeforeAQuotedAddressIsNotARegex()
+        {
+            // "/x" (and "/mix", "/sim") after a bare path once read as the end of a regex with flags: /old, redirect: "/x.
+            const string routes = "import KScript.Http\n\nRoutes {\n  Get(path: /old, redirect: \"/x\", status: 301)\n  Get(path: /team, redirect: \"/mix\")\n}\n";
+            DocumentAnalysis a = Code(routes, "routes.kscript");
+            Assert.DoesNotContain(a.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+            Assert.Equal(routes, KScript.Language.Formatting.Formatter.Format(routes, "routes.kscript").Text);
+
+            List<Token> tokens = Lexer.Tokenize("Get(path: /old, redirect: \"/x\", status: 301)");
+            Assert.Contains(tokens, t => t.Kind == TokenKind.SlashPath && t.Span.Length == 4);
+            Assert.DoesNotContain(tokens, t => t.Kind == TokenKind.Regex);
+            Assert.Contains(tokens, t => t.Kind == TokenKind.String);
         }
 
         [Fact]

@@ -62,6 +62,9 @@ public class SlashPathAndDateFormatTests
     [InlineData("echo \"{ /^ab$/i->type() } { /blog/->type() } { 10 / 2 }\"", "regex regex 5")]
     [InlineData("x = 6\ny = 3\necho $x/$y", "2")]
     [InlineData("echo /docs/start->type()", "slash_path")]
+    [InlineData("echo [/old, \"/x\"]", "/old, /x")]
+    [InlineData("m = { from: /old, to: '/mix' }\necho \"{ $m.from->type() } { $m.to }\"", "slash_path /mix")]
+    [InlineData("echo \"{ 'a, b'->matches(/a, b/i) } { /I can't/i->type() }\"", "true regex")]
     [InlineData("fn open(at: slash_path) => \"{$at}\"\necho \"{ @open(/blog/) } { @open('/a b/c') } { @open(a/b) }\"", "/blog /a b/c /a/b")]
     public void BarePathsAndRegexesAndDivisionDontClash(string code, string expected) => Assert.Equal(expected, Code(code));
 

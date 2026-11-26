@@ -211,7 +211,7 @@ namespace KScript.Auth
             string address = email is ISemanticText t ? t.Text : AuthApp.Text(email) ?? string.Empty;
             string key = address.Trim().ToLowerInvariant() + "|" + AuthApp.Text(auth.Request.GetValueOrDefault("ip"));
             auth.App.CheckAttempts(key);
-            Dictionary<string, object> user = auth.Users.Verify(email, c.Arg(1, "password"));
+            Dictionary<string, object> user = auth.Users.Verify(email, c.Arg(1, "password"), PasswordValue.ProjectAlgorithm(c.Module));
             if (user == null)
             {
                 auth.App.Failed(key);
@@ -237,6 +237,7 @@ namespace KScript.Auth
                 ["created_at"] = AuthApp.Stamp(),
                 ["expires"] = AuthApp.Now() + app.Settings.ResetLifetime,
             });
+            app.Wrote();
             return token;
         }
 

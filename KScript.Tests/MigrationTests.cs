@@ -393,6 +393,14 @@ public sealed class MigrationTests : DataFixture
         string fresh = Ok("fresh", "--seed");
         Assert.Contains("Dropped", fresh);
         Assert.Equal("1", Keep("echo User->count()"));
+
+        // --pretend drops nothing: it names the tables and prints what every migration would run.
+        string pretended = Ok("fresh", "--pretend");
+        Assert.Contains("Would drop", pretended);
+        Assert.Contains("users", pretended);
+        Assert.Contains("CREATE TABLE", pretended);
+        Assert.DoesNotContain("Dropped", pretended);
+        Assert.Equal("1", Keep("echo User->count()"));
         Assert.Contains("seeded users", Ok("seed", "users"));
         Assert.Equal("2", Keep("echo User->count()"));
         Assert.Contains("Did you mean users?", Failed("seed", "user5"));

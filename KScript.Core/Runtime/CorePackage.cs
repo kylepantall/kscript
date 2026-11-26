@@ -266,8 +266,8 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("break", "Leaves the innermost loop.", ContentKind.Empty), _ => throw new BreakSignal());
-            p.Element(new ElementInfo("continue", "Skips to the next turn of the innermost loop.", ContentKind.Empty), _ => throw new ContinueSignal());
+            p.Element(new ElementInfo("break", "Leaves the innermost loop.", ContentKind.Empty), run => throw new BreakSignal { Module = run.Module, Offset = run.Element.Span.Start });
+            p.Element(new ElementInfo("continue", "Skips to the next turn of the innermost loop.", ContentKind.Empty), run => throw new ContinueSignal { Module = run.Module, Offset = run.Element.Span.Start });
 
             p.Element(new ElementInfo("match", "Compares one value against several cases. Inside, `$it` is the value.", ContentKind.Statements,
                 new A("value", K.Expression, "The value to compare.", true))
@@ -820,7 +820,7 @@ namespace KScript.Runtime
             if (item.GetAttribute("value")?.Value is DecodedText v) return run.Interpreter.EvaluateText(v, run.Scope, run.Module);
             DecodedText content = run.Interpreter.ContentOf(run.Module, item);
             if (content == null) return string.Empty;
-            string text = TextLayout.Tidy(run.Interpreter.Interpolate(content, run.Scope, run.Module, bareReferences: true));
+            string text = TextLayout.Fill(run.Interpreter, content, run.Scope, run.Module);
             return Values.TryNumber(text, out double n) ? n : text;
         }
 
@@ -864,7 +864,7 @@ namespace KScript.Runtime
                 object fallback = c.Arg(1);
                 if (c.Host.EnvironmentOverrides?.TryGetValue(name, out string overridden) == true)
                     return overridden ?? fallback;
-                return Environment.GetEnvironmentVariable(name)
+                return c.Host.EnvironmentVariable(name)
                     ?? (c.Host.ConfigEnvironment?.TryGetValue(name, out string configured) == true ? configured : null)
                     ?? fallback;
             });
@@ -886,7 +886,8 @@ namespace KScript.Runtime
                 var map = new Dictionary<string, object>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
                 if (i.Host.ConfigEnvironment != null)
                     foreach (var entry in i.Host.ConfigEnvironment) map[entry.Key] = entry.Value;
-                foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
+                if (!i.Host.HideEnvironment)
+                    foreach (System.Collections.DictionaryEntry e in Environment.GetEnvironmentVariables()) map[(string)e.Key] = (string)e.Value;
                 if (i.Host.EnvironmentOverrides != null)
                     foreach (var entry in i.Host.EnvironmentOverrides)
                     {

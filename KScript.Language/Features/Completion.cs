@@ -116,6 +116,13 @@ namespace KScript.Language.Features
             {
                 return ExpectedValueCompletions(analysis, offset) ?? new List<CompletionItem>();
             }
+            // "Hi $user.name" in a .kscript file is an error (KS6019: a value goes in { }), so no member carries it on.
+            // (The name itself is still completed: "Hi $us" is how the reference gets written before it is wrapped.)
+            if (analysis.BareQuotedReferences.Any(bare => offset > bare.Start && offset <= bare.End + 1
+                && analysis.Source.Text.AsSpan(bare.Start, Math.Min(offset, analysis.Source.Text.Length) - bare.Start).Contains('.')))
+            {
+                return new List<CompletionItem>();
+            }
             if (AliasMemberCompletions(analysis, offset) is List<CompletionItem> members)
             {
                 return members;
@@ -546,7 +553,8 @@ namespace KScript.Language.Features
 
         private List<CompletionItem> AttributeValueCompletions(DocumentAnalysis analysis, Cursor cursor)
         {
-            ElementInfo info = Catalog.GetElement(cursor.TagElement.Name);
+            // <KScript.Document> is Document from the package that has it.
+            ElementInfo info = Catalog.GetElement(cursor.TagElement.Name) ?? Catalog.GetElement(ElementInfo.BareName(cursor.TagElement.Name));
             AttributeInfo a = info?.GetAttribute(cursor.Attribute.Name);
             DecodedText value = cursor.Attribute.Value;
             int index = value.FromSource(cursor.Offset);
@@ -626,6 +634,12 @@ namespace KScript.Language.Features
                     {
                         // <let type="duration" value="‸">: the values a native type offers.
                         return typed.Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: false)).ToList();
+                    }
+                    if (cursor.Region == null && a.Kind == AttributeKind.Template && a.Options.Count > 0)
+                    {
+                        // Text with fixed words of its own (paper: a4, letter... or any size in quotes) offers those words first.
+                        return a.Options.Select(o => new CompletionItem { Label = o, Kind = CompletionKind.Value, ReplaceSpan = TextSpan.FromBounds(value.SourceSpan.Start, value.SourceSpan.End) })
+                            .Concat(ExpressionStartCompletions(analysis, cursor.Offset, replace, template: true)).ToList();
                     }
                     return cursor.Region != null ? null : ExpressionStartCompletions(analysis, cursor.Offset, replace, a.Kind == AttributeKind.Template);
 

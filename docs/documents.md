@@ -111,7 +111,7 @@ Text in `Paragraph`, `Item`, captions and titles may use:
 | --- | --- |
 | `**bold**`, `*italic*` | Bold and italic (`__bold__` and `_italic_` too). |
 | `` `code` `` | Code. |
-| `[text](https://...)` | A link. |
+| `[text](https://...)` | A link: a web address, `mailto:`, or a file or `#place` with no scheme. Anything else, such as `javascript:`, stays as text. |
 | `\( x^2 \)` | Maths in the line. `\[ ... \]` also works. |
 | `[@key]`, `[@a; @b]` | A citation of a source in the [bibliography](#citations-and-references). |
 | `[#id]` | A cross-reference: the number of the section, table, figure or equation with that `id`. |
@@ -155,14 +155,14 @@ Document(template: report, title: "Annual Report", author: "The team", to: "repo
 | --- | --- |
 | `Author(affiliation, email)` | An author. Its text is the name. Or give `author: "Ada Lovelace; Alan Turing"` on the document. |
 | `Abstract` | The summary under the title. |
-| `Section(title, id, numbered, new_page)` | A section. A section inside a section is a subsection, down to six levels. |
+| `Section(title, id, numbered, new_page)` | A section. A section inside a section is a subsection, down to six levels; a seventh is an error. |
 | `Paragraph(id, align, lines)` | A paragraph. |
 | `List(style, start)` and `Item` | A list: `bullet`, `number`, `letter` or `roman`. A `List` right after an `Item` is nested in it. |
 | `Quote(by)` | A block quotation. |
 | `Code(language)` | Code, in a fixed-width font, kept exactly as written. |
 | `Contents(title, depth)` | A table of contents, with page numbers in the PDF. |
-| `Markdown(src)` | Markdown from its text or a file: [see below](#markdown). |
-| `PageBreak`, `VSpace(height)`, `Rule` | A new page, a gap such as `1cm`, and a line across the page. |
+| `Markdown(path)` | Markdown from its text or a file: [see below](#markdown). |
+| `PageBreak`, `VSpace(height)`, `Rule` | A new page, a gap such as `VSpace(height: '1cm')`, and a line across the page. |
 
 ## Maths
 
@@ -233,7 +233,7 @@ Document(title: "Scores", to: "scores.pdf") {
 }
 ```
 
-`widths:` makes the table as wide as the text, sharing the width in those proportions. Without it, columns are as wide as their text. `rules:` is `booktabs` (lines above, below and under the header, the default), `grid` or `none`; `size: 0.9` makes the text smaller. A caption numbers the table, and its heading row repeats when a table runs onto a new page.
+`widths:` makes the table as wide as the text, sharing the width in those proportions. Without it, columns are as wide as their text. `rules:` is `booktabs` (lines above, below and under the header, the default), `grid` or `none`; `size: 0.9` makes the text smaller. A caption numbers the table, and its heading row repeats when a table runs onto a new page (in LaTeX, a table of more than 30 rows is a `longtable` for the same reason). A table with no rows is left out of the LaTeX and Markdown files.
 
 ## Figures
 
@@ -265,7 +265,7 @@ Document(template: paper, title: "Cited", to: "cited.pdf") {
 
 Only cited sources are listed. With `citations: numeric` (the default) they are numbered in the order they are first cited, as [1]. With `citations: author-year` they read (Berlekamp et al., 1982) and the list is sorted by author. A `Source` takes any BibTeX field as an attribute; `author` separates people with `and`. If you cite sources but leave out `Bibliography`, the references go at the end.
 
-A citation or cross-reference to an id that doesn't exist is an error, as is the same id used twice.
+A citation or cross-reference to an id that doesn't exist is an error, as is the same id used twice. An `id:` is text like any other, so a loop can make one for each item: `Section(title: $chapter.title, id: "ch-{ $chapter.number }")`.
 
 ## Footnotes and cross-references
 
@@ -325,22 +325,22 @@ These go on `Document` and change what the template set:
 
 | Attribute | What it does |
 | --- | --- |
-| `paper` | `a4` (default), `a3`, `a5`, `b5`, `letter`, `legal`, or a size such as `15cm x 20cm`. `landscape: true` turns it. |
-| `margin` | One size (`2.5cm`), or `'2cm 3cm'` (top and bottom, sides), or four sizes like CSS. Sizes can be `mm`, `cm`, `in` or `pt`. |
+| `paper` | `a4` (default), `a3`, `a5`, `b5`, `letter` or `legal`, or a size in quotes such as `'15cm x 20cm'`. `landscape: true` turns it. |
+| `margin` | One size (`'2.5cm'`), or `'2cm 3cm'` (top and bottom, sides), or four sizes like CSS. Sizes can be `mm`, `cm`, `in` or `pt`, and go in quotes. |
 | `font`, `heading_font` | `serif` (Times), `sans` (Helvetica) or `mono` (Courier). |
 | `size`, `line_height` | The text size in points (`11`) and the line spacing as a multiple of it (`1.4`). |
 | `align` | `justify`, `left`, `center` or `right`. |
-| `accent` | The colour of headings and the title page: `#1f4e79` or a name such as `navy`. |
+| `accent` | The colour of headings and the title page, in quotes: `'#1f4e79'` or a name such as `'navy'`. |
 | `numbered` | `false` leaves sections without numbers. |
 | `title_page`, `chapters` | `true` puts the title on its own page, and starts each top-level section on a new page. |
 | `citations` | `numeric` or `author-year`. |
 | `header`, `footer` | `'left \| centre \| right'`, with `[page]`, `[pages]`, `[title]`, `[author]` and `[date]`. `footer: "| Page [page] of [pages] |"` centres a page count. `footer: ""` has none. |
 | `rules` | The default table lines: `booktabs`, `grid` or `none`. |
-| `language` | The text's language, such as `en-GB`, for Word's spelling and HTML. |
+| `language` | The text's language, such as `'en-GB'`, for Word's spelling and HTML. |
 
 ## Fonts and characters
 
-The PDF uses the fonts every PDF reader has (Times, Helvetica, Courier and Symbol), so nothing is embedded and files stay small. They cover Western European languages, Greek letters and maths symbols. Characters outside them, such as Chinese or emoji, come out as `?` in the PDF; the Word, HTML, Markdown and LaTeX files keep them.
+The PDF uses the fonts every PDF reader has (Times, Helvetica, Courier and Symbol), so nothing is embedded and files stay small. They cover Western European languages, plain Greek letters and maths symbols. Characters outside them, such as Chinese, emoji or Greek letters with accents (ά), come out as `?` in the PDF; the Word, HTML, Markdown and LaTeX files keep them.
 
 ## Commands
 

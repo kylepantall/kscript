@@ -176,5 +176,8 @@ namespace KScript.Language.Features
     {
         public string Error { get; init; }
         public List<TextChange> Changes { get; } = new List<TextChange>();
+
+        /// <summary>Where the name is written in the other files of the project: each gets the same new name.</summary>
+        public List<SourceLocation> OtherFiles { get; } = new List<SourceLocation>();
     }
 }

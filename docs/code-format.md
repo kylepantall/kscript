@@ -55,7 +55,7 @@ their meaning (`<let>` declares in the current scope, `<set>` changes), and `ksc
 | `const config = { retries: 3 }` | `<const name="config" value="…" />` |
 | `count: int = $raw` | `<let name="count" type="int" value="$raw" />` |
 | `@greet('Hi')` | `<do>@greet('Hi')</do>` |
-| `echo "Hello, $name"` | `<echo>Hello, $name</echo>` |
+| `echo "Hello, { $name }"` | `<echo>Hello, { $name }</echo>` |
 | `echo $list[1]`, `echo(format: json) $data` | `<echo value="$list[1]" />` |
 | `if a { } elif b { } else { }` | `<if test>`, `<elif test>`, `<else>` |
 | `for item in $list { }`, `for key, value in $map { }` | `<for each in>` |
@@ -89,7 +89,7 @@ Any other name is an element: `name(attribute: value, ...) "text" { children }`,
 ```
 input(into: old_dir) "Move files from: "
 Row(gap: 8, wrap) {
-  Button(variant: primary, on_click: "playing = not $playing") "{ $playing ? 'Pause' : 'Play' }"
+  Button(variant: primary, on_click: { playing = not $playing }) "{ $playing ? 'Pause' : 'Play' }"
 }
 ```
 
@@ -171,7 +171,7 @@ repo = ```<Repo>
   words `lt`, `le`, `gt`, `ge`, `eq` and `ne` are the XML spellings: `kscript convert` writes the symbols, and a
   word left in a `.kscript` file is reported (KS6012) with a fix.
 - A name is declared bare and read with `$`: `total = 0`, `total += 1`, `for item in $list`, `fn double(n)`,
-  `fn(n) => $n * 2`. Writing `$total = 0` or `fn($n)` is reported (KS6010) with a fix.
+  `fn(n) => $n * 2`. Writing `$total = 0`, `fn double($n)` or `fn($n)` is reported (KS6010) with a fix.
 - The file is the body of an implied `<kscript>`, so `kscript { }` around it is optional. `import` goes at that top
   level, not inside another block.
 - A package is named only in `import KScript.UI`. A statement is never written with the `KScript.` prefix: write
@@ -226,7 +226,7 @@ before the element, or in its `description` attribute.
 ```
 kscript convert tour.ks.xml          # writes tour.kscript
 kscript convert tour.kscript         # writes tour.ks.xml
-kscript convert scripts/ --syntax kscript   # every XML script in a folder (tests are skipped)
+kscript convert scripts/ --syntax kscript   # every XML script in a folder, tests too
 kscript convert tour.ks.xml --stdout    # print instead of writing
 ```
 
@@ -247,6 +247,10 @@ Converting keeps a project working in the new format:
 - Converting a folder also converts its tests (`name.test.ks.xml` becomes `name.test.kscript`), renames converted
   files in its `.html` and `.md` pages, and updates the project's `kscript.json`: `"main"` and other file names, and
   each `*.ks.xml` include pattern gains a `*.kscript` twin.
+- Scripts in the folder that stay as they are (a `.kscript` component beside XML scripts) have their imports of
+  converted scripts renamed too.
+- The new file is laid out as `kscript fmt` would lay it out, with the project's `format` settings, so it passes
+  `kscript fmt --check`.
 
 ```
 kscript convert . --syntax kscript     # the whole project
@@ -258,8 +262,8 @@ Test files can be written in this format: `name.test.kscript` files get KScript.
 ```
 import "../lib/strings.kscript"
 
-describe(name: slugify) {
-  test(name: joins words with dashes) {
+describe(name: 'slugify') {
+  test(name: 'joins words with dashes') {
     expect(value: @slugify('Hello World'), equals: 'hello-world')
   }
 }

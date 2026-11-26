@@ -141,7 +141,12 @@ namespace KScript.Style
             if (value is string name && !double.TryParse(name.Replace("px", string.Empty), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             {
                 if (name.EndsWith("em", StringComparison.Ordinal) && double.TryParse(name.TrimEnd('m', 'e', 'r'), NumberStyles.Float, CultureInfo.InvariantCulture, out double em)) return em * 16;
-                Dictionary<string, object> points = c.Scope != null && c.Scope.TryGet("breakpoints", out object b) && b is Dictionary<string, object> mine ? mine : DefaultBreakpoints;
+                // The stylesheet's own breakpoints change or add to the defaults; the ones it doesn't name stay.
+                var points = new Dictionary<string, object>(DefaultBreakpoints);
+                if (c.Scope != null && c.Scope.TryGet("breakpoints", out object b) && b is Dictionary<string, object> mine)
+                {
+                    foreach (var point in mine) points[point.Key] = point.Value;
+                }
                 if (!points.TryGetValue(name, out object px))
                     throw new KScriptException($"There is no breakpoint '{name}'. Breakpoints: {string.Join(", ", points.Keys)}. Set your own with <let name=\"breakpoints\" value=\"{{ md: 800 }}\" />.", "Argument");
                 return Values.ToNumber(px, $"$breakpoints.{name}");
@@ -149,7 +154,12 @@ namespace KScript.Style
             return Values.ToNumber(value is string s ? s.Replace("px", string.Empty) : value, $"@{c.Name}()");
         }
 
-        private static double Base(CallContext c) => c.Has(1) ? c.Num(1) : 16;
+        private static double Base(CallContext c)
+        {
+            double size = c.Has(1) ? c.Num(1) : 16;
+            if (!(size > 0) || double.IsInfinity(size)) throw c.Error($"{c.Display} needs a base above 0, not {Values.FormatNumber(size)}.", "Argument");
+            return size;
+        }
 
         private static string Px(double px) => Num(px) + "px";
 

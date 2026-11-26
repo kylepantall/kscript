@@ -332,6 +332,11 @@ namespace KScript.Scaffolding
                 cli.NewLine();
                 cli.Heading("  kscript.json:");
                 output.Write(result.Contents["kscript.json"]);
+                if (result.Note != null)
+                {
+                    cli.NewLine();
+                    cli.Comment("  " + result.Note);
+                }
                 return 0;
             }
 

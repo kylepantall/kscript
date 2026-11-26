@@ -13,8 +13,26 @@ namespace KScript.Pages
     /// <summary>Markdown support for pages: rendering, front matter and Markdown documents as values.</summary>
     public static class PageMarkdown
     {
+        // The advanced extensions without generic attributes: `{onclick=...}` after a block would let a value
+        // filled into the page add attributes to the element around it. Pages write their own HTML for that.
         private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-            .UseAdvancedExtensions()
+            .UseAbbreviations()
+            .UseAutoIdentifiers()
+            .UseCitations()
+            .UseCustomContainers()
+            .UseDefinitionLists()
+            .UseEmphasisExtras()
+            .UseFigures()
+            .UseFooters()
+            .UseFootnotes()
+            .UseGridTables()
+            .UseMathematics()
+            .UseMediaLinks()
+            .UsePipeTables()
+            .UseListExtras()
+            .UseTaskLists()
+            .UseDiagrams()
+            .UseAutoLinks()
             .Build();
 
         public static string ToHtml(string markdown) => Markdig.Markdown.ToHtml(markdown ?? string.Empty, Pipeline);
@@ -64,21 +82,31 @@ namespace KScript.Pages
             return value;
         }
 
-        /// <summary>Escapes a value inserted into Markdown, so it shows as written instead of becoming formatting or HTML.</summary>
+        /// <summary>
+        /// Escapes a value inserted into Markdown, so it shows as written instead of becoming formatting, structure or
+        /// HTML. Every character Markdown (or one of its extensions) gives a meaning becomes a character reference,
+        /// which Markdown reads as plain text and which also reads correctly inside an HTML block. Line breaks and a
+        /// leading space are written the same way, so a value can't start a new block (a list, a heading, code).
+        /// </summary>
         public static string Escape(string s)
         {
             if (string.IsNullOrEmpty(s)) return string.Empty;
             var sb = new System.Text.StringBuilder(s.Length + 8);
-            foreach (char c in s)
+            for (int i = 0; i < s.Length; i++)
             {
-                if ("\\`*_[]#|~".IndexOf(c) >= 0) sb.Append('\\').Append(c);
-                else if (c == '<') sb.Append("&lt;");
+                char c = s[i];
+                if (c == '<') sb.Append("&lt;");
                 else if (c == '>') sb.Append("&gt;");
                 else if (c == '&') sb.Append("&amp;");
+                else if (c == '\r' && i + 1 < s.Length && s[i + 1] == '\n') continue;
+                else if (c is '\n' or '\r' or '\t' || (c == ' ' && i == 0) || EscapedPunctuation.IndexOf(c) >= 0)
+                    sb.Append("&#").Append(((int)c).ToString(CultureInfo.InvariantCulture)).Append(';');
                 else sb.Append(c);
             }
             return sb.ToString();
         }
+
+        private const string EscapedPunctuation = "\\`*_[]#|~{}=^:!+-.()\"$@";
 
         /// <summary>Removes the common leading indentation, so Markdown nested inside indented HTML still works.</summary>
         public static string Dedent(string text)

@@ -38,8 +38,8 @@ namespace KScript.Queueing
 
         public bool TryGetMember(string name, out object value)
         {
-            value = name == "count" ? (double)pushed.Count : null;
-            return value != null;
+            value = null;
+            return false;
         }
 
         public bool TryCallMethod(CallContext call, string name, out object result)

@@ -450,6 +450,41 @@ namespace KScript.Projects
         public string Directory { get; private set; }
 
         public string Name { get; set; }
+
+        /// <summary>The time zone the project's stored dates are in, by its IANA name. Europe/London when not set.</summary>
+        public string TimeZone { get; private set; } = DefaultTimeZone;
+
+        /// <summary><see cref="TimeZone"/> as a zone.</summary>
+        public TimeZoneInfo Zone { get; private set; } = DefaultZone;
+
+        public const string DefaultTimeZone = "Europe/London";
+
+        /// <summary>Europe/London: from the computer's own time zone data, or by its rule where there is none (a bare container).</summary>
+        public static TimeZoneInfo DefaultZone { get; } = FindZone(DefaultTimeZone) ?? London();
+
+        /// <summary>The zone with an IANA name such as Europe/Paris or America/New_York (or UTC), or null when there is none.</summary>
+        public static TimeZoneInfo FindZone(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(name.Trim());
+            }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException || ex is InvalidTimeZoneException || ex is System.Security.SecurityException || ex is ArgumentException)
+            {
+                return string.Equals(name.Trim(), "UTC", StringComparison.OrdinalIgnoreCase) ? TimeZoneInfo.Utc : null;
+            }
+        }
+
+        // London's rule since 1996: an hour ahead from 01:00 UTC on the last Sunday of March to 01:00 UTC on the last Sunday of October.
+        private static TimeZoneInfo London()
+        {
+            var start = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 1, 0, 0), 3, 5, DayOfWeek.Sunday);
+            var end = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(new DateTime(1, 1, 1, 2, 0, 0), 10, 5, DayOfWeek.Sunday);
+            var rule = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(DateTime.MinValue.Date, DateTime.MaxValue.Date, TimeSpan.FromHours(1), start, end);
+            return TimeZoneInfo.CreateCustomTimeZone(DefaultTimeZone, TimeSpan.Zero, DefaultTimeZone, "GMT", "BST", new[] { rule });
+        }
+
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
         public TestSettings Test { get; } = new TestSettings();
@@ -711,6 +746,12 @@ namespace KScript.Projects
         /// <summary>Unknown keys and values that were ignored.</summary>
         public List<string> Warnings { get; } = new List<string>();
 
+        /// <summary>
+        /// The warnings that stop every script in the project from running (a package that doesn't exist), so
+        /// kscript check counts them as errors. Each is also in <see cref="Warnings"/>.
+        /// </summary>
+        public List<string> Errors { get; } = new List<string>();
+
         /// <summary>The standards kscript.json names in "standard", as written. Unset means kscript:recommended.</summary>
         public List<string> Standard { get; private set; } = new List<string> { Standards.Recommended };
 
@@ -827,6 +868,17 @@ namespace KScript.Projects
                         case "name":
                             config.Name = String(prop.Value, "name", config);
                             break;
+                        case "timezone":
+                            if (String(prop.Value, "timezone", config) is string zoneName)
+                            {
+                                if (FindZone(zoneName) is TimeZoneInfo found)
+                                {
+                                    config.TimeZone = zoneName.Trim();
+                                    config.Zone = found;
+                                }
+                                else config.Errors.Add($"timezone: there is no time zone called '{zoneName}' on this computer. Use a name such as Europe/London, America/New_York or UTC.");
+                            }
+                            break;
                         case "serve":
                             ReadServe(prop.Value, config);
                             break;
@@ -874,11 +926,14 @@ namespace KScript.Projects
                             config.Natives = Strings(prop.Value, "natives", config) ?? config.Natives;
                             break;
                         case "packages":
-                            config.Packages = Strings(prop.Value, "packages", config) ?? config.Packages;
+                            config.Packages = Strings(prop.Value, "packages", config, "[\"KScript.IO\"]", "package names") ?? config.Packages;
                             foreach (string package in config.Packages)
                             {
-                                if (!KScript.Runtime.PackageRegistry.Default.IsKnown(package))
-                                    config.Warnings.Add($"packages: there is no package '{package}'. Packages: {string.Join(", ", KScript.Runtime.PackageRegistry.Default.Names.Where(n => n != "KScript.Core"))}.");
+                                if (KScript.Runtime.PackageRegistry.Default.IsKnown(package)) continue;
+                                // Every script imports these, so a wrong name stops them all: an error, not a warning.
+                                string unknown = $"packages: there is no package '{package}'. Packages: {string.Join(", ", KScript.Runtime.PackageRegistry.Default.Names.Where(n => n != "KScript.Core"))}.";
+                                config.Warnings.Add(unknown);
+                                config.Errors.Add(unknown);
                             }
                             break;
                         default:
@@ -1451,7 +1506,7 @@ namespace KScript.Projects
             }
         }
 
-        /// <summary>A length of time in seconds: a number of seconds, or text such as "90s", "15m", "2h", "30d" or "1w".</summary>
+        /// <summary>A length of time in seconds: a number of seconds, or text such as "500ms", "90s", "15m", "1h30m", "30d" or "1w".</summary>
         private static double? Duration(JsonElement e, string name, ProjectConfig config)
         {
             if (e.ValueKind == JsonValueKind.Number && e.TryGetDouble(out double n) && n > 0) return n;
@@ -1460,15 +1515,12 @@ namespace KScript.Projects
             return null;
         }
 
-        /// <summary>Seconds in text such as "90", "90s", "15m", "2h", "30d" or "1w"; null if it isn't one.</summary>
-        public static double? Seconds(string text)
-        {
-            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(text ?? string.Empty, @"^\s*(\d+(?:\.\d+)?)\s*(s|m|h|d|w)?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!m.Success) return null;
-            double amount = double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-            double seconds = amount * (m.Groups[2].Value.ToLowerInvariant() switch { "m" => 60, "h" => 3600, "d" => 86400, "w" => 604800, _ => 1 });
-            return seconds > 0 ? seconds : null;
-        }
+        /// <summary>
+        /// Seconds in text such as "90", "90s", "500ms", "15m" or "1h30m"; null if it isn't a length of time above 0.
+        /// Read by the same rule as a duration in a script, so the file and the command line accept what scripts do.
+        /// </summary>
+        public static double? Seconds(string text) =>
+            KScript.Runtime.Duration.TrySeconds(text, out double seconds) && seconds > 0 ? seconds : null;
 
         private static bool? Bool(JsonElement e, string name, ProjectConfig config)
         {
@@ -1654,7 +1706,7 @@ namespace KScript.Projects
                         else config.Warnings.Add("test.timeout should be a number of seconds (0 for no limit).");
                         break;
                     case "packages":
-                        config.Test.Packages = Strings(p.Value, "test.packages", config) ?? config.Test.Packages;
+                        config.Test.Packages = Strings(p.Value, "test.packages", config, "[\"KScript.Test\"]", "package names") ?? config.Test.Packages;
                         foreach (string package in config.Test.Packages)
                         {
                             if (!KScript.Runtime.PackageRegistry.Default.IsKnown(package))
@@ -1843,11 +1895,11 @@ namespace KScript.Projects
             return null;
         }
 
-        private static List<string> Strings(JsonElement e, string name, ProjectConfig config)
+        private static List<string> Strings(JsonElement e, string name, ProjectConfig config, string example = "[\"drafts/**\"]", string what = "paths")
         {
             if (e.ValueKind == JsonValueKind.Array && e.EnumerateArray().All(i => i.ValueKind == JsonValueKind.String))
                 return e.EnumerateArray().Select(i => i.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-            config.Warnings.Add($"{name} should be a list of paths, e.g. [\"drafts/**\"].");
+            config.Warnings.Add($"{name} should be a list of {what}, e.g. {example}.");
             return null;
         }
 

@@ -27,13 +27,16 @@ A name keeps a store's keys apart from other stores': `@cache(file, name: 'weath
 | --- | --- |
 | `->get(key, default: …)` | The value, or the default (`null`) when it isn't there or has run out. |
 | `->set(key, value, ttl: …)` | Keeps the value and returns it. |
+| `->set_if_absent(key, value, ttl: …)` | Keeps the value only when the key isn't there or has run out. True when this call stored it. |
 | `->remember(key, compute, ttl: …)` | The value, or else what `compute` returns, which is then kept. |
 | `->has(key)` | True when a value is there and hasn't run out. |
 | `->remove(key)` | Removes the key. True if it was there. |
-| `->increment(key, by: 1, ttl: …)` | Adds to a number (0 when it isn't there) and returns the new number. A count keeps the time limit it started with unless you give a new one. |
+| `->increment(key, by: 1, ttl: …)` | Adds to a number (0 when it isn't there) and returns the new number. A count keeps the time limit it started with unless you give a new one. Adding is one step, so requests and scripts that count at the same moment all count. |
 | `->ttl(key)` | How long until the key runs out, as a duration, or `null` when it never does. |
 | `->keys()` | The keys that are there, sorted. |
 | `->clear()` | Removes every key and returns how many there were. |
+| `->group(name)` | A cache of its own inside this one, with the same methods: `$cache->group('rates')->set(…)`. Its keys are apart from the store's own and from other groups'. |
+| `->clear_group(name)` | Removes every key of that group and returns how many there were. |
 
 ## Time limits
 

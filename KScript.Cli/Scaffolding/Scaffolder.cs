@@ -144,13 +144,13 @@ namespace KScript.Scaffolding
             if (header.ContainsKey("adds-to") && !request.Rendering)
                 throw new StubException($"kscript make {template.Type} adds to a file rather than making one; run it as kscript make {template.Type} {Example(template.Type)}.");
             ApplyDefaults(header, values);
+            CheckOptions(header, values, request.Options, root);
 
             if (string.Equals(template.Type, "component", StringComparison.OrdinalIgnoreCase))
             {
                 CheckComponentName(values["kebab"], request.Name);
                 if (MarkupParser.IsCodePath(template.FileName))
                 {
-                    ScriptFormat.AddValues(values, ScriptFormat.KScript);
                     PrepareComponent(root, projectConfig, request, values);
                 }
             }
@@ -349,6 +349,88 @@ namespace KScript.Scaffolding
                 if (eq <= 0) continue;
                 string key = pair.Substring(0, eq).Trim();
                 if (!values.ContainsKey(key)) values[key] = pair.Substring(eq + 1).Trim();
+            }
+        }
+
+        /// <summary>
+        /// The header's <c>checks: status=status; tries=int; level=info|warn|error</c> says what an option's value must
+        /// be, so a wrong one is refused before anything is written instead of making a file that fails kscript check.
+        /// Kinds: int, number, status (an HTTP status), duration, durations, fields (name: type, …), names,
+        /// assignments (name = value, …), file (a file in the project), locale, or the choices separated by |.
+        /// <c>name=</c> checks the name itself. Only what was given on the command line is checked.
+        /// </summary>
+        internal static void CheckOptions(Dictionary<string, string> header, Dictionary<string, string> values, IReadOnlyDictionary<string, string> given, string root)
+        {
+            if (!header.TryGetValue("checks", out var checks)) return;
+            foreach (string pair in checks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                int eq = pair.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = pair.Substring(0, eq).Trim(), kind = pair.Substring(eq + 1).Trim();
+                bool isName = key == "name";
+                if (!isName && (given == null || !given.Keys.Any(k => string.Equals(k.Replace('-', '_'), key, StringComparison.OrdinalIgnoreCase)))) continue;
+                string value = (values.GetValueOrDefault(key) ?? "").Trim();
+                string option = isName ? "The name" : "--" + key.Replace('_', '-');
+                if (!isName && (value.Length == 0 || value == "true") && kind != "file")
+                {
+                    if (kind is "fields" or "names" or "assignments" or "durations" && value.Length == 0) continue;
+                    throw new StubException($"{option} needs a value.");
+                }
+                string problem = OptionProblem(kind, value, root);
+                if (problem != null) throw new StubException($"{option} should be {problem}, not '{value}'.");
+            }
+        }
+
+        /// <summary>What a value of this kind should have been, or null when it is one.</summary>
+        private static string OptionProblem(string kind, string value, string root)
+        {
+            static string[] Items(string list) => list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var invariant = System.Globalization.CultureInfo.InvariantCulture;
+            switch (kind)
+            {
+                case "int":
+                    return int.TryParse(value, System.Globalization.NumberStyles.None, invariant, out _) ? null : "a whole number";
+                case "number":
+                    return double.TryParse(value, System.Globalization.NumberStyles.Float, invariant, out double n) && !double.IsNaN(n) && !double.IsInfinity(n) ? null : "a number";
+                case "status":
+                    return int.TryParse(value, System.Globalization.NumberStyles.None, invariant, out int status) && status >= 100 && status <= 599 ? null : "an HTTP status from 100 to 599, such as 404";
+                case "duration":
+                    return Runtime.Duration.TrySeconds(value, out double seconds) && seconds >= 0 ? null : "a length of time such as 30s or 5m";
+                case "durations":
+                    return Items(value).All(d => Runtime.Duration.TrySeconds(d, out double each) && each >= 0) ? null : "lengths of time such as \"10s, 1m, 5m\"";
+                case "fields":
+                {
+                    var names = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (string field in Items(value))
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(field, @"\A([A-Za-z_]\w*)\??\s*:\s*\S");
+                        if (!match.Success) return $"fields written as name: type, such as \"name: string, age?: int\" ('{field}' is not one)";
+                        if (!names.Add(match.Groups[1].Value)) return $"fields with different names ('{match.Groups[1].Value}' is there twice)";
+                    }
+                    return null;
+                }
+                case "names":
+                {
+                    var names = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (string name in Items(value))
+                    {
+                        string snake = StubNames.Snake(name);
+                        if (snake.Length == 0 || !(char.IsLetter(snake[0]) || snake[0] == '_')) return $"names that start with a letter, comma separated ('{name}' does not)";
+                        if (!names.Add(snake)) return $"different names ('{name}' is there twice)";
+                    }
+                    return null;
+                }
+                case "assignments":
+                    return Items(value).All(a => System.Text.RegularExpressions.Regex.IsMatch(a, @"\A[A-Za-z_]\w*\s*=\s*\S")) ? null : "constants written as name = value, such as \"max_items = 10, page_size = 25\"";
+                case "file":
+                    return value.Length > 0 && value != "true" && File.Exists(Path.Combine(root, value)) ? null : "a file in the project (there is none at that path)";
+                case "locale":
+                    return System.Text.RegularExpressions.Regex.IsMatch(value, @"\A[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*\z") ? null : "a locale such as fr or en-GB";
+                default:
+                {
+                    string[] choices = kind.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    return choices.Contains(value, StringComparer.OrdinalIgnoreCase) ? null : ProjectScaffolder.Either(choices);
+                }
             }
         }
 

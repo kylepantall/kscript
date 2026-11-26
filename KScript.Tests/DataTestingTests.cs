@@ -140,6 +140,59 @@ public sealed class DataTestingTests : DataFixture
 
     private void Keep() => Directory.CreateDirectory(Path.Combine(Project, "data"));
 
+    private const string PostRoutes = """
+        import KScript.Http
+        import KScript.Data
+        import "../models/author.kscript"
+        import "../models/post.kscript"
+
+        Routes {
+          Get(path: /posts) {
+            return { titles: Post->order_by(title)->pluck(title) }
+          }
+          Put(path: /posts) {
+            $db->transaction(fn() => Post->fake(title: 'By the API'))
+            return { count: Post->count() }
+          }
+        }
+        """;
+
+    private const string PostRouteTests = """
+        import KScript.Net
+
+        test(name: 'the API sees what the test made') {
+          Post->fake(title: 'By the test')
+          expect(value: @api(/api/posts)->json().titles, equals: ['By the test'])
+        }
+
+        test(name: 'the test sees what the API made') {
+          expect(value: @api(/api/posts, options: { method: 'PUT' })->json().count, equals: 1)
+          expect(value: Post->pluck(title), equals: ['By the API'])
+        }
+
+        test(name: 'and each test starts with neither') {
+          expect(value: @api(/api/posts)->json().titles, equals: [])
+          expect(value: Post->count(), equals: 0)
+        }
+        """;
+
+    [Fact]
+    public void ARouteCalledWithApiUsesTheTestsDatabaseAndIsUndoneWithTheTest()
+    {
+        FileOf("routes/api.kscript", PostRoutes);
+        Passed(RunTests(PostRouteTests));
+    }
+
+    [Fact]
+    public void ARouteCalledWithApiSharesTheConfiguredDatabaseToo()
+    {
+        if (Server == null) FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:data/test.sqlite\n");
+        Keep();
+        FileOf("routes/api.kscript", PostRoutes);
+        Passed(RunTests("$db->create_table(Author)\n$db->create_table(Post)\n\n" + PostRouteTests,
+            "{ \"name\": \"testing\", \"config\": { \"files\": [\"config.yaml?\"] }, \"test\": { \"database\": \"config\" } }"));
+    }
+
     [Fact]
     public void FakesNeedAModelTheyCanFill()
     {

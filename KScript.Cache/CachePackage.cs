@@ -40,6 +40,15 @@ namespace KScript.Caching
         public abstract void Put(string key, object value, DateTime? expires);
 
         public abstract bool PutIfAbsent(string key, object value, DateTime? expires);
+
+        /// <summary>
+        /// Adds to the number under a key (0 when it isn't there) in one step, so two callers at once both count,
+        /// and returns the new number. expires replaces the key's time limit; null keeps the one it has.
+        /// </summary>
+        public abstract double Add(string key, double by, DateTime? expires);
+
+        protected static double Number(string key, object current) => current == null ? 0 : Values.ToNumber(current, $"The value of '{key}'");
+
         public abstract CacheStore Group(string name);
 
         public abstract bool Forget(string key);
@@ -111,11 +120,8 @@ namespace KScript.Caching
                 {
                     string key = Key(call);
                     double by = call.Num(1, 1);
-                    double now = TryGet(key, out object current, out DateTime? expires) && current != null ? Values.ToNumber(current, $"The value of '{key}'") : 0;
                     // The count keeps the time limit it started with, so throttling-style counters still run out.
-                    DateTime? until = call.Has(2) && call.Arg(2) != null ? Expires(call.Arg(2)) : expires;
-                    Put(key, now + by, until);
-                    result = now + by;
+                    result = Add(key, by, call.Has(2) && call.Arg(2) != null ? Expires(call.Arg(2)) : null);
                     return true;
                 }
                 case "ttl":
@@ -243,6 +249,16 @@ namespace KScript.Caching
             }
         }
 
+        public override double Add(string key, double by, DateTime? expires)
+        {
+            DateTime now = Clock();
+            var entry = entries.AddOrUpdate(key, _ => (by, expires), (_, old) => old.Expires == null || old.Expires > now
+                ? (Number(key, old.Value) + by, expires ?? old.Expires)
+                : (by, expires));
+            Prune();
+            return (double)entry.Value;
+        }
+
         public override bool Forget(string key) => entries.TryRemove(key, out _);
 
         public override int Flush()
@@ -347,6 +363,13 @@ namespace KScript.Caching
             return true;
         });
 
+        public override double Add(string key, double by, DateTime? expires) => Locked(() =>
+        {
+            double sum = (TryGetUnlocked(key, out object current, out DateTime? kept) ? Number(key, current) : 0) + by;
+            PutUnlocked(key, sum, expires ?? kept);
+            return sum;
+        });
+
         private void PutUnlocked(string key, object value, DateTime? expires)
         {
             Directory.CreateDirectory(Folder);
@@ -412,7 +435,23 @@ namespace KScript.Caching
             if (ttl is double n && (double.IsNaN(n) || double.IsInfinity(n))) throw new KScriptException($"A time limit must be more than 0 seconds, not {Values.ToStr(ttl)}.", "Argument");
             double seconds = Duration.Seconds(ttl, "A time limit (ttl)");
             if (seconds <= 0) throw new KScriptException($"A time limit must be more than 0 seconds, not {Values.ToStr(ttl)}.", "Argument");
+            if (seconds > LongestLimit) throw new KScriptException($"A time limit can be at most 100 years, not {Values.ToStr(ttl)}. Leave it out to keep a value until it is removed.", "Argument");
             return seconds;
+        }
+
+        /// <summary>100 years in seconds: past any real use, and far from the last date a clock can hold.</summary>
+        private const double LongestLimit = 100 * 365.25 * 86400;
+
+        private static string StoreName(CallContext c, string name)
+        {
+            try
+            {
+                return AppFolders.CleanName(name);
+            }
+            catch (KScriptException)
+            {
+                throw c.Error($"'{name}' can't be used as a cache name. Give a name such as 'weather'.", "Argument");
+            }
         }
 
         /// <summary>The store a script asks for: memory (the default) or file, with an optional name.</summary>
@@ -420,7 +459,7 @@ namespace KScript.Caching
         {
             string kind = c.Has(kindArgument) && c.Arg(kindArgument) != null ? c.Str(kindArgument).Trim().ToLowerInvariant() : "memory";
             string app = StoragePackage.AppName(c, 99);
-            string name = c.Has(nameArgument) && c.Arg(nameArgument) != null ? AppFolders.CleanName(c.Str(nameArgument)) : "default";
+            string name = c.Has(nameArgument) && c.Arg(nameArgument) != null ? StoreName(c, c.Str(nameArgument)) : "default";
             // The store's type (memory|file) means the interpreter has already refused any other name.
             return kind == "file"
                 ? new FileCacheStore(name, Path.Combine(AppFolders.Folder(app, "cache"), "kscript-cache", name))

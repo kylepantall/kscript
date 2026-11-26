@@ -18,6 +18,8 @@ Then run it:
 kscript hello.kscript
 ```
 
+`kscript run hello.kscript` does the same. Anything after the script's name goes to the script as `$args`.
+
 A script runs from top to bottom, one statement per line. `//` starts a comment.
 
 ## Variables
@@ -48,7 +50,11 @@ echo $label
 Lists are written `[1, 2, 3]` and maps `{ name: 'Joan', age: 82 }`. Every value has methods, called with `->`.
 
 ```kscript try
-people = [{ name: 'Joan', age: 82 }, { name: 'Sam', age: 35 }, { name: 'Ada', age: 36 }]
+people = [
+  { name: 'Joan', age: 82 },
+  { name: 'Sam', age: 35 },
+  { name: 'Ada', age: 36 }
+]
 
 echo "{ $people->count() } people"
 echo "Oldest: { $people->max_by(fn(p) => $p.age).name }"

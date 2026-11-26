@@ -53,6 +53,13 @@ namespace KScript.Style
                     return Fail(error, $"There is no file or folder at '{input}'.");
                 }
             }
+            // Two stylesheets that would be written to one file: stop before either is, so none is lost unnoticed.
+            var clash = jobs.Distinct().GroupBy(job => job.Target, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+            if (clash != null)
+            {
+                string Shown(string path) => Path.GetRelativePath(KScript.Runtime.WorkingFolder.Current, path);
+                return Fail(error, $"{string.Join(" and ", clash.Select(job => Shown(job.Source)))} would both be written to {Shown(clash.Key)}. Compile them one at a time, or give each its own --out folder.");
+            }
             if (jobs.Count == 0)
             {
                 output.WriteLine("No stylesheets found (files ending in .ks.css, .ks.scss or .ks.sass).");

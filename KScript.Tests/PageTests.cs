@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using KScript.Pages;
 using KScript.Runtime;
 
@@ -235,6 +236,80 @@ public class PageRendererTests
         Assert.Contains("<h2 id=", html);
         Assert.Contains("Hi *Kyle*</h2>", html);
         Assert.Contains("<li>one</li>", html);
+    }
+
+    [Theory]
+    [InlineData("{#a onmouseover=alert(1)}")]
+    [InlineData("x {.big onclick=alert(1)}")]
+    [InlineData("a\n\n<script>alert(1)</script>")]
+    [InlineData("a\r\n\r\n# Big\n\n- x **b** `c`")]
+    [InlineData("[c](javascript:alert(1))")]
+    [InlineData("    indented\n> quote\n1. one\n+ plus\n===\n~~s~~ ==m== ^u^ :::div")]
+    [InlineData("<http://e.example> http://e.example www.e.example a@e.example")]
+    [InlineData("a | b\n--|--\n1 | 2")]
+    [InlineData("![i](x \"t\") [r]: /x \"t\"\n\n[r] [^1]\n\n[^1]: note")]
+    public void Markdown_values_are_only_ever_text(string value)
+    {
+        using var site = new TempSite(
+            ("page.md", "# Hi {$request.query.q}\n\nBio: {$request.query.q} end.\n\n- item {$request.query.q}\n"),
+            ("block.html", "<markdown>\nNote:\n\n{$request.query.q}\n</markdown>"));
+        var request = new Dictionary<string, object> { ["query"] = new Dictionary<string, object> { ["q"] = value } };
+        string page = site.Render("page.md", request).Body;
+        string block = site.Render("block.html", request).Body;
+
+        // The value adds no element and no attribute, whatever Markdown or HTML it holds: the page has what its
+        // author wrote (a heading, a paragraph, a list of one item) and nothing more.
+        Assert.Equal(new[] { "h1", "p", "ul", "li" }, Regex.Matches(page, "<([a-z0-9]+)").Select(m => m.Groups[1].Value));
+        Assert.Matches("^<h1 id=\"[^\"<>]*\">Hi [^<]*</h1>\\s*<p>Bio: [^<]* end\\.</p>\\s*<ul>\\s*<li>item [^<]*</li>\\s*</ul>\\s*$", page);
+        Assert.Equal(new[] { "p", "p" }, Regex.Matches(block, "<([a-z0-9]+)").Select(m => m.Groups[1].Value));
+    }
+
+    [Fact]
+    public void Markdown_values_keep_their_characters_and_the_authors_markdown_still_works()
+    {
+        using var site = new TempSite(("page.md", """
+            # Prices for {$request.query.q}
+
+            | Item | Price |
+            | ---- | ----- |
+            | Tea  | {$request.query.q} |
+
+            - [x] done
+            - [link]({$request.query.to})
+
+            Term
+            :   Its meaning[^1]
+
+            https://example.com
+
+            [^1]: A note.
+            """));
+        var request = new Dictionary<string, object>
+        {
+            ["query"] = new Dictionary<string, object> { ["q"] = "Tom & Jerry <3 (ok) a_b c.d 100% café! $5", ["to"] = "https://example.com/a-b_c.html?x=1&y=2" },
+        };
+        string html = site.Render("page.md", request).Body;
+        Assert.Contains(">Prices for Tom &amp; Jerry &lt;3 (ok) a_b c.d 100% café! $5</h1>", html);
+        Assert.Contains("<td>Tom &amp; Jerry &lt;3 (ok) a_b c.d 100% café! $5</td>", html);
+        Assert.Contains("type=\"checkbox\"", html);
+        Assert.Contains("<a href=\"https://example.com/a-b_c.html?x=1&amp;y=2\">link</a>", html);
+        Assert.Contains("<dt>Term</dt>", html);
+        Assert.Contains("<a href=\"https://example.com\">https://example.com</a>", html);
+        Assert.Contains("class=\"footnote", html);
+    }
+
+    [Fact]
+    public void An_error_in_a_page_names_the_line_it_is_on()
+    {
+        using var site = new TempSite(
+            ("page.html", "<h1>a</h1>\n<p>ok</p>\n\n<div>\n  <p>{ $nope.x }</p>\n</div>\n"),
+            ("attr.html", "<h1>a</h1>\n\n<if test=\"$nope gt 1\">\n  <p>x</p>\n</if>\n"));
+        // The line was always 1 (the expression's own first line), wherever in the page the mistake was.
+        KScriptException text = Assert.Throws<PageException>(() => site.Render("page.html")).ToKScriptError();
+        Assert.Equal(("page.html", 5, "Name"), (text.File, text.Line, text.Type));
+        Assert.Contains("$nope is not defined", text.Message);
+        KScriptException attribute = Assert.Throws<PageException>(() => site.Render("attr.html")).ToKScriptError();
+        Assert.Equal(("attr.html", 3), (attribute.File, attribute.Line));
     }
 
     [Fact]

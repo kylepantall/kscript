@@ -281,7 +281,11 @@ namespace KScript.Documents.Text
             else if (container != null) parts.Add(new TextInline("."));
 
             string link = source["doi"] != null ? "https://doi.org/" + source["doi"].Replace("https://doi.org/", string.Empty) : source["url"];
-            if (link != null)
+            if (link != null && !InlineParser.IsLinkTarget(link))
+            {
+                parts.Add(new TextInline(" " + link));
+            }
+            else if (link != null)
             {
                 parts.Add(new TextInline(" "));
                 var l = new LinkInline { Url = link };

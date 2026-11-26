@@ -22,7 +22,7 @@ A map, or a list of maps, on its own in `echo` prints as indented JSON, coloured
 
 Variables belong to the block they are declared in. `{{` and `}}` are literal braces.
 
-`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written.
+`"Double quotes"` interpolate expressions in `{ }` after `echo`, in assignments, in return values, and in call arguments. In `.kscript`, [KS6019](errors.md#ks6019) catches bare references and offers to wrap them in braces. `'Single quotes'` keep text exactly as written. Quoted text after `echo` is printed as written too, with its spaces: `echo "  - { $item }"` prints the two spaces. In XML, the text between `<echo>` and `</echo>` is trimmed and loses the indentation its lines share, and the values filled into it are left alone, except that an empty value leaves no stray space behind and the text never ends in a line break.
 
 ```kscript
 greeting = "Hello { $name }, you have { $count * 2 } points."
@@ -35,9 +35,9 @@ A `{ }` in double quotes always holds an expression, whatever it opens with: a v
 
 ## Expressions
 
-`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
+`+ - * / % **`, `== !=` (loose: `'3' == 3`), `=== !==` (strict), `< <= > >=`, `and or not`, `??`, `?.`, `a ? b : c`, `in`, list `[1, 2]` and map `{ name: 'Joan' }` literals, `$p.name`, `$list[0]` (negative indexes count from the end), ranges `0..10` and `0..100 step 5` (end excluded, also with a step such as `0.1`), `match $x { 1 => 'one', _ => 'other' }`, `->method()`, `|>` and `fn(x) => …`. Write `and` and `or` to combine conditions. Prefix `!` has the same precedence and truthiness as `not`, so `!$ready`, `! $ready` and `not $ready` are equivalent. Use it on a field (`!$user.active`), a whole condition (`if !($ready and $open) { … }`), or an interpolation (`"{ ! null->is_null() }"`). The spelling `null->!is_null()` negates the method result before the next link in the chain. XML has a word for each comparison as well (`lt le gt ge eq ne`), for use inside quoted attributes, since XML can't hold a raw `<` there; the [shorthand start tags](#control-flow) accept `<` and `>` as written. In a `.kscript` file the words are reported (KS6012) and `kscript check --fix` writes the symbols.
 
-When comparing a number with a string using `<`, `<=`, `>` or `>=`, KScript compares numerically if the string can be parsed as a number. If parsing fails, the comparison returns `false`.
+When comparing a number with a string using `<`, `<=`, `>` or `>=`, KScript compares numerically if the string can be parsed as a number. If parsing fails, the comparison returns `false`. Comparisons can't be chained: `1 < $n < 10` is an error, so write `1 < $n and $n < 10`. Two dates are equal with `==` only when they are the same moment, seconds included.
 
 Use `expression as Type` for a checked conversion, for example `$text as int`. The target can also be a declared record, enum or refinement type. [Checked conversions](types.md#checked-conversions-with-as)
 
@@ -90,7 +90,7 @@ Shorthand tags make a `.ks.xml` file KScript markup rather than strict XML: KScr
 ### Early returns instead of else
 
 Inside a function or a loop, end a branch early instead of writing `else`: `return` in a function,
-`continue` or `break` in a loop. The main path then stays at the left edge and each special case is dealt with
+`continue` or `break` in a loop (they act on a loop in the same function, never on the loop that called it). The main path then stays at the left edge and each special case is dealt with
 first.
 
 ```kscript try
@@ -339,6 +339,10 @@ On a list, `contains(value)`, `index_of(value)`, `remove(value)` and `count_of(v
 | `''` | `true` | `true` |
 | `'   '` | `false` | `true` |
 | `'hello'` | `false` | `false` |
+
+A number is always written in plain digits, never with an exponent: `echo 10 ** 20` prints `100000000000000000000` and `echo 0.1 ** 20` prints `0.00000000000000000001`. A whole number keeps every digit up to 9007199254740992 (16 digits), so a long id prints as it was read, and a fraction shows 15 significant digits, so `0.1 + 0.2` prints `0.3`.
+
+On text, `->count()` and positions (in `->slice()`, `->index_of()` and `$text[0]`) count most characters as one place and a character such as an emoji as two. No method cuts such a character in half: `->chars()`, `->first()`, `->last()` and `->reverse()` work with whole characters as a reader sees them, and `->slice()` and `->truncate()` move a cut that would fall inside one back to before it.
 
 A plain fact about a value is a field, read with a dot and no brackets, the same way a map's keys are:
 
@@ -770,9 +774,11 @@ import slugify from "lib/strings.kscript"
 // …
 ```
 
+Only `.kscript` and `.ks.xml` files can be imported. A function the script declares itself wins over an imported one of the same name, and an imported `const` stays a constant.
+
 | Package | What it adds |
 | --- | --- |
-| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, headers, align)` (see [Terminal output](#terminal-output)) |
+| `KScript.Terminal` | `input(into, type, default, secret)` (type can be `email`, `handle`, `uuid` or `password`), `picker` (a file or folder path), `menu(options)`, `confirm`, `pause`, `clear`, `@color(text, color: 'green')`, `@bold`, `@dim`, `@underline`, `@terminal_width()`, `@is_terminal()` (no when output is piped), `echo(format: markdown)`, and the kscript command line's own look: `info`, `success`, `warn`, `alert(type: error)`, `heading`, `detail(name)`, `bullets(items)`, `task(name) { }`, `table(rows, columns, header, align)` (see [Terminal output](#terminal-output)) |
 | `KScript.Math` | `@sqrt` `@round(x, digits: 2)` `@clamp(x, min: 0, max: 10)` `@logarithm` `@sin` `@cos` `@atan2` `@hypot` `@gcd` `@factorial` `@random(low: 1, high: 6)` `@random_bytes(16, format: 'hex')` `@pick` `@shuffle` `@sum` `@average` `@median` `@stdev`, `$pi` `$e` |
 | `KScript.IO` | `@read_text` `@read_lines` `@read_json` `@write_text` `@append_text` `@write_json` `@files(folder, pattern: '*.txt', recursive)` `@folders` `@file(path)` `@exists` `@join_path(base: $dir, ['a', 'b.txt'])` `@known_folder(downloads)`, `@move(from, to)` `@copy(from, to)` `@delete(path)` `@create_folder(path)`. File values have the fields `.name` `.extension` `.size` `.modified`… and methods such as `->read_text()`. |
 | `KScript.Net` | Sends HTTP requests with `@api(url, options: { method, headers, body, timeout })`. The response has `.status`, `.is_ok`, `.text`, `->json()` and `->check()`. Also provides `@download(url, to)` and `@query_string`. A path such as `'/api/notes'` asks the project's own routes. See [Calling your own API](http.md#calling-your-own-api). |

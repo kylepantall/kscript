@@ -74,6 +74,11 @@ namespace KScript.Language.Features
                     continue;
                 }
 
+                // A type, enum, model, error or job is named in its own declaration: there is no value type to show.
+                if (s.IsTypeDeclaration)
+                {
+                    continue;
+                }
                 bool typed = s.Kind == SymbolKind.Variable || s.Kind == SymbolKind.Constant || s.Kind == SymbolKind.LoopVariable || s.Kind == SymbolKind.Parameter;
                 if (!typed || s.Shape.IsVague || IsObvious(analysis, s))
                 {

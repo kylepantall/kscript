@@ -307,6 +307,53 @@ public sealed class AuthPackageTests : IDisposable
     }
 
     [Fact]
+    public void AProjectThatHashesWithBcryptKeepsItsHashesAtSignIn()
+    {
+        HttpApp app = App(types: "\"types\": { \"password\": { \"min\": 10, \"algorithm\": \"bcrypt\" } },");
+        var b = new Browser(app);
+        string id = Id(b);
+        AuthApp auth = app.Auth;
+        string registered = Values.ToStr(auth.Users.Get(id)["password_hash"]);
+        Assert.StartsWith("$2", registered);
+
+        // Signing in leaves a hash of the project's own algorithm as it is.
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery", "session": false }"""))["user"]);
+        Assert.Equal(registered, Values.ToStr(auth.Users.Get(id)["password_hash"]));
+
+        // A weaker one is made again, still with bcrypt.
+        Dictionary<string, object> record = auth.Users.Get(id);
+        record["password_hash"] = BCrypt.Net.BCrypt.HashPassword("correct horse battery", 4);
+        auth.Users.Put(id, record);
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery", "session": false }"""))["user"]);
+        Assert.StartsWith("$2a$12$", Values.ToStr(auth.Users.Get(id)["password_hash"]).Replace("$2b$", "$2a$"));
+    }
+
+    [Fact]
+    public void SessionsAndResetTokensThatRanOutAreSweptNowAndThen()
+    {
+        HttpApp app = App();
+        var b = new Browser(app);
+        string id = Id(b);
+        AuthApp auth = app.Auth;
+        Assert.NotNull(Map(Post(b, "/attempt", """{ "email": "joan@example.com", "password": "correct horse battery" }"""))["user"]);
+        Assert.NotNull(Map(Post(b, "/reset-token", """{ "email": "joan@example.com" }"""))["token"]);
+        int sessions = auth.Sessions.All().Count();
+        Assert.True(sessions > 0);
+        Assert.Single(auth.Resets.All());
+
+        // Nothing that is still good is removed.
+        Assert.Equal(0, auth.Sweep());
+
+        // A visitor who never comes back leaves a session behind; the writes of other visitors clear it away.
+        now = now.AddDays(400);
+        Assert.Equal(sessions, auth.Sessions.All().Count());
+        for (int i = 0; i < AuthApp.SweepEvery; i++) auth.Wrote();
+        Assert.Empty(auth.Sessions.All());
+        Assert.Empty(auth.Resets.All());
+        Assert.NotNull(auth.Users.Get(id));
+    }
+
+    [Fact]
     public void SignInOutAndUsersFromAStoreOfYourOwn()
     {
         var b = new Browser(App());
@@ -516,6 +563,11 @@ public sealed class AuthPackageTests : IDisposable
 
         Assert.Equal(90.0, ProjectConfig.Seconds("90"));
         Assert.Equal(3600.0, ProjectConfig.Seconds("1H"));
+        // The same lengths of time a script takes: milliseconds and joined units too.
+        Assert.Equal(0.5, ProjectConfig.Seconds("500ms"));
+        Assert.Equal(5400.0, ProjectConfig.Seconds("1h30m"));
+        Assert.Null(ProjectConfig.Seconds("soon"));
+        Assert.Null(ProjectConfig.Seconds("-5s"));
         Assert.Null(ProjectConfig.Seconds("0"));
         Assert.Null(ProjectConfig.Seconds(null));
     }

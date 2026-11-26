@@ -141,7 +141,8 @@ namespace KScript.Data
                     return Binary(b);
 
                 case UnaryNode u when u.Operator == "not":
-                    return new SqlUnary("NOT", Condition(u.Operand));
+                    // A condition on an empty column is unknown to the database, and not true to KScript.
+                    return new SqlUnary("IS NOT TRUE", Condition(u.Operand));
 
                 case UnaryNode u when u.Operator == "-":
                     return new SqlUnary("-", Expr(u.Operand));
@@ -208,7 +209,8 @@ namespace KScript.Data
             object value = Evaluate(other);
             object key = value is Record r ? ModelInfo.KeyOfTarget(rel, r) : value;
             Column fk = owner.Model.Column(rel.ForeignKey);
-            result = owner.Wrap(new SqlBinary(equal ? "=" : "<>", Column(owner, rel.ForeignKey, m), new SqlValue(key, fk)), null);
+            var same = new SqlBinary("=", Column(owner, rel.ForeignKey, m), new SqlValue(key, fk));
+            result = owner.Wrap(key == null ? new SqlUnary(equal ? "IS NULL" : "IS NOT NULL", same.Left) : equal ? same : new SqlUnary("IS NOT TRUE", same), null);
             return true;
         }
 
@@ -258,7 +260,7 @@ namespace KScript.Data
                 {
                     Most(1);
                     SqlExpr test = Inner(0, true) ?? throw Cannot(call, $"->all() on {text} needs a lambda: fn(x) => $x.published.");
-                    result = owner.Wrap(new SqlUnary("NOT", new SqlUnary("EXISTS", rel.Subquery(Call, from, alias, "1", condition: new SqlUnary("NOT", test)))), null);
+                    result = owner.Wrap(new SqlUnary("NOT", new SqlUnary("EXISTS", rel.Subquery(Call, from, alias, "1", condition: new SqlUnary("IS NOT TRUE", test)))), null);
                     return true;
                 }
                 case "sum":
@@ -302,7 +304,12 @@ namespace KScript.Data
                         l = new SqlCall("LOWER", l);
                         r = new SqlCall("LOWER", r);
                     }
-                    return new SqlBinary(equal ? "=" : "<>", l, r);
+                    // A variable that holds null compares like the word null: IS NULL.
+                    if (r is SqlValue { Value: null }) return new SqlUnary(equal ? "IS NULL" : "IS NOT NULL", l);
+                    if (l is SqlValue { Value: null }) return new SqlUnary(equal ? "IS NULL" : "IS NOT NULL", r);
+                    if (equal) return new SqlBinary("=", l, r);
+                    // An empty column isn't equal to a value, so it is one of the rows != keeps.
+                    return l is SqlValue || r is SqlValue ? new SqlUnary("IS NOT TRUE", new SqlBinary("=", l, r)) : new SqlBinary("<>", l, r);
                 }
                 case "<":
                 case "<=":
@@ -336,6 +343,8 @@ namespace KScript.Data
                     SqlExpr l = Expr(b.Left);
                     SqlExpr r = Expr(b.Right);
                     bool text = b.Operator == "+" && (IsText(l) || IsText(r));
+                    // 3 / 2 is 1.5, as it is in a script: databases divide two whole numbers into a whole number.
+                    if (b.Operator == "/") l = new SqlBinary("*", l, new SqlRaw("1.0"));
                     return new SqlBinary(text ? "||" : b.Operator, l, r);
                 }
                 default:

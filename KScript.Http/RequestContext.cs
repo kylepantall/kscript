@@ -65,9 +65,25 @@ namespace KScript.Http
             Live = Live,
             HostItems = { [HttpPackage.ContextKey] = this },
             StartupConfig = App.StartupConfig,
-            RoutedLiveProof = Values.ToStr(Request.GetValueOrDefault("method")) == "GET"
-                ? () => PageLive.Sign(new Dictionary<string, object>(), LiveProofScope) : null,
+            RoutedLiveProof = () => PageLive.Sign(new Dictionary<string, object>(), LiveProofScope),
+            LiveUnavailable = LiveUnavailable,
         };
+
+        /// <summary>True for a page file answered by its address: any method renders it, so a GET can always render it again.</summary>
+        public bool FilePage { get; init; }
+
+        /// <summary>
+        /// A live block calls back by rendering the page's GET again. Why that can't work for this request, or null:
+        /// a view answered for a POST (or PUT, DELETE...) at an address with no GET route has nothing to render again.
+        /// </summary>
+        private string LiveUnavailable()
+        {
+            string method = Values.ToStr(Request.GetValueOrDefault("method"));
+            string path = Values.ToStr(Request.GetValueOrDefault("path"));
+            if (FilePage || method is "GET" or "HEAD" || Table.Match("GET", path)?.Route != null) return null;
+            return $"This page answers {method} {path}, and <live> blocks call back with GET {path}, which has no route. " +
+                   $"Redirect to a GET page after handling the {method}, or add a GET route for {path} that shows the same view.";
+        }
 
         internal string LiveProofScope => "GET\0" + App.SiteRoot + "\0" + Values.ToStr(Request["url"]) + "\0" + Auth.CsrfToken;
 

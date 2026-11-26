@@ -91,7 +91,7 @@ public sealed class NetTests : IDisposable
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PUT', body: 'plain', headers: {{ 'user-agent': 'example-app/1.0' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', {{ method: 'PATCH', body: 'a=1', headers: {{ 'Content-Type': 'application/x-www-form-urlencoded' }} }}).text }}</echo>" +
             $"<echo>{{ @api('{server.Url}/echo', null).status }}</echo>");
-        Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain\nPATCH application/x-www-form-urlencoded a=1\n201\n", output);
+        Assert.Equal("POST application/json {\"a\":1} k\nPUT text/plain; charset=utf-8 plain \nPATCH application/x-www-form-urlencoded a=1 \n201\n", output);
         Assert.Equal(new[] { "kscript", "example-app/1.0", "kscript", "kscript" }, server.Requests.Select(r => r.Headers["User-Agent"]));
     }
 
@@ -141,6 +141,59 @@ public sealed class NetTests : IDisposable
         {
             tcp.Stop();
         }
+    }
+
+    [Fact]
+    public void ACookieFromOneAnswerIsNotSentOnLaterCalls()
+    {
+        server.SetCookie = "session=abc; Path=/";
+        Run($"<let name=\"r\" value=\"@api('{server.Url}/json')\" /><let name=\"r\" value=\"@api('{server.Url}/json')\" /><let name=\"r\" value=\"@api('{server.Url}/json', {{ headers: {{ Cookie: 'mine=1' }} }})\" />");
+        lock (server.Requests)
+        {
+            Assert.Equal(3, server.Requests.Count);
+            Assert.False(server.Requests[0].Headers.ContainsKey("Cookie"));
+            Assert.False(server.Requests[1].Headers.ContainsKey("Cookie"));
+            Assert.Equal("mine=1", server.Requests[2].Headers["Cookie"]);
+        }
+    }
+
+    [Fact]
+    public void AClientPathIsAddedToTheBaseUrl()
+    {
+        const string stub = "<let name=\"seen\" value=\"fn(path) => @with_http_stub(fn(request) => { body: $request.url }, fn() => $client($path).text)\" />";
+        string Urls(string root, params string[] paths) => Run(
+            $"<let name=\"client\" value=\"@http_client('{root}')\" />" + stub
+            + string.Concat(paths.Select(path => $"<echo>{{ $seen('{path}') }}</echo>")));
+
+        Assert.Equal("https://api.example.com/v1/users\nhttps://api.example.com/v1/users\nhttps://api.example.com/v1/users/7?full=1\nhttps://api.example.com/v1\n",
+            Urls("https://api.example.com/v1", "users", "/users", "users/7?full=1", ""));
+        Assert.Equal("https://api.example.com/v1/users\n", Urls("https://api.example.com/v1/", "/users"));
+        Assert.Equal("https://api.example.com/users\n", Urls("https://api.example.com", "users"));
+        Assert.Equal("https://api.example.com/v1/other.example.com/x\n", Urls("https://api.example.com/v1", "//other.example.com/x"));
+        foreach (string path in new[] { "../admin", "../../admin", "users/../../admin", "https://other.example.com/x" })
+        {
+            var error = Assert.Throws<KScriptException>(() => Urls("https://api.example.com/v1", path));
+            Assert.Equal("Argument", error.Type);
+            Assert.Contains("must stay under the base URL https://api.example.com/v1/", error.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData("{ timeout: 99999999999999 }", "timeout and retry_delay can be at most 24 days")]
+    [InlineData("{ method: 'GE T' }", "method 'GE T' isn't an HTTP method")]
+    [InlineData("{ method: '' }", "method '' isn't an HTTP method")]
+    [InlineData("{ method: 'post', body: 'x', headers: { 'Content-Type': 'not a type' } }", "Content-Type 'not a type' isn't a content type")]
+    public void BadRequestOptionsAreRefusedInPlainWords(string options, string message)
+    {
+        var error = Fails($"<let name=\"r\" value=\"@api('{server.Url}/echo', {options})\" />");
+        Assert.Equal("Argument", error.Type);
+        Assert.Contains(message, error.Message);
+    }
+
+    [Fact]
+    public void AQueryStringWritesAListOncePerItem()
+    {
+        Assert.Equal("tag=a&tag=b%20c&page=2 true\n", Run("<let name=\"q\" value=\"@query_string({ tag: ['a', 'b c'], page: 2, none: [] })\" /><echo>{ $q } { @parse_query($q).tag == ['a', 'b c'] }</echo>"));
     }
 
     [Fact]

@@ -164,7 +164,7 @@ public class ProjectConfigTests
         var props = schema.RootElement.GetProperty("properties");
         string Keys(System.Text.Json.JsonElement e) => string.Join(",", e.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
 
-        Assert.Equal("$schema,agents,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test,types", Keys(props));
+        Assert.Equal("$schema,agents,app,config,extensions,format,http,libraries,library,lint,make,name,natives,packages,paths,queue,serve,standard,test,timezone,types", Keys(props));
         Assert.Equal("merge", Keys(props.GetProperty("agents").GetProperty("properties")));
         var agents = Parse("""{ "agents": { "merge": ["docs/team.md", "docs/checks.md"] } }""");
         Assert.Empty(agents.Warnings);
@@ -500,7 +500,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(File.Exists(Path.Combine(parent.Root, "api-only", "desktop.kscript")));
         string makefile = File.ReadAllText(Path.Combine(parent.Root, "api-only", "Makefile"));
         Assert.Contains("routes:\n\t$(KSCRIPT) routes", makefile);
-        Assert.Contains("app:\n\t$(KSCRIPT) app build", makefile);
+        Assert.Contains("app:\n\t$(KSCRIPT) compile", makefile);
         Assert.Contains("%:\n\t$(KSCRIPT) make $@ $(name) $(args)", makefile);
     }
 
@@ -540,10 +540,10 @@ public class MakeProjectTests : IDisposable
     public void AMistypedOptionIsPointedOut()
     {
         using var parent = new TempSite();
-        var (code, output, _) = Make(parent.Root, "site", "--no-dekstop");
-        Assert.Equal(0, code);
-        Assert.Contains("no 'dekstop' option", output);
-        Assert.True(File.Exists(Path.Combine(parent.Root, "site", "desktop.kscript")));
+        var (code, _, err) = Make(parent.Root, "site", "--no-dekstop");
+        Assert.Equal(2, code);
+        Assert.Contains("The web project template has no --dekstop option. Its options: --syntax, --desktop, --http, --port.", err);
+        Assert.False(Directory.Exists(Path.Combine(parent.Root, "site")));
     }
 
     [Fact]

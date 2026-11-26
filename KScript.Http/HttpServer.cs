@@ -12,14 +12,18 @@ namespace KScript.Http
     {
         /// <summary>
         /// Serves a site. <paramref name="before"/> may answer a request before the routes and pages do (it returns
-        /// null to let them); <paramref name="started"/> gets the address once the server is listening.
+        /// null to let them); <paramref name="started"/> gets the address once the server is listening. With
+        /// <paramref name="production"/> an error is answered with a plain 500 and its details go to the log only.
         /// </summary>
         public static Task<int> RunAsync(string siteFolder, ProjectConfig project, int port, string host, TextWriter log, CancellationToken stop = default,
-            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null, bool liveReload = false)
+            Func<Microsoft.AspNetCore.Http.HttpRequest, Task<PageResult>> before = null, Action<string> started = null, bool liveReload = false,
+            bool production = false)
         {
             var app = new HttpApp(siteFolder, project, log);
             app.LoadStartupConfig();
             PageSite site = app.PageSite;
+            // In production a visitor is not shown an error's message, file and line; the log has them.
+            site.HideErrorDetails = production;
             site.RenderPage = app.RenderFilePage;
             if (app.HasRoutes)
             {
@@ -139,17 +143,22 @@ namespace KScript.Http
                 KScript.Runtime.ErrorReport.Write(error, ex);
                 return ExitCodes.Usage;
             }
-            if (!json && !app.HasRoutes)
+            int NoRoutes()
             {
                 new KScript.Output.CliOutput(error).Error($"There are no route files in [{app.SiteRoot}]. Add routes.kscript (or api.kscript) with import KScript.Http and a Routes {{ }} block, or routes.ks.xml starting with <KScript.Routes>.");
                 return ExitCodes.Usage;
             }
+            if (!json && !app.HasRoutes) return NoRoutes();
             try
             {
                 if (json)
                 {
                     app.LoadStartupConfig();
-                    output.WriteLine(Values.ToJson(RouteCatalog.Entries(app, app.Table()), indented: true));
+                    var entries = RouteCatalog.Entries(app, app.Table());
+                    // JSON also lists file-based pages, so a site of pages alone has something to show. With no route
+                    // files and no pages it is the same mistake it is as text.
+                    if (!app.HasRoutes && entries.Count == 0) return NoRoutes();
+                    output.WriteLine(Values.ToJson(entries, indented: true));
                     return 0;
                 }
                 if (plain)

@@ -88,6 +88,16 @@ namespace KScript.Runtime
             set => fileRoot = value == null ? null : Path.GetFullPath(value);
         }
 
+        /// <summary>
+        /// True when scripts must not see this computer's environment variables (the docs' Run buttons and the MCP
+        /// server's run_code, which run code nobody has read): <c>$env</c> and <c>@env()</c> then hold only what the
+        /// script's own config sets.
+        /// </summary>
+        public bool HideEnvironment { get; set; }
+
+        /// <summary>An environment variable of this computer, or null when there is none or <see cref="HideEnvironment"/> is set.</summary>
+        public string EnvironmentVariable(string name) => HideEnvironment ? null : Environment.GetEnvironmentVariable(name);
+
         /// <summary>False when files may only be read, not written, moved or deleted (pages served by kscript serve).</summary>
         public bool CanWriteFiles { get; set; } = true;
 

@@ -37,6 +37,53 @@ public sealed class StyleTests : IDisposable
     }
 
     [Fact]
+    public void A_less_than_sign_inside_a_css_string_is_text()
+    {
+        const string svg = ".a { background: url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><path d='M0 0'/></svg>\"); }\n";
+        Assert.Equal(svg, Css(svg));
+        Assert.Equal(".b::before { content: \"<b>\"; }\n.c::after { content: '</if> \\' <let>'; }\n", Css(".b::before { content: \"<b>\"; }\n.c::after { content: '</if> \\' <let>'; }\n"));
+        // Tags still work around strings, after an apostrophe in a comment, and a string still takes values.
+        Assert.Equal("/* don't */\n.d::before { content: \"<i>4</i>\"; }\n.e { w: 4; }\n",
+            Css("<let name=\"n\" value=\"4\" />\n/* don't */\n<if test=\"$n == 4\">\n.d::before { content: \"<i>{$n}</i>\"; }\n</if>\n.e { w: {$n}; }\n"));
+    }
+
+    [Fact]
+    public void Own_breakpoints_change_and_add_to_the_defaults()
+    {
+        const string own = "<let name=\"breakpoints\" value=\"{ md: 800, wide: 1800 }\" />";
+        Assert.Equal("(min-width: 800px) (min-width: 1800px) (min-width: 1024px) (min-width: 640px)",
+            ScriptRunner.RunBody(own + "<echo>{ @up('md') } { @up('wide') } { @up('lg') } { @up('sm') }</echo>", "", "KScript.Style").TrimEnd());
+        Assert.Contains("There is no breakpoint 'huge'. Breakpoints: sm, md, lg, xl, xxl, wide", ScriptRunner.Fails(own + "<echo>{ @up('huge') }</echo>", "KScript.Style").Message);
+        Assert.Contains("@rem() needs a base above 0, not 0", ScriptRunner.Fails("<echo>{ @rem(24, 0) }</echo>", "KScript.Style").Message);
+    }
+
+    [Fact]
+    public void Two_stylesheets_are_never_written_to_one_file()
+    {
+        FileOf("a/site.ks.css", ".a { }");
+        FileOf("b/site.ks.css", ".b { }");
+        var output = new StringWriter();
+        var error = new StringWriter();
+        string cwd = Directory.GetCurrentDirectory();
+        Directory.SetCurrentDirectory(dir);
+        try
+        {
+            Assert.Equal(2, CssCommand.Run(new[] { "a", "b", "--out", "out" }, output, error));
+            Assert.Contains("would both be written to", error.ToString());
+            Assert.Contains(Path.Combine("a", "site.ks.css"), error.ToString());
+            Assert.Contains(Path.Combine("b", "site.ks.css"), error.ToString());
+            Assert.False(Directory.Exists(Path.Combine(dir, "out")));
+            // The same stylesheet named twice is one job, and separate folders are fine.
+            Assert.Equal(0, CssCommand.Run(new[] { "a", "a/site.ks.css", "--out", "out" }, output, error));
+            Assert.Equal(".a { }", File.ReadAllText(Path.Combine(dir, "out", "site.css")));
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(cwd);
+        }
+    }
+
+    [Fact]
     public void Themes_come_from_json_with_loops_and_helpers()
     {
         FileOf("theme.json", "{ \"colors\": { \"primary\": \"#3355ff\", \"text\": { \"muted\": \"#666\" } }, \"space\": { \"sm\": 4, \"lg\": 16 } }");

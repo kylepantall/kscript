@@ -121,7 +121,10 @@ namespace KScript.Runtime
         {
             using var stream = new MemoryStream();
             WriteJson(stream, value, indented);
-            return Encoding.UTF8.GetString(stream.ToArray());
+            string json = Encoding.UTF8.GetString(stream.ToArray());
+            // The writer ends lines the way the computer does. Line breaks inside strings are escaped, so every
+            // carriage return here is layout: the text is the same on every computer without them.
+            return indented ? json.Replace("\r\n", "\n") : json;
         }
 
         /// <summary>Writes KScript's JSON representation, optionally bounding the UTF-8 payload while building it.</summary>
@@ -147,7 +150,7 @@ namespace KScript.Runtime
                 case null: w.WriteNullValue(); break;
                 case bool b: w.WriteBooleanValue(b); break;
                 case double d when double.IsNaN(d) || double.IsInfinity(d): w.WriteNullValue(); break;
-                case double d when d == Math.Floor(d) && Math.Abs(d) < 1e15: w.WriteNumberValue((long)d); break;
+                case double d when d == Math.Floor(d) && Math.Abs(d) < ExactWhole: w.WriteNumberValue((long)d); break;
                 case double d: w.WriteNumberValue(d); break;
                 case string s: CheckSize(s.Length); w.WriteStringValue(s); break;
                 case DateTime dt: w.WriteStringValue(dt.ToString("o", CultureInfo.InvariantCulture)); break;
@@ -195,11 +198,36 @@ namespace KScript.Runtime
             var other => other.ToString(),
         };
 
+        /// <summary>Below this (2 to the power 53) every whole number is held exactly, so it is written digit for digit.</summary>
+        private const double ExactWhole = 9007199254740992d;
+
+        /// <summary>
+        /// A number as text: always plain digits, never an exponent. A fraction shows 15 significant digits, which
+        /// hides the noise of binary arithmetic (0.1 + 0.2 reads 0.3); a number of 1e15 and above shows the shortest
+        /// digits that read back as the same number, so a 16 digit id keeps every digit.
+        /// </summary>
         public static string FormatNumber(double d)
         {
             if (double.IsNaN(d) || double.IsInfinity(d)) return d.ToString(CultureInfo.InvariantCulture);
-            if (d == Math.Floor(d) && Math.Abs(d) < 1e15) return ((long)d).ToString(CultureInfo.InvariantCulture);
-            return d.ToString("0.###############", CultureInfo.InvariantCulture);
+            if (d == Math.Floor(d) && Math.Abs(d) < ExactWhole) return ((long)d).ToString(CultureInfo.InvariantCulture);
+            return Plain(d.ToString(Math.Abs(d) < 1e15 ? "G15" : "R", CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>Rewrites a number .NET wrote with an exponent (1.5E-07, 1E+20) as plain digits (0.00000015).</summary>
+        private static string Plain(string text)
+        {
+            int e = text.IndexOf('E');
+            if (e < 0) return text;
+            int exponent = int.Parse(text.AsSpan(e + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+            bool negative = text[0] == '-';
+            string mantissa = text.Substring(negative ? 1 : 0, e - (negative ? 1 : 0));
+            int dot = mantissa.IndexOf('.');
+            string digits = dot < 0 ? mantissa : mantissa.Remove(dot, 1);
+            int point = (dot < 0 ? mantissa.Length : dot) + exponent;
+            string plain = point <= 0 ? "0." + new string('0', -point) + digits
+                : point >= digits.Length ? digits + new string('0', point - digits.Length)
+                : digits.Insert(point, ".");
+            return negative ? "-" + plain : plain;
         }
 
         public static bool Truthy(object value) => Unwrap(value) switch
@@ -219,7 +247,8 @@ namespace KScript.Runtime
             switch (Unwrap(value))
             {
                 case double d: number = d; return true;
-                case string s when s.Trim().Length > 0 && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed):
+                // 'NaN' and 'Infinity' are words, not numbers.
+                case string s when s.Trim().Length > 0 && double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && double.IsFinite(parsed):
                     number = parsed; return true;
                 default: number = 0; return false;
             }
@@ -231,7 +260,32 @@ namespace KScript.Runtime
             throw new KScriptException($"{context} needs a number, but got {Describe(value)}.", "Type");
         }
 
-        public static int ToInt(object value, string context) => (int)Math.Truncate(ToNumber(value, context));
+        /// <summary>The whole-number part, kept within what an int holds (a position past either end of any list).</summary>
+        public static int ToInt(object value, string context)
+        {
+            double number = Math.Truncate(ToNumber(value, context));
+            return double.IsNaN(number) ? 0 : (int)Math.Clamp(number, int.MinValue, int.MaxValue);
+        }
+
+        /// <summary>Text as a date. A plain number such as '1.5' is not one.</summary>
+        public static bool TryDate(string text, out DateTime date)
+        {
+            date = default;
+            return !TryNumber(text, out _) && DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out date);
+        }
+
+        /// <summary>Moves a date, or says so when the result is outside the years a date can hold.</summary>
+        public static DateTime ShiftDate(Func<DateTime> shift)
+        {
+            try
+            {
+                return shift();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                throw new KScriptException("That is outside the dates KScript can hold (the years 1 to 9999).", "Argument");
+            }
+        }
 
         /// <summary>yes/no, true/false, on/off and 1/0, as written in attributes like <c>const="yes"</c>.</summary>
         public static bool? ParseBool(string text) => (text ?? string.Empty).Trim().ToLowerInvariant() switch
@@ -296,6 +350,8 @@ namespace KScript.Runtime
             if (a is List<object> || b is List<object> || a is Dictionary<string, object> || b is Dictionary<string, object> || a is ICallable || b is ICallable)
                 return StrictEquals(a, b);
             if ((a is double || b is double) && TryNumber(a, out double x) && TryNumber(b, out double y)) return x == y;
+            // Two dates are equal when they are the same moment: their text leaves the seconds out.
+            if (a is DateTime da && b is DateTime db) return da == db;
             if (a is string sa && b is string sb && TryNumber(sa, out double nx) && TryNumber(sb, out double ny)) return nx == ny;
             return string.Equals(ToStr(a), ToStr(b), StringComparison.Ordinal);
         }
@@ -311,6 +367,9 @@ namespace KScript.Runtime
             if (a is PasswordValue || b is PasswordValue) throw PasswordValue.CompareError();
             if (NativeTypeRegistry.TryCompare(a, b, op, out int native)) return native;
             if (TryNumber(a, out double x) && TryNumber(b, out double y)) return x.CompareTo(y);
+            // true < 3 is what 1 < 2 < 3 comes to: a mistake, not a comparison.
+            if (allowUnordered && ((a is bool && b is double) || (a is double && b is bool)))
+                throw new KScriptException($"Can't compare {Describe(a)} with {Describe(b)} using '{op}'.", "Type");
             if (allowUnordered && ((a is double && b is string) || (a is string && b is double))) return null;
             if (a is DateTime da && b is DateTime db) return da.CompareTo(db);
             if (a == null || b == null)
@@ -373,7 +432,7 @@ namespace KScript.Runtime
                     break;
                 case "date":
                     if (value is DateTime) return value;
-                    if (value is string ds && DateTime.TryParse(ds, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dt)) return dt;
+                    if (value is string ds && TryDate(ds, out var dt)) return dt;
                     break;
                 case "email":
                 case "password":

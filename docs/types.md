@@ -548,6 +548,8 @@ A `PasskeySessionKey` supports the methods of `string` and its own methods. Insi
 
 The target can also be a built-in type (`$text as int`), a type with local rules (`$name as string(min: 2)`), or a list (`$rows as Repo[]`). An optional target such as `PasskeySessionKey?` accepts null and validates every non-null value. Parenthesize an arithmetic expression to convert its result, as in `($a + $b) as int`.
 
+Converting one number with `as int`, a typed variable (`n: int = 3.9`) or an `int` parameter drops the fraction and gives `3`. Data checked against a type is stricter: an `int` field, an `int[]` item or a refinement of `int` reports a number that isn't whole (`needs a whole number, but got a number (12.9)`) instead of cutting it down. Text such as `'NaN'` or `'Infinity'` is not a number, and a plain number such as `'1.5'` is not a date.
+
 ### Your own native types
 
 `kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code:

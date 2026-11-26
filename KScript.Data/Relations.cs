@@ -264,7 +264,7 @@ namespace KScript.Data
         public Query For(CallContext call, Record owner)
         {
             object value = OwnerValue(owner);
-            return Base(call).And(Condition(value == null ? Array.Empty<object>() : new[] { value })).Of(this, owner);
+            return Base(call).And(Condition(value == null ? Array.Empty<object>() : new[] { value })).Pin().Of(this, owner);
         }
 
         /// <summary>The column a pivot table keeps this model's key in: stored like the key.</summary>

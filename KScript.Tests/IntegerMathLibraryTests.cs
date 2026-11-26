@@ -36,8 +36,6 @@ public sealed class IntegerMathLibraryTests
 
     [Theory]
     [InlineData("gcd(9007199254740992, 1)")]
-    [InlineData("gcd(12, 'NaN')")]
-    [InlineData("lcm('Infinity', 0)")]
     [InlineData("lcm(9007199254740991, 2)")]
     [InlineData("factorial(-1)")]
     [InlineData("factorial(171)")]
@@ -45,5 +43,15 @@ public sealed class IntegerMathLibraryTests
     {
         var error = Assert.Throws<KScriptException>(() => Calculate(Source, call, new PackageRegistry()));
         Assert.Equal("Argument", error.Type);
+    }
+
+    [Theory]
+    [InlineData("gcd(12, 'NaN')")]
+    [InlineData("lcm('Infinity', 0)")]
+    public void WordsAreNotNumbers(string call)
+    {
+        // 'NaN' and 'Infinity' are text, so they are refused where the argument is bound, like any other word.
+        var error = Assert.Throws<KScriptException>(() => Calculate(Source, call, new PackageRegistry()));
+        Assert.Equal("Type", error.Type);
     }
 }

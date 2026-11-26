@@ -143,8 +143,8 @@ namespace KScript.Http
                 else if (route.Pattern.IsOptional(name)) parameter["description"] = "Optional: the route also matches without it.";
                 else if (route.Pattern.IsCatchAll(name)) parameter["description"] = "The rest of the path, which may hold / characters.";
                 parameters.Add(parameter);
-                if (bound) responses["404"] = Response($"There is no {((RecordType)Shapes.ResolveNamed(p.Type, fn.Closure, fn.Module)).Name} with the {{{name}}} in the path.", error: true);
-                else if (p?.Type != null || route.Pattern.Rules.ContainsKey(name)) responses["404"] = Response($"No such resource: the {{{name}}} in the path doesn't fit.", error: true);
+                if (bound) responses["404"] = Response($"There is no {((RecordType)Shapes.ResolveNamed(p.Type, fn.Closure, fn.Module)).Name} with the {{{name}}} in the path.", error: true, route);
+                else if (p?.Type != null || route.Pattern.Rules.ContainsKey(name)) responses["404"] = Response($"No such resource: the {{{name}}} in the path doesn't fit.", error: true, route);
             }
 
             if (fn != null)
@@ -171,22 +171,22 @@ namespace KScript.Http
                             if (text != null) requestBody["description"] = text;
                             operation["requestBody"] = requestBody;
                             typedInput = true;
-                            if (p.Name is "json" or "body") responses["400"] = Response("The body isn't valid JSON.", error: true);
+                            if (p.Name is "json" or "body") responses["400"] = Response("The body isn't valid JSON.", error: true, route);
                             break;
                     }
                 }
             }
             if (parameters.Count > 0) operation["parameters"] = parameters;
-            if (typedInput) responses["422"] = ValidationResponse();
+            if (typedInput) responses["422"] = ValidationResponse(route);
 
             // Middleware: auth needs a bearer token, throttle can answer 429.
             auth = route.Middleware.Any(m => m.Function == null && m.Name == "auth");
             if (auth)
             {
                 operation["security"] = new List<object> { new Dictionary<string, object> { ["bearerAuth"] = new List<object>() } };
-                responses["401"] = Response("The bearer token is missing or wrong.", error: true);
+                responses["401"] = Response("The bearer token is missing or wrong.", error: true, route);
             }
-            if (route.Middleware.Any(m => m.Function == null && m.Name == "throttle")) responses["429"] = Response("Too many requests: wait for Retry-After seconds.", error: true);
+            if (route.Middleware.Any(m => m.Function == null && m.Name == "throttle")) responses["429"] = Response("Too many requests: wait for Retry-After seconds.", error: true, route);
             if (method == "GET" && (route.Middleware.Any(m => m.Function == null && m.Name == "etag") || UsesEtag(route, fn)))
                 responses["304"] = Response("Not modified: the client's copy (If-None-Match) is current.", error: false);
             if (route.Middleware.Count > 0) operation["x-middleware"] = route.Middleware.Select(m => (object)m.ToString()).ToList();
@@ -200,7 +200,7 @@ namespace KScript.Http
                     success = success == 200 ? status : success;
                     continue;
                 }
-                responses.TryAdd(status.ToString(CultureInfo.InvariantCulture), Response(Reason(status), error: status >= 400));
+                responses.TryAdd(status.ToString(CultureInfo.InvariantCulture), Response(Reason(status), error: status >= 400, route));
             }
 
             responses[success.ToString(CultureInfo.InvariantCulture)] = SuccessResponse(route, fn, doc, schemas, success);
@@ -295,6 +295,8 @@ namespace KScript.Http
             }
             bool html = !route.Api && schema == null && UsesView(route, fn);
             if (html) return Html(description ?? "An HTML page.");
+            // A page route with nothing said about its answer may send HTML, text or a redirect: no body is promised.
+            if (!route.Api && schema == null) return new Dictionary<string, object> { ["description"] = description ?? Reason(status) };
             return new Dictionary<string, object>
             {
                 ["description"] = description ?? Reason(status),
@@ -344,9 +346,11 @@ namespace KScript.Http
             ["content"] = new Dictionary<string, object> { ["text/html"] = new Dictionary<string, object> { ["schema"] = new Dictionary<string, object> { ["type"] = "string" } } },
         };
 
-        private static Dictionary<string, object> Response(string description, bool error)
+        private static Dictionary<string, object> Response(string description, bool error, Route route = null)
         {
             var response = new Dictionary<string, object> { ["description"] = description };
+            // Only API routes answer an error as JSON; a page route answers a small HTML page.
+            if (error && route?.Api == false) return Html(description);
             if (error)
             {
                 response["content"] = new Dictionary<string, object> { ["application/json"] = new Dictionary<string, object> { ["schema"] = new Dictionary<string, object> { ["$ref"] = Refs + "Error" } } };
@@ -354,9 +358,9 @@ namespace KScript.Http
             return response;
         }
 
-        private static Dictionary<string, object> ValidationResponse()
+        private static Dictionary<string, object> ValidationResponse(Route route)
         {
-            Dictionary<string, object> response = Response("The data doesn't fit the type: problems lists each field that is wrong.", error: true);
+            Dictionary<string, object> response = Response("The data doesn't fit the type: problems lists each field that is wrong.", error: true, route);
             return response;
         }
 

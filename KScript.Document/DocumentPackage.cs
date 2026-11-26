@@ -21,7 +21,7 @@ namespace KScript.Documents
 
         internal static readonly string[] Inside = { "Document", "fn" };
 
-        private static A Id => new A("id", K.Text, "A name for [#id] cross-references, such as id: intro.");
+        private static A Id => new A("id", K.Template, "A name for [#id] cross-references, such as id: \"intro\".");
 
         private static ElementInfo Info(string name, string description, ContentKind content, string example, params A[] attributes) =>
             new ElementInfo(name, description, content, attributes)
@@ -45,7 +45,7 @@ namespace KScript.Documents
                 new A("keywords", K.Template, "Keywords, as a list: `['cellular automata', 'Game of Life']` (in XML, `cellular automata, Game of Life`). They are shown under the abstract and saved in the file's properties.") { NameList = true },
                 new A("to", K.Template, "Where to save it, by extension: paper.pdf, paper.tex, paper.docx, paper.md or paper.html. Save several with a list: [paper.pdf, paper.docx].") { NameList = true },
                 new A("into", K.DeclareVariable, "A variable that receives the document, for ->save(), ->pages() or ->markdown() later."),
-                new A("paper", K.Template, "Paper size: a4 (the default), a3, a5, b5, letter, legal, or a size such as 15cm x 20cm."),
+                new A("paper", K.Template, "Paper size: a4 (the default), a3, a5, b5, letter, legal, or a size such as '15cm x 20cm'.", false, "a4", "a3", "a5", "b5", "letter", "legal"),
                 new A("landscape", K.Bool, "true turns the paper sideways."),
                 new A("margin", K.Template, "Margins: one size (2.5cm), or top/right/bottom/left like CSS ('2cm 2.5cm')."),
                 new A("font", K.Enum, "Body text: serif (Times), sans (Helvetica) or mono (Courier).", false, "serif", "sans", "mono"),
@@ -53,8 +53,8 @@ namespace KScript.Documents
                 new A("size", K.Template, "Body text size in points, such as 11."),
                 new A("line_height", K.Template, "Baseline to baseline as a multiple of the text size, such as 1.4."),
                 new A("align", K.Enum, "Body text: justify, left, center or right.", false, "justify", "left", "center", "right"),
-                new A("accent", K.Template, "The colour of headings and the title page: #rrggbb or a name such as navy."),
-                new A("numbered", K.Bool, "no leaves sections without numbers."),
+                new A("accent", K.Template, "The colour of headings and the title page: '#1f4e79' or a name such as 'navy'."),
+                new A("numbered", K.Bool, "false leaves sections without numbers."),
                 new A("title_page", K.Bool, "true puts the title, authors, date and abstract on a page of their own."),
                 new A("chapters", K.Bool, "true starts each top-level section on a new page."),
                 new A("citations", K.Enum, "numeric ([1]) or author-year ((Conway, 1970)).", false, "numeric", "author-year"),
@@ -71,25 +71,25 @@ namespace KScript.Documents
             }, DocumentElements.Document);
 
             p.Element(Info("Author", "An author, with an affiliation and email. Its text is the name.", ContentKind.Template,
-                "Author(affiliation: \"University of Cambridge\", email: \"ada@example.org\") \"Ada Lovelace\"",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Author affiliation=\"University of Cambridge\" email=\"ada@example.org\">Ada Lovelace</Author>\n</KScript.Document>",
                 new A("affiliation", K.Template, "Where they work or study."),
                 new A("email", K.Template, "Their email address.")), DocumentElements.Author);
             p.Element(Info("Abstract", "The summary under the title. A blank line starts a new paragraph.", ContentKind.Template,
-                "Abstract \"We measure how gliders move.\""), DocumentElements.Abstract);
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Abstract>We measure how gliders move.</Abstract>\n</KScript.Document>"), DocumentElements.Abstract);
             p.Element(Info("Section", "A section with a numbered heading. A Section inside a Section is a subsection.", ContentKind.Statements,
-                "Section(title: Methods, id: methods) {\n  Paragraph \"We ran each pattern for 1000 generations.\"\n}",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Section title=\"Methods\" id=\"methods\">\n    <Paragraph>We ran each pattern for 1000 generations.</Paragraph>\n  </Section>\n</KScript.Document>",
                 new A("title", K.Template, "The heading. It may hold **bold**, *italic* and \\( maths \\).", true), Id,
-                new A("numbered", K.Bool, "no leaves this section without a number."),
+                new A("numbered", K.Bool, "false leaves this section without a number."),
                 new A("new_page", K.Bool, "true starts it on a new page.")), DocumentElements.Section);
             p.Element(Info("Paragraph", "A paragraph. Its text may hold **bold**, *italic*, `code`, [links](https://...), \\( maths \\), [@key] citations, [#id] cross-references and ^[footnotes]. A blank line starts a new paragraph.", ContentKind.Template,
-                "Paragraph \"Gliders travel diagonally [@gardner1970], as Figure [#fig-glider] shows.^[Every four generations.]\"",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Paragraph>Gliders travel **diagonally**, one cell every \\( 4 \\) generations.^[Down and to the right.]</Paragraph>\n</KScript.Document>",
                 Id, new A("align", K.Enum, "left, center, right or justify (the document's setting is the default).", false, "left", "center", "right", "justify"),
                 new A("lines", K.Bool, "true keeps the line breaks in the text, as in an address or a poem.")), DocumentElements.Paragraph);
             p.Element(Info("Markdown", "Markdown, from its text or a file: # headings become sections, with paragraphs, lists, tables, code, quotes, images and maths (\\[ \\] in scripts, also $ $ and $$ $$ in files).", ContentKind.Template,
-                "Markdown(path: \"chapters/results.md\")",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Markdown path=\"chapters/results.md\" />\n</KScript.Document>",
                 new A("path", K.Path, "A Markdown file, relative to the script.")), DocumentElements.Markdown);
             p.Element(Info("List", "A bulleted or numbered list of Item elements. A List right after an Item is nested in it.", ContentKind.Statements,
-                "List(style: number) {\n  Item \"Measure\"\n  Item \"Compare\"\n}",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <List style=\"number\">\n    <Item>Measure</Item>\n    <Item>Compare</Item>\n  </List>\n</KScript.Document>",
                 new A("style", K.Enum, "bullet (the default), number, letter or roman.", false, "bullet", "number", "letter", "roman"),
                 new A("start", K.Expression, "The first number, such as 3.")), DocumentElements.List);
             p.Element(new ElementInfo("Item", "An item of a list. Its text works like a Paragraph's.", ContentKind.Template)
@@ -97,10 +97,10 @@ namespace KScript.Documents
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "List" },
                 LiteralText = TextLiterals.Maths,
-                Example = "Item \"Gliders move by **one cell** diagonally.\"",
+                Example = "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <List>\n    <Item>Gliders move by **one cell** diagonally.</Item>\n  </List>\n</KScript.Document>",
             }, DocumentElements.Item);
             p.Element(Info("Table", "A table: from rows:, or from Tr rows inside it. Tables with a caption are numbered. It takes the same rows, columns, align and header as the terminal's table.", ContentKind.Statements,
-                "Table(caption: \"Patterns\", rows: $patterns, columns: { Pattern: 'name', Period: 'period' }, align: ['left', 'right'])",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Table caption=\"Patterns\" rows=\"$patterns\" columns=\"{ Pattern: 'name', Period: 'period' }\" align=\"['left', 'right']\" />\n</KScript.Document>",
                 new A("caption", K.Template, "The caption, shown above the table as 'Table 1: ...'."), Id,
                 new A("rows", K.Expression, "The rows: a list of maps (each a row), or a list of lists (the first is the heading row)."),
                 new A("columns", K.Expression, "Which values of each map to show, in order: a list of keys ['name', 'age'], or a map from heading to key { Name: 'name' }. Defaults to the first row's keys."),
@@ -115,43 +115,43 @@ namespace KScript.Documents
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Table" },
                 LiteralText = TextLiterals.Maths,
-                Example = "Tr(header) \"Pattern | Period | Speed\"\nTr \"Glider | 4 | c/4\"",
+                Example = "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Table caption=\"Patterns\">\n    <Tr header=\"true\">Pattern | Period | Speed</Tr>\n    <Tr>Glider | 4 | c/4</Tr>\n  </Table>\n</KScript.Document>",
             }, DocumentElements.Row);
             p.Element(Info("Figure", "An image (PNG or JPEG) with a caption. Figures with a caption are numbered.", ContentKind.Empty,
-                "Figure(path: \"glider.png\", caption: \"A glider\", id: fig-glider, width: 0.5)",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Figure path=\"glider.png\" caption=\"A glider\" id=\"fig-glider\" width=\"0.5\" />\n</KScript.Document>",
                 new A("path", K.Path, "The image, relative to the script.", true),
                 new A("caption", K.Template, "The caption, shown below as 'Figure 1: ...'."), Id,
                 new A("width", K.Expression, "The share of the text width, from 0 to 1 (or '60%').")), DocumentElements.Figure);
             p.Element(new ElementInfo("Math", "A displayed equation in LaTeX, numbered unless numbered: false. Its text is used as written, so braces are LaTeX's. Inside matrix, cases and aligned, a new line ends a row.", ContentKind.Template,
-                Id, new A("numbered", K.Bool, "no leaves it without an equation number."))
+                Id, new A("numbered", K.Bool, "false leaves it without an equation number."))
             {
                 Context = ElementContext.Script,
                 MustBeInside = Inside,
                 InsideAnyAncestor = true,
                 LiteralText = TextLiterals.All,
-                Example = "Math(id: eq-growth) \"N(t) = N_0 e^{rt}\"",
+                Example = "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Math id=\"eq-growth\">N(t) = N_0 e^{rt}</Math>\n</KScript.Document>",
             }, DocumentElements.Math);
             p.Element(new ElementInfo("Code", "A block of source code in a monospaced font, used as written.", ContentKind.Template,
-                Id, new A("language", K.Text, "The language, such as python, for Markdown and HTML."))
+                Id, new A("language", K.Template, "The language, such as python, for Markdown and HTML."))
             {
                 Context = ElementContext.Script,
                 MustBeInside = Inside,
                 InsideAnyAncestor = true,
                 LiteralText = TextLiterals.All,
-                Example = "Code(language: kscript) \"echo 'Hello'\"",
+                Example = "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Code language=\"python\">print('Hello')</Code>\n</KScript.Document>",
             }, DocumentElements.Code);
             p.Element(Info("Quote", "A quotation, set in from both margins.", ContentKind.Template,
-                "Quote(by: \"John Conway\") \"I hate the Game of Life.\"",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Quote by=\"John Conway\">I hate the Game of Life.</Quote>\n</KScript.Document>",
                 new A("by", K.Template, "Who said it.")), DocumentElements.Quote);
-            p.Element(Info("Contents", "The table of contents, with page numbers in PDFs.", ContentKind.Empty, "Contents(depth: 2)",
+            p.Element(Info("Contents", "The table of contents, with page numbers in PDFs.", ContentKind.Empty, "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Contents depth=\"2\" />\n</KScript.Document>",
                 new A("title", K.Template, "The heading (default Contents)."),
                 new A("depth", K.Expression, "How many levels to list: 2 lists sections and subsections (default 3).")), DocumentElements.Contents);
             p.Element(Info("Bibliography", "The list of works cited with [@key]: from a BibTeX file, Source elements inside it, or both. Without one, the list goes at the end.", ContentKind.Statements,
-                "Bibliography(path: \"refs.bib\")",
+                "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Paragraph>Life is universal [@berlekamp1982].</Paragraph>\n  <Bibliography path=\"refs.bib\" />\n</KScript.Document>",
                 new A("path", K.Path, "A BibTeX (.bib) file, relative to the script."),
                 new A("title", K.Template, "The heading (default References).")), DocumentElements.Bibliography);
             p.Element(new ElementInfo("Source", "A work to cite, written out: id: is the key for [@key], and other attributes are BibTeX fields (author, title, year, journal, volume, pages, publisher, url, doi...).", ContentKind.Empty,
-                new A("id", K.Text, "The citation key, as in [@conway1970].", true),
+                new A("id", K.Template, "The citation key, as in [@conway1970].", true),
                 new A("type", K.Text, "article, book, inproceedings, misc..."),
                 new A("author", K.Template, "Authors, separated by ' and ' as in BibTeX."),
                 new A("title", K.Template, "The title."),
@@ -160,14 +160,15 @@ namespace KScript.Documents
                 Context = ElementContext.Script,
                 MustBeInside = new[] { "Bibliography" },
                 AllowsExtraAttributes = true,
-                Example = "Source(id: gardner1970, type: article, author: \"Martin Gardner\", title: \"The fantastic combinations of John Conway's new solitaire game life\", journal: \"Scientific American\", year: 1970, volume: 223, pages: \"120--123\")",
+                ExtraAttributesDo = "are more fields of the source, such as journal, volume, pages, url or doi",
+                Example = "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Paragraph>Life was first described in 1970 [@gardner1970].</Paragraph>\n  <Bibliography>\n    <Source id=\"gardner1970\" type=\"article\" author=\"Martin Gardner\" title=\"Mathematical Games\" journal=\"Scientific American\" year=\"1970\" volume=\"223\" pages=\"120--123\" />\n  </Bibliography>\n</KScript.Document>",
             }, DocumentElements.Source);
-            p.Element(Info("PageBreak", "Starts a new page.", ContentKind.Empty, "PageBreak()"), DocumentElements.PageBreak);
-            p.Element(Info("VSpace", "Vertical space.", ContentKind.Empty, "VSpace(height: 1cm)",
-                new A("height", K.Template, "How much: a length such as 12pt, 5mm or 1cm.", true)), DocumentElements.VSpace);
-            p.Element(Info("Rule", "A horizontal line across the text.", ContentKind.Empty, "Rule()"), DocumentElements.Rule);
+            p.Element(Info("PageBreak", "Starts a new page.", ContentKind.Empty, "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <PageBreak />\n</KScript.Document>"), DocumentElements.PageBreak);
+            p.Element(Info("VSpace", "Vertical space.", ContentKind.Empty, "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <VSpace height=\"1cm\" />\n</KScript.Document>",
+                new A("height", K.Template, "How much: a length such as '12pt', '5mm' or '1cm'.", true)), DocumentElements.VSpace);
+            p.Element(Info("Rule", "A horizontal line across the text.", ContentKind.Empty, "<KScript.Document title=\"Gliders\" to=\"gliders.pdf\">\n  <Rule />\n</KScript.Document>"), DocumentElements.Rule);
             p.Element(Info("Letter", "A letter: the sender's address and date on the right, the recipient, a subject line, a greeting, the body inside it, a closing and a signature.", ContentKind.Statements,
-                "Letter(from: \"1 High Street\\nCambridge\", to: \"Sam Smith\\n2 Low Road\\nLeeds\", subject: \"Your order\", opening: \"Dear Sam,\", closing: \"Best wishes,\", signature: \"Ada\") {\n  Paragraph \"Thank you for your order.\"\n}",
+                "<KScript.Document template=\"letter\" to=\"letter.pdf\">\n  <Letter from=\"1 High Street\\nCambridge\" to=\"Sam Smith\\n2 Low Road\\nLeeds\" subject=\"Your order\" opening=\"Dear Sam,\" closing=\"Best wishes,\" signature=\"Ada\">\n    <Paragraph>Thank you for your order.</Paragraph>\n  </Letter>\n</KScript.Document>",
                 new A("from", K.Template, "The sender's name and address, one line each."),
                 new A("to", K.Template, "The recipient's name and address, one line each."),
                 new A("date", K.Template, "The date (default: today, as 20 November 2026)."),
@@ -176,7 +177,7 @@ namespace KScript.Documents
                 new A("closing", K.Template, "The sign-off, such as 'Yours sincerely,'."),
                 new A("signature", K.Template, "The name under the sign-off, with a line for a title if needed.")), DocumentElements.Letter);
             p.Element(Info("Invoice", "An invoice: from and to addresses, the invoice number and dates, a table of items with subtotal, tax and total, and notes.", ContentKind.Empty,
-                "Invoice(number: \"INV-042\", from: \"Pantall Ltd\\n1 High Street\", to: \"Acme plc\\n2 Low Road\", currency: GBP, tax: 20, items: [{ description: 'Consulting', quantity: 3, price: 450 }])",
+                "<KScript.Document template=\"invoice\" to=\"invoice.pdf\">\n  <Invoice number=\"INV-042\" from=\"Life Lab Ltd\\n1 High Street\" to=\"Acme plc\\n2 Low Road\" currency=\"GBP\" tax=\"20\" items=\"[{ description: 'Consulting', quantity: 3, price: 450 }]\" />\n</KScript.Document>",
                 new A("items", K.Expression, "The lines: a list of maps with description, quantity (default 1) and price (or amount).", true),
                 new A("number", K.Template, "The invoice number."),
                 new A("from", K.Template, "Your name and address, one line each."),
@@ -207,12 +208,12 @@ namespace KScript.Documents
 
             p.Examples(
                 ("document->save", "@document('# Notes')->save('notes', as: pdf)"),
-                ("document->find", "echo @document('# Notes')->find('Notes')"),
-                ("document->replace", "echo @document('# Notes')->replace('Notes', 'Outline')->markdown()"),
-                ("document->insert", "echo @document('# Notes')->insert(' and ideas')->markdown()"),
+                ("document->find", "@document('# Notes')->find('Notes')"),
+                ("document->replace", "@document('# Notes')->replace('Notes', 'Outline')->markdown()"),
+                ("document->insert", "@document('# Notes')->insert(' and ideas')->markdown()"),
                 ("document->pages", "<echo>{ $doc->pages() } pages</echo>"),
                 ("document->markdown", "<echo>{ $doc->markdown() }</echo>"),
-                ("document->latex", "<do>@write_file('paper.tex', $doc->latex())</do>"),
+                ("document->latex", "<do>@write_text('paper.tex', $doc->latex())</do>"),
                 ("document->html", "<echo>{ $doc->html()->count() }</echo>"),
                 ("document->words", "<echo>{ $doc->words() } words</echo>"));
         }

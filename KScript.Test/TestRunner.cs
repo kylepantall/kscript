@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using KScript.Projects;
 using KScript.Runtime;
+using KScript.Syntax;
 
 namespace KScript.Testing
 {
@@ -240,7 +241,7 @@ namespace KScript.Testing
                 }
                 catch (KScriptException ex)
                 {
-                    result.Error = Describe(ex, settings, limit, settings.Cancellation, defaultTimeout, "the file's top-level code");
+                    result.Error = Describe(ex, settings, limit, settings.Cancellation, defaultTimeout, "the file's top-level code", !full.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
                     result.Output = TestPackage.Tidy(fileOutput.ToString());
                     return;
                 }
@@ -327,7 +328,7 @@ namespace KScript.Testing
                 }
                 catch (ExitSignal exit)
                 {
-                    message = $"The test called <exit> (code {exit.Code}). Use @run_script() to test a script that exits.";
+                    message = Wording.Of($"The test called <exit> (code {exit.Code}). Use @run_script() to test a script that exits.").For(test.Module.IsCode);
                 }
                 catch (ControlSignal signal)
                 {
@@ -341,7 +342,13 @@ namespace KScript.Testing
                     failure ??= ending;
                 }
 
-                if (failure != null) message = Describe(failure, settings, limit, settings.Cancellation, timeout, "the test");
+                if (failure != null) message = Describe(failure, settings, limit, settings.Cancellation, timeout, "the test", test.Module.IsCode);
+                // A test that ran out of time has failed, whatever its own code made of being stopped.
+                if (TimedOut(limit, settings.Cancellation) && (failure == null || failure.Type != "Cancelled"))
+                {
+                    failure = null;
+                    message = TimedOutMessage(timeout, "the test", test.Module.IsCode);
+                }
             }
             clock.Stop();
 
@@ -387,10 +394,15 @@ namespace KScript.Testing
             return cts;
         }
 
-        private static string Describe(KScriptException ex, TestRunSettings settings, CancellationTokenSource limit, CancellationToken outer, double timeout, string what)
+        private static bool TimedOut(CancellationTokenSource limit, CancellationToken outer) => limit.IsCancellationRequested && !outer.IsCancellationRequested;
+
+        private static string TimedOutMessage(double timeout, string what, bool code) =>
+            $"Timed out: {what} ran for more than {timeout:0.###} seconds. "
+            + (code ? "Set timeout: ... on the test" : "Set timeout=\"...\" on the <test>") + ", test.timeout in kscript.json, or --timeout.";
+
+        private static string Describe(KScriptException ex, TestRunSettings settings, CancellationTokenSource limit, CancellationToken outer, double timeout, string what, bool code)
         {
-            if (ex.Type == "Cancelled" && limit.IsCancellationRequested && !outer.IsCancellationRequested)
-                return $"Timed out: {what} ran for more than {timeout:0.###} seconds. Set timeout=\"...\" on the <test>, test.timeout in kscript.json, or --timeout.";
+            if (ex.Type == "Cancelled" && TimedOut(limit, outer)) return TimedOutMessage(timeout, what, code);
             if (ex.Type == TestPackage.AssertionType) return ex.Message;
             // A file that can't load has no test location to show, so its error carries its own.
             string where = what != "the test" && ex.Line > 0 ? $"{Display(ex.File, settings.BaseDirectory)}:{ex.Line}:{ex.Column}: " : string.Empty;

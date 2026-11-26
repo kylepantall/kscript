@@ -48,6 +48,7 @@ public class HttpCachingTests
           <Get path="/counted" middleware="cache_response:1m"><return value="'count ' + @counter()" /></Get>
           <Get path="/counted-default" middleware="cache_response, etag"><return value="'count ' + @counter()" /></Get>
           <Get path="/private" to="c.private" middleware="cache_response" />
+          <Get path="/sets-cookie" middleware="cache_response"><return value="@response('count ' + @counter())->with_header('Set-Cookie', 'seen=1')" /></Get>
           <Post path="/counted-post" middleware="cache_response"><return value="'count ' + @counter()" /></Post>
           <fn name="counter">
             <do>@write_text('count.txt', ((@exists('count.txt') ? @read_text('count.txt') : '0')->to_number() + 1)->to_string())</do>
@@ -142,6 +143,33 @@ public class HttpCachingTests
         PageResult value = Send(app, "GET", "/by-hand-value");
         Assert.Equal(HttpCaching.Tag("v1", weak: true), value.Headers["ETag"]);
         Assert.Equal("no-store", value.Headers["Cache-Control"]);
+    }
+
+    [Fact]
+    public void KeptAnswersAreNeverSharedWithOrTakenFromVisitorsWithCookies()
+    {
+        using var site = Site();
+        var app = new HttpApp(site.Root);
+        PageResult WithCookie(string path) => app.Handle(new Dictionary<string, object>
+        {
+            ["method"] = "GET", ["path"] = path, ["url"] = path,
+            ["headers"] = new Dictionary<string, object> { ["cookie"] = "who=ada" },
+            ["cookies"] = new Dictionary<string, object> { ["who"] = "ada" },
+        });
+
+        // A visitor with a cookie (a session, a login) always gets an answer made for them, and it isn't kept.
+        PageResult mine = WithCookie("/counted");
+        Assert.Equal(("count 1", "MISS"), (mine.Body, mine.Headers["X-Cache"]));
+        PageResult anonymous = Send(app, "GET", "/counted");
+        Assert.Equal(("count 2", "MISS"), (anonymous.Body, anonymous.Headers["X-Cache"]));
+        Assert.Equal("count 3", WithCookie("/counted").Body);
+        Assert.Equal(("count 2", "HIT"), (Send(app, "GET", "/counted").Body, Send(app, "GET", "/counted").Headers["X-Cache"]));
+
+        // An answer that sets a cookie is one visitor's: it is made again for the next.
+        PageResult first = Send(app, "GET", "/sets-cookie");
+        Assert.Equal(("count 4", "MISS"), (first.Body, first.Headers["X-Cache"]));
+        PageResult second = Send(app, "GET", "/sets-cookie");
+        Assert.Equal(("count 5", "MISS"), (second.Body, second.Headers["X-Cache"]));
     }
 
     [Fact]

@@ -334,7 +334,7 @@ The KS6xxx codes come in two kinds.
 
 ## KS6010
 
-**A name declared with `$`.** An error in a `.kscript` file, and a warning in XML. `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, and `fn(n) => $n * 2`, not `fn($n) => $n * 2`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
+**A name declared with `$`.** An error in a `.kscript` file, and a warning in XML. `$` reads a value; a name being declared or assigned is written bare. Write `total = 3` and `total += 1`, not `$total = 3`, `fn(n) => $n * 2`, not `fn($n) => $n * 2`, and `fn double(n) => $n * 2`, not `fn double($n)`. This holds in XML too (`<do>total += 1</do>`). `kscript check --fix` rewrites it.
 
 ## KS6011
 
@@ -360,7 +360,7 @@ Calling the name makes a value of every kind of type: `Repo($data)`, `Repo(name:
 
 ## KS6018
 
-**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name.
+**A length of time without its unit.** A length of time is a duration: a number and a unit, with no quotes. Write `timeout: 30s`, `ttl: 10m` and `wait(duration: 500ms)`, not `timeout: 30` or `ttl: '10m'`. The units are `ms`, `s`, `m`, `h`, `d` and `w`, and they can be joined: `1h30m`. A plain number still means seconds, so this is a warning and the fix adds `s`. `wait(500ms)` takes its one argument without the name. The check reads arguments written with their name: a time given without it (`wait(5)`) or as a key of a map (`options: { timeout: 30 }`) is not flagged, and is still seconds.
 
 ## KS6019
 

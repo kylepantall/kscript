@@ -62,6 +62,9 @@ namespace KScript.Pages
         public Func<string> RoutedLiveProof { get; set; }
         private string routeProof;
         internal string RouteProof => routeProof ??= RoutedLiveProof?.Invoke();
+
+        /// <summary>For a routed view, why its live blocks could not call back (in plain words), or null when they can.</summary>
+        public Func<string> LiveUnavailable { get; set; }
         internal string EntryFile { get; set; }
         internal List<string> LiveParents { get; } = new();
         internal List<object> LiveEffects { get; } = new();
@@ -1027,6 +1030,7 @@ namespace KScript.Pages
             string id = inferredId ?? (el.Attr("id") is string explicitId ? Interpolate(explicitId, scope, state, EscapeMode.None) : $"live-{++ctx.LiveCounter}");
             if (string.IsNullOrWhiteSpace(id) || ctx.LiveParents.Contains(id, StringComparer.Ordinal) || depth == 32)
                 throw new PageException("Live components need distinct, nonempty IDs and no more than 32 parents.");
+            if (ctx.LiveUnavailable?.Invoke() is string unavailable) throw new PageException(unavailable);
             string proof = ctx.RouteProof;
             bool fileComponent = proof == null && classFields?.Count > 0;
             string ownerProof = fileComponent ? "file-component\0" + ctx.SiteRoot + "\0" + ctx.EntryFile + "\0" +
@@ -1095,6 +1099,15 @@ namespace KScript.Pages
                     if (!stateNames.Contains(path[0]) || locked.Contains(path[0]) ||
                         !TryBinding(liveScope, path, out object old, out var owner)) continue;
                     bool typed = classFields?.Contains(path[0]) == true;
+                    // A form control sends text, a number, true/false, or a list of those (a multi-select, checkboxes).
+                    // Untyped state takes nothing else from the browser, so a posted map can't replace a value.
+                    static bool Plain(object v) => v is null or string or double or bool;
+                    if (!typed && !Plain(kv.Value) && !(kv.Value is List<object> items && items.All(Plain)))
+                        throw new PageResponseSignal(new PageResult
+                        {
+                            Status = 422, ContentType = "text/plain; charset=utf-8",
+                            Body = $"The value sent for {kv.Key} isn't one a form control sends: text, a number, true or false, or a list of those.",
+                        });
                     object next = !typed && kv.Value is string text && old is double && Values.TryNumber(text, out double number) ? number : kv.Value;
                     try
                     {

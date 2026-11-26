@@ -19,7 +19,7 @@ The formatter adjusts layout and separators while preserving what the file does.
 - Blocks are indented by nesting, and so are the lines inside a `( )`, `[ ]` or `{ }` that spans several lines. A statement continued on the next line (after `+`, `,` or `=`, or before `|>` or `->`) goes one level further in.
 - Each statement goes on its own line: a one-line block such as `for i in 1..3 { echo $i }` is opened up, and statements joined with `;` are split.
 - `else`, `elif`, `catch` and `finally` go on the line of the `}` before them: `} else {`.
-- Spacing inside a line: one space after commas and colons (`add(1, 2)`, `{ a: 1 }`), around `=` and `=>`, before a block's `{` and before a `//` comment at the end of a line.
+- Spacing inside a line: a space is added where one is missing after a comma or a colon (`add(1, 2)`, `{ a: 1 }`), around a statement's `=` and a `=>`, before a block's `{` and before a `//` comment at the end of a line. Spaces you wrote are kept, so `total   = 1` and a comment lined up with the ones around it stay as they are, and so does the inside of a parameter list or an expression (`b: int=2`, `$a+$b`).
 - A line that runs past `print_width` (80 columns unless you [set it](#settings)) is wrapped, as described in [Long lines](#long-lines).
 - Model options go one per line when the header is long or already split. A trailing comma also requests this layout for a short header. Each option gets a comma, including the last one, so adding an option changes one line.
 - Trailing spaces are removed, runs of blank lines shrink to `max_blank_lines` (and go entirely at the start and end of a block), and the file ends with exactly one newline.
@@ -65,7 +65,7 @@ Prettier and dart format do. Each step is tried in this order:
 
 A `//` or `///` comment that runs past `print_width` is broken between words, and the words that move down join the next
 comment line when it carries on the same paragraph. In a doc comment, the rest of a tag (`@param`) or a list item hangs
-under its text. `@example` code, ``` fences, tables, headings and words too long to fit (like links) are left alone.
+under its text. `@example` code, ``` fences, tables, headings and words too long to fit (like links) are left alone, and a line is never broken just before a word that would start something new on its own line: a tag such as `@deprecated`, a list item or a heading.
 
 ```kscript
 import KScript.IO
@@ -186,7 +186,7 @@ Each thing the formatter does is a rule you can turn off under `format.rules` (`
 | `trim_trailing_whitespace` | Removes spaces at the ends of lines of text. | They're kept. |
 | `collapse_blank_lines` | Shrinks runs of blank lines to `max_blank_lines`. | Blank lines are kept. |
 | `final_newline` | Ends the file with exactly one newline. | The file ends as it did. |
-| `spacing` | `.kscript` files: one space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
+| `spacing` | `.kscript` files: adds a missing space after commas and colons, around `=` and `=>`, and before a block's `{`. | Spacing inside lines is kept. |
 | `brace_style` | `.kscript` files: `} else {`, `} catch {` on one line. | `else` and `catch` stay on the line they're on. |
 | `wrap_chains` | `.kscript` files: puts each call of a `->` chain or `\|>` pipe that runs past `print_width` on its own line. | Chains stay on one line. |
 | `wrap_bodies` | `.kscript` files: moves a long one-line function's body (and a long lambda's, when it is a call's only argument) to the line after its `=>`. | Bodies stay on the `=>` line. |

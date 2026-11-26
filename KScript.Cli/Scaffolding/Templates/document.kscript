@@ -1,11 +1,12 @@
 --- make
 description: A document script in documents/ that writes a PDF and a Word file (KScript.Document)
 category: Documents
-usage: <name> [--template paper|report|plain] [--syntax kscript|xml]
---template: The look: paper, report or plain (default paper)
+usage: <name> [--template paper|report|plain|letter|invoice] [--syntax kscript|xml]
+--template: The look: paper, report, plain, letter or invoice (default paper)
 --syntax: kscript or xml (default the project's make.syntax)
 example: kscript make document annual-report --template report
 example: kscript make document papers/gliders
+checks: template=paper|report|plain|letter|invoice
 to: {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Build it: kscript {{ paths.documents }}/{{ dir }}{{ kebab }}{{ ext }} (writes {{ kebab }}.pdf and {{ kebab }}.docx next to it). See the Documents guide for tables, figures and citations.
 ---

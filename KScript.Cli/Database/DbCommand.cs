@@ -90,6 +90,15 @@ namespace KScript.Databases
                     case "fresh":
                     {
                         if (production && a.Flag("force") != true) return Fail(err, "db fresh drops every table, so it doesn't run on the production database. Add --force if you really mean it.");
+                        if (a.Flag("pretend") == true)
+                        {
+                            // Nothing is dropped or run: the tables that would go, then the SQL every migration would run.
+                            List<string> doomed = migrator.DropAll(pretend: true);
+                            cli.NewLine();
+                            cli.Info(doomed.Count == 0 ? "The database has no tables to drop." : $"Would drop {Count(doomed.Count, "table")}: {string.Join(", ", doomed)}.");
+                            Migrate(migrator, a, cli, fromEmpty: true);
+                            return 0;
+                        }
                         List<string> dropped = migrator.DropAll();
                         cli.NewLine();
                         cli.Info(dropped.Count == 0 ? "The database had no tables." : $"Dropped {Count(dropped.Count, "table")}.");
@@ -195,7 +204,7 @@ namespace KScript.Databases
 
         #region migrate and rollback
 
-        private static void Migrate(Migrator migrator, CliArgs a, CliOutput cli)
+        private static void Migrate(Migrator migrator, CliArgs a, CliOutput cli, bool fromEmpty = false)
         {
             bool pretend = a.Flag("pretend") == true;
             cli.NewLine();
@@ -208,7 +217,7 @@ namespace KScript.Databases
             };
             migrator.Done = (file, time) => cli.TaskLine(file.Name, true, time);
             if (!pretend) cli.Info("Running migrations.");
-            List<MigrationFile> ran = migrator.Migrate(pretend);
+            List<MigrationFile> ran = migrator.Migrate(pretend, fromEmpty);
             if (ran.Count == 0) cli.Info("Nothing to migrate: every migration has run.");
             else if (pretend) cli.NewLine();
         }

@@ -34,7 +34,7 @@ desktop:
 	$(KSCRIPT) desktop{{ ext }}
 
 app:
-	$(KSCRIPT) app build
+	$(KSCRIPT) compile
 {{/if}}
 
 compile:

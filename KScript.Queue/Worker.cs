@@ -282,6 +282,11 @@ namespace KScript.Queueing
             {
                 return Failed(ex, clock);
             }
+            catch (Exception ex) when (ex is not JobReleaseSignal and not JobFailSignal)
+            {
+                // The job's file stopped some other way (exit at the top, or an error inside kscript): the job fails, the worker carries on.
+                return Failed(Stopped(job, ex), clock);
+            }
 
             KScriptException error;
             try
@@ -307,6 +312,17 @@ namespace KScript.Queueing
             {
                 error = ex;
             }
+            catch (ExitSignal exit) when (exit.Code == 0)
+            {
+                // exit (with no error code) in a handle ends the job, as it would end a script.
+                interpreter.Host.FlushLogs();
+                return new AttemptResult { Outcome = JobOutcome.Done, Elapsed = clock.Elapsed };
+            }
+            catch (Exception ex)
+            {
+                // exit with an error code, a stray break or return, or an error inside kscript: the attempt fails, the worker carries on.
+                error = Stopped(job, ex);
+            }
             interpreter.Host.FlushLogs();
 
             if (ShouldRetry(job, error, QueueRuntime.Clock()))
@@ -324,13 +340,21 @@ namespace KScript.Queueing
             {
                 type.RunFailed(interpreter, value, jobContext, failed);
             }
-            catch (Exception ex) when (ex is KScriptException or ControlSignal)
+            catch (Exception ex)
             {
                 KScript.Runtime.ErrorReport.Write(interpreter.Host.Error, $"{type.Name}'s fn failed() stopped with an error.", ex);
             }
             interpreter.Host.FlushLogs();
             return new AttemptResult { Outcome = JobOutcome.Failed, Error = error, Elapsed = clock.Elapsed };
         }
+
+        /// <summary>An attempt that ended with something other than a script error, as the error the job fails (or retries) with.</summary>
+        private static KScriptException Stopped(QueuedJob job, Exception ex) => ex switch
+        {
+            ExitSignal exit => new KScriptException($"{job.Job} stopped with exit code {exit.Code}.", "Cancelled"),
+            ControlSignal signal => new KScriptException(signal.Message, "Context"),
+            _ => new KScriptException($"{job.Job} stopped with an error inside kscript: {ex.Message}", "Internal", ex),
+        };
 
         private static AttemptResult Failed(KScriptException error, Stopwatch clock) =>
             new AttemptResult { Outcome = JobOutcome.Failed, Error = error, Elapsed = clock.Elapsed };

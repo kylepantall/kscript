@@ -6,6 +6,7 @@ usage: <Name> [--fields "name: string, stars: int from stargazers_count"] [--sam
 --sample: Take the fields from a saved example of the data instead
 example: kscript make type Repo --fields "name: string, stars: int from stargazers_count, topics: string[] = []"
 example: kscript make type Order --sample data/order.json
+checks: fields=fields; sample=file
 to: {{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.types }}/{{ dir }}{{ kebab }}{{ ext }}", then map data with @read_json(path, as: {{ pascal }}) or {{ pascal }}($data)
 ---

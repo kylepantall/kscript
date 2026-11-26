@@ -87,14 +87,15 @@ namespace KScript.Data
                     return word.Name;
                 case bool b:
                     return dialect.Bool(b);
-                case double d when column?.Kind == ColumnKind.Integer || (column == null && d == Math.Floor(d) && Math.Abs(d) < 9e15):
+                // A number that isn't whole stays as it is, so a column of whole numbers compares with 2.5, not with 2.
+                case double d when d == Math.Floor(d) && (column?.Kind == ColumnKind.Integer || (column == null && Math.Abs(d) < 9e15)):
                     return (long)d;
                 case double d:
                     return d;
                 case string s when column?.Kind == ColumnKind.Integer && long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out long n):
                     return n;
                 case DateTime dt:
-                    return dialect.Date(dt);
+                    return dialect.Date(StoredDates.ToStored(dt));
                 case PasswordValue password:
                     return password.Hash(password.Algorithm);
                 case PasswordHash hash:
@@ -174,7 +175,7 @@ namespace KScript.Data
                 case ColumnKind.Bool:
                     return raw is bool b ? b : Convert.ToInt64(raw, CultureInfo.InvariantCulture) != 0;
                 case ColumnKind.Date:
-                    return raw is DateTime dt ? dt : DateTime.Parse(Values.ToStr(Plain(raw)), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal);
+                    return StoredDates.FromStored(raw is DateTime dt ? dt : DateTime.Parse(Values.ToStr(Plain(raw)), CultureInfo.InvariantCulture, DateTimeStyles.None));
                 case ColumnKind.Email:
                 case ColumnKind.Handle:
                 case ColumnKind.Uuid:

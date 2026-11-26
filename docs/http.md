@@ -79,7 +79,7 @@ A controller is a plain `fn`. Its parameters are filled in by name:
 - `input`: the query, form and JSON fields together.
 - `query`, `form`, `headers`, `cookies`.
 
-A typed parameter is converted, so `id: int` gives a number. A `type` maps the request data into a record, so the controller only sees data of the right shape:
+A typed parameter is converted, so `id: int` gives a number. Numbers a request sends are not rounded to fit: `1.9` for an `int` (or a number too large to hold) answers `422`, or `404` in the path, while `2` and `2.0` are both 2. A `type` maps the request data into a record, so the controller only sees data of the right shape:
 
 ```kscript
 type NewPerson {
@@ -176,6 +176,10 @@ fn show(id: int) {
 ```
 
 `Validation` (422), `BadRequest` (400), `Unauthorized` (401), `Forbidden` (403), `NotFound` (404), `Conflict` (409) and `TooManyRequests` (429, with `Retry-After` when the error has a `retry_after` field) are built in, so `throw Forbidden "Admins only"` works without a declaration, and an error type that extends one answers with its status. Give an error type its own status with `error PaymentFailed(status: 402)`. Unlike `@abort()`, these are ordinary errors: a `try` in the controller can still catch them. Errors without a status still answer `500`.
+
+While you work on a site a `500` shows the error's message, file and line (as JSON on API routes). In the production environment (`kscript serve --env production`, or `KSCRIPT_ENV=production`) the answer is only `Something went wrong on our side. Please try again later.`, and the details go to the server's log. Errors with a status of their own, and `@abort()`, say the same in both.
+
+A request whose body can't be read answers `413` when it is over a size or field limit and `400` when it is cut short or isn't what its `Content-Type` says, as JSON on API paths.
 
 Controllers and actions in views rendered with `@view()` can read and write files within the site folder. Set `"write_files": false` to make both read-only. Anything a controller prints with `echo` goes to the server log.
 
@@ -279,7 +283,7 @@ kscript {
 
 **Cache-Control.** `cache` on a route (or the `cache_control` middleware) sets `Cache-Control` on successful `GET` answers and on `304`s. A number alone is a public max-age in seconds, so `cache: 300` gives `public, max-age=300`. Otherwise list the directives: `public`, `private`, `no-cache`, `no-store`, `no-transform`, `must-revalidate`, `proxy-revalidate`, `must-understand`, `immutable`, `max-age=`, `s-maxage=`, `stale-while-revalidate=` and `stale-if-error=`. A directive the browser wouldn't understand is an error when the route file loads. A header set by the controller (`->with_cache('no-store')`) wins.
 
-**Answers kept on the server.** `cache_response:5m` keeps whole `200` answers to `GET` in KScript.Cache's memory store for that long, by URL, and answers again from memory without running the controller. Answers carry `X-Cache: HIT` or `MISS`. Requests with an `Authorization` header, and answers marked `private` or `no-store`, are never kept, so one person's answer is never given to another.
+**Answers kept on the server.** `cache_response:5m` keeps whole `200` answers to `GET` in KScript.Cache's memory store for that long, by URL, and answers again from memory without running the controller. Answers carry `X-Cache: HIT` or `MISS`. So that one person's answer is never given to another, a request with an `Authorization` header or any cookie (a session, a login) always runs the controller and is never kept, and neither is an answer that sets a cookie, starts a session (a form's CSRF token does) or is marked `private` or `no-store`. That makes `cache_response` right for public pages and API answers read without cookies; a signed-in visitor's page is always made fresh.
 
 Put `etag` in `http.middleware` (or in a group) to tag every route at once:
 
@@ -313,6 +317,7 @@ Group(middleware: auth) {
 `$request` (or a controller's `request` parameter) is a map with these keys:
 
 - `method` (upper case), `path`, `url` (path and query), `query`, `form`, `json`, `input`, `body` (the raw text).
+- A value in `query` or `form` is text. A name sent more than once (`?tag=a&tag=b`) is a list of texts, so no value is lost. A typed field says which you want: `tags: string[]` takes the name sent once or many times and is always a list, while `tag: string` answers `422` when it is sent twice.
 - `headers`, with lower-case names, and `cookies`.
 - `params` (the path parameters), `ip` and `route` (the route's name).
 
@@ -322,6 +327,7 @@ Group(middleware: auth) {
 
 `kscript serve` sends `Server: kscript` on HTTP responses. To set your own value for a route, use `->with_header('Server', 'my-app')`.
 
+- `@response($answer)` given a response returns it as it is, with its status; `@response($answer, status: 410)` changes the status.
 - Read it with `.status`, `.body`, `.type`, `.headers`, `->header(name)`, `.is_ok` and `->json()`.
 - Change it with `->with_status(code)`, `->with_header(name, value)`, `->with_type(type)`, `->with_etag(value)` and `->with_cache(directives)`. Each returns the response, so the calls chain.
 
@@ -381,12 +387,12 @@ The document is OpenAPI 3.1. Each part comes from the code:
 | path parameters | the controller's typed parameter (`id: int` is an integer), else the `where` rule (`int`, `number`, `uuid`, or a `pattern` for `slug`, `alpha` and regular expressions). |
 | query parameters | `query: Search`: each field of the type is a query parameter, required unless it is optional. |
 | request body | `json: NewPerson` or `body: NewPerson` as `application/json`, `form: T` as a form, `input: T` as either. |
-| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. |
-| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. Errors share the `Error` schema. |
+| success answer | `/// @returns Person[]` (a type, then any words) for the schema. The status is 200, or the 2xx a `@response(..., status: 201)` gives. Views are `text/html`. Without `@returns`, an API route's answer is JSON of any shape and a page route's has no declared body. |
+| error answers | `@abort(404)` and `status: 409` in the controller. 422 for typed input that doesn't fit (the body lists the `problems`), 400 for a JSON body that isn't JSON, 404 for a path parameter with a type or rule, 401 for `auth`, 429 for `throttle`, 304 for `etag`. API routes' errors share the `Error` schema; a page route's errors are `text/html`. |
 | summary, description | the controller's `///` doc comment (the first line is the summary, the rest the description), or one on the route itself. `@param id ...` describes a parameter. |
 | deprecated | `@deprecated` in the doc comment. |
 | security | the `auth` middleware, as a bearer token scheme. Every middleware is also listed under `x-middleware`. |
-| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. |
+| schemas | each `type` and `enum` the routes use, with field descriptions and required fields, in `components.schemas`. Fields a type doesn't name are left out of the record without an error, so a schema only says `additionalProperties: false` for `type T(extra: error)` (which answers `422`), and `true` for `extra: keep`. |
 | tags | the controller's import name (`people` for `people.show`). |
 | info | `http.openapi.title` and `version`, else the project's `name` and `app.version`. |
 

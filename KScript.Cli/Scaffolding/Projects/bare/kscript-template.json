@@ -42,7 +42,7 @@
     "{{#if web}}kscript serve           serve the site at http://localhost:{{ port }}{{/if}}",
     "{{#if api}}{{#unless web}}kscript serve           serve the API at http://localhost:{{ port }}/api/hello{{/unless}}{{/if}}",
     "{{#if api}}kscript routes          list the routes in routes/api{{ ext }}{{/if}}",
-    "{{#if desktop}}kscript desktop{{ ext }}{{#if xml}} {{/if}} open the desktop app; kscript app build packages it{{/if}}",
+    "{{#if desktop}}kscript desktop{{ ext }}  open the desktop app; kscript compile builds it as a program{{/if}}",
     "{{#if docker}}docker compose up --build    build and serve the site in a container{{/if}}",
     "kscript test            run the tests in tests/",
     "kscript check           check every {{#if web}}page and {{/if}}script",

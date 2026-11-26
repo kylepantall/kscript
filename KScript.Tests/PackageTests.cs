@@ -192,6 +192,28 @@ public class PackageTests
     }
 
     [Fact]
+    public void MathRefusesNumbersItCannotHoldExactly()
+    {
+        Assert.Equal("NaN 6 12 0", Eval("[@sign(@sqrt(-1)), @gcd(12, 18), @lcm(4, 6), @lcm(0, 5)]->join(' ')", "KScript.Math"));
+        Assert.Contains("@gcd() works with whole numbers up to 9007199254740992", Fails("<echo>{ @gcd(-9223372036854775808, 1) }</echo>", "KScript.Math").Message);
+        Assert.Contains("@random() works with whole numbers up to 9007199254740992", Fails("<echo>{ @random(1, 9223372036854775807) }</echo>", "KScript.Math").Message);
+        KScriptException large = Fails("<echo>{ @lcm(4000000000, 3000000007) }</echo>", "KScript.Math");
+        Assert.Equal("Math", large.Type);
+        Assert.Contains("too large to hold exactly", large.Message);
+    }
+
+    [Fact]
+    public void ASeedBelongsToItsOwnRun()
+    {
+        // One run's seed leaves the next run's numbers alone: eight rolls of a million never repeat by chance.
+        const string rolls = "<echo>{ [1, 2, 3, 4, 5, 6, 7, 8]->map(fn(i) => @random(1, 1000000))->join(' ') }</echo>";
+        string seeded = RunBody("<do>@random_seed(7)</do>" + rolls, "", "KScript.Math");
+        Assert.Equal(seeded, RunBody("<do>@random_seed(7)</do>" + rolls, "", "KScript.Math"));
+        Assert.NotEqual(seeded, RunBody(rolls, "", "KScript.Math"));
+        Assert.Equal("3", Eval("@shuffle([1, 2, 3])->count()", "KScript.Math"));
+    }
+
+    [Fact]
     public void RandomIsRepeatableWithASeed()
     {
         string a = RunBody("<do>@random_seed(7)</do><echo>{ @random(low: 1, high: 100) } { @random(low: 1, high: 100) }</echo>", "", "KScript.Math");
@@ -271,6 +293,19 @@ public class PackageTests
     {
         Assert.Equal("Hi|<h1 id=\"hi\">Hi</h1>", Eval("@markdown('# Hi').title + '|' + @markdown('# Hi').html->trim()", "KScript.Markdown"));
         Assert.Equal("<p><em>x</em></p>", Eval("'*x*'->markdown()->trim()", "KScript.Markdown"));
+    }
+
+    [Fact]
+    public void FrontMatterEndsAtALineOfThreeDashes()
+    {
+        // An empty block, with nothing between its two lines.
+        Assert.Equal("0|body", Eval("@markdown('---' + @char_of(10) + '---' + @char_of(10) + 'body').meta->count() + '|' + @markdown('---' + @char_of(10) + '---' + @char_of(10) + 'body').text", "KScript.Markdown"));
+        Assert.Equal("0|", Eval("@markdown('---' + @char_of(10) + '---').meta->count() + '|' + @markdown('---' + @char_of(10) + '---').text", "KScript.Markdown"));
+        // Only a line that is exactly --- ends the block: not a value with dashes in it, and not ----.
+        var (meta, body) = KScript.Markdown.MarkdownText.SplitFrontMatter("---\ntitle: A\nnote: --- x\n---\nbody\n---\nmore");
+        Assert.Equal("A", meta["title"]);
+        Assert.Equal("body\n---\nmore", body);
+        Assert.Equal("---\ntitle: A\n----\nbody", KScript.Markdown.MarkdownText.SplitFrontMatter("---\ntitle: A\n----\nbody").Body);
     }
 
     [Fact]
