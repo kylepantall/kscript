@@ -486,7 +486,7 @@ Emit an event from an action with `@emit_event('notes-changed', data: $note.id, 
 
 ### Drag, drop and sorting
 
-For a drop target, put `draggable="true" drag-value="{$item.id}"` on the source and `on-drop` on the destination. The action reads `$event.drag_value`, and `$event.x` and `$event.y` give the drop point inside the destination. `@drop-class('over')` on the destination adds the class while something it takes is dragged over it.
+To drag one element onto another, put `@drag(copy: true, value: $item.id)` on the source and `on-drop` on the destination (see the next section). The action reads `$event.drag_value`, and `$event.x` and `$event.y` give the drop point inside the destination. `@drop-class('over')` on the destination adds the class while something it takes is dragged over it.
 
 ### Move an element with @drag
 

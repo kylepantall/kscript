@@ -62,7 +62,6 @@ namespace KScript.Pages
             yield return new(Syntax.Markup.DragDirective.Attribute, AttributeKind.Expression, "Move this element with the pointer, and run its on-dragend handler where it lands: @drag(front: true). With copy: true, drag a ghost onto an on-drop target.");
             yield return new("drop-files", AttributeKind.Text, "Send files dropped on this element through the named live-upload input inside it: @drop-files('upload').");
             yield return new("drop-class", AttributeKind.Text, "Add classes while something this element accepts is dragged over it: @drop-class('file-over').");
-            yield return new("drag-value", AttributeKind.Template, "Send this draggable element's value to the drop handler.");
             yield return new("every", AttributeKind.Template, "Set the on-tick interval, for example 1s.");
             yield return new("event-name", AttributeKind.Text, "Filter on-event by the emitted event name.");
             yield return new(Syntax.Markup.ClassDirective.Attribute, AttributeKind.Expression, "Switch classes on by conditions: @class(done: $todo.done) or @class({ $todo.done: ['done', 'struck'] }).");
