@@ -67,6 +67,28 @@ public class BrowserDirectiveTests
         Assert.Contains("only works in a live component or a <live> block", System.Net.WebUtility.HtmlDecode(ex.Message));
     }
 
+    [Fact]
+    public void Drop_targets_name_their_upload_input_and_hover_class()
+    {
+        string html = Render("""
+            <article @drop-files('upload') @drop-class('file-over')>
+              <input type="file" name="upload" live-upload @on-change(title = 'x')>
+            </article>
+            <div drop-class="over ready" @on-dblclick(title = 'y')></div>
+            """);
+        Assert.Contains("<article data-ks-drop-files=\"upload\" data-ks-drop-class=\"file-over\">", html);
+        Assert.Contains("data-ks-drop-class=\"over ready\" data-ks-on-dblclick=", html);
+    }
+
+    [Theory]
+    [InlineData("<p @drop-class('not.a class')>x</p>", "@drop-class: not.a isn't a class name.")]
+    [InlineData("<p @drop-files('')>x</p>", "@drop-files needs the name of a live-upload input")]
+    public void A_drop_target_mistake_says_what_to_write(string tag, string message)
+    {
+        var ex = Assert.ThrowsAny<Exception>(() => Render(tag));
+        Assert.Contains(message, System.Net.WebUtility.HtmlDecode(ex.Message));
+    }
+
     [Theory]
     [InlineData("$delete", true)]
     [InlineData("call: $delete", true)]
