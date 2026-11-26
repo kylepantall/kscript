@@ -92,7 +92,8 @@ public class ComponentDocumentTests
             type Line extends Component {
               construct({ text: string })
 
-              fn render() => ```md
+              // A block may name the place too, beside a render for another one.
+              fn render(document) => ```md
                 {$text}
                 ```
             }

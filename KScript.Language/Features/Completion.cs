@@ -1121,7 +1121,8 @@ namespace KScript.Language.Features
             // an override replaces the built-in method of the same name.
             var extensions = analysis.ExtensionMethodsFor(receiver);
             List<Symbol> added = (receiver.RefinementBase != null ? receiver.Methods.Values.Concat(extensions) : extensions.Concat(receiver.Methods.Values))
-                .GroupBy(m => m.Name, StringComparer.Ordinal).Select(g => g.First()).ToList();
+                .GroupBy(m => m.Name, StringComparer.Ordinal).Select(g => g.First())
+                .Where(m => InsideType(analysis, Analyzer.PrivateOwner(receiver, m.Name, method: true), replace.Start)).ToList();
             var names = new HashSet<string>(added.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
             List<CompletionItem> items = added.Select(m => new CompletionItem
             {
@@ -1137,6 +1138,14 @@ namespace KScript.Language.Features
             items.AddRange(BuiltInMethodItems(analysis, receiver, replace, existingArguments).Where(i => !names.Contains(i.Label)));
             return items;
         }
+
+        /// <summary>
+        /// True when a private member of <paramref name="owner"/> can be used at <paramref name="offset"/>: the
+        /// offset is inside that type's block. Always true for a member that isn't private (no owner).
+        /// </summary>
+        private static bool InsideType(DocumentAnalysis analysis, string owner, int offset) =>
+            owner == null || analysis.Markup.DescendantElements().Any(e => e.Name is "type" or "model"
+                && e.GetAttributeValue("name")?.Trim() == owner && e.Span.Start <= offset && offset <= e.Span.End);
 
         private List<CompletionItem> BuiltInMethodItems(DocumentAnalysis analysis, TypeShape receiver, TextSpan replace, bool existingArguments) =>
             BuiltInMethods(receiver).Where(m => !NeedsImport(analysis, m.Package))
@@ -1190,13 +1199,13 @@ namespace KScript.Language.Features
             {
                 return MethodItems(analysis, receiver, replace);
             }
-            return FieldItems(receiver, replace);
+            return FieldItems(analysis, receiver, replace);
         }
 
         /// <summary>The fields of a value: a map's keys or a record's fields, and the ones its type has (<c>$response.status</c>).</summary>
-        private List<CompletionItem> FieldItems(TypeShape shape, TextSpan replace)
+        private List<CompletionItem> FieldItems(DocumentAnalysis analysis, TypeShape shape, TextSpan replace)
         {
-            List<CompletionItem> items = shape.Fields.Values.Select(f => new CompletionItem
+            List<CompletionItem> items = shape.Fields.Values.Where(f => InsideType(analysis, f.PrivateTo, replace.Start)).Select(f => new CompletionItem
             {
                 Label = f.Name,
                 Kind = CompletionKind.Field,
@@ -1548,7 +1557,7 @@ namespace KScript.Language.Features
                 return new List<CompletionItem>();
             }
 
-            return FieldItems(InferAt(analysis, region, target), replace);
+            return FieldItems(analysis, InferAt(analysis, region, target), replace);
         }
 
         #endregion

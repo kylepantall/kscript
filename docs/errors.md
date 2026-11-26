@@ -260,6 +260,8 @@ echo $person.email ?? '-'    // fine: not close to a field, so it may be optiona
 
 Text and numbers have no fields at all, so `$name.upper` stops the script. Call the method instead: `$name->upper()`.
 
+The same code reports a [private](types.md#private-fields-and-methods) field or method used outside its type. Use one of the type's other methods, or take `private` off the member.
+
 ## KS5011
 
 **An error type that isn't declared.** Declare it with `error Name { }`, or use a built-in one such as `Validation`, `NotFound` or `IO`.

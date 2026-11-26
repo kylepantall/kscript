@@ -648,6 +648,37 @@ echo "{$point.x}, {$point.y} is {$point.length} from the origin"
 
 A [component](components.md#inputs-and-state-with-construct) uses the same block to separate the attributes a page may set from the state it keeps.
 
+## Private fields and methods
+
+Put `private` in front of a field or a method to keep it to the type. Only the type's own methods, its `construct` block and (for a component) its `render` can use it.
+
+```kscript
+type Counter {
+  construct({ start: int = 0 }) {
+    count = $start
+  }
+
+  private count: int
+
+  private fn doubled() => $count * 2
+
+  fn total() => $this->doubled() + $count
+}
+
+counter = Counter(start: 2)
+echo $counter->total()
+```
+
+- Code outside the type can't read a private field (`$counter.count`), set it, pass it when a value is made, or call a private method (`$counter->doubled()`). `kscript check` reports each, and the same error stops a running script.
+- A private field is left out when a value is shown or turned into JSON, so `$counter->to_json()` is `{"start":2}`.
+- A method reaches the private members of another value of its own type, such as `fn same(other: Counter) => $other.count == $count`.
+- A [joined type](#joined-types) uses the private members of the types it is built on.
+- The editor offers private members only inside the type.
+- On a [model](data.md) a private field is still a column. It is stored and loaded as usual, and only the model's own methods read it.
+- There is no `public`, because it is what every other member already is.
+
+`private` is about what other code may use. It isn't secrecy: the state of a [live component](components.md) travels to the browser and back, signed, whether it is private or not.
+
 ## Types read from text
 
 A type with fields and a `pattern` can be made from text. The pattern's named groups fill the fields of the same name, and each one is converted to its field's type. `fn` inside a type adds a method, which sees the fields:
@@ -724,7 +755,7 @@ In XML, the same types are attributes and elements of `<type>`:
 </type>
 ```
 
-A `<construct>` holds the fields a caller may pass, then the statements to run. `kscript convert` turns either form into the other.
+A `<construct>` holds the fields a caller may pass, then the statements to run. A private member has `private="yes"` on its `<field>` or `<fn>`. `kscript convert` turns either form into the other.
 
 ## Ideas for later
 

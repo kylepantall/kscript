@@ -158,6 +158,29 @@ namespace KScript.Syntax.Markup
                         default: ParseType(parent, nestedStart, nestedDoc, nested); break;
                     }
                 }
+                else if (fields && (parent.Name is "type" or "model") && PrivateAhead() is int afterPrivate)
+                {
+                    // private count: int, private fn tally() { }: only the type's own code can use it.
+                    int privateStart = pos;
+                    string privateDoc = TakeDoc();
+                    int before = parent.Children.Count;
+                    pos = afterPrivate;
+                    if (Lookahead("fn ") || Lookahead("fn\t"))
+                    {
+                        pos += 2;
+                        ParseFn(parent, afterPrivate, privateDoc);
+                    }
+                    else
+                    {
+                        pendingDoc = privateDoc == null ? null : new StringBuilder(privateDoc);
+                        ParseField(parent);
+                    }
+                    if (parent.Children.Count > before && parent.Children[before] is MarkupElement member)
+                    {
+                        member.Span = TextSpan.FromBounds(privateStart, member.Span.End);
+                        AddAttribute(member, TypeBody.PrivateWord, DecodedText.Plain("yes", privateStart), new TextSpan(privateStart, TypeBody.PrivateWord.Length));
+                    }
+                }
                 else if (fields && (Lookahead("fn ") || Lookahead("fn\t")))
                 {
                     // A method of the type: fn width(unit: Unit) => ...
@@ -2736,6 +2759,16 @@ namespace KScript.Syntax.Markup
             string name = ReadName();
             pos = save;
             return name;
+        }
+
+        /// <summary>Where the member after <c>private</c> starts, or null when the line isn't one: a field called private stays a field.</summary>
+        private int? PrivateAhead()
+        {
+            if (!Lookahead(TypeBody.PrivateWord)) return null;
+            int p = pos + TypeBody.PrivateWord.Length;
+            if (p >= text.Length || (text[p] != ' ' && text[p] != '\t')) return null;
+            while (p < text.Length && (text[p] == ' ' || text[p] == '\t')) p++;
+            return p < text.Length && Lexer.IsIdentStart(text[p]) ? p : null;
         }
 
         private bool TryWord(string word)

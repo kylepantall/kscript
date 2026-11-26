@@ -148,7 +148,7 @@ namespace KScript.Syntax.Markup
         /// anything else.
         /// </summary>
         public static StringBlock SourceBlock(MarkupElement function, DecodedText value) =>
-            value != null && IsRender(function) && function.GetAttribute("surface") == null && function.GetAttribute("returns") == null
+            value != null && IsRender(function) && function.GetAttributeValue("surface")?.Trim() is null or Document && function.GetAttribute("returns") == null
                 && LeadingBlock(value) is StringBlock block && IsSource(block) ? block : null;
 
         /// <summary>True for a block named md, markdown, latex or tex.</summary>

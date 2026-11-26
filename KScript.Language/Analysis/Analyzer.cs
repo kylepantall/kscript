@@ -1270,7 +1270,9 @@ namespace KScript.Language.Analysis
                 var fn = e.Name == "fn" ? e : e.Ancestors().FirstOrDefault(parent => parent.Name == "fn");
                 if (ComponentScript.HtmlBlock(fn, attr.Value) is { Error: null } block)
                 {
-                    AnalyzeComponentHtml(block, attr.Value, scope);
+                    componentHtmlOwner = fn.Parent;
+                    try { AnalyzeComponentHtml(block, attr.Value, scope); }
+                    finally { componentHtmlOwner = null; }
                     return;
                 }
                 if (ComponentScript.StyleBlock(fn, attr.Value) is { Error: null }) return;
@@ -1645,7 +1647,11 @@ namespace KScript.Language.Analysis
                 TypeShape record = set.Target is IdentifierNode named
                     ? scope.Lookup(named.Name, region.Source.ToSource(named.Span).Start)?.Shape
                     : Infer(set.Target, region);
-                if (record != null) CheckRecordField(record, set, region);
+                if (record != null)
+                {
+                    CheckRecordField(record, set, region);
+                    CheckPrivate(record, set.Name, method: false, region.Source.ToSource(set.NameSpan), region);
+                }
             }
             while (t is MemberNode || t is IndexNode)
             {

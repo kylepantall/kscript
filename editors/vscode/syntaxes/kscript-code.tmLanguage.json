@@ -100,7 +100,7 @@
       }
     },
     "fn": {
-      "match": "\\b(?:(override)\\s+)?(fn)\\s+([A-Za-z_][\\w-]*)",
+      "match": "\\b(?:(override|private)\\s+)?(fn)\\s+([A-Za-z_][\\w-]*)",
       "captures": {
         "1": {
           "name": "storage.modifier.kscript"
@@ -133,6 +133,14 @@
     },
     "declaration": {
       "patterns": [
+        {
+          "match": "^\\s*(private)(?=\\s+[A-Za-z_])",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.kscript"
+            }
+          }
+        },
         {
           "match": "\\b(const)\\s+([A-Za-z_][\\w-]*)",
           "captures": {

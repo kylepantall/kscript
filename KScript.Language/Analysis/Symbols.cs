@@ -214,6 +214,9 @@ namespace KScript.Language.Analysis
         /// <summary>The type has a construct block that doesn't list this field: a caller can't pass it.</summary>
         public bool OwnState { get; init; }
 
+        /// <summary>The type a private field belongs to (<c>private count: int</c>), or null when any code can use the field.</summary>
+        public string PrivateTo { get; init; }
+
         internal string ValueType
         {
             get

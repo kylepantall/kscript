@@ -73,6 +73,12 @@ namespace KScript.Language.Analysis
                 if (argument.Name != null)
                 {
                     if (instance == null || !instance.Fields.TryGetValue(argument.Name, out FieldInfo field)) continue;
+                    if (field.PrivateTo != null)
+                    {
+                        Report(region.Source.ToSource(argument.NameSpan), DiagnosticSeverity.Error, DiagnosticCodes.UnknownParameter,
+                            $"'{argument.Name}' is private to {field.PrivateTo} and can't be passed in.");
+                        continue;
+                    }
                     if (field.OwnState)
                     {
                         Report(region.Source.ToSource(argument.NameSpan), DiagnosticSeverity.Error, DiagnosticCodes.UnknownParameter,

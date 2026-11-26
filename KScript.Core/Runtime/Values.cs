@@ -161,7 +161,7 @@ namespace KScript.Runtime
                     break;
                 case Dictionary<string, object> map:
                     w.WriteStartObject();
-                    HashSet<string> hidden = (map as Record)?.Type.Hidden;
+                    HashSet<string> hidden = (map as Record)?.Type.Unlisted;
                     foreach (var kv in map)
                     {
                         if (hidden != null && hidden.Contains(kv.Key)) continue;

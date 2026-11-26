@@ -358,7 +358,11 @@ namespace KScript.Language.Analysis
                 description = description != null && detail != null ? description + " " + detail : description ?? detail;
                 bool optional = nameAttr.ValueText.TrimEnd().EndsWith('?') || IsYes(field.GetAttributeValue("optional")) || field.GetAttribute("default") != null;
                 bool own = field.GetAttribute("value") == null && !TypeBody.IsInput(field);
-                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional) { OwnState = own };
+                shape.Fields[name] = new FieldInfo(name, type != null ? TypeNamed(type, field.Span.Start) ?? TypeShape.Unknown : TypeShape.Unknown, TrimmedSpan(nameAttr.Value), description, type, optional)
+                {
+                    OwnState = own,
+                    PrivateTo = TypeBody.IsPrivate(field) ? field.Parent?.GetAttributeValue("name")?.Trim() : null,
+                };
             }
         }
 

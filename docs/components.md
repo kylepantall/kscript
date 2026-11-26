@@ -180,6 +180,8 @@ type NoteCard extends Component {
 
 `<note-card title="Shopping" />` works, and `<note-card clicks="{5}" />` is reported by `kscript check`. The block after the list is optional. It runs each time the page builds the component, before saved state is restored, so keep it free of writes. See [constructors](types.md#constructors) for the rules shared with every type.
 
+Mark a field or method `private` to keep it to the component: `private clicks: int`, `private fn tally()`. A page can't pass it, and no other code can read or call it. See [private fields and methods](types.md#private-fields-and-methods).
+
 ### Types that belong to a component
 
 A type, enum, error or model that only one component uses can live inside that component's block. The component file then holds everything it needs.

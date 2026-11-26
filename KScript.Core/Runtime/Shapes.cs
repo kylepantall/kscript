@@ -265,10 +265,13 @@ namespace KScript.Runtime
         /// <summary>Listed in the type's <c>construct({ ... })</c>: a caller may pass it.</summary>
         public bool Input { get; internal set; }
 
+        /// <summary>Only the type's own methods can use it: <c>private count: int</c>.</summary>
+        public bool Private { get; internal set; }
+
         internal bool HasDefault => DefaultNode != null || DefaultText != null;
 
         internal FieldDefinition WithType(TypeRef type, bool optional) =>
-            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional) { Owner = Owner, Input = Input };
+            new FieldDefinition(Name, type, From, Path, DefaultNode, DefaultText, ValueText, Description, optional) { Owner = Owner, Input = Input, Private = Private };
 
         /// <summary>Parses a path such as <c>owner.login</c> or <c>items[0].name</c> into keys and indexes, or null.</summary>
         internal static List<object> ParsePath(string text)
@@ -403,6 +406,16 @@ namespace KScript.Runtime
         public bool IsComponent { get; internal set; }
 
         /// <summary>Inherited record methods evaluate their bodies, defaults and catches in the defining module.</summary>
+        /// <summary>
+        /// The type that declares a private field or method called <paramref name="name"/>, or null when this type
+        /// has no such private member.
+        /// </summary>
+        internal RecordType PrivateOwner(string name, bool method)
+        {
+            if (method) return OwnMethods.TryGetValue(name, out MarkupElement fn) && TypeBody.IsPrivate(fn) ? MethodOwner(name, fn) : null;
+            return Field(name) is { Private: true } field ? field.Owner ?? this : null;
+        }
+
         internal RecordType MethodOwner(string name, MarkupElement declaration)
         {
             foreach (RecordType parent in Bases)
@@ -443,6 +456,21 @@ namespace KScript.Runtime
 
         /// <summary>Fields left out when a record is turned into JSON, such as a password hash.</summary>
         internal HashSet<string> Hidden { get; set; }
+
+        /// <summary>
+        /// The fields left out when a record is written as JSON or shown: the ones a package hides (a model's
+        /// <c>hidden:</c>) and the private ones. Null when there are none.
+        /// </summary>
+        internal HashSet<string> Unlisted
+        {
+            get
+            {
+                if (!fields.Any(f => f.Private)) return Hidden;
+                var unlisted = new HashSet<string>(Hidden ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+                unlisted.UnionWith(fields.Where(f => f.Private).Select(f => f.Name));
+                return unlisted;
+            }
+        }
 
         public string ToText() => Name;
 
@@ -1281,7 +1309,10 @@ namespace KScript.Runtime
                 if (rules.ProblemFor(refined.Root(), $"the field '{name}'") is string problem) throw run.Error(problem, null, "Syntax");
                 type = TypeRef.Of(refined, 0, type.Optional);
             }
-            return new FieldDefinition(name, type, from, path, null, defaultText, value, e.GetAttributeValue("description"), optional || optionalAttribute);
+            return new FieldDefinition(name, type, from, path, null, defaultText, value, e.GetAttributeValue("description"), optional || optionalAttribute)
+            {
+                Private = TypeBody.IsPrivate(e),
+            };
         }
 
         private static void CheckFieldName(string name, ElementRun run, string attribute)
@@ -1346,7 +1377,7 @@ namespace KScript.Runtime
             foreach ((FieldDefinition f, RecordType links) in fields)
             {
                 // Hidden fields are never in a record's JSON.
-                if (type.Hidden?.Contains(f.Name) == true) continue;
+                if (type.Unlisted?.Contains(f.Name) == true) continue;
                 RecordType owner = f.Owner ?? type;
                 Dictionary<string, object> property = links != null
                     ? WithListDepth(RecordSchema(links, root, defs, refBase), f.Type.ListDepth)
@@ -1735,7 +1766,12 @@ namespace KScript.Runtime
                 bool found = TryRead(source, f.Path, out object raw, out string at, out string key);
                 if (key != null) used.Add(key);
                 string fieldPath = path + at;
-                bool own = type.HasConstructor && !f.Input;
+                if (f.Private && found)
+                {
+                    Problem(fieldPath, f.Name, $"is private to {type.Name} and can't be passed in.");
+                    continue;
+                }
+                bool own = f.Private || (type.HasConstructor && !f.Input);
                 if (own && found)
                 {
                     // construct lists what may be passed; every other field is the value's own state.

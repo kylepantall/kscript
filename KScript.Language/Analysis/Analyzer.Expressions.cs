@@ -107,6 +107,7 @@ namespace KScript.Language.Analysis
                         return;
                     }
                     CheckMethod(m.Name, region.Source.ToSource(m.NameSpan), receiver, m.ArgumentList == null ? -1 : m.Arguments.Count, pipe: false, m.Arguments, region);
+                    CheckPrivate(receiver, m.Name, method: true, region.Source.ToSource(m.NameSpan), region);
                     if (m.Name == "sql" && receiver.Type == KType.Database)
                     {
                         CheckSqlTextIsNotFilledIn(m.Arguments, region);
@@ -136,6 +137,7 @@ namespace KScript.Language.Analysis
                     {
                         AnalyzeExpr(member.Target, region, scope, ExprContext.Value);
                         CheckField(member, region);
+                        CheckPrivate(Infer(member.Target, region), member.Name, method: false, region.Source.ToSource(member.NameSpan), region);
                     }
                     return;
 
