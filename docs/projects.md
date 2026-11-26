@@ -112,6 +112,39 @@ KSCRIPT_SOURCE=/absolute/path/to/kscript docker compose up --build
 
 The app runs as an unprivileged user with a read-only application directory. Compose keeps KScript.Storage, authentication state and project-relative SQLite files in the `app-state` volume at `/var/lib/kscript`. The volume survives container replacement. `KSCRIPT_PROJECT_DATA_ROOT` places configured relative auth and SQLite paths under that folder. For an absolute path or a separate database server, configure the corresponding mount or connection for your deployment. Restart `kscript serve` when changing storage paths so it refreshes the private files excluded from public serving. Secrets can be supplied as runtime environment variables. The generated `.dockerignore` excludes dotfiles, common credential files, local databases and runtime state. Add any project-specific secret filenames before building.
 
+### Where a container keeps its data
+
+The generated `Dockerfile` sets two folders on the `app-state` volume:
+
+| Variable | Set to | What it holds |
+| --- | --- | --- |
+| `KSCRIPT_STORAGE_ROOT` | `/var/lib/kscript/storage` | Every app's [app folders](storage.md#the-folders): KScript.Auth users, sessions and API tokens kept in its default folder, `@storage()` files and the file cache |
+| `KSCRIPT_PROJECT_DATA_ROOT` | `/var/lib/kscript/project` | Relative paths in `kscript.json` for auth data (`http.auth.folder`) and SQLite databases, which would otherwise be inside the read-only `/app` |
+
+Both need to be on a volume. Without one, everything in them is lost each time the container is recreated, which happens on every `docker compose up --build`. `kscript serve` in a container prints a warning when either variable is missing.
+
+#### Docker files from before 0.27
+
+Docker files made by an earlier `kscript make docker` mount only `app-data:/app/data`, so users and sessions stay in the container's home folder and **every account is lost when the container is recreated**. To keep your own changes to those files, such as an added Postgres service, update them by hand instead of using `--force`:
+
+```dockerfile
+# Dockerfile: make the folder, owned by the app's user, and point KScript at it
+RUN install -d -o app -g app -m 700 /var/lib/kscript
+ENV KSCRIPT_STORAGE_ROOT=/var/lib/kscript/storage KSCRIPT_PROJECT_DATA_ROOT=/var/lib/kscript/project
+```
+
+```yaml
+# compose.yaml
+services:
+  app:
+    volumes:
+      - app-state:/var/lib/kscript
+volumes:
+  app-state:
+```
+
+Accounts made before the change are inside the old container and go when it is replaced. To keep them, copy them out of the running container first: `docker compose cp app:/home/app/.local ./kscript-backup`. Each app's files are in `share/<app>` and `state/<app>` there. Once the new container is up, copy them into `/var/lib/kscript/storage/<App name>/data` and `/var/lib/kscript/storage/<App name>/state`.
+
 ### Running the development site in Docker
 
 Run `kscript serve` in a local project with a Compose file to start its app service. Use `--no-docker` to serve on the host. It bind-mounts the project read-only at `/app` and defaults to the development environment. Open the site and edit pages, styles, or route files locally. The browser reloads when the container sees the edits. Use `--no-reload` to refresh manually. Restart the service after changing startup configuration or image dependencies. Existing Compose data volumes still apply. For a named or anonymous volume mounted under the source directory, such as `/app/data`, KScript creates the local mountpoint directory before starting Compose.

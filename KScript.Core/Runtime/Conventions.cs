@@ -136,6 +136,8 @@ namespace KScript.Runtime
             ["document->html"] = "writes the document as HTML",
             ["document->latex"] = "writes the document as LaTeX",
             ["document->markdown"] = "writes the document as Markdown",
+            ["markdown->html"] = "renders the Markdown as HTML",
+            ["markdown->latex"] = "renders the Markdown as LaTeX",
             ["type->schema"] = "builds the type's JSON Schema",
             ["error->chain"] = "walks the causes into a list",
             // Work that reads a file, a database, a queue or the network.
@@ -145,6 +147,8 @@ namespace KScript.Runtime
             ["response->check"] = "throws unless the status is 2xx",
             ["document->pages"] = "lays the document out to count its pages",
             ["document->words"] = "counts the words in the text",
+            ["markdown->pages"] = "lays the Markdown out to count its pages",
+            ["markdown->words"] = "counts the words in the text",
             ["database->tables"] = "asks the database",
             ["queue->size"] = "asks the queue's driver",
             ["queue->waiting"] = "asks the queue's driver",

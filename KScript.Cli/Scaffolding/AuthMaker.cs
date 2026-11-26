@@ -19,8 +19,8 @@ namespace KScript.Scaffolding
 
     /// <summary>
     /// <c>kscript make auth</c>: sign-in for a web app in one go. It writes a controller (controllers/accounts), the
-    /// pages it renders (views/auth/: sign in, sign up, forgot and reset password, the account page with API tokens),
-    /// adds their routes to the web routes file (and, with --api, token routes to the API file), and gives
+    /// pages it renders (views/auth/: sign in, sign up, forgot and reset password, the account page), the components
+    /// those pages are made of (_components/: the forms, the account details, passkeys and API tokens), adds their routes to the web routes file (and, with --api, token routes to the API file), and gives
     /// kscript.json a password rule. The files come from Scaffolding/Auth, written once as .kscript and converted with
     /// --syntax xml like every other template.
     /// </summary>
@@ -52,6 +52,7 @@ namespace KScript.Scaffolding
             values["paths.controllers"] = Folder(project, "controllers");
             values["paths.views"] = Folder(project, "views");
             values["paths.requests"] = Folder(project, "requests");
+            values["paths.components"] = Folder(project, "components");
             values["api_prefix"] = (project?.Http.ApiPrefix ?? "/api").TrimEnd('/');
             bool hasLayout = File.Exists(Path.Combine(root, "_layout.html"));
             values["layout"] = "/_layout.html";

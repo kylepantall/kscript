@@ -504,7 +504,7 @@ namespace KScript.Scaffolding
             var projects = new (string, string)[]
             {
                 ("project <folder>", "Start a new web app, with a desktop app unless --no-desktop (--bare for a bare project)"),
-                ("auth", "Sign-in pages, routes and a controller. Use --passkeys for passwordless accounts or --api for token routes"),
+                ("auth", "Sign-in pages built from components, routes and a controller. Use --passkeys for passwordless accounts or --api for token routes"),
                 ("docker", "Add Docker and Compose to an existing KScript project"),
                 ("templates [type…]", "Copy the built-in templates to _templates/ to customise them"),
                 ("templates project", "Copy the project template to customise new projects (--global for all)"),

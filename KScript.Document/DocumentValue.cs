@@ -25,6 +25,25 @@ namespace KScript.Documents
             }
         }
 
+        /// <summary>A Markdown or LaTeX fence as a document, for the document methods a fence has itself: $notes->html().</summary>
+        internal static DocumentValue FromFence(object fence, CallContext call) =>
+            new DocumentValue((FencedFile)fence, call.Module?.Directory ?? call.Host.WorkingDirectory);
+
+        /// <summary>The methods a Markdown fence shares with a document. Its own source is .text, as a LaTeX fence's is.</summary>
+        internal static readonly string[] MarkdownOutputs = { "latex", "html", "pages", "words" };
+
+        /// <summary><c>$fence->save(path, as?)</c>: the source as it is for .md or .tex (or no extension), else rendered.</summary>
+        internal static object SaveFence(object fence, CallContext call)
+        {
+            var file = (FencedFile)fence;
+            string path = call.Str(0), format = call.Str(1, null);
+            if (format == null && !string.IsNullOrWhiteSpace(path) && !Path.EndsInDirectorySeparator(path) && Path.GetExtension(path).Length == 0)
+                file.Save(call.Host, path, call.Module?.Directory);
+            else
+                FromFence(file, call).Save(call.Host, path, call.Module?.Directory, format);
+            return null;
+        }
+
         internal static object FromSource(CallContext call)
         {
             object input = call.Arg(0);

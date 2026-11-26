@@ -235,7 +235,20 @@ test(name: "a note is saved") {
 
 ### Testing who may do what
 
-`@acting_as()` from [KScript.Auth](auth.md#policies) sets who `@user()`, `@can()` and `@authorize()` ask about, until the test ends. Pass `null` to act as a guest.
+`@acting_as()` from [KScript.Auth](auth.md#policies) sets who `@user()`, `@can()` and `@authorize()` ask about, until the test ends. Pass `null` to act as a guest. Routes the test calls with `@api(/...)` see the same user, including routes behind `auth`, `auth:session` or `auth:token` middleware, so a signed-in route needs no token in a test:
+
+```kscript
+import KScript.Auth
+import KScript.Net
+
+test(name: "the dashboard greets me") {
+  @acting_as(@register('ada@example.test', 'correct-horse-battery-9'))
+  expect(value: @api(/dashboard).status, equals: 200)
+}
+```
+
+To test cookie-keyed behaviour, such as a guest's board or a remembered preference, send the cookie yourself: `@api(/, options: { headers: { Cookie: 'sb_guest=0f8f' } })`. The response's `.cookies` shows the cookies it set.
+
 
 ```kscript
 import KScript.Auth

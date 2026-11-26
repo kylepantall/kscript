@@ -28,14 +28,7 @@ Routes {
   ModelUpdate(name: edit_profile, model: Profile, owner: user_id, fields: [bio])
   Group(middleware: auth) {
     Get(path: /profile, to: @accounts.show_profile)
-    Get(path: /account, to: @accounts.account, name: "account")
+    Get(path: /account, view: 'auth/account', name: "account")
     Post(path: /logout, to: @accounts.sign_out, name: "logout")
-    Post(
-      path: /account/passkeys/{id}/delete,
-      to: @accounts.delete_passkey,
-      middleware: csrf
-    )
-    Post(path: /account/tokens, to: @accounts.make_token)
-    Post(path: /account/tokens/{id}/delete, to: @accounts.delete_token)
   }
 }

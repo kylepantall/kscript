@@ -140,7 +140,7 @@ namespace KScript.Auth
                     Policies.Authorize(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"));
                     return c.Arg(1, "target");
                 }, "<do>@authorize(update, $post)</do>").Info.KeepsBareWords = true;
-            p.Command("acting_as", "user", "In a test, sets who @can, @authorize and @user() ask about until the test ends: @acting_as($editor). Pass null to act as a guest.",
+            p.Command("acting_as", "user", "In a test, sets who @can, @authorize and @user() ask about until the test ends, in the test and in routes it calls with @api(/...): @acting_as($editor). Pass null to act as a guest.",
                 KType.Any, c => Policies.ActAs(c.Host, Values.Unwrap(c.Arg(0, "user"))), "<do>@acting_as({ id: 1, role: 'editor' })</do>");
 
             p.Command("user", "", "The signed-in user (a map with id, email and the fields they registered with), or null for a guest. It comes from the session cookie, or from an API token (Authorization: Bearer).",

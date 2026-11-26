@@ -883,7 +883,8 @@ namespace KScript.Language.Analysis
             }
             if (applicable.Count == 0)
             {
-                Report(nameSpan, DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
+                // A fence's type is certain (only a fence makes one), so a method it hasn't got always fails when it runs.
+                Report(nameSpan, IsFenceType(type) ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning, DiagnosticCodes.TypeMismatch,
                     $"{arrow}{name}() works on {Plural(candidates[0].ReceiverType)}, but this value is {Article(type)}." + ToStringHint(candidates[0], type, arrow, name));
                 return;
             }
@@ -1006,8 +1007,20 @@ namespace KScript.Language.Analysis
         /// For a string method on a value that isn't a string (a uuid, a date, a number): how to call it on the text anyway.
         /// <c>->json()</c> reads JSON text, so a value that isn't text is pointed at <c>->to_json()</c> instead.
         /// </summary>
+        /// <summary>The types a fence makes: Markdown, LaTeX and other formatted source. Nothing else has them.</summary>
+        private static bool IsFenceType(string type) => type is KType.Markdown or KType.Latex or KType.FormattedFile;
+
         private static string ToStringHint(CallableInfo method, string type, string arrow, string name)
         {
+            if (IsFenceType(type))
+            {
+                if (method.ReceiverType == KType.String) return $" Use .text{arrow}{name}() to work on its source text.";
+                if ((type == KType.Latex && name == "latex") || (type == KType.Markdown && name == "markdown"))
+                    return $" It is {(type == KType.Latex ? "LaTeX" : "Markdown")} already: .text is its source.";
+                if (type == KType.Latex && method.ReceiverType is KType.Document or KType.Markdown)
+                    return " LaTeX source can be edited, and saved as .tex for a LaTeX engine, but KScript doesn't render it. Write a Markdown fence to make PDF, Word or HTML.";
+                return string.Empty;
+            }
             if (method.ReceiverType != KType.String || !(IsSemanticText(type) || HasTextForm(type)))
             {
                 return string.Empty;

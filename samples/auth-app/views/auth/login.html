@@ -1,17 +1,5 @@
-<import package="KScript.Auth" />
 <layout path="/_layout.html" title="Sign in">
   <h1>Sign in</h1>
-  <if test="$session->has('status')"><p class="status">{ $session->get('status') }</p></if>
-  <if test="$data.error != null"><p class="error">{ $data.error }</p></if>
-  <form method="post" action="/login">
-    {! @csrf_field() }
-    <p><label>Email<br><input type="email" name="email" value="{ $data.email ?? '' }" required autocomplete="email"></label></p>
-    <p><label>Password<br><input type="password" name="password" required autocomplete="current-password"></label></p>
-    <p><label><input type="checkbox" name="remember" value="yes"> Keep me signed in</label></p>
-    <p><button>Sign in</button></p>
-  </form>
-  <if test="@has_passkeys()">
-    <p><button passkey="login">Sign in with a passkey</button></p>
-  </if>
+  <sign-in-form email="{$data.email ?? ''}" error="{$data.error}" />
   <p><a href="/forgot-password">Forgot your password?</a> · <a href="/register">Create an account</a></p>
 </layout>

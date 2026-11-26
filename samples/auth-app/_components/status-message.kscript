@@ -1,0 +1,10 @@
+import KScript.Web
+import KScript.Auth
+
+/// The message a controller flashed before its redirect, such as "Your password
+/// has been changed." Shows nothing when there is none.
+type StatusMessage extends Component {
+  fn render() => ```html
+    <if test="$session->has('status')"><p class="status">{$session->get('status')}</p></if>
+    ```
+}
