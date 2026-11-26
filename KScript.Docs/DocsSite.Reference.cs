@@ -487,6 +487,7 @@ namespace KScript.Docs
             ["@stylesheet"] = "compiles a stylesheet file of yours",
             ["<translations>"] = "reads a folder of translation files",
             ["@locale_path"] = "is for web pages",
+            ["@inject"] = "takes a record from the route being answered",
             ["@read_markdown"] = "reads a Markdown file of yours",
             ["@stylesheet"] = "compiles a stylesheet file of yours",
         };

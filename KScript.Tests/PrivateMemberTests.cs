@@ -43,7 +43,7 @@ public class PrivateMemberTests
     {
         const string message = "is private to Counter. Only Counter's own methods can use it.";
         KScriptException read = Fails("echo $c.count");
-        Assert.Equal("Access", read.Type);
+        Assert.Equal("Context", read.Type);
         Assert.Contains("'count' " + message, read.Message);
         Assert.Contains("'count' " + message, Fails("echo $c['count']").Message);
         Assert.Contains("'count' " + message, Fails("echo $c?.count ?? 0").Message);

@@ -604,6 +604,7 @@ namespace KScript.Http
                     && kind.TryFind(new CallContext(interpreter, p.Name, Array.Empty<object>(), scope: fn.Closure, module: fn.Module), type, value, out object found))
                 {
                     named[p.Name] = found;
+                    if (found is Record record) ctx.Bound[p.Name] = record;
                     continue;
                 }
                 try

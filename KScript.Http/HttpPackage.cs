@@ -188,6 +188,7 @@ namespace KScript.Http
                 }, "<a href=\"{ @route('people.show', id: $p.id) }\">{ $p.name }</a>");
 
             RouteCatalog.Register(p);
+            Injection.AddSource(RequestContext.Inject);
 
             foreach (var f in HttpResponse.Fields)
                 p.Field(KType.HttpResponse, f.Name, f.Type, f.Description);

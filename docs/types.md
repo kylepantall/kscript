@@ -646,6 +646,23 @@ echo "{$point.x}, {$point.y} is {$point.length} from the origin"
 - Passing a field that `construct` doesn't list is an error that names the fields it takes. The editor reports it as you type.
 - A joined type runs its bases' `construct` blocks first, then its own.
 
+An input whose type is a [model](data.md) can default to the record the route holds. `@inject()` reads the model from the input's type and takes the route parameter with the input's name:
+
+```kscript
+type PostSummary {
+  construct({ post: Post = @inject() }) {
+    words = $post.body->split(' ')->count()
+  }
+
+  words: int
+}
+
+// a controller on /posts/{post}
+fn stats() => PostSummary()
+```
+
+`PostSummary(post: $other)` still takes what it is given. Where no route is being answered, leaving the input out is an error that names it. See [taking the route's record](components.md#take-the-routes-record-with-inject) for the rules.
+
 A [component](components.md#inputs-and-state-with-construct) uses the same block to separate the attributes a page may set from the state it keeps.
 
 ## Private fields and methods

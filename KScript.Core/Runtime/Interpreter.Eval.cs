@@ -672,7 +672,7 @@ namespace KScript.Runtime
         {
             if (target is not Record record || record.Type.PrivateOwner(name, method) is not RecordType owner) return;
             if (scope.TryGet("this", out object self) && self is Record inside && inside.Type.IsA(owner)) return;
-            throw Fail(node, ctx, TypeBody.PrivateMessage(name, owner.Name), "Access");
+            throw Fail(node, ctx, TypeBody.PrivateMessage(name, owner.Name), "Context");
         }
 
         private object EvaluateOrNull(ExprNode node, Scope scope, EvalContext ctx)

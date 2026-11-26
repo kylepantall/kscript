@@ -1788,6 +1788,8 @@ namespace KScript.Runtime
                 {
                     RecordType owner = f.Owner ?? type;
                     Scope s = owner.Closure.Child();
+                    // @inject() as the default reads the input it is filling from here.
+                    s.Declare(Injection.InputVariable, new Injection.Input(owner, f));
                     raw = f.DefaultNode != null ? interpreter.Evaluate(f.DefaultNode, s, new EvalContext(owner.Module, null)) : interpreter.EvaluateText(f.DefaultText, s, owner.Module);
                 }
                 else if (!found && !f.Optional && missingField != null)

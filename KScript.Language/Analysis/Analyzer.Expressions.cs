@@ -548,6 +548,7 @@ namespace KScript.Language.Analysis
                 ReferenceSqlValues(arguments, region, scope);
             }
             if (count < 0) return;
+            if (command.Name == Injection.Command && command.Package == "KScript.Core") CheckInject(arguments, region, callSpan);
             if (pipedValue != null && command is { Package: "KScript.Http", Name: "route" })
                 CheckRouteName(pipedValue, region);
 
