@@ -905,6 +905,18 @@ namespace KScript.Pages
                     if (!el.HasAttr("tabindex")) sb.Append(" tabindex=\"0\"");
                     continue;
                 }
+                if (a.Name is "drop-files" or "drop-class")
+                {
+                    if (state.LiveScope == null) throw new PageException($"@{a.Name} only works in a live component or a <live> block.");
+                    string names = Values.ToStr(AttributeValue(a, scope, state)).Trim();
+                    if (names.Length == 0) throw new PageException(a.Name == "drop-files"
+                        ? "@drop-files needs the name of a live-upload input inside the element, such as @drop-files('upload')."
+                        : "@drop-class needs a class, such as @drop-class('file-over').");
+                    if (a.Name == "drop-class" && names.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(n => !ClassDirective.IsClassName(n)) is string bad)
+                        throw new PageException($"@drop-class: {bad} isn't a class name.");
+                    sb.Append(" data-ks-").Append(a.Name).Append("=\"").Append(Values.HtmlEscape(names)).Append('"');
+                    continue;
+                }
                 if (a.Name is "live-stream" or "live-portal" or "live-action" or "live-client")
                 {
                     if (state.LiveScope == null) throw new PageException($"{a.Name} only works inside a <live> block.");

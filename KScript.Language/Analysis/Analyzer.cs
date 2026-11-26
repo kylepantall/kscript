@@ -1023,6 +1023,12 @@ namespace KScript.Language.Analysis
                 {
                     Report(attr.NameSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttribute, "Use @autogrow() on a textarea.");
                 }
+                if (attr.Name == "drop-files" && Kind != DocumentKind.Script && component == null && attr.Value != null &&
+                    attr.ValueText.Trim() is string uploadName && uploadName.Length > 0 && !uploadName.Contains('{') && !HasUploadInput(e, uploadName))
+                {
+                    Report(attr.Span, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"@drop-files('{uploadName}') needs a file input named {uploadName} with live-upload inside this element.");
+                }
                 if (attr.Value == null)
                 {
                     continue;
@@ -1069,6 +1075,11 @@ namespace KScript.Language.Analysis
 
             WalkChildren(e.Children, inner, markupMode: true);
         }
+
+        /// <summary>True when the element holds a live-upload file input of this name.</summary>
+        private static bool HasUploadInput(MarkupElement e, string name) => e.Children.OfType<MarkupElement>().Any(child =>
+            child.Name.Equals("input", StringComparison.OrdinalIgnoreCase) && child.GetAttribute("live-upload") != null &&
+            child.GetAttribute("name")?.ValueText == name || HasUploadInput(child, name));
 
         private void ReportUnknownElement(MarkupElement e)
         {
