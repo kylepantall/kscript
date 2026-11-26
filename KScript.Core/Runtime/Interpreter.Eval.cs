@@ -138,63 +138,122 @@ namespace KScript.Runtime
         }
 
         /// <summary>
-        /// Runs an event handler: statements (<c>count += 1</c>), a function or method to call (<c>$save</c>), or a
-        /// shorthand (<c>toggle: $open</c> flips a bool). In a window a lone bool flips too (<c>on_click: $open</c>);
-        /// on a page, with <paramref name="bareBool"/> false, it is an error that names toggle:.
+        /// Runs an event handler: statements (<c>count += 1</c>), a function or method to call (<c>$save</c>), or
+        /// shorthands (<c>toggle: $open</c>, <c>add: $draft, to: $tags</c>; see <see cref="HandlerShorthands"/>) run
+        /// left to right. In a window a lone bool flips too (<c>on_click: $open</c>); on a page, with
+        /// <paramref name="bareBool"/> false, it is an error that names toggle:.
         /// </summary>
         public void RunHandler(DecodedText text, Scope scope, Module module, bool bareBool = true)
         {
-            if (KScript.Syntax.Markup.ComponentScript.LabelledHandler(text?.Value) is (string label, string labelled, int valueStart))
+            if (HandlerShorthands.IsShorthand(text?.Value))
             {
-                if (label != KScript.Syntax.Markup.ComponentScript.Toggle)
-                {
-                    throw new KScriptException(KScript.Syntax.Markup.ComponentScript.UnknownShorthandMessage(label), "Syntax") { Offset = text.ToSource(0), OffsetModule = module };
-                }
-                var value = new DecodedText(labelled, Enumerable.Range(valueStart, labelled.Length + 1).Select(text.ToSource).ToArray());
-                var field = (VariableNode)GetParse(module, value, ParseMode.Statements).Nodes[0];
-                if (!scope.TryGet(field.Name, out object current) || current is not bool on)
-                {
-                    throw Fail(field, new EvalContext(module, value), KScript.Syntax.Markup.ComponentScript.ToggleNeedsBoolMessage(labelled,
-                        scope.TryGet(field.Name, out object other) ? Values.Describe(other) : "not defined"), "Type");
-                }
-                scope.Assign(field.Name, !on);
+                RunShorthands(text, scope, module);
                 return;
             }
             ParseResult parsed = GetParse(module, text, ParseMode.Statements);
             if (parsed.Nodes.Count == 1 && parsed.Nodes[0] is VariableNode variable)
             {
-                if (!scope.TryGet(variable.Name, out object value))
-                {
-                    // on_click: $save names a method of the component the handler belongs to.
-                    if (scope.TryGet("this", out object self) && self is Record record
-                        && record.Type.OwnMethods.TryGetValue(variable.Name, out MarkupElement method))
-                    {
-                        RecordType owner = record.Type.MethodOwner(variable.Name, method);
-                        Scope methodScope = CatchClauses.BindReceiver(owner.Closure, record, recordFields: true);
-                        Call(DeclareFunction(method, methodScope, owner.Module, record.Type.Catches, record), Array.Empty<object>(), null, scope, module);
-                        return;
-                    }
-                    ExecuteStatements(text, scope, module, declare: false);
-                    return;
-                }
-                if (value is bool flag)
+                if (scope.TryGet(variable.Name, out object value) && value is bool flag)
                 {
                     if (!bareBool)
                     {
-                        throw Fail(variable, new EvalContext(module, text), KScript.Syntax.Markup.ComponentScript.BareBoolMessage("$" + variable.Name), "Syntax");
+                        throw Fail(variable, new EvalContext(module, text), HandlerShorthands.BareBoolMessage("$" + variable.Name), "Syntax");
                     }
                     scope.Assign(variable.Name, !flag);
                     return;
                 }
-                if (value is ICallable function)
+                if (!CallHandlerValue(variable, text, scope, module, Array.Empty<object>()))
                 {
-                    Call(function, Array.Empty<object>(), null, scope, module);
-                    return;
+                    ExecuteStatements(text, scope, module, declare: false);
                 }
-                throw Fail(variable, new EvalContext(module, text),
-                    $"A handler that is one value flips a bool or calls a function, and ${variable.Name} is {Values.Describe(value)}. Write statements instead, such as {variable.Name} = ….", "Type");
+                return;
             }
             ExecuteStatements(text, scope, module, declare: false);
+        }
+
+        /// <summary>
+        /// Calls the function a handler names: a variable holding one, or a method of the component the handler belongs
+        /// to. False when the name is neither (the caller reports it as an unknown variable).
+        /// </summary>
+        private bool CallHandlerValue(VariableNode variable, DecodedText text, Scope scope, Module module, object[] args)
+        {
+            if (!scope.TryGet(variable.Name, out object value))
+            {
+                // $save names a method of the component the handler belongs to.
+                if (scope.TryGet("this", out object self) && self is Record record
+                    && record.Type.OwnMethods.TryGetValue(variable.Name, out MarkupElement method))
+                {
+                    RecordType owner = record.Type.MethodOwner(variable.Name, method);
+                    Scope methodScope = CatchClauses.BindReceiver(owner.Closure, record, recordFields: true);
+                    Call(DeclareFunction(method, methodScope, owner.Module, record.Type.Catches, record), args, null, scope, module);
+                    return true;
+                }
+                return false;
+            }
+            if (value is ICallable function)
+            {
+                Call(function, args, null, scope, module);
+                return true;
+            }
+            throw Fail(variable, new EvalContext(module, text),
+                $"A handler that is one value calls a function, and ${variable.Name} is {Values.Describe(value)}. Write statements instead, such as {variable.Name} = ….", "Type");
+        }
+
+        /// <summary>Runs a handler written as shorthands, one step at a time.</summary>
+        private void RunShorthands(DecodedText text, Scope scope, Module module)
+        {
+            HandlerShorthands.Reading reading = HandlerShorthands.Read(text.Value);
+            if (reading.Parse.Errors.FirstOrDefault() is { } syntax)
+            {
+                throw new KScriptException(syntax.Message, "Syntax") { Offset = text.ToSource(syntax.Span.Start), OffsetModule = module };
+            }
+            if (reading.Problems.Count > 0)
+            {
+                throw new KScriptException(reading.Problems[0].Message, "Syntax") { Offset = text.ToSource(reading.Problems[0].Span.Start), OffsetModule = module };
+            }
+            var ctx = new EvalContext(module, text);
+            foreach (HandlerShorthands.Step step in reading.Steps)
+            {
+                if (step.Action.Name == HandlerShorthands.Call)
+                {
+                    object[] args = step.Companion == null ? Array.Empty<object>()
+                        : Evaluate(step.Companion.Value, scope, ctx) is List<object> list ? list.ToArray() : new[] { Evaluate(step.Companion.Value, scope, ctx) };
+                    if (step.Value.Value is VariableNode called)
+                    {
+                        if (!CallHandlerValue(called, text, scope, module, args))
+                        {
+                            throw Fail(called, ctx, $"call: needs a function or one of the component's methods, and ${called.Name} is not defined.", "Name");
+                        }
+                    }
+                    else if (Evaluate(step.Value.Value, scope, ctx) is ICallable function)
+                    {
+                        Call(function, args, null, scope, module);
+                    }
+                    else
+                    {
+                        throw Fail(step.Value.Value, ctx, "call: needs a function or one of the component's methods.", "Type");
+                    }
+                    continue;
+                }
+                if (step.Action.FieldType is string type)
+                {
+                    object current = Evaluate(step.Field, scope, ctx);
+                    bool fits = type switch
+                    {
+                        KType.Bool => current is bool,
+                        KType.Number => current is double or int or long or decimal,
+                        KType.List => current is List<object>,
+                        _ => true,
+                    };
+                    if (!fits)
+                    {
+                        string field = text.Value.Substring(step.Field.Span.Start, step.Field.Span.Length);
+                        throw Fail(step.Field, ctx, HandlerShorthands.FieldTypeMessage(step.Action, field, Values.Describe(current)), "Type");
+                    }
+                }
+                (string statement, int[] map) = HandlerShorthands.Statement(step, text.Value).Value;
+                ExecuteStatements(new DecodedText(statement, map.Select(text.ToSource).ToArray()), scope, module, declare: false);
+            }
         }
 
         /// <summary>Replaces <c>{ expr }</c> (and, in element text, bare <c>$name</c>) in text. <paramref name="escape"/> is applied to inserted values, except <c>{! raw }</c>.</summary>

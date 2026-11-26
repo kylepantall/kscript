@@ -261,9 +261,9 @@ jobs:
           "$K" smoke.ks.xml | tee smoke.out
           grep -q "kscript ok: 3" smoke.out
           "$K" samples/scripts/oldest.kscript
-          "$K" check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data --warnings-as-errors
-          "$K" fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data "Example Sites/team"
-          "$K" test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data
+          "$K" check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data samples/task-board --warnings-as-errors
+          "$K" fmt --check samples/scripts samples/xml samples/life-lab samples/http-app samples/storage samples/data samples/task-board "Example Sites/team"
+          "$K" test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data samples/task-board
           # KScript.Data's SQLite library ships beside kscript, like the UI's.
           (cd samples/data && "$K" shop.kscript | grep -q "Paid orders: 1")
           (cd samples/queue-app && export KSCRIPT_STORAGE_ROOT="$RUNNER_TEMP/kscript-queue" && "$K" signup.kscript && "$K" worker --stop-when-empty | tee "$RUNNER_TEMP/worker.out" && "$K" queue status)

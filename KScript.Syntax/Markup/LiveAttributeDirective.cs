@@ -13,6 +13,7 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
         int pos = start + 1;
         while (pos < text.Length && (Lexer.IsIdentChar(text[pos]) || text[pos] == '-')) pos++;
         string name = text[(start + 1)..pos].ToLowerInvariant();
+        if (name == "class") name = ClassDirective.Attribute; // @class(done: $todo.done) adds to the tag's class
         if (LiveAttributes.ArgumentFor(name) is not LiveDirectiveArgument kind) return false;
         var nameSpan = TextSpan.FromBounds(start, pos);
         pos = SkipSpace(text, pos);
@@ -34,11 +35,11 @@ public readonly record struct LiveAttributeDirective(string Name, TextSpan NameS
                 if (token.Is(")") && --depth == 0)
                 {
                     directive = new(name, nameSpan, TextSpan.FromBounds(argument, at), '\0', token.Span.End,
-                        at == pos ? $"@{name} needs a handler." : null);
+                        at == pos ? (name == ClassDirective.Attribute ? "@class needs classes and conditions, such as @class(done: $todo.done)." : $"@{name} needs a handler.") : null);
                     return true;
                 }
             }
-            directive = new(name, nameSpan, TextSpan.FromBounds(argument, recovery), '\0', recovery, $"@{name} is missing its closing ')'.");
+            directive = new(name, nameSpan, TextSpan.FromBounds(argument, recovery), '\0', recovery, $"@{(name == ClassDirective.Attribute ? "class" : name)} is missing its closing ')'.");
             return true;
         }
 

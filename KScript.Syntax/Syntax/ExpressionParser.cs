@@ -103,6 +103,49 @@ namespace KScript.Syntax
             return new ParseResult(text, nodes, p.errors);
         }
 
+        /// <summary>
+        /// Parses comma separated named arguments, <c>toggle: $open, emit: 'saved'</c> (a handler's shorthands).
+        /// Every node is an <see cref="ArgumentNode"/>; one without a name is an error.
+        /// </summary>
+        public static ParseResult ParseNamedArguments(string text)
+        {
+            ExpressionParser p = new ExpressionParser(text ?? string.Empty, 0, false);
+            List<ExprNode> nodes = new List<ExprNode>();
+            while (p.Peek().Kind != TokenKind.EndOfInput)
+            {
+                ArgumentNode arg = new ArgumentNode();
+                Token first = p.Peek();
+                if (first.Kind == TokenKind.Identifier && p.Peek(1).Is(":"))
+                {
+                    p.Advance();
+                    p.Advance();
+                    arg.Name = first.Text;
+                    arg.NameSpan = first.Span;
+                }
+                else
+                {
+                    p.Error(first.Span, "Expected a shorthand such as toggle: $open. Shorthands and statements can't be mixed in one handler.", DiagnosticCodes.StatementSyntax);
+                }
+                arg.Value = p.ParseRootExpression();
+                arg.Span = TextSpan.FromBounds(first.Span.Start, arg.Value.Span.End);
+                nodes.Add(arg);
+                if (!p.Peek().Is(","))
+                {
+                    break;
+                }
+                p.Advance();
+            }
+            p.ExpectEnd();
+            return new ParseResult(text, nodes, p.errors);
+        }
+
+        /// <summary>True when the text starts with a word and a colon (<c>toggle: $open</c>), as named arguments do.</summary>
+        public static bool StartsWithNamedArgument(string text)
+        {
+            ExpressionParser p = new ExpressionParser(text ?? string.Empty, 0, false);
+            return p.Peek().Kind == TokenKind.Identifier && p.Peek(1).Is(":");
+        }
+
         /// <summary>Parses <c>;</c>-separated statements: assignments and expressions (for <c>&lt;do&gt;</c>, <c>&lt;let&gt;x = 3&lt;/let&gt;</c>).</summary>
         public static ParseResult ParseStatements(string text)
         {

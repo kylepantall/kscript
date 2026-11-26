@@ -85,7 +85,7 @@ echo "{$repo.name} by {$repo.owner} has {$repo.stars} stars"
   <state name="todos" value="[]" />
   <state name="draft" value="''" />
 
-  <form on-submit="todos = $todos->push($draft); draft = ''">
+  <form on-submit="add: $draft, to: $todos, set: $draft, to: ''">
     <input bind="draft" placeholder="What needs doing?">
     <button>Add</button>
   </form>

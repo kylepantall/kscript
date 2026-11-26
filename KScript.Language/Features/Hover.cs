@@ -59,6 +59,10 @@ namespace KScript.Language.Features
                 return typeName;
             }
             Cursor cursor = Locate(analysis, offset);
+            if (cursor.InAttributeValue && ShorthandHover(cursor) is HoverResult shorthand)
+            {
+                return shorthand;
+            }
 
             if (cursor.InElementName || cursor.InEndTagName)
             {

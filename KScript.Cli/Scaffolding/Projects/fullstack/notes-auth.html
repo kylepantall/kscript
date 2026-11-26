@@ -32,7 +32,7 @@ to: notes.html
 
       <ul class="notes">
         <for each="n" in="$notes">
-          <li class="{ $n.done ? 'done' : '' }">
+          <li @class(done: $n.done)>
             <label><input
               type="checkbox"
               checked="{$n.done}"

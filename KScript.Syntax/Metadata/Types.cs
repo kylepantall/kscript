@@ -60,6 +60,9 @@ namespace KScript.Metadata
         public const string Queue = "queue";
         public const string FakeQueue = "fake_queue";
 
+        /// <summary>KScript.Web: a page rendered in a test by @visit('/'), to click through.</summary>
+        public const string PageVisit = "page_visit";
+
         /// <summary>A &lt;type&gt; declared by a script: <c>Repo</c>.</summary>
         public const string Type = "type";
 

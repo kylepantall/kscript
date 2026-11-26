@@ -73,14 +73,14 @@ public class ValueHandlerTests
     {
         using var site = Site();
         PageResult failed = Event(site, 2, site.Render("index.html").Body);
-        Assert.Contains("flips a bool or calls a function", failed.Body);
+        Assert.Contains("calls a function", failed.Body);
         Assert.Contains("missing", Event(site, 3, site.Render("index.html").Body).Body);
     }
 
     [Theory]
     [InlineData(4, "Write toggle: $open to flip it.")]
     [InlineData(5, "no 'flip:' shorthand")]
-    [InlineData(6, "toggle: flips a bool, and $label is")]
+    [InlineData(6, "toggle: works on a bool field, and $label is")]
     public void A_page_handler_names_toggle_for_a_bool_and_checks_shorthands(int handler, string message)
     {
         using var site = Site();

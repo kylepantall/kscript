@@ -16,7 +16,7 @@
 
     <ul class="tasks">
       <for each="t" in="$tasks">
-        <li class="{ $t.done ? 'done' : '' }">
+        <li @class(done: $t.done)>
           <label><input
             type="checkbox"
             checked="{$t.done}"

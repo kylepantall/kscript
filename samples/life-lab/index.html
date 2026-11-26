@@ -91,7 +91,8 @@
             <for each="row" at="y" in="$world.grid">
               <for each="c" at="x" in="$row">
                 <button
-                  class="{ $c eq 'O' ? 'cell on' : 'cell' }"
+                  class="cell"
+                  @class(on: $c eq 'O')
                   value="{$x},{$y}"></button>
               </for>
             </for>

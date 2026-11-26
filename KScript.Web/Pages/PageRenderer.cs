@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using KScript.Runtime;
+using KScript.Syntax.Markup;
 
 namespace KScript.Pages
 {
@@ -774,8 +775,22 @@ namespace KScript.Pages
                 if (!el.HasAttr("type")) sb.Append(" type=\"button\"");
             }
             bool hasHandler = false;
+            string switchedClasses = el.Attr(ClassDirective.Attribute) is string classIf ? SwitchedClasses(classIf, scope, state) : null;
             foreach (var a in el.Attributes)
             {
+                if (a.Name == ClassDirective.Attribute)
+                {
+                    if (!el.HasAttr("class") && switchedClasses.Length > 0)
+                        sb.Append(" class=\"").Append(Values.HtmlEscape(switchedClasses)).Append('"');
+                    continue;
+                }
+                if (a.Name == "class" && switchedClasses != null)
+                {
+                    string own = a.Value == null ? string.Empty : Interpolate(a.Value, scope, state, EscapeMode.None);
+                    string joined = string.Join(" ", (own + " " + switchedClasses).Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal));
+                    sb.Append(' ').Append(a.SourceName ?? a.Name).Append("=\"").Append(Values.HtmlEscape(joined)).Append('"');
+                    continue;
+                }
                 if (a.Name == "passkey")
                 {
                     string action = Values.ToStr(AttributeValue(a, scope, state));
@@ -932,6 +947,39 @@ namespace KScript.Pages
             RenderNodes(el.Children, scope.Child(), sb, childrenState);
             sb.Append("</").Append(el.SourceName ?? el.Name).Append('>');
             if (passkeyButton) sb.Append("<span role=\"status\" data-ks-passkey-status></span>");
+        }
+
+        /// <summary>
+        /// The classes a <c>@class(...)</c> directive switches on: each entry's class (or list of classes) whose
+        /// condition is true, or whose conditions are all true when the condition is a list.
+        /// </summary>
+        private static string SwitchedClasses(string directive, Scope scope, RenderState state)
+        {
+            ClassDirective.Reading reading = ClassDirective.Read(directive);
+            if (reading.Problems.Count > 0) throw new PageException("@class: " + reading.Problems[0].Message);
+            var classes = new List<string>();
+            foreach (ClassDirective.Entry entry in reading.Entries)
+            {
+                string conditionText = directive.Substring(entry.Condition.Start, entry.Condition.Length);
+                object condition = Eval(conditionText, scope, state);
+                IEnumerable<object> conditions = condition is List<object> all ? all : new[] { condition };
+                if (conditions.Any(c => c is not bool))
+                    throw new PageException($"@class: {conditionText} must be true or false (or a list of them), and it is {Values.Describe(condition)}.");
+                if (!conditions.All(c => (bool)c)) continue;
+                if (entry.ClassName != null)
+                {
+                    classes.Add(entry.ClassName);
+                    continue;
+                }
+                object named = Eval(directive.Substring(entry.Classes.Start, entry.Classes.Length), scope, state);
+                foreach (object name in named is List<object> list ? list : new List<object> { named })
+                {
+                    if (name is not string className || !ClassDirective.IsClassName(className))
+                        throw new PageException($"@class: {Values.ToStr(name)} isn't a class name.");
+                    classes.Add(className);
+                }
+            }
+            return string.Join(" ", classes.Distinct(StringComparer.Ordinal));
         }
 
         private static string InputChoiceValue(PageElement element, Scope scope, RenderState state) =>

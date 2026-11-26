@@ -86,6 +86,18 @@ namespace KScript.Web
             foreach (ValueFieldInfo field in RequestFields.Common)
                 p.Field(field.Receiver, field.Name, field.Type, field.Description);
 
+            p.Command("visit", "path: string", "For tests: renders a page of this project (serve.root in kscript.json) as a browser gets it. `->click('Add')` runs a live handler, `->fill('draft', 'milk')` types into a bound input, and `.text`, `.html` and `->classes('Buy milk')` show the result.",
+                KType.PageVisit, call => PageVisit.Open(call, Values.ToStr(call.Arg(0))), "<let name=\"page\" value=\"@visit('/tasks')->fill('draft', 'Buy milk')->click('Add')\" />\n<echo>{ $page.text }</echo>");
+            VisitMethod(p, "click", "text: string", "Runs the live on-click handler of the element with this text (or aria-label or title) and redraws its block. Returns the page, so clicks chain.", KType.PageVisit);
+            VisitMethod(p, "change", "text: string", "Runs the on-change handler of the input with this label (the text of the <label> around it), such as a checkbox, and redraws its block.", KType.PageVisit);
+            VisitMethod(p, "submit", "text?: string", "Runs the on-submit handler of the form (the one with this text, when given) and redraws its block.", KType.PageVisit);
+            VisitMethod(p, "fill", "field: string, value", "Types a value into the input bound to this field (bind=\"$draft\"), sent with the next click or submit.", KType.PageVisit);
+            VisitMethod(p, "classes", "text: string", "The classes of the first element whose own text is this: classes('Buy milk').", KType.List);
+            p.Field(KType.PageVisit, "html", KType.String, "The page's HTML as it is now, after any clicks.");
+            p.Field(KType.PageVisit, "text", KType.String, "The words on the page as it is now, without tags and with runs of spaces made one.");
+            p.Field(KType.PageVisit, "path", KType.String, "The address visited.");
+            p.Field(KType.PageVisit, "status", KType.Number, "The HTTP status of the last render.");
+
             p.Command("emit_event", "name, data?, target?", "Sends an event from a live action to the page's live blocks. A target limits it to one block ID.", KType.Null, EmitEvent,
                 "@emit_event('items-changed', data: $item.id, target: 'summary')");
             p.Command("live_redirect", "path", "Sends the browser to a path on this site after a live action.", KType.Null, RedirectLive,
@@ -159,6 +171,10 @@ namespace KScript.Web
             LiveActionStream.Emit(page.Request, target, call.Str(1), mode, call.Bool(3));
             return null;
         }
+
+        private static void VisitMethod(PackageBuilder p, string name, string parameters, string description, string returns) =>
+            p.Method(KType.PageVisit, name, parameters, description, returns, (target, call) =>
+                target is PageVisit visit && visit.TryCallMethod(call, name, out object result) ? result : throw call.Error($"->{name}() doesn't work on {Values.Describe(target)}.", "Type"));
 
         private static PageContext LiveAction(CallContext call) =>
             call.Host.Items.TryGetValue(PageRuntime.ContextKey, out object host) && host is PageContext { InLiveAction: true } page

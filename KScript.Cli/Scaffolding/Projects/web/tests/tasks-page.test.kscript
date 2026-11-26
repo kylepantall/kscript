@@ -1,0 +1,28 @@
+// Clicks through the Tasks page as a browser would: @visit renders it, and each
+// click or change runs its live handler on the server. Run with: kscript test
+import KScript.Web
+
+describe(name: "the Tasks page") {
+  test(name: "it lists the starter tasks") {
+    page = @visit('/tasks')
+    expect(value: $page.text, contains: 'Try the web app: kscript serve')
+    expect(value: $page.text, contains: '2 tasks left')
+  }
+
+  test(name: "adding a task clears the box") {
+    page = @visit('/tasks')->fill('draft', 'Write the docs')->submit()
+    expect(value: $page.text, contains: 'Write the docs')
+    expect(value: $page.text, contains: '3 tasks left')
+  }
+
+  test(name: "ticking a task marks it done") {
+    page = @visit('/tasks')->change('Try the web app: kscript serve')
+    expect(value: $page.html, contains: '<li class="done">')
+    expect(value: $page.text, contains: '1 task left')
+  }
+
+  test(name: "removing a task takes it off the list") {
+    page = @visit('/tasks')->click('Remove')
+    expect(value: $page.text, not_contains: 'Try the web app')
+  }
+}

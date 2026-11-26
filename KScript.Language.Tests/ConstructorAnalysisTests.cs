@@ -148,7 +148,7 @@ namespace KScript.Language.Tests
         {
             TestHelpers.AssertClean(Check("_components/flip-card.kscript", Card1("<button @on-click(toggle: $open)>Flip</button><button on-click=\"$add\">Add</button>")));
             string problems = Messages(Check("_components/flip-card.kscript", Card1("<button @on-click($label)>Bad</button><button @on-click($nope)>Bad</button>")));
-            Assert.Contains("A handler that is one value flips a bool or calls a function, and $label is string.", problems);
+            Assert.Contains("A handler that is one value calls a function, and $label is string.", problems);
             Assert.Contains("$nope is not defined", problems);
         }
 
@@ -165,15 +165,6 @@ namespace KScript.Language.Tests
             Assert.Equal("Change to toggle: $open", fix.Title);
             Assert.Contains("@on-click(toggle: $open)", AnalyzerTests.Apply(bare, fix.Changes));
             TestHelpers.AssertClean(Check("_components/flip-card.kscript", AnalyzerTests.Apply(bare, fix.Changes)));
-        }
-
-        [Theory]
-        [InlineData("<button @on-click(toggle: $label)>x</button>", "KS5005 toggle: flips a bool, and $label is string. Write statements instead, such as label = ….")]
-        [InlineData("<button @on-click(toggle: $nope)>x</button>", "$nope is not defined")]
-        [InlineData("<button @on-click(flip: $open)>x</button>", "KS2003 A handler has no 'flip:' shorthand. It takes toggle:, a function to call, or statements.")]
-        public void A_shorthand_is_checked(string handler, string message)
-        {
-            Assert.Contains(message, Messages(Check("_components/flip-card.kscript", Card1(handler))));
         }
 
         [Fact]

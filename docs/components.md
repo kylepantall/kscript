@@ -14,7 +14,7 @@ type ClickCounter extends Component {
 
   fn render() {
     return ```html
-    <button type="button" @on-click(count += 1)>Count is {$count}</button>
+    <button type="button" @on-click(increment: $count)>Count is {$count}</button>
     ```
   }
 }
@@ -171,7 +171,7 @@ type NoteCard extends Component {
     <article>
       <h3>{$heading}</h3>
       <button type="button" @on-click(toggle: $open)>{$open ? 'Hide' : 'Show'}</button>
-      <button type="button" @on-click(clicks += 1)>Clicked {$clicks}</button>
+      <button type="button" @on-click(increment: $clicks)>Clicked {$clicks}</button>
     </article>
     ```
   }
@@ -434,7 +434,40 @@ A command it doesn't read is an error that names it, so nothing is left out with
 
 ## Actions and browser events
 
-Handlers contain KScript statements and can call imported functions. A handler can also be a function or one of the component's methods, which is called, so `@on-click($save)` runs `fn save()`. To flip a bool field, use the `toggle:` shorthand: `@on-click(toggle: $open)` is the same as `@on-click(open = not $open)`. A bare bool such as `@on-click($open)` is an error with a quick fix to `toggle:`. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
+Handlers contain KScript statements and can call imported functions. A handler can also be a function or one of the component's methods, which is called, so `@on-click($save)` runs `fn save()`. To flip a bool field, use the `toggle:` shorthand: `@on-click(toggle: $open)` is the same as `@on-click(open = not $open)`. A bare bool such as `@on-click($open)` is an error with a quick fix to `toggle:`.
+
+### Handler shorthands
+
+A handler can name what it does instead of spelling out the statement. Each shorthand is optional: the statement form keeps working. Several shorthands run left to right in one handler, such as `@on-click(add: $draft, to: $tags, set: $draft, to: '')`. A handler holds shorthands or statements, not both.
+
+| Shorthand | Same as | Field |
+| --- | --- | --- |
+| `toggle: $open` | `open = not $open` | bool |
+| `call: $save` | `fn save()` of the component, or a function in a variable | fn or method |
+| `call: $save, with: [$note.id]` | `$this->save($note.id)` | fn or method |
+| `increment: $count` | `count = $count + 1` | number |
+| `increment: $count, by: 5` | `count = $count + 5` | number |
+| `decrement: $count`, `by:` | `count = $count - 1` | number |
+| `set: $tab, to: 'notes'` | `tab = 'notes'` | any |
+| `add: $draft, to: $tags` | `tags = $tags->push($draft)` | list |
+| `remove: $tag, from: $tags` | `tags = $tags->remove($tag)` | list |
+
+`kscript check` and the editor check each field's type, complete the names (and `by:`, `to:`, `from:` or `with:` after the action they go with), and show the statement a shorthand stands for on hover.
+
+### Switching classes
+
+`@class(...)` adds classes to a tag's own `class` while their conditions are true. Put the class first for one class per condition, or the condition first to switch several classes at once:
+
+```html
+<li class="item" @class(done: $todo.done, 'is-late': $todo.due < @today())>{$todo.title}</li>
+<li @class({
+  $todo.done: ['done', 'struck'],
+  [$todo.done, $open]: 'expanded',
+  $todo.done or $open: 'highlight',
+})>{$todo.title}</li>
+```
+
+A condition is a bool, or a list of bools that must all be true. With the condition first, the value is a class name or a list of them. Browser details are available as `$event`. A key event includes its key, code and modifiers. Pointer events include coordinates, button, pointer ID and pointer type where applicable.
 
 | Interaction | Attributes |
 | --- | --- |
