@@ -1,0 +1,37 @@
+// @visit renders pages the way kscript serve answers them: routes first, with
+// their middleware, then file pages, and live actions run against the route
+// (#198).
+import KScript.Web
+import KScript.Auth
+
+describe(name: 'Pages') {
+  test(name: 'the home page is a file page') {
+    expect(@visit('/').text, contains: 'Sign in or create an account')
+  }
+
+  test(name: 'a guest is sent from the account page to sign in') {
+    page = @visit('/account')
+    expect($page.path, equals: '/login')
+    expect($page.status, same: 200)
+  }
+
+  test(name: 'the sign-in page comes from a controller route') {
+    expect(@visit('/login').html, contains: '<form')
+  }
+
+  test(name: 'a signed-in account page makes an API token') {
+    @acting_as(@register('ada@example.test', 'correct-horse-battery-9'))
+    page = @visit('/account')
+    expect($page.path, equals: '/account')
+    page = $page->fill('name', 'laptop')->submit('Make a token')
+    expect($page.text, contains: 'Your new token is')
+    expect($page.text, contains: 'laptop, made')
+  }
+
+  test(name: "the profile page shows the signed-in user's profile") {
+    @acting_as(@register('bea@example.test', 'correct-horse-battery-9'))
+    page = @visit('/profile')->click('Show saved bio')
+    expect($page.path, equals: '/profile')
+    expect($page.text, contains: 'Saved bio:')
+  }
+}

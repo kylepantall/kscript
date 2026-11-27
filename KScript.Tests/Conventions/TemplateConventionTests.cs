@@ -38,9 +38,10 @@ public sealed class TemplateConventionTests : IDisposable
         return (code, o.ToString());
     }
 
-    /// <summary>The words of a command line, with "quoted words" kept whole.</summary>
+    /// <summary>The words of a command line, with "quoted words" and 'quoted words' kept whole.</summary>
     private static string[] Words(string command) =>
-        Regex.Matches(command, @"""((?:[^""\\]|\\.)*)""|(\S+)").Select(m => m.Groups[1].Success ? m.Groups[1].Value.Replace("\\\"", "\"") : m.Groups[2].Value).ToArray();
+        Regex.Matches(command, @"""((?:[^""\\]|\\.)*)""|'([^']*)'|(\S+)").Select(m => m.Groups[1].Success ? m.Groups[1].Value.Replace("\\\"", "\"")
+            : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value).ToArray();
 
     /// <summary>
     /// Every way a generator is documented to be used: its plain form (kscript make type name) and each example in

@@ -418,6 +418,7 @@ public sealed class AuthMakeTests : AuthSiteFixture
     [Theory]
     [InlineData("{}", "{\n  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } }\n}")]
     [InlineData("{ \"name\": \"x\" }", "{\n  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } },\n\"name\": \"x\" }")]
+    [InlineData("{ \"name\": \"x\" }\n", "{\n  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } },\n\"name\": \"x\" }\n")]
     [InlineData("{\n  \"name\": \"x\"\n}", "{\n  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } },\n  \"name\": \"x\"\n}")]
     [InlineData("{\n  \"$schema\": \"s\",\n  \"name\": \"x\"\n}", "{\n  \"$schema\": \"s\",\n  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } },\n  \"name\": \"x\"\n}")]
     [InlineData("[]", null)]

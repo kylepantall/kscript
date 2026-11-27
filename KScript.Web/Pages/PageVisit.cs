@@ -23,16 +23,27 @@ namespace KScript.Pages
         private readonly PageSite site;
         private readonly Dictionary<string, object> binds = new Dictionary<string, object>(StringComparer.Ordinal);
 
-        private PageVisit(PageSite site, string path)
+        /// <summary>The most redirects a visit follows, as a browser would, before it gives up.</summary>
+        private const int MaxRedirects = 5;
+
+        /// <summary>For a page a route served: who asks (the script's host and folder), the headers it gave, and the cookies the app set.</summary>
+        private readonly KScriptHost host;
+        private readonly string folder;
+        private readonly Dictionary<string, object> headers = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> cookies = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        private PageVisit(PageSite site, string path, KScriptHost host, string folder)
         {
             this.site = site;
+            this.host = host;
+            this.folder = folder;
             Path = path;
         }
 
         public string TypeName => KScript.Metadata.KType.PageVisit;
 
         /// <summary>The address visited, such as /tasks.</summary>
-        public string Path { get; }
+        public string Path { get; private set; }
 
         /// <summary>The page's HTML as it is now, after any clicks.</summary>
         public string Html { get; private set; }
@@ -41,15 +52,28 @@ namespace KScript.Pages
 
         public string ToText() => $"page {Path}";
 
-        /// <summary>Renders a page of the site the calling script belongs to (serve.root in its kscript.json, else its folder).</summary>
-        public static PageVisit Open(CallContext call, string path)
+        /// <summary>
+        /// Renders a page of the site the calling script belongs to, as kscript serve answers it: the project's routes
+        /// first (a view: route or a controller, with their middleware), then the file pages under serve.root (in its
+        /// kscript.json, else the script's folder). <paramref name="options"/> takes headers, as @api() does.
+        /// </summary>
+        public static PageVisit Open(CallContext call, string path, Dictionary<string, object> options = null, string bearer = null)
         {
             if (string.IsNullOrWhiteSpace(path)) throw call.Error("@visit() needs the address of a page, such as @visit('/') or @visit('/tasks').", "Argument");
             if (!path.StartsWith('/')) path = "/" + path;
             string start = call.Module?.Directory ?? call.Interpreter.Host.WorkingDirectory;
             Projects.ProjectConfig config = Projects.ProjectConfig.FindAndLoad(start);
             var site = new PageSite(config?.SiteRoot ?? start);
-            var visit = new PageVisit(site, path);
+            var visit = new PageVisit(site, path, call.Interpreter.Host, start);
+            if (options?.GetValueOrDefault("headers") is object given && Values.Unwrap(given) is Dictionary<string, object> map)
+                foreach (var kv in map) visit.headers[kv.Key.ToLowerInvariant()] = Values.ToStr(kv.Value);
+            if (!string.IsNullOrEmpty(bearer)) visit.headers["authorization"] = "Bearer " + bearer;
+
+            if (visit.Routed(call, "GET", path, null) is LocalResponse routed)
+            {
+                visit.FollowRedirects(call, routed);
+                return visit;
+            }
 
             var uri = new Uri(new Uri("http://localhost"), path);
             PageRoute route = site.Resolve(uri.AbsolutePath);
@@ -73,6 +97,65 @@ namespace KScript.Pages
             visit.Html = result.Body;
             visit.Status = result.Status;
             return visit;
+        }
+
+        /// <summary>
+        /// Sends a request for <paramref name="path"/> to the project's routes, with the visit's headers and cookies, and
+        /// keeps the cookies it sets. Null when no route answers it.
+        /// </summary>
+        private LocalResponse Routed(CallContext call, string method, string path, string body, Dictionary<string, object> extra = null)
+        {
+            var uri = new Uri(new Uri("http://localhost"), path);
+            var sent = new Dictionary<string, object>(headers, StringComparer.OrdinalIgnoreCase);
+            if (extra != null) foreach (var kv in extra) sent[kv.Key] = kv.Value;
+            if (cookies.Count > 0)
+            {
+                string jar = string.Join("; ", cookies.Select(c => c.Key + "=" + c.Value));
+                sent["cookie"] = sent.GetValueOrDefault("cookie") is object own && Values.ToStr(own).Length > 0 ? Values.ToStr(own) + "; " + jar : jar;
+            }
+            var request = new Dictionary<string, object>
+            {
+                ["method"] = method,
+                ["path"] = uri.AbsolutePath,
+                ["url"] = uri.PathAndQuery,
+                ["query"] = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).ToDictionary(q => q.Key, q => (object)q.Value.ToString()),
+                ["headers"] = sent,
+                ["body"] = body ?? string.Empty,
+            };
+            LocalResponse response = LocalRequests.TrySendToRoutes(host, folder, request);
+            if (response == null) return null;
+            object setCookie = response.Headers.GetValueOrDefault("Set-Cookie");
+            foreach (object one in setCookie is List<object> list ? list : setCookie != null ? new List<object> { setCookie } : new List<object>())
+            {
+                string pair = Values.ToStr(one).Split(';')[0];
+                int eq = pair.IndexOf('=');
+                if (eq <= 0) continue;
+                string name = pair.Substring(0, eq).Trim(), value = pair.Substring(eq + 1).Trim();
+                // A cookie set to expire is the server clearing it.
+                if (value.Length == 0 || Values.ToStr(one).Contains("max-age=0", StringComparison.OrdinalIgnoreCase)) cookies.Remove(name);
+                else cookies[name] = value;
+            }
+            return response;
+        }
+
+        /// <summary>Takes a route's answer as the page, following its redirects (to this site) as a browser does.</summary>
+        private void FollowRedirects(CallContext call, LocalResponse response)
+        {
+            for (int hops = 0; ; hops++)
+            {
+                Status = response.Status;
+                string location = response.Status is >= 300 and < 400 ? response.Headers.GetValueOrDefault("Location") as string : null;
+                if (location == null || !location.StartsWith('/') || location.StartsWith("//", StringComparison.Ordinal))
+                {
+                    if (response.Status == 404) throw call.Error($"@visit('{Path}'): the site has no page at {Path} (its route answered 404).", "NotFound");
+                    Html = response.Body ?? string.Empty;
+                    return;
+                }
+                if (hops >= MaxRedirects) throw call.Error($"@visit('{Path}'): the page redirected more than {MaxRedirects} times.", "Http");
+                Path = location;
+                response = Routed(call, "GET", location, null)
+                    ?? throw call.Error($"@visit(): {Path} redirected to {location}, which has no route.", "NotFound");
+            }
         }
 
         public bool TryGetMember(string name, out object value)
@@ -166,7 +249,13 @@ namespace KScript.Pages
             string blockHtml = Html[block.Index..blockEnd];
             var blockBinds = binds.Where(b => blockHtml.Contains($"data-ks-bind=\"{Values.HtmlEscape(b.Key)}\"", StringComparison.Ordinal))
                 .ToDictionary(b => b.Key, b => b.Value, StringComparer.Ordinal);
-            string json = Values.ToJson(new Dictionary<string, object>
+            var parents = StartTag.Matches(Html).Where(t => t.Index < block.Index && t.Groups[2].Value.Contains("data-ks-live=\"", StringComparison.Ordinal) && ElementEnd(t) > block.Index)
+                .Select(t => (object)new Dictionary<string, object>
+                {
+                    ["id"] = System.Net.WebUtility.HtmlDecode(Attribute(t, "data-ks-live")),
+                    ["state"] = System.Net.WebUtility.HtmlDecode(Attribute(t, "data-ks-state") ?? string.Empty),
+                }).ToList();
+            var payload = new Dictionary<string, object>
             {
                 ["page"] = Path,
                 ["block"] = System.Net.WebUtility.HtmlDecode(Attribute(block, "data-ks-live")),
@@ -175,12 +264,50 @@ namespace KScript.Pages
                 ["args"] = args == null ? null : System.Net.WebUtility.HtmlDecode(args),
                 ["binds"] = blockBinds,
                 ["event"] = ev ?? new Dictionary<string, object> { ["type"] = eventName },
-            });
+            };
+            // A component inside another, on a page a route served, sends its ancestors' state, as the browser does.
+            if (parents.Count > 0 && Attribute(block, "data-ks-route") != null) payload["parents"] = parents;
+            string json = Values.ToJson(payload);
+            if (Attribute(block, "data-ks-route") is string proof)
+            {
+                FireRouted(call, eventName, label, json, System.Net.WebUtility.HtmlDecode(proof), block.Index, blockEnd);
+                foreach (string key in blockBinds.Keys) binds.Remove(key);
+                return;
+            }
             PageResult result = PageServer.HandleLive(site, json, new Dictionary<string, object>());
             Status = result.Status;
             if (result.Status != 200) throw call.Error($"{call.Display} on '{label ?? eventName}' failed ({result.Status}): {result.Body}", "Http");
             foreach (string key in blockBinds.Keys) binds.Remove(key);
             Html = Html[..block.Index] + result.Body + Html[blockEnd..];
+        }
+
+        /// <summary>
+        /// A live action on a page a route served: posted to the page's own address with its proof, as the browser does,
+        /// so the route's middleware and controller run again before the handler.
+        /// </summary>
+        private void FireRouted(CallContext call, string eventName, string label, string json, string proof, int blockStart, int blockEnd)
+        {
+            var extra = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["content-type"] = "application/json",
+                ["x-kscript-live"] = proof,
+            };
+            LocalResponse response = Routed(call, "POST", Path, json, extra)
+                ?? throw call.Error($"{call.Display}: {Path} has no route any more, so '{label ?? eventName}' has nothing to run.", "NotFound");
+            Status = response.Status;
+            if (response.Status is >= 200 and < 300 && response.Headers.GetValueOrDefault("X-KScript-Fragment") as string == "1")
+            {
+                // The fragment is the block's new HTML.
+                Html = Html[..blockStart] + response.Body + Html[blockEnd..];
+                return;
+            }
+            if (response.Status is >= 200 and < 400)
+            {
+                // Anything else (a redirect, a whole page) makes the browser load the page again.
+                FollowRedirects(call, response.Status is >= 300 ? response : Routed(call, "GET", Path, null) ?? response);
+                return;
+            }
+            throw call.Error($"{call.Display} on '{label ?? eventName}' failed ({response.Status}): {response.Body}", "Http");
         }
 
         /// <summary>The text of the &lt;label&gt; an element is inside, or null.</summary>

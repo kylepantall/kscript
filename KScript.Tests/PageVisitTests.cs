@@ -81,4 +81,60 @@ public class PageVisitTests
         using var site = Site();
         Assert.Contains(message, Fails(site, "echo " + code));
     }
+
+    /// <summary>A project whose pages come from routes: a view: route, a controller, a redirect and a file page (#198).</summary>
+    private static TempSite RoutedSite() => new(
+        ("kscript.json", "{ \"name\": \"routed\" }"),
+        ("routes/web.kscript", """
+            import KScript.Http
+            import "../controllers/board.kscript" as board
+
+            Routes {
+              Get(path: /hello, view: 'hello')
+              Get(path: /, to: @board.show)
+              Get(path: /old, redirect: '/hello')
+              Get(path: /gone, to: @board.gone)
+              Get(path: /loop, redirect: '/loop')
+            }
+            """),
+        ("controllers/board.kscript", """
+            import KScript.Http
+            import KScript.Web
+
+            /// @public
+            fn show(request) => @view('board', owner: $request.cookies.guest ?? 'guest')
+
+            /// @public
+            fn gone(request) => @response('Gone', status: 404)
+            """),
+        ("views/hello.html", "<p>Hello from a view</p>"),
+        ("views/board.html", "<body><h1>Board of {$owner}</h1><click-counter live-id=\"c\" /></body>"),
+        ("about.html", "<p>A file page</p>"),
+        ("_components/click-counter.kscript", Counter));
+
+    [Fact]
+    public void A_visit_renders_pages_that_routes_serve()
+    {
+        using var site = RoutedSite();
+        Assert.Equal("Hello from a view 200", Run(site, "p = @visit('/hello')\necho \"{$p.text} {$p.status}\""));
+        Assert.Contains("Board of guest", Run(site, "echo @visit('/').text"));
+        // The live handler runs against the route, as it does in the browser.
+        Assert.Contains("Count 2", Run(site, "echo @visit('/')->click('Add one')->click('Add one').text"));
+        Assert.Contains("Name Joan", Run(site, "echo @visit('/')->fill('$name', 'Joan')->click('Add one').text"));
+        Assert.Equal("/hello Hello from a view", Run(site, "p = @visit('/old')\necho \"{$p.path} {$p.text}\""));
+        Assert.Contains("Board of ann", Run(site, "echo @visit('/', { headers: { Cookie: 'guest=ann' } }).text"));
+        // A path no route answers is a file page.
+        Assert.Equal("A file page", Run(site, "echo @visit('/about').text"));
+    }
+
+    [Theory]
+    [InlineData("@visit('/gone')", "its route answered 404")]
+    [InlineData("@visit('/loop')", "redirected more than 5 times")]
+    [InlineData("@visit('/nowhere')", "the site has no page at /nowhere")]
+    [InlineData("@visit('/')->click('Break')", "failed (500)")]
+    public void A_visit_to_a_route_says_what_went_wrong(string code, string message)
+    {
+        using var site = RoutedSite();
+        Assert.Contains(message, Fails(site, "echo " + code));
+    }
 }

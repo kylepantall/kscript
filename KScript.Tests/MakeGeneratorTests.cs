@@ -61,9 +61,13 @@ public sealed class MakeGeneratorTests : IDisposable
         return app.Handle(request);
     }
 
-    /// <summary>Splits an example command line the way a shell would: words, and "quoted words".</summary>
+    /// <summary>
+    /// Splits an example command line the way a shell would: words, "quoted words" and 'quoted words'. A $name inside
+    /// double quotes is the shell's own variable, so it is swapped for nothing, as bash does (an example must quote it singly).
+    /// </summary>
     private static string[] Words(string command) =>
-        Regex.Matches(command, "\"([^\"]*)\"|(\\S+)").Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value).ToArray();
+        Regex.Matches(command, "\"([^\"]*)\"|'([^']*)'|(\\S+)").Select(m => m.Groups[1].Success ? Regex.Replace(m.Groups[1].Value, @"\$[A-Za-z_]\w*", "")
+            : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value).ToArray();
 
     [Theory]
     [InlineData("--status should be an HTTP status", "error", "E", "--status", "abc")]
@@ -82,6 +86,8 @@ public sealed class MakeGeneratorTests : IDisposable
     [InlineData("--sample should be a file in the project", "type", "T", "--sample", "missing.json")]
     [InlineData("--fields should be fields written as name: type", "model", "M", "--fields", "name")]
     [InlineData("--status needs a value", "error", "E", "--status")]
+    [InlineData("--message should be a message whose {…} name a field", "error", "E", "--message", "No order {}")]
+    [InlineData("--message should be a message without double quotes", "error", "E", "--message", "Say \"hi\"")]
     public void GeneratorsRefuseOptionValuesThatWouldNotCheck(string expected, params string[] args)
     {
         string app = Project();

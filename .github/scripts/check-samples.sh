@@ -20,7 +20,7 @@ $k fmt --check libraries samples/scripts samples/xml samples/life-lab samples/ht
   samples/documents samples/queue-app samples/data samples/task-board samples/types "Example Sites/team"
 
 group "Run KScript tests"
-$k test samples/scripts samples/xml samples/life-lab samples/queue-app samples/data samples/task-board
+$k test samples/scripts samples/xml samples/life-lab samples/auth-app samples/queue-app samples/data samples/task-board
 
 group "Run the data sample's migrations and seeder"
 $k db migrate --seed --project samples/data --no-ansi < /dev/null
@@ -70,4 +70,21 @@ $k check .
 $k fmt --check .
 $k routes .
 $k test .
+# A message whose {$name} the shell has swapped for {} is refused, not written as code that doesn't parse.
+if $k make error OrderNotFound --message "No order {}" --fields "id: int" -n; then
+  echo "kscript make error wrote a message with an empty {}" >&2
+  exit 1
+fi
+$k make error OrderNotFound --extends NotFound --message 'No order {$id}' --fields "id: int"
+$k check .
+cd ..
+
+group "kscript make auth on a one-line kscript.json"
+# The password rule goes inside the braces, so the project still loads.
+mkdir one-line-app
+echo '{ "name": "one-line-app" }' > one-line-app/kscript.json
+$k make auth --dir one-line-app -n
+$k check one-line-app --warnings-as-errors
+$k fmt --check one-line-app
+$k routes one-line-app
 echo "::endgroup::"

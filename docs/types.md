@@ -558,7 +558,7 @@ Converting one number with `as int`, a typed variable (`n: int = 3.9`) or an `in
 kscript make native Sku --pattern '/^[A-Z]{3}-\d{4}$/' --normalize '$value->trim()->upper()'
 kscript make native Percent --base int --min 0 --max 100
 kscript make native Username --base handle --max 16 --not @admin,@root
-kscript make native CompanySite --base url --validate "\$value.host->ends_with('example.com'), 'Use a company site'"
+kscript make native CompanySite --base url --validate '$value.host->ends_with("example.com"), "Use a company site"'
 ```
 
 The first one writes `natives/sku.kscript`:

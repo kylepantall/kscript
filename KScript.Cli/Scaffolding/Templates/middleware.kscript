@@ -7,7 +7,7 @@ usage: <name> [--header X-Name] [--before]
 example: kscript make middleware secure-headers --header X-Frame-Options
 example: kscript make middleware admin-only --before
 to: {{ paths.middleware }}/{{ dir }}{{ kebab }}{{ ext }}
-hint: Use it in a route file: import {{ paths.middleware }}/{{ dir }}{{ kebab }}{{ ext }} (the path is relative to the route file, so "../{{ paths.middleware }}/…" from routes/), then Middleware(use: {{ snake }}), Group(middleware: {{ snake }}) or Get(…, middleware: {{ snake }})
+hint: Use it in a route file: import "../{{ paths.middleware }}/{{ dir }}{{ kebab }}{{ ext }}" from routes/ (the path is relative to the route file), then Middleware(use: {{ snake }}), Group(middleware: {{ snake }}) or Get(…, middleware: {{ snake }})
 ---
 import KScript.Http
 

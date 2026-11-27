@@ -302,7 +302,9 @@ namespace KScript.Scaffolding
             int lineEnd = json.IndexOf('\n', open);
             bool empty = Regex.IsMatch(json.Substring(open + 1), @"^\s*\}");
             string rule = "  // New passwords (@register, @reset_password) must be at least this long.\n  \"types\": { \"password\": { \"min\": 10 } }" + (empty ? "\n" : ",\n");
-            if (lineEnd < 0 || empty) return json.Substring(0, open + 1) + "\n" + rule + json.Substring(open + 1).TrimStart();
+            // A file on one line ({ "name": "x" }) gets the rule straight after its brace, not after the line.
+            bool braceOnItsOwnLine = lineEnd >= 0 && json.Substring(open + 1, lineEnd - open - 1).Trim().Length == 0;
+            if (!braceOnItsOwnLine || empty) return json.Substring(0, open + 1) + "\n" + rule + json.Substring(open + 1).TrimStart();
             // After the $schema line, when the file starts with one.
             int after = lineEnd + 1;
             string next = json.Substring(after);

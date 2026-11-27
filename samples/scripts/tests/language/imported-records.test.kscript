@@ -1,0 +1,20 @@
+// A record from another script's function keeps its type through an import
+// alias: kscript check knows $found.links[0] is a Link with ->address() (#197).
+import "../../lib/bookmarks.kscript" as bookmarks
+
+test(name: 'a list item of an imported record keeps its own methods') {
+  found = @bookmarks.find('Reading')
+  expect($found.links[0]->address(), equals: 'example.com/a')
+  expect(
+    $found.links->map(fn(l) => $l->address()),
+    equals: ['example.com/a', 'example.org']
+  )
+}
+
+test(name: 'a loop over the imported list sees the same type') {
+  addresses = []
+  for link in @bookmarks.find('Reading').links {
+    addresses = $addresses->push($link->address())
+  }
+  expect($addresses, equals: ['example.com/a', 'example.org'])
+}

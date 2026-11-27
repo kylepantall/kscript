@@ -44,7 +44,10 @@ namespace KScript.Http
             if (!request.ContainsKey("cookies") && ((Dictionary<string, object>)request["headers"]).GetValueOrDefault("cookie") is object cookieHeader)
                 request["cookies"] = ParseCookies(Values.ToStr(cookieHeader));
 
-            PageResult result = app.Handle(request) ?? new PageResult
+            bool routesOnly = request.Remove(LocalRequests.RoutesOnlyKey);
+            PageResult result = app.Handle(request);
+            if (result == null && routesOnly) return null;
+            result ??= new PageResult
             {
                 Status = 404,
                 Body = Values.ToJson(new Dictionary<string, object> { ["error"] = $"No route for {request["method"]} {request["path"]}." }),

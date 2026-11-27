@@ -4,11 +4,11 @@ category: Scripts and data
 usage: <Name> [--status 402] [--extends Validation] [--message "..."] [--fields "order: int, reason?: string"]
 --status: The HTTP status a KScript.Http route answers with when nothing catches it, such as 402
 --extends: The error type it is a kind of, such as NotFound or Validation (default Error)
---message: The message, with the fields as variables: "No order {$id}" (default the name in words)
+--message: The message, with the fields as variables: 'No order {$id}' (default the name in words)
 --fields: The fields, comma separated, as name: type, with ? for optional and = for a default
 example: kscript make error PaymentFailed --status 402 --fields "order: int, reason?: string"
-example: kscript make error OrderNotFound --extends NotFound --message "No order {$id}" --fields "id: int"
-checks: status=status; fields=fields
+example: kscript make error OrderNotFound --extends NotFound --message 'No order {$id}' --fields "id: int"
+checks: status=status; fields=fields; message=message
 to: {{ paths.errors }}/{{ dir }}{{ kebab }}{{ ext }}
 hint: Import it with import "{{ paths.errors }}/{{ dir }}{{ kebab }}{{ ext }}", then throw {{ pascal }}(...) and catch {{ pascal }} as e
 ---
