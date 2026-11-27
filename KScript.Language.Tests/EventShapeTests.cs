@@ -141,6 +141,7 @@ namespace KScript.Language.Tests
             Assert.Contains("data", FieldsAfter(board, "@on-event(title = $event."));
         }
 
+<<<<<<< HEAD
         [Theory]
         [InlineData("@on-click(title = $event.value) @on-drop(title = $event.drag_value)")]
         [InlineData("@on-dblclick(title = 'x') @on-drop(title = $event.drag_value)")]
@@ -178,6 +179,8 @@ namespace KScript.Language.Tests
             Assert.Single(board.Analysis.Diagnostics, d => d.Message.StartsWith("event has no field 'drag_value'", StringComparison.Ordinal));
         }
 
+=======
+>>>>>>> 5115ae1628e3f51c64dd48fcb025b07cbc2395c7
         [Fact]
         public void A_field_the_event_does_not_have_is_reported()
         {
