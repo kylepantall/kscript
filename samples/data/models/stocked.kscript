@@ -1,0 +1,9 @@
+import KScript.Data
+
+/// Something counted in stock. A model that extends it gets the stock field and
+/// the in_stock() scope.
+model Stocked(mixin) {
+  stock: int = 0
+
+  fn in_stock(query) => $query->where(fn(item) => $item.stock > 0)
+}

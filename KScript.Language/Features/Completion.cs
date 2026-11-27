@@ -1031,6 +1031,24 @@ namespace KScript.Language.Features
                     SortText = "1" + s.Name,
                 }).ToList();
 
+            // @boards.find_note(): an import alias starts a call too, so it is offered with the functions, followed by its dot.
+            Scope scope = analysis.ScopeAt(replace.Start);
+            foreach (Symbol import in scope.VisibleAt(replace.Start).Where(s => s.Kind == SymbolKind.Import && scope.Lookup(s.Name, replace.Start) == s)
+                .GroupBy(s => s.Name, StringComparer.Ordinal).Select(g => g.First()))
+            {
+                items.Add(new CompletionItem
+                {
+                    Label = sigil + import.Name,
+                    Kind = CompletionKind.Module,
+                    Detail = import.Description,
+                    InsertText = sigil + import.Name + ".",
+                    ReplaceSpan = replace,
+                    FilterText = import.Name,
+                    SortText = "1" + import.Name,
+                    SuggestAgain = true,
+                });
+            }
+
             var packages = new HashSet<string>(analysis.UnqualifiedCommandPackages, StringComparer.OrdinalIgnoreCase);
             if (analysis.Kind == DocumentKind.Script && analysis.MarkupAt(replace.Start).Kind == DocumentKind.Page)
                 packages.UnionWith(global::KScript.Pages.PageElementNames.DefaultPackages.SelectMany(Catalog.WithRequired));

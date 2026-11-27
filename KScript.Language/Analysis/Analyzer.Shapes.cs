@@ -141,6 +141,11 @@ namespace KScript.Language.Analysis
                     }
                 }
                 foreach (KeyValuePair<string, Symbol> method in baseShape.Methods) shape.Methods[method.Key] = method.Value;
+                foreach (KeyValuePair<string, Symbol> inherited in baseShape.Scopes)
+                {
+                    // A base's or mixin's scope runs on a query of this model: Item->owned_by() where Item extends Owned.
+                    shape.Scopes[inherited.Key] = InheritedScope(inherited.Value, shape);
+                }
             }
             if (!refined && shape.Type == KType.Map)
             {
@@ -186,7 +191,7 @@ namespace KScript.Language.Analysis
                 {
                     // A scope: User->admins() runs it on a query of the model, which it is given as query.
                     var scope = new Symbol { Name = fnName, Kind = SymbolKind.Function, DeclarationSpan = span, DeclaringElement = fn, Description = fn.Documentation,
-                        ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
+                        MethodLocation = method.MethodLocation, ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
                     scope.Parameters.AddRange(method.Parameters.Skip(1));
                     shape.Scopes[fnName] = scope;
                     scopeDeclarations[scope] = method;
@@ -194,6 +199,17 @@ namespace KScript.Language.Analysis
                 }
                 shape.Methods[fnName] = method;
             }
+        }
+
+        /// <summary>A scope a model takes from a base or mixin: the same fn, returning a query of the model that inherits it.</summary>
+        private Symbol InheritedScope(Symbol scope, TypeShape shape)
+        {
+            var copy = new Symbol { Name = scope.Name, Kind = SymbolKind.Function, DeclarationSpan = scope.DeclarationSpan, DeclaringElement = scope.DeclaringElement,
+                Description = scope.Description, MethodLocation = scope.MethodLocation, SourcePath = scope.SourcePath,
+                ReturnShape = new TypeShape(KType.Query) { Name = shape.Name, Instance = shape } };
+            copy.Parameters.AddRange(scope.Parameters);
+            if (scopeDeclarations.TryGetValue(scope, out Symbol fn)) scopeDeclarations[copy] = fn;
+            return copy;
         }
 
         /// <summary>A model field's type as written, and whether it may be left out.</summary>

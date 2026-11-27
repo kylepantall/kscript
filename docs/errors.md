@@ -65,7 +65,7 @@ if $count == 1 { }   // right
 
 ## KS2003
 
-**Two statements run together.** Put each on its own line, or separate them with `;`.
+**Two statements run together, or a statement does nothing.** Put each statement on its own line, or separate them with `;`. A statement on its own must do something: assign, call or return. `$total + 1`, or `@boards.max_file_size` on its own line, reads a value and drops it, and `@greet` without brackets names the function without calling it. The quick fixes call it (`@greet()`) or remove the line.
 
 ## KS2004
 
