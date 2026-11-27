@@ -274,6 +274,24 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void The_contents_page_lists_every_heading_in_every_guide()
+    {
+        // Made from the guides' headings, so a new section (such as the built-in mixins) is listed by itself.
+        DocPage contents = Site.Value.Find("/guide");
+        foreach (DocPage guide in Site.Value.Pages.Where(p => p.Source != null && p.ParentPath == null))
+        {
+            Assert.Contains($"href=\"{guide.Path}\"", contents.Body);
+            Assert.True(guide.Toc.Count > 0 && guide.Toc[0].Level == 2, $"{guide.Path} should start its headings with a ## topic.");
+            foreach (var (level, id, _) in guide.Toc)
+                Assert.True(contents.Body.Contains($"href=\"{guide.Path}/{id}\"") || contents.Body.Contains($"href=\"{guide.Path}#{id}\""), $"{guide.Path}#{id} is missing from the contents.");
+        }
+
+        Assert.Contains(">Built-in models and mixins</a>", contents.Body);
+        Assert.Contains("Built-in models and mixins", new KScript.Docs.Mcp.DocsMarkdown(Site.Value).Page("/guide", "kscript"));
+        Assert.Equal("/guide", Site.Value.Pages[Site.Value.Pages.FindIndex(p => p.Path == "/") + 1].Path);
+    }
+
+    [Fact]
     public void The_a_to_z_lists_everything_built_in()
     {
         string index = Site.Value.Find("/reference/index").Body;

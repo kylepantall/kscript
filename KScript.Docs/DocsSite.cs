@@ -152,6 +152,7 @@ namespace KScript.Docs
                 string markdown = readGuide(guide.File);
                 if (markdown != null) site.AddGuide(guide, markdown);
             }
+            site.AddContents();
             site.AddReference();
             site.AddBuiltinPages();
             site.AddCli();
