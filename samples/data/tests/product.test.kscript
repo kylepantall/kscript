@@ -49,4 +49,13 @@ describe(name: 'Product') {
       same: true
     )
   }
+
+  test(name: 'filters with its own scopes and the ones from Stocked') {
+    Product->create(sku: 'TEA-9', name: 'Black tea', price: 5, stock: 3)
+    Product->create(sku: 'MUG-1', name: 'Blue mug', price: 8)
+    Product->create(sku: 'POT-2', name: 'Teapot', price: 30, stock: 1)
+    expect(Product->in_stock()->count(), same: 2)
+    expect(Product->cheap()->in_stock()->pluck(name), equals: ['Black tea'])
+    expect(Product->cheap(under: 50)->count(), same: 3)
+  }
 }

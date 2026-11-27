@@ -1,11 +1,14 @@
 import KScript.Data
+import "stocked.kscript"
 
 /// Something the shop sells.
-model Product(timestamps, unique: [sku]) {
+model Product(timestamps, unique: [sku]) extends Stocked {
   sku: string(max: 20)
   name: string(max: 120)
   price: number(min: 0)
-  stock: int = 0
   tags: string[] = []
   orders: Order[]
+
+  fn cheap(query, under: number = 10) =>
+    $query->where(fn(p) => $p.price < $under)
 }

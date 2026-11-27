@@ -459,6 +459,16 @@ namespace KScript.Language.Features
             return sb.ToString();
         }
 
+        /// <summary>A constant's value as written, when it is short enough to show on one line of a hover.</summary>
+        private static string ShortValue(string written) =>
+            written != null && written.Length <= 60 && !written.Contains('\n', StringComparison.Ordinal) ? written : null;
+
+        /// <summary>The file an aliased member comes from, as the import writes it, or null for anything else.</summary>
+        private static string ImportedFrom(Symbol s) =>
+            s.Alias == null ? null
+            : s.Alias.DeclaringElement?.GetAttributeValue("path")?.Trim() is { Length: > 0 } path ? path
+            : s.Alias.SourcePath != null ? System.IO.Path.GetFileName(s.Alias.SourcePath) : null;
+
         internal string SymbolMarkdown(DocumentAnalysis analysis, Symbol s)
         {
             StringBuilder sb = new StringBuilder("```kscript\n");
@@ -479,6 +489,10 @@ namespace KScript.Language.Features
                     if (s.Shape.Type != KType.Any)
                     {
                         sb.Append(": ").Append(s.Shape.Pretty());
+                    }
+                    if (ShortValue(s.ConstantText) is string value)
+                    {
+                        sb.Append(" = ").Append(value);
                     }
                     break;
                 case SymbolKind.Constant when s.IsTypeDeclaration:
@@ -507,8 +521,11 @@ namespace KScript.Language.Features
                 // them with their types. Hovering a field (.data) gives its description.
                 sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Values.Select(f => "`" + f.Name + (f.Shape.IsVague ? string.Empty : ": " + f.Shape.Display(1)) + "`")));
             }
-            DocComment doc = s.Kind is SymbolKind.Function or SymbolKind.Constant or SymbolKind.Variable ? s.Doc : null;
-            if (s.Kind == SymbolKind.Function && s.DocumentationWithErrors() is { Length: > 0 } functionDoc)
+            // An aliased member with no doc comment of its own has a stand-in description naming its file, which the
+            // "Imported as" line below says already.
+            bool standIn = ImportedFrom(s) != null && s.Description?.StartsWith("Imported from ", StringComparison.Ordinal) == true;
+            DocComment doc = !standIn && s.Kind is SymbolKind.Function or SymbolKind.Constant or SymbolKind.Variable ? s.Doc : null;
+            if (!standIn && s.Kind == SymbolKind.Function && s.DocumentationWithErrors() is { Length: > 0 } functionDoc)
             {
                 sb.Append("\n\n").Append(functionDoc);
             }
@@ -516,7 +533,7 @@ namespace KScript.Language.Features
             {
                 sb.Append("\n\n").Append(doc.ToMarkdown());
             }
-            else if (!string.IsNullOrEmpty(s.Description))
+            else if (!string.IsNullOrEmpty(s.Description) && !standIn)
             {
                 sb.Append("\n\n").Append(s.Description);
             }
@@ -539,9 +556,9 @@ namespace KScript.Language.Features
                     sb.Append("\n\nConstants and types: ").Append(string.Join(", ", others));
                 }
             }
-            if (s.Alias?.SourcePath != null)
+            if (ImportedFrom(s) is string from)
             {
-                sb.Append("\n\nFrom `").Append(s.Alias.DeclaringElement?.GetAttributeValue("path")?.Trim() ?? System.IO.Path.GetFileName(s.Alias.SourcePath)).Append("`, imported as ").Append(s.Alias.Name).Append('.');
+                sb.Append("\n\nImported as ").Append(s.Alias.Name).Append(" from ").Append(from);
             }
             if (s.ExtensionOf != null)
             {

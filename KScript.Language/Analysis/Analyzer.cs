@@ -514,6 +514,7 @@ namespace KScript.Language.Analysis
         }
 
         /// <summary>The values of the enums other files declare, by file and name, so an imported enum is a type here too.</summary>
+        private readonly Dictionary<(string Path, string Name), string> importedConstantValues = new Dictionary<(string Path, string Name), string>();
         private readonly Dictionary<(string Path, string Name), List<string>> importedEnums = new Dictionary<(string Path, string Name), List<string>>();
 
         private static List<string> EnumValuesOf(MarkupElement e) =>
@@ -540,6 +541,10 @@ namespace KScript.Language.Analysis
                 IsTypeDeclaration = importedTypes.Contains((full, name)),
                 Shape = TypeShape.Unknown,
             };
+            if (full != null && importedConstantValues.TryGetValue((full, name), out string written))
+            {
+                symbol.ConstantText = written;
+            }
             if (full != null && importedEnums.TryGetValue((full, name), out List<string> values))
             {
                 symbol.EnumValues = values;
@@ -589,6 +594,10 @@ namespace KScript.Language.Analysis
                 if (let.Name == "enum")
                 {
                     importedEnums[(path, nameAttr.ValueText.Trim())] = EnumValuesOf(let);
+                }
+                if (let.Name is "let" or "const" && let.GetAttributeValue("value")?.Trim() is { Length: > 0 } written)
+                {
+                    importedConstantValues[(path, nameAttr.ValueText.Trim().TrimStart('$'))] = written;
                 }
                 TextSpan span = nameAttr.Value.SourceSpan;
                 constants[nameAttr.ValueText.Trim().TrimStart('$')] = (new ExternalLocation(path, other.GetPosition(span.Start), other.GetPosition(span.End)), let.Documentation);
@@ -1689,14 +1698,69 @@ namespace KScript.Language.Analysis
                     }
                     ExprNode effect = node;
                     while (effect is UnaryNode { Operator: "not" } negation) effect = negation.Operand;
-                    bool isCall = effect is CommandCallNode or MethodCallNode or CallNode or PipeNode;
+                    // @lib.size or @greet with no brackets names a value or a function without calling it.
+                    bool isCall = effect is CommandCallNode { ArgumentList: not null } or MethodCallNode or CallNode or PipeNode;
                     if (!requireEffect || !isCall)
                     {
-                        Report(region.Source.ToSource(node.Span), DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
-                            requireEffect ? "This statement does nothing. Assign it (x = ...) or call something." : "Expected an assignment such as x = 3.");
+                        TextSpan whole = region.Source.ToSource(node.Span);
+                        Report(whole, DiagnosticSeverity.Error, DiagnosticCodes.StatementSyntax,
+                            !requireEffect ? "Expected an assignment such as x = 3."
+                            : effect is CommandCallNode reference ? NoEffectReference(reference, region, scope)
+                            : "This statement does nothing. Assign it (x = ...) or call something.",
+                            requireEffect ? NoEffectFixes(effect, whole) : null);
                     }
                 }
             }
+        }
+
+        /// <summary>The message for a statement that only names something: <c>@lib.size</c> reads a constant, <c>@greet</c> names a function.</summary>
+        private string NoEffectReference(CommandCallNode reference, ExpressionRegion region, Scope scope)
+        {
+            string name = reference.Name;
+            int dot = name.IndexOf('.');
+            int at = region.Source.ToSource(reference.Span.Start);
+            Symbol target = dot > 0 && scope.Lookup(name.Substring(0, dot), at) is Symbol { Kind: SymbolKind.Import } import
+                ? (import.Members.TryGetValue(name.Substring(dot + 1), out Symbol member) ? member : null)
+                : scope.Lookup(name, at, includeMethods: true);
+            return target != null && target.Kind != SymbolKind.Function
+                ? $"This statement does nothing: it reads @{name} and drops it. Assign it (x = @{name}) or remove it."
+                : $"This statement does nothing: @{name} without brackets is the function itself. Call it with @{name}() or remove it.";
+        }
+
+        /// <summary>Quick fixes for a statement with no effect: call it, when it names a function without brackets, and remove it.</summary>
+        private IReadOnlyList<QuickFix> NoEffectFixes(ExprNode effect, TextSpan whole)
+        {
+            var fixes = new List<QuickFix>();
+            if (effect is CommandCallNode { ArgumentList: null } reference && (!reference.Name.Contains('.', StringComparison.Ordinal) || IsImportedFunction(reference)))
+            {
+                fixes.Add(new QuickFix($"Call it: @{reference.Name}()", new TextChange(new TextSpan(whole.End, 0), "()")));
+            }
+            fixes.Add(new QuickFix("Remove the statement", new TextChange(StatementLine(whole), string.Empty)));
+            return fixes;
+        }
+
+        private bool IsImportedFunction(CommandCallNode reference)
+        {
+            int dot = reference.Name.IndexOf('.');
+            return result.RootScope.Lookup(reference.Name.Substring(0, dot), int.MaxValue) is Symbol { Kind: SymbolKind.Import } import
+                && ((import.Members.TryGetValue(reference.Name.Substring(dot + 1), out Symbol member) && member.Kind == SymbolKind.Function)
+                    || (import.Package != null && catalog.GetCommand(reference.Name.Substring(dot + 1)) != null));
+        }
+
+        /// <summary>The whole line a statement sits on, with its line break, when nothing else shares the line; else the statement.</summary>
+        private TextSpan StatementLine(TextSpan statement)
+        {
+            string text = source.Text;
+            int start = statement.Start;
+            while (start > 0 && text[start - 1] is ' ' or '\t') start--;
+            int end = statement.End;
+            while (end < text.Length && text[end] is ' ' or '\t') end++;
+            bool lineStart = start == 0 || text[start - 1] == '\n';
+            bool lineEnd = end == text.Length || text[end] is '\r' or '\n';
+            if (!lineStart || !lineEnd) return statement;
+            if (end < text.Length && text[end] == '\r') end++;
+            if (end < text.Length && text[end] == '\n') end++;
+            return TextSpan.FromBounds(start, end);
         }
 
         private void AnalyzeAssignmentTarget(AssignmentNode assign, ExpressionRegion region, Scope scope)
