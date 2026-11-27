@@ -367,60 +367,40 @@ namespace KScript.Language.Analysis
             return suggestion != null ? new[] { new QuickFix($"Change to {format(suggestion)}", new TextChange(span, suggestion)) } : null;
         }
 
-        /// <summary>Parses <c>who, greeting = 'Hello', count: int = 1</c>.</summary>
+        /// <summary>Parses <c>who, greeting = 'Hello', count: int = 1</c>, and one-of groups (<c>add|remove: file</c>), with <see cref="ParameterList"/>.</summary>
         private List<FunctionParameter> ParseParameters(DecodedText value, bool report)
         {
             List<FunctionParameter> list = new List<FunctionParameter>();
-            string text = value.Value;
-            int depth = 0;
-            char quote = '\0';
-            int start = 0;
-            for (int i = 0; i <= text.Length; i++)
+            var problems = report ? new List<ParameterProblem>() : null;
+            var checkedTypes = new HashSet<int>();
+            foreach (ParameterEntry entry in ParameterList.Read(value.Value, problems))
             {
-                char c = i < text.Length ? text[i] : ',';
-                if (quote != '\0')
+                FunctionParameter p = ParseParameter(value, entry, report, checkedTypes);
+                if (p == null) continue;
+                if (list.Any(x => x.Name == p.Name) && report)
                 {
-                    if (Quotes.IsEscape(text, i, text.Length, quote))
-                    {
-                        i++;
-                    }
-                    else if (c == quote)
-                    {
-                        quote = '\0';
-                    }
-                    continue;
+                    Report(p.Span, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The parameter '{p.Name}' is listed twice.");
                 }
-                if (c == '\'' || c == '"')
-                {
-                    quote = c;
-                }
-                else if (c == '(' || c == '[' || c == '{')
-                {
-                    depth++;
-                }
-                else if (c == ')' || c == ']' || c == '}')
-                {
-                    depth--;
-                }
-                else if (c == ',' && depth <= 0)
-                {
-                    FunctionParameter p = ParseParameter(value, start, i, report);
-                    if (p != null)
-                    {
-                        if (list.Any(x => x.Name == p.Name) && report)
-                        {
-                            Report(p.Span, DiagnosticSeverity.Error, DiagnosticCodes.DuplicateDeclaration, $"The parameter '{p.Name}' is listed twice.");
-                        }
-                        list.Add(p);
-                    }
-                    start = i + 1;
-                }
+                list.Add(p);
+            }
+            if (report)
+            {
+                // A group's names and the bars between them share one colour in the editor.
+                foreach (FunctionParameter p in list.Where(p => p.InGroup)) result.OneOfSpans.Add(p.Span);
+                foreach (ParameterEntry group in ParameterList.Read(value.Value).Where(e => e.InGroup).GroupBy(e => e.Group).Select(g => g.First()))
+                    foreach (int bar in ParameterList.Bars(value.Value, group.Start, group.Start + group.Length))
+                        result.OneOfSpans.Add(value.ToSource(new TextSpan(bar, 1)));
+            }
+            foreach (ParameterProblem problem in problems ?? Enumerable.Empty<ParameterProblem>())
+            {
+                Report(value.ToSource(new TextSpan(problem.Start, Math.Max(problem.Length, 1))), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, problem.Message);
             }
 
             if (report)
             {
                 bool sawDefault = false;
-                foreach (FunctionParameter p in list)
+                // A group's members are passed by name, so they sit anywhere in the list.
+                foreach (FunctionParameter p in list.Where(p => !p.InGroup))
                 {
                     if (p.HasDefault)
                     {
@@ -435,24 +415,13 @@ namespace KScript.Language.Analysis
             return list;
         }
 
-        private FunctionParameter ParseParameter(DecodedText value, int start, int end, bool report)
+        private FunctionParameter ParseParameter(DecodedText value, ParameterEntry entry, bool report, HashSet<int> checkedTypes)
         {
-            string part = value.Value.Substring(start, end - start);
-            if (string.IsNullOrWhiteSpace(part))
-            {
-                return null;
-            }
-
-            int eq = part.IndexOf('=');
-            string head = eq >= 0 ? part.Substring(0, eq) : part;
-            string def = eq >= 0 ? part.Substring(eq + 1).Trim() : null;
-            int colon = head.IndexOf(':');
-            string namePart = colon >= 0 ? head.Substring(0, colon) : head;
-            string type = colon >= 0 ? head.Substring(colon + 1).Trim() : null;
-
-            int lead = namePart.Length - namePart.TrimStart().Length;
-            string name = namePart.Trim();
-            int nameStart = start + lead;
+            string part = value.Value.Substring(entry.Start, entry.Length);
+            string def = entry.Default;
+            string type = entry.Type;
+            string name = entry.Name;
+            int nameStart = entry.NameStart;
             if (name.StartsWith("$", StringComparison.Ordinal))
             {
                 name = name.Substring(1);
@@ -460,26 +429,28 @@ namespace KScript.Language.Analysis
             }
 
             TextSpan span = value.ToSource(new TextSpan(nameStart, name.Length));
-            if (name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
+            if (entry.Optional || name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
             {
                 if (report)
                 {
-                    Report(value.ToSource(new TextSpan(start, end - start)), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
-                        $"'{part.Trim()}' isn't a valid parameter. Write name, name: type or name = default.");
+                    Report(value.ToSource(new TextSpan(entry.Start, entry.Length)), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"'{part.Trim()}' isn't a valid parameter. Write name, name: type, name = default, or a group such as add|remove: file.");
                 }
                 return null;
             }
 
-            if (report && type != null)
+            TextSpan typeSpan = type != null ? value.ToSource(new TextSpan(entry.TypeStart, type.Length)) : default;
+            // A shared type (add|remove: file) is checked once, for the group's first member.
+            bool checkType = report && type != null && !(entry.InGroup && entry.GroupSharesType && checkedTypes.Contains(entry.TypeStart));
+            if (checkType)
             {
-                int typeStart = start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length);
-                CheckMoneyRates(type, value.ToSource(new TextSpan(typeStart, type.Length)));
-                ReferenceTypeName(type, value.ToSource(new TextSpan(typeStart, type.Length)));
+                checkedTypes.Add(entry.TypeStart);
+                CheckMoneyRates(type, typeSpan);
+                ReferenceTypeName(type, typeSpan);
             }
-            if (report && type != null && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
+            if (checkType && !IsBuiltInTypeName(TypeBase(type)) && !DeclaredEnums().Contains(TypeBase(type)) && !TypeNames().Contains(TypeBase(type)))
             {
-                Report(value.ToSource(new TextSpan(start + colon + 1 + (head.Length - colon - 1 - head.Substring(colon + 1).TrimStart().Length), type.Length)),
-                    DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
+                Report(typeSpan, DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue, $"Unknown type '{type}'. Use one of: {string.Join(", ", BuiltInTypes.Concat(SemanticTypeNames))}, or declare it with <enum name=\"{type}\" values=\"...\" />.");
             }
 
             if (report && def != null)
@@ -491,7 +462,7 @@ namespace KScript.Language.Analysis
                 }
             }
 
-            return new FunctionParameter { Name = name, Type = type, Default = def, Span = span };
+            return new FunctionParameter { Name = name, Type = type, Default = def, Span = span, Group = entry.Group, GroupOptional = entry.GroupOptional };
         }
 
         /// <summary>Splits <c>[a, b]</c> (or <c>a, b</c>) into names and their document spans.</summary>

@@ -186,10 +186,10 @@ namespace KScript.Net
                                 { DefaultValue = "100ms", Example = "250ms" },
                         },
                     },
-                    new ParameterInfo("post", optional: true, type: KType.Any, description: "Sends this body with POST: `@api('/notes', post: { title: 'Ship it' })`. Maps and lists are sent as JSON, base64 values as binary data, and other values as UTF-8 text. Without post:, put:, patch: or delete:, the request is a GET."),
-                    new ParameterInfo("put", optional: true, type: KType.Any, description: "Sends this body with PUT."),
-                    new ParameterInfo("patch", optional: true, type: KType.Any, description: "Sends this body with PATCH."),
-                    new ParameterInfo("delete", optional: true, type: KType.Any, description: "Sends a DELETE. `delete: true` sends no body; anything else is sent as the body."),
+                    new ParameterInfo("post", optional: true, type: KType.Any, description: "Sends this body with POST: `@api('/notes', post: { title: 'Ship it' })`. Maps and lists are sent as JSON, base64 values as binary data, and other values as UTF-8 text. Without post:, put:, patch: or delete:, the request is a GET.") { Group = 0, GroupOptional = true },
+                    new ParameterInfo("put", optional: true, type: KType.Any, description: "Sends this body with PUT.") { Group = 0, GroupOptional = true },
+                    new ParameterInfo("patch", optional: true, type: KType.Any, description: "Sends this body with PATCH.") { Group = 0, GroupOptional = true },
+                    new ParameterInfo("delete", optional: true, type: KType.Any, description: "Sends a DELETE. `delete: true` sends no body; anything else is sent as the body.") { Group = 0, GroupOptional = true },
                     new ParameterInfo("bearer", optional: true, type: KType.String, description: "An Authorization: Bearer header with this token."),
                     new ParameterInfo("timeout", optional: true, type: Duration.TypeName, description: "The same as options.timeout: 5s."),
                     new ParameterInfo("retries", optional: true, type: KType.Number, description: "The same as options.retries: 3."),
@@ -271,8 +271,8 @@ namespace KScript.Net
             }
             // post: null and delete: false send nothing, so a helper can pass its own arguments straight on.
             bool Sent(string method) => Given(method) && Values.Unwrap(Named(method)) is not (null or false);
+            // post:, put:, patch: and delete: are one group in the signature, so the call has been checked for two of them.
             string[] methods = new[] { "post", "put", "patch", "delete" }.Where(Sent).ToArray();
-            if (methods.Length > 1) throw c.Error($"@api() takes one of post:, put:, patch: and delete:, and was given {string.Join(" and ", methods.Select(m => m + ":"))}.", "Argument");
             foreach (string method in methods)
             {
                 Set("method", method.ToUpperInvariant(), method);

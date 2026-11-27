@@ -229,10 +229,11 @@ namespace KScript.Syntax.Markup
             {
                 yield break;
             }
-            foreach (string part in SplitTopLevel(parameters))
+            // Every member of a one-of group (add|remove: file) is a parameter of its own.
+            foreach (ParameterEntry entry in ParameterList.Read(parameters))
             {
-                string name = part.Trim().TrimStart('$');
-                int cut = name.IndexOfAny(new[] { ':', '=', ' ' });
+                string name = entry.Name.Trim().TrimStart('$');
+                int cut = name.IndexOf(' ');
                 yield return (cut < 0 ? name : name.Substring(0, cut)).Trim().TrimStart('.');
             }
         }

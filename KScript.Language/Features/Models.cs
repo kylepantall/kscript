@@ -80,6 +80,15 @@ namespace KScript.Language.Features
 
         /// <summary>The declared parameter types, including list depth and native type options.</summary>
         internal IReadOnlyList<string> ParameterTypes { get; init; }
+
+        /// <summary>
+        /// Per parameter, the text of <see cref="Label"/> to highlight while it is active, or null for its own label. Every
+        /// member of a one-of group highlights the whole group (<c>add|remove: file</c>), so the group reads as one slot.
+        /// </summary>
+        public IReadOnlyList<string> Highlights { get; init; }
+
+        /// <summary>Per parameter, its one-of group, or -1. Null when the call has no groups.</summary>
+        internal IReadOnlyList<int> ParameterGroups { get; init; }
     }
 
     public sealed class SignatureHelpResult
@@ -155,6 +164,9 @@ namespace KScript.Language.Features
         Declaration = 1,
         Readonly = 2,
         DefaultLibrary = 4,
+
+        /// <summary>A part of a one-of group (<c>add|remove: file</c>), where it is declared and where a call names it.</summary>
+        OneOf = 8,
     }
 
     public readonly struct SemanticToken

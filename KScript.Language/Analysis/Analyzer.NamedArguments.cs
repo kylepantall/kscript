@@ -17,8 +17,12 @@ namespace KScript.Language.Analysis
         /// <remarks><paramref name="RawText"/>: how a bare word is read for the parameter's type, as text ("word") or a handle ("handle").</remarks>
         internal readonly record struct ParameterSlot(string Name, bool Required, bool Variadic, bool Flag = false, IReadOnlyList<string> Values = null, string TypeName = null,
             IReadOnlyList<string> ItemValues = null, string RawText = null, string Type = null, bool AcceptsModel = false, bool OptionalNativeCallback = false,
-            bool ScriptParameter = false, TypeArgumentConstraint TypeConstraint = TypeArgumentConstraint.None, Signature FunctionSignature = null, bool RequiresRouteName = false)
+            bool ScriptParameter = false, TypeArgumentConstraint TypeConstraint = TypeArgumentConstraint.None, Signature FunctionSignature = null, bool RequiresRouteName = false,
+            int Group = -1, bool GroupOptional = false)
         {
+            /// <summary>A member of a one-of group (<c>add|remove: file</c>): passed by name, and at most one per group.</summary>
+            public bool InGroup => Group >= 0;
+
             public bool IsEnum => Values != null && Values.Count > 0;
 
             /// <summary>A list of an enum (<c>sizes: Size[]</c>): its items can be written bare, <c>[large, small]</c>.</summary>
@@ -51,21 +55,22 @@ namespace KScript.Language.Analysis
                     RawText: NativeTypes.Get(p.Type) is { } native && native.Name != "port" ? native.RawKind : p.Type == "word" ? "word" : null,
                     Type: p.Type, AcceptsModel: knownReceiver && p.AcceptsModel, OptionalNativeCallback: p.Optional && p.Type == KType.Fn,
                     TypeConstraint: p.TypeConstraint, FunctionSignature: p.FunctionSignature,
-                    RequiresRouteName: c is { Package: "KScript.Http", Name: "route" } && p.Name == "name")).ToList()))
+                    RequiresRouteName: c is { Package: "KScript.Http", Name: "route" } && p.Name == "name", Group: p.Group, GroupOptional: p.GroupOptional)).ToList()))
                 .ToList();
 
         private List<List<ParameterSlot>> SlotsOf(Symbol fn, Scope scope) =>
             new List<List<ParameterSlot>>
             {
-                fn.Parameters.Select(p =>
+                // A group's members are named only, so they come after the others, as the interpreter binds them.
+                fn.Parameters.OrderBy(p => p.InGroup ? 1 : 0).Select(p =>
                 {
                     Symbol type = p.Type != null && !KType.Declarable.Contains(p.Type) && p.Type != "number" && p.Type != "date" && p.Type != "any"
                         ? scope?.Lookup(p.Type, int.MaxValue) : null;
                     string raw = type?.EnumValues == null ? RawTextKindOf(p.Type, scope, int.MaxValue) : null;
                     string itemType = p.Type != null && p.Type.EndsWith("[]", StringComparison.Ordinal) ? p.Type.Substring(0, p.Type.Length - 2).Trim() : null;
                     Symbol item = itemType != null && !KType.Declarable.Contains(itemType) ? scope?.Lookup(itemType, int.MaxValue) : null;
-                    return new ParameterSlot(p.Name, !p.HasDefault, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : item?.EnumValues != null ? item.Name : null,
-                        item?.EnumValues, raw, p.Type, ScriptParameter: true);
+                    return new ParameterSlot(p.Name, !p.HasDefault && !p.InGroup, false, p.Type == KType.Bool, type?.EnumValues, type?.EnumValues != null ? type.Name : item?.EnumValues != null ? item.Name : null,
+                        item?.EnumValues, raw, p.Type, ScriptParameter: true, Group: p.Group, GroupOptional: p.GroupOptional);
                 }).ToList(),
             };
 
@@ -281,7 +286,8 @@ namespace KScript.Language.Analysis
         private bool CheckNamedArguments(string display, IReadOnlyList<ArgumentNode> args, int piped, List<List<ParameterSlot>> signatures, ExpressionRegion region, TextSpan callSpan)
         {
             // Every command, method and function has at least one signature.
-            bool special = args.Any(a => a.Name != null || BareWord(a) != null || pendingRaw.Contains(a));
+            bool special = args.Any(a => a.Name != null || BareWord(a) != null || pendingRaw.Contains(a))
+                || signatures.Any(s => s.Any(p => p.InGroup));
 
             static int IndexOf(List<ParameterSlot> s, string name) => s.FindIndex(p => !p.Variadic && p.Name == name);
             // Of the signatures that have every name given, one that takes as many arguments as were given (->with() on
@@ -429,7 +435,12 @@ namespace KScript.Language.Analysis
                     late.Add(a);
                     continue;
                 }
-                if (SlotAt(positional) is ParameterSlot s)
+                if (SlotAt(positional) is ParameterSlot { InGroup: true } member)
+                {
+                    Report(region.Source.ToSource(a.Span), DiagnosticSeverity.Error, DiagnosticCodes.NamedArgument,
+                        $"{display} takes '{member.Name}' by name, as one of a group: write {member.Name}: and the value.");
+                }
+                else if (SlotAt(positional) is ParameterSlot s)
                 {
                     CheckEnumLiteral(display, a, s, region);
                     ClaimTyped(a, s, region);
@@ -490,8 +501,49 @@ namespace KScript.Language.Analysis
                     Report(callSpan, DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
                         $"{display} needs a value for {string.Join(" and ", missing.Select(m => "'" + m + "'"))}.");
                 }
+                CheckGroups(display, signature, filled, region, callSpan);
             }
             return special;
+        }
+
+        /// <summary>
+        /// One-of groups: two members passed is an error at the second, and none of a required group an error at the
+        /// call, worded as the interpreter words them. A member given null counts as not passed.
+        /// </summary>
+        private void CheckGroups(string display, List<ParameterSlot> signature, Dictionary<int, ArgumentNode> filled, ExpressionRegion region, TextSpan callSpan)
+        {
+            foreach (var group in signature.Select((p, i) => (Slot: p, Index: i)).Where(x => x.Slot.InGroup).GroupBy(x => x.Slot.Group))
+            {
+                foreach (var x in group)
+                    if (filled.TryGetValue(x.Index, out ArgumentNode named) && named?.Name != null)
+                        result.OneOfSpans.Add(region.Source.ToSource(named.NameSpan));
+                List<string> names = group.Select(x => x.Slot.Name).ToList();
+                var given = group.Where(x => filled.TryGetValue(x.Index, out ArgumentNode a) && a != null && a.Value is not LiteralNode { Kind: LiteralKind.Null } && a.Value is not LiteralNode { Kind: LiteralKind.Bool, Value: "false" })
+                    .Select(x => filled[x.Index]).OrderBy(a => a.Span.Start).ToList();
+                // A variable or call may be null (a helper passing its own post: $post, put: $put straight on), so two
+                // members are only an error here when both are values; the interpreter checks the rest when it runs.
+                var passed = given.Where(a => a.Value is LiteralNode or ListNode or MapNode or LambdaNode).ToList();
+                string problem = given.Count == 0
+                    ? KScript.Syntax.ParameterList.GroupProblem(display, names, group.First().Slot.GroupOptional, 0)
+                    : passed.Count > 1 ? KScript.Syntax.ParameterList.GroupProblem(display, names, group.First().Slot.GroupOptional, passed.Count) : null;
+                if (problem == null) continue;
+                ArgumentNode extra = passed.Count > 1 ? passed[1] : null;
+                Report(extra != null ? region.Source.ToSource(extra.Name != null ? extra.NameSpan : extra.Span) : callSpan, DiagnosticSeverity.Error,
+                    passed.Count > 1 ? DiagnosticCodes.NamedArgument : DiagnosticCodes.ArgumentCount, problem,
+                    extra != null ? new[] { new QuickFix($"Remove {extra.Name ?? "this argument"}", new TextChange(ArgumentRemovalSpan(extra, region), string.Empty)) } : null);
+            }
+        }
+
+        /// <summary>An argument with the comma and space before it, so removing it leaves the call tidy.</summary>
+        private static TextSpan ArgumentRemovalSpan(ArgumentNode a, ExpressionRegion region)
+        {
+            TextSpan span = region.Source.ToSource(a.Span);
+            string text = region.Source.Value;
+            int start = a.Span.Start;
+            while (start > 0 && char.IsWhiteSpace(text[start - 1])) start--;
+            if (start > 0 && text[start - 1] == ',') start--;
+            TextSpan from = region.Source.ToSource(new TextSpan(start, a.Span.Start - start));
+            return new TextSpan(from.Start, span.End - from.Start);
         }
 
         /// <summary>A bare word on an enum parameter: fine if it is one of the values, otherwise a diagnostic with the closest.</summary>

@@ -35,58 +35,82 @@ namespace KScript.Runtime
 
         public override string ToString() => Name + (Type != null ? ": " + Type : string.Empty) + (Default != null ? " = …" : string.Empty);
 
-        /// <summary>Parses <c>who, greeting = 'Hello'</c> or <c>count: int = 1</c>.</summary>
+        /// <summary>A list as it is declared, with groups written as groups.</summary>
+        public static string Label(IReadOnlyList<Parameter> parameters) =>
+            ParameterList.Label(parameters, p => p.Group, p => p.GroupOptional, p => p.Name, p => p.Type, p => p.ToString());
+
+        /// <summary>
+        /// Which one-of group the parameter is in, or -1 (<c>add|remove: file</c>: a caller passes exactly one of them,
+        /// by name). Members not passed are null.
+        /// </summary>
+        public int Group { get; init; } = -1;
+
+        /// <summary>True when the group may be left out altogether: <c>at|after?: date</c>.</summary>
+        public bool GroupOptional { get; init; }
+
+        public bool InGroup => Group >= 0;
+
+        /// <summary>Parses <c>who, greeting = 'Hello'</c>, <c>count: int = 1</c> or a group, <c>add|remove: file</c>.</summary>
         public static List<Parameter> ParseList(string text, out string error)
         {
             error = null;
             var result = new List<Parameter>();
             if (string.IsNullOrWhiteSpace(text)) return result;
 
-            foreach (string part in SplitTopLevel(text, ','))
+            var problems = new List<ParameterProblem>();
+            List<ParameterEntry> entries = ParameterList.Read(text, problems);
+            if (problems.Count > 0)
             {
-                string p = part.Trim();
-                if (p.Length == 0) continue;
+                error = problems[0].Message;
+                return result;
+            }
+            foreach (ParameterEntry entry in entries)
+            {
+                string written = text.Substring(entry.Start, entry.Length).Trim();
                 ExprNode defaultValue = null;
-                string defaultText = null;
-                int eq = IndexOfTopLevel(p, '=');
-                if (eq >= 0)
+                string defaultText = entry.Default;
+                if (defaultText != null)
                 {
-                    defaultText = p.Substring(eq + 1).Trim();
-                    ParseResult parsed = ExpressionParser.ParseExpression(p.Substring(eq + 1));
+                    ParseResult parsed = ExpressionParser.ParseExpression(defaultText);
                     // A typed parameter's default that isn't an expression may be raw text for its type, checked when it is used.
-                    if (!parsed.Success && !p.Substring(0, eq).Contains(':'))
+                    if (!parsed.Success && entry.Type == null)
                     {
-                        error = $"The default value of '{p.Substring(0, eq).Trim()}' isn't a valid expression: {parsed.Errors[0].Message}";
+                        error = $"The default value of '{entry.Name}' isn't a valid expression: {parsed.Errors[0].Message}";
                         return result;
                     }
                     defaultValue = parsed.Success ? parsed.Root : null;
-                    p = p.Substring(0, eq).Trim();
                 }
 
-                string type = null;
-                int colon = p.IndexOf(':');
-                if (colon >= 0)
+                string type = entry.Type;
+                // Any other name is an <enum> or a <type>, looked up when the function is called.
+                if (type != null && TypeRef.Parse(type) == null)
                 {
-                    type = p.Substring(colon + 1).Trim();
-                    p = p.Substring(0, colon).Trim();
-                    // Any other name is an <enum> or a <type>, looked up when the function is called.
-                    if (TypeRef.Parse(type) == null)
-                    {
-                        error = $"Unknown type '{type}' for parameter '{p}'. Use one of: {string.Join(", ", Values.DeclarableTypes)}, or the name of an <enum> or <type> (with [] for a list and ? to allow null).";
-                        return result;
-                    }
-                }
-
-                string name = p.TrimStart('$');
-                if (name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
-                {
-                    error = $"'{part.Trim()}' isn't a parameter name. Write names like who, count: int, or greeting = 'Hello'.";
+                    error = $"Unknown type '{type}' for parameter '{entry.Name}'. Use one of: {string.Join(", ", Values.DeclarableTypes)}, or the name of an <enum> or <type> (with [] for a list and ? to allow null).";
                     return result;
                 }
-                result.Add(new Parameter(name, type, defaultValue, defaultText));
+
+                string name = entry.Name.TrimStart('$');
+                if (entry.Optional || name.Length == 0 || !Lexer.IsIdentStart(name[0]) || !name.All(Lexer.IsIdentChar))
+                {
+                    error = $"'{written}' isn't a parameter name. Write names like who, count: int, or greeting = 'Hello'.";
+                    return result;
+                }
+                result.Add(new Parameter(name, type, defaultValue, defaultText) { Group = entry.Group, GroupOptional = entry.GroupOptional });
             }
             return result;
         }
+
+        /// <summary>The members of each group, in order.</summary>
+        public static IEnumerable<List<Parameter>> Groups(IReadOnlyList<Parameter> parameters) =>
+            parameters.Where(p => p.InGroup).GroupBy(p => p.Group).Select(g => g.ToList());
+
+        /// <summary>
+        /// The error for a call that passed more than one member of a group, or none of a required one; null when the
+        /// call is fine. <paramref name="passed"/> says whether a member was given.
+        /// </summary>
+        public static string GroupProblem(string display, IReadOnlyList<Parameter> parameters, Func<Parameter, bool> passed) =>
+            Groups(parameters).Select(g => ParameterList.GroupProblem(display, g.Select(p => p.Name).ToList(), g[0].GroupOptional, g.Count(passed)))
+                .FirstOrDefault(problem => problem != null);
 
         internal static IEnumerable<string> SplitTopLevel(string text, char separator)
         {
@@ -177,7 +201,7 @@ namespace KScript.Runtime
 
         public string Name { get; }
         public IReadOnlyList<Parameter> Parameters { get; }
-        public Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault, type: p.Type)).ToArray());
+        public Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault || p.InGroup, type: p.Type) { Group = p.Group, GroupOptional = p.GroupOptional }).ToArray());
         public string Description { get; }
         internal MarkupElement Element { get; }
         internal ExprNode ValueExpression { get; }
@@ -281,15 +305,32 @@ namespace KScript.Runtime
                 }
                 if (declared is EnumType e) enums[p.Name] = e;
             }
-            IReadOnlyList<object> args = ArgumentBinder.BindByName(call,
-                Parameters.Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null,
+            // Members of a one-of group are named only: they bind after the others, so a positional argument never lands on one.
+            int[] order = Enumerable.Range(0, Parameters.Count).OrderBy(i => Parameters[i].InGroup ? 1 : 0).ToArray();
+            IReadOnlyList<object> bound = ArgumentBinder.BindByName(call,
+                order.Select(i => Parameters[i]).Select(p => new ArgumentBinder.Slot(p.Name, false, Values: enums.TryGetValue(p.Name, out EnumType e) ? e.Names : null,
                     TypeName: e?.Name ?? enumLists.GetValueOrDefault(p.Name)?.Name, ItemValues: enumLists.GetValueOrDefault(p.Name)?.Names,
                     RawText: p.Type == null || e != null ? null : Shapes.RawTextKind(TypeRef.Parse(p.Type), Closure, Module))
-                    { RawItemText = rawItems?.GetValueOrDefault(p.Name) }).ToList(), out HashSet<int> given);
+                    { RawItemText = rawItems?.GetValueOrDefault(p.Name), NamedOnly = p.InGroup }).ToList(), out HashSet<int> boundGiven);
+            var args = new object[Parameters.Count];
+            var given = new HashSet<int>();
+            for (int k = 0; k < order.Length; k++)
+            {
+                if (k < bound.Count) args[order[k]] = bound[k];
+                if (boundGiven.Contains(k) && !(Parameters[order[k]].InGroup && bound[k] == null)) given.Add(order[k]);
+            }
+            if (Parameter.GroupProblem($"@{Name}()", Parameters, p => given.Contains(IndexOf(p))) is string problem)
+                throw new KScriptException(problem, "Argument");
             for (int i = 0; i < Parameters.Count; i++)
             {
                 Parameter p = Parameters[i];
                 object value;
+                if (p.InGroup && !given.Contains(i))
+                {
+                    // The members of a group the caller didn't pass are null.
+                    scope.Declare(p.Name, null);
+                    continue;
+                }
                 if (given.Contains(i)) value = args[i];
                 else if (p.HasDefault && p.Type != null && RawDefault(p) is string raw) value = raw;
                 else if (p.Default != null) value = interpreter.Evaluate(p.Default, scope, new EvalContext(Module, null));
@@ -315,7 +356,14 @@ namespace KScript.Runtime
             return null;
         }
 
-        public override string ToString() => $"fn {Name}({string.Join(", ", Parameters)})";
+        private int IndexOf(Parameter p)
+        {
+            for (int i = 0; i < Parameters.Count; i++)
+                if (ReferenceEquals(Parameters[i], p)) return i;
+            return -1;
+        }
+
+        public override string ToString() => $"fn {Name}({Parameter.Label(Parameters)})";
     }
 
     /// <summary>A command or method used as a value (<c>$people->map(@greet)</c>), or a function written in C#.</summary>

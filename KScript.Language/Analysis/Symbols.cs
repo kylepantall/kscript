@@ -278,9 +278,9 @@ namespace KScript.Language.Analysis
         /// <summary>For functions: their parameters, in order, and how many are required.</summary>
         public List<FunctionParameter> Parameters { get; } = new List<FunctionParameter>();
 
-        public int RequiredParameterCount => Parameters.Count(p => !p.HasDefault);
+        public int RequiredParameterCount => Parameters.Count(p => !p.HasDefault && !p.InGroup);
 
-        internal Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault, type: p.Type)).ToArray());
+        internal Signature PositionalSignature => new Signature(Parameters.Select(p => new ParameterInfo(p.Name, optional: p.HasDefault || p.InGroup, type: p.Type) { Group = p.Group, GroupOptional = p.GroupOptional }).ToArray());
 
         /// <summary>For &lt;enum&gt; types: their values, in order. A parameter typed with the enum takes them bare.</summary>
         public List<string> EnumValues { get; internal set; }
@@ -318,7 +318,7 @@ namespace KScript.Language.Analysis
         private string MethodOwner => ExtensionOf ?? (DeclaringElement?.Parent?.Name is "type" or "model" ? DeclaringElement.Parent.GetAttributeValue("name") : null);
 
         public string Signature => Kind == SymbolKind.Function
-            ? $"{(MethodOwner != null ? MethodOwner + "->" : Alias != null ? "@" + Alias.Name + "." : "@")}{Name}({string.Join(", ", Parameters.Select(p => p.Label))})"
+            ? $"{(MethodOwner != null ? MethodOwner + "->" : Alias != null ? "@" + Alias.Name + "." : "@")}{Name}({FunctionParameter.Labels(Parameters)})"
             : Alias != null ? Alias.Name + "." + Name : "$" + Name;
 
         /// <summary>The signature with the return type when it is known: <c>@double(x: int): number</c>.</summary>
@@ -335,6 +335,18 @@ namespace KScript.Language.Analysis
         public bool HasDefault => Default != null;
         public TextSpan Span { get; internal set; }
         public string Label => Name + (Type != null ? ": " + Type : string.Empty) + (HasDefault ? " = " + Default : string.Empty);
+
+        /// <summary>Which one-of group the parameter is in (<c>add|remove: file</c>), or -1. Members are passed by name.</summary>
+        public int Group { get; internal set; } = -1;
+
+        /// <summary>True when the group may be left out: <c>at|after?: date</c>.</summary>
+        public bool GroupOptional { get; internal set; }
+
+        public bool InGroup => Group >= 0;
+
+        /// <summary>The list as declared, with each group as one entry: <c>note_id: int, add|remove: file</c>.</summary>
+        public static string Labels(IReadOnlyList<FunctionParameter> parameters) =>
+            KScript.Syntax.ParameterList.Label(parameters, p => p.Group, p => p.GroupOptional, p => p.Name, p => p.Type, p => p.Label);
     }
 
     /// <summary>A use of a symbol in the document.</summary>

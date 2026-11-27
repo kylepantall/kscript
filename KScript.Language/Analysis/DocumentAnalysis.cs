@@ -70,6 +70,12 @@ namespace KScript.Language.Analysis
         public List<SymbolReference> References { get; } = new List<SymbolReference>();
         public List<ExpressionRegion> Regions { get; } = new List<ExpressionRegion>();
         internal HashSet<TextSpan> BareQuotedReferences { get; } = new HashSet<TextSpan>();
+
+        /// <summary>
+        /// The parts of one-of groups (<c>add|remove: file</c>): member names where they are declared, the bars between
+        /// them, and the names a call passes. Semantic tokens give them one colour, so a group reads as one.
+        /// </summary>
+        internal HashSet<TextSpan> OneOfSpans { get; } = new HashSet<TextSpan>();
         public List<DocumentLink> Links { get; } = new List<DocumentLink>();
         public Dictionary<Symbol, ExternalLocation> ExternalDeclarations { get; } = new Dictionary<Symbol, ExternalLocation>();
 

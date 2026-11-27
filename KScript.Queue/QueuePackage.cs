@@ -78,9 +78,9 @@ namespace KScript.Queueing
                     return fake;
                 });
 
-            Method(p, KType.Job, "dispatch", "delay?: duration, at?: date, queue?: string, connection?: string", "Queues the job and returns what was queued: { id, job, queue, connection, available_at }. delay (10m) or at (a date) make it wait; null when a unique job is already queued.", KType.Map);
+            Method(p, KType.Job, "dispatch", "(delay: duration | at: date)?, queue?: string, connection?: string", "Queues the job and returns what was queued: { id, job, queue, connection, available_at }. delay (10m) or at (a date) make it wait; null when a unique job is already queued.", KType.Map);
             Method(p, KType.Job, "run", "", "Runs the job's handle now, here, without a queue. Errors reach the caller.", KType.Any);
-            Method(p, KType.Chain, "dispatch", "delay?: duration, at?: date, queue?: string, connection?: string", "Queues the first job of the chain; each of the others is queued when the one before it succeeds.", KType.Map);
+            Method(p, KType.Chain, "dispatch", "(delay: duration | at: date)?, queue?: string, connection?: string", "Queues the first job of the chain; each of the others is queued when the one before it succeeds.", KType.Map);
             Method(p, KType.Chain, "run", "", "Runs the jobs now, here, one after another.", KType.Null);
             Method(p, KType.Chain, "count", "", "How many jobs are in the chain.", KType.Number);
             p.Field(KType.Queue, "name", KType.String, "The queue's name.");

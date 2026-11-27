@@ -60,7 +60,7 @@ public sealed class ApiShorthandTests : StorageFixture
     }
 
     [Theory]
-    [InlineData("@api('/api/echo', post: 1, put: 2)", "one of post:, put:, patch: and delete:")]
+    [InlineData("@api('/api/echo', post: 1, put: 2)", "@api() takes one of post:, put:, patch: or delete:, not more than one.")]
     [InlineData("@api('/api/echo', post: 1, options: { method: 'PUT' })", "takes the method and body as one argument")]
     [InlineData("@api('/api/echo', options: { body: 1 })", "takes the method and body as one argument")]
     [InlineData("@api('/api/echo', post: 1, options: { timeout: 2s }, timeout: 1s)", "was given timeout twice")]

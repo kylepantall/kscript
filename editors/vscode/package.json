@@ -425,6 +425,12 @@
         "editor.suggest.showSnippets": false
       }
     },
+    "semanticTokenModifiers": [
+      {
+        "id": "oneOf",
+        "description": "A part of a one-of parameter group, such as add|remove: file. Its names and bars share one colour."
+      }
+    ],
     "semanticTokenScopes": [
       {
         "language": "kscript",
@@ -437,6 +443,15 @@
           ],
           "parameter": [
             "variable.parameter.kscript"
+          ],
+          "parameter.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
+          ],
+          "property.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
+          ],
+          "operator.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
           ],
           "property": [
             "variable.other.property.kscript"
@@ -460,6 +475,15 @@
           ],
           "parameter": [
             "variable.parameter.kscript"
+          ],
+          "parameter.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
+          ],
+          "property.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
+          ],
+          "operator.oneOf": [
+            "entity.other.attribute-name.oneof.kscript"
           ],
           "property": [
             "variable.other.property.kscript"

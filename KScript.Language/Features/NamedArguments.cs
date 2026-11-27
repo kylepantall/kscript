@@ -34,7 +34,9 @@ namespace KScript.Language.Features
                 {
                     signatures.Add(new SignatureInfo
                     {
-                        Label = $"{c.Prefix}{c.Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})",
+                        Label = $"{c.Prefix}{c.Name}({s.Label})",
+                        Highlights = GroupHighlights(s.Parameters, p => p.Group, p => p.GroupOptional, p => p.Name, p => p.Values.Count > 0 ? string.Join(" | ", p.Values) : p.Type),
+                        ParameterGroups = s.Parameters.Any(p => p.InGroup) ? s.Parameters.Select(p => p.Group).ToList() : null,
                         Documentation = c.Description,
                         Parameters = s.Parameters.Select(p => (p.Label, WithAccepts(p.Deprecated != null ? DeprecationLine(p.Deprecated, p.Name) + p.Description : p.Description, p.Values.Count > 0 ? null : p.Type))).ToList(),
                         Details = s.Parameters.Select(p => (p.Name, p.Values.Count > 0 ? p.Values : suggestValues && p.Type == KType.Type ? TypeNames(analysis) : ValuesOf(p.Type), p.IsFlag)).ToList(),
@@ -69,6 +71,8 @@ namespace KScript.Language.Features
                 signatures.Add(new SignatureInfo
                 {
                     Label = fn.TypedSignature,
+                    Highlights = GroupHighlights(fn.Parameters, p => p.Group, p => p.GroupOptional, p => p.Name, p => p.Type),
+                    ParameterGroups = fn.Parameters.Any(p => p.InGroup) ? fn.Parameters.Select(p => p.Group).ToList() : null,
                     Documentation = fn.DocumentationWithErrors(includeParams: false),
                     Parameters = fn.Parameters.Select(p => (p.Label, WithAccepts(doc?.ParamText(p.Name), p.Type))).ToList(),
                     Details = fn.Parameters.Select(p => (p.Name, ValuesOf(p.Type), p.Type == KType.Bool)).ToList(),
@@ -239,6 +243,18 @@ namespace KScript.Language.Features
             });
         }
 
+        /// <summary>For each parameter, the group label it highlights (<c>add|remove: file</c>), or null; null when there are no groups.</summary>
+        private static IReadOnlyList<string> GroupHighlights<T>(IReadOnlyList<T> parameters, Func<T, int> group, Func<T, bool> optional, Func<T, string> name, Func<T, string> type)
+        {
+            if (!parameters.Any(p => group(p) >= 0)) return null;
+            return parameters.Select(p =>
+            {
+                if (group(p) < 0) return null;
+                List<T> members = parameters.Where(x => group(x) == group(p)).ToList();
+                return ParameterList.GroupLabel(members.Select(name).ToList(), members.Select(type).ToList(), optional(p));
+            }).ToList();
+        }
+
         /// <summary>The name in a parameter label: <c>name?</c>, <c>rest...</c>, <c>count: int = 1</c>.</summary>
         private static string ParameterName(string label)
         {
@@ -321,21 +337,30 @@ namespace KScript.Language.Features
 
             foreach (SignatureInfo signature in signatures)
             {
+                IReadOnlyList<int> groups = signature.ParameterGroups;
                 for (int i = 0; i < signature.Parameters.Count; i++)
                 {
                     (string label, string doc) = signature.Parameters[i];
                     string name = ParameterName(label);
-                    if (name.Length == 0 || label.EndsWith("...", StringComparison.Ordinal) || i < positional || named.Contains(name) || !seen.Add(name))
+                    int group = groups?[i] ?? -1;
+                    // A group's members are only ever named; outside groups, the first positional arguments fill parameters in order.
+                    bool filled = group < 0 && (groups == null ? i : Enumerable.Range(0, i).Count(j => groups[j] < 0)) < positional;
+                    // Once one member of a group is written, the others aren't offered: the call takes one of them.
+                    bool sibling = group >= 0 && Enumerable.Range(0, groups.Count).Any(j => j != i && groups[j] == group && named.Contains(ParameterName(signature.Parameters[j].Label)));
+                    if (name.Length == 0 || label.EndsWith("...", StringComparison.Ordinal) || filled || sibling || named.Contains(name) || !seen.Add(name))
                     {
                         continue;
                     }
+                    List<string> members = group < 0 ? null : Enumerable.Range(0, groups.Count).Where(j => groups[j] == group).Select(j => ParameterName(signature.Parameters[j].Label)).ToList();
                     items.Add(new CompletionItem
                     {
                         Label = name + ":",
                         Kind = CompletionKind.Parameter,
-                        Detail = label,
+                        Detail = members != null ? signature.Highlights[i] : label,
                         Deprecated = signature.DeprecatedParameters.Contains(name),
-                        Documentation = (doc != null ? doc + "\n\n" : string.Empty) + $"Named argument of `{signature.Label}`.",
+                        Documentation = (doc != null ? doc + "\n\n" : string.Empty)
+                            + (members != null ? $"One of {ParameterList.Choices(members)} pass only one. " : string.Empty)
+                            + $"Named argument of `{signature.Label}`.",
                         InsertText = name + ": ",
                         // An enum or yes/no parameter: show its values as soon as the name is in.
                         SuggestAgain = signature.ModelParameters.Contains(name) || (signature.Details != null && i < signature.Details.Count && (signature.Details[i].Values?.Count > 0 || signature.Details[i].Flag)),
