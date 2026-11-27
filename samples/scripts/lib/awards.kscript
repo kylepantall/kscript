@@ -1,0 +1,6 @@
+// Awards for the method-use test: the caller never names the type's file, so
+// kscript check has to follow the imports to count its method as used (#201).
+import "../types/medal.kscript"
+
+/// The prize for a place.
+fn for_place(place: int) => Medal(place: $place)

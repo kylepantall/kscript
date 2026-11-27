@@ -137,4 +137,59 @@ public class PageVisitTests
         using var site = RoutedSite();
         Assert.Contains(message, Fails(site, "echo " + code));
     }
+
+    /// <summary>One component sends events with @emit_event(), another hears them with @on-event (#202).</summary>
+    private static TempSite EventSite() => new(
+        ("kscript.json", "{ \"name\": \"events\" }"),
+        ("routes/web.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: /board, view: 'board')\n}\n"),
+        ("index.html", "<body><sender-button live-id=\"sender\" /><receiver-box live-id=\"receiver\" /><receiver-box live-id=\"other\" /></body>"),
+        ("views/board.html", "<body><sender-button live-id=\"sender\" /><receiver-box live-id=\"receiver\" /></body>"),
+        ("_components/sender-button.kscript", """
+            import KScript.Web
+
+            type SenderButton extends Component {
+              fn send() {
+                @emit_event('pinged', data: 7, target: 'receiver')
+              }
+
+              fn shout() {
+                @emit_event('pinged', data: 9)
+              }
+
+              fn render() => ```html
+                <button type="button" @on-click($send)>Ping</button>
+                <button type="button" @on-click($shout)>Shout</button>
+                ```
+            }
+            """),
+        ("_components/receiver-box.kscript", """
+            import KScript.Web
+
+            type ReceiverBox extends Component {
+              private got: int = 0
+              private from: string = ''
+
+              fn render() => ```html
+                <div>
+                  <span hidden @on-event(got = $event.data) event-name="other"></span>
+                  <span hidden @on-event(got = $event.data; from = $event.source) event-name="pinged"></span>
+                  <p>Got {$got} from {$from}</p>
+                </div>
+                ```
+            }
+            """));
+
+    [Fact]
+    public void A_visit_delivers_emitted_events_to_other_blocks()
+    {
+        using var site = EventSite();
+        // target: reaches only that block, through its listener for the event's name.
+        Assert.Equal("Ping Shout Got 7 from sender Got 0 from", Run(site, "echo @visit('/')->click('Ping').text"));
+        // No target: every block that listens hears it.
+        Assert.Equal("Ping Shout Got 9 from sender Got 9 from sender", Run(site, "echo @visit('/')->click('Shout').text"));
+        // The event is read once: the sender's HTML no longer carries it.
+        Assert.DoesNotContain("data-ks-events", Run(site, "echo @visit('/')->click('Ping').html"));
+        // On a page a route serves, too.
+        Assert.Contains("Got 7 from sender", Run(site, "echo @visit('/board')->click('Ping').text"));
+    }
 }

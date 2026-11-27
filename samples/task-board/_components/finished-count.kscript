@@ -1,0 +1,14 @@
+import KScript.Web
+
+/// Counts the tasks finished on the board. The board's Finish buttons send
+/// task-finished with emit:, and this block hears it with @on-event.
+type FinishedCount extends Component {
+  private count: int = 0
+
+  fn render() => ```html
+    <p>
+      <span hidden @on-event(increment: $count) event-name="task-finished"></span>
+      Finished so far: {$count}
+    </p>
+    ```
+}

@@ -55,17 +55,22 @@ namespace KScript.Language.Analysis
             string root = ProjectRoot(folder, files);
             string stem = Path.GetFileName(target).Split('.')[0];
 
+            var texts = new List<(string File, string Text)>();
             foreach (string file in ProjectFiles(root ?? folder, recursive: root != null, files))
             {
-                if (SamePath(file, target))
+                if (!SamePath(file, target) && files.ReadText(file) is string other)
                 {
-                    continue;
+                    texts.Add((file, other));
                 }
+            }
+            HashSet<string> reaching = Reaching(texts, stem);
+
+            foreach ((string file, string other) in texts)
+            {
                 // Component templates import their companion automatically and may never spell its filename.
                 bool companion = MarkupParser.KindFromPath(file) != DocumentKind.Script
                     && SamePath(TemplateContracts.CompanionFile(files, file), target);
-                string other = files.ReadText(file);
-                if (other == null || (!companion && other.IndexOf(stem, StringComparison.OrdinalIgnoreCase) < 0))
+                if (!companion && !reaching.Contains(file))
                 {
                     continue;
                 }
@@ -89,6 +94,38 @@ namespace KScript.Language.Analysis
             found.Importers.Clear();
             found.Importers.AddRange(scripts.Concat(pages));
             return found;
+        }
+
+        /// <summary>
+        /// The files that may use the script: those that mention its name, and those that mention a file that does, and
+        /// so on. A value's type can come from a script the caller never names: main imports lib/zoo, whose make()
+        /// returns a Zebra from types/zebra, so main's ->shown() is a use of zebra's method. Only files found this way are
+        /// analysed, so the search stays a text scan for the rest.
+        /// </summary>
+        private static HashSet<string> Reaching(List<(string File, string Text)> texts, string stem)
+        {
+            var reaching = new HashSet<string>(StringComparer.Ordinal);
+            var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { stem };
+            var pending = new Queue<string>();
+            pending.Enqueue(stem);
+            while (pending.Count > 0)
+            {
+                string name = pending.Dequeue();
+                foreach ((string file, string text) in texts)
+                {
+                    if (reaching.Contains(file) || text.IndexOf(name, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+                    reaching.Add(file);
+                    string next = Path.GetFileName(file).Split('.')[0];
+                    if (next.Length > 0 && stems.Add(next))
+                    {
+                        pending.Enqueue(next);
+                    }
+                }
+            }
+            return reaching;
         }
 
         /// <summary>Forgets every file's cached uses (for tests).</summary>

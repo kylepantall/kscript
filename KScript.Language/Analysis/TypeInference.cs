@@ -116,14 +116,20 @@ namespace KScript.Language.Analysis
                     {
                         TypeShape first = Infer(list.Items[0], region);
                         IEnumerable<TypeShape> rest = list.Items.Skip(1).Select(item => Infer(item, region));
+                        List<TypeShape> others = rest.ToList();
                         if (first.RefinementBase != null)
                         {
-                            shape.Element = Analyzer.Unify(rest.Prepend(first).ToList());
+                            shape.Element = Analyzer.Unify(others.Prepend(first).ToList());
+                        }
+                        else if (first.Name != null && others.All(item => item.Name == first.Name && item.Type == first.Type))
+                        {
+                            // [Zebra(...), $other_zebra]: records of one type keep it, with its methods.
+                            shape.Element = first;
                         }
                         else if (first.Type == KType.Map)
                         {
                             TypeShape merged = new TypeShape(KType.Map);
-                            foreach (TypeShape item in rest.Prepend(first))
+                            foreach (TypeShape item in others.Prepend(first))
                             {
                                 foreach (KeyValuePair<string, FieldInfo> f in item.Fields)
                                 {
@@ -134,7 +140,7 @@ namespace KScript.Language.Analysis
                         }
                         else
                         {
-                            shape.Element = rest.All(item => item.Type == first.Type) ? first : TypeShape.Unknown;
+                            shape.Element = others.All(item => item.Type == first.Type) ? first : TypeShape.Unknown;
                         }
                     }
                     return shape;
