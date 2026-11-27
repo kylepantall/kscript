@@ -253,6 +253,9 @@ public sealed class DocsTests
         string types = Site.Value.Find("/reference/types").Body;
         foreach (string type in KScript.Runtime.Values.DeclarableTypes)
         {
+            // Other tests register made-up types (such as sku) for the whole run; those have no page.
+            if (NativeTypeRegistry.Get(type)?.GetType().Assembly == typeof(DocsTests).Assembly)
+                continue;
             Assert.Contains($"id=\"type-{Html.Slug(type)}\"", types);
             Assert.True(KScript.Metadata.NativeTypes.Get(type) != null || DocsSite.BasicTypeDescriptions.ContainsKey(type), $"Say what a {type} holds in DocsSite.BasicTypeDescriptions.");
         }
