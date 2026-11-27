@@ -188,7 +188,7 @@ Use it for scripts that do their work at the top level or call `exit`. A test th
 - `->fill(field, value)` types into the input bound to that field, and `->submit(text?)` runs a form's on-submit.
 - `.text` is the words on the page, `.html` its HTML, and `->classes(text)` the classes of the element whose own text that is.
 
-Each of these returns the page, so they chain. A page that isn't there is a `NotFound` error.
+Each of these returns the page, so they chain. A page that isn't there is a `NotFound` error. Events a handler sends with `@emit_event()` (or `emit:`) reach the other blocks' `on-event` listeners, as they do in the browser: the block named by `target:`, or every block that listens.
 
 A visit to a route keeps the cookies the app sets (a guest cookie, the session) for its clicks, and follows redirects as a browser does: `.path` is where it ended up. `@acting_as()` signs the visit in, as it does for `@api(/...)`, and `@visit(path, { headers: { Cookie: 'guest=abc' } })` sends headers of its own (`bearer:` sends a token):
 
