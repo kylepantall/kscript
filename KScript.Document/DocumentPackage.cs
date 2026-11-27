@@ -223,7 +223,19 @@ namespace KScript.Documents
                 ("document->markdown", "<echo>{ $doc->markdown() }</echo>"),
                 ("document->latex", "<do>@write_text('paper.tex', $doc->latex())</do>"),
                 ("document->html", "<echo>{ $doc->html()->count() }</echo>"),
-                ("document->words", "<echo>{ $doc->words() } words</echo>"));
+                ("document->words", "<echo>{ $doc->words() } words</echo>"),
+                ("markdown->find", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<echo>{ $notes->find('ideas') }</echo>"),
+                ("markdown->replace", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<echo>{ $notes->replace('ideas', 'plans').text }</echo>"),
+                ("markdown->insert", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<echo>{ $notes->insert(' More soon.').text }</echo>"),
+                ("markdown->save", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<do>$notes->save('notes.pdf')</do>\n<do>$notes->save('notes.docx')</do>"),
+                ("markdown->pages", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<echo>{ $notes->pages() } pages</echo>"),
+                ("markdown->latex", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<do>@write_text('notes.tex', $notes->latex())</do>"),
+                ("markdown->html", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<do>@write_text('notes.html', $notes->html())</do>"),
+                ("markdown->words", "<let name=\"notes\" value=\"```markdown\n  # Notes\n\n  Some *ideas* for the launch.\n  ```\" />\n<echo>{ $notes->words() } words</echo>"),
+                ("latex->find", "<let name=\"paper\" value=\"```latex\n  \\section*{Introduction}\n  Some ideas.\n  ```\" />\n<echo>{ $paper->find('ideas') }</echo>"),
+                ("latex->replace", "<let name=\"paper\" value=\"```latex\n  \\section*{Introduction}\n  Some ideas.\n  ```\" />\n<echo>{ $paper->replace('ideas', 'plans').text }</echo>"),
+                ("latex->insert", "<let name=\"paper\" value=\"```latex\n  \\section*{Introduction}\n  Some ideas.\n  ```\" />\n<echo>{ $paper->insert(' More soon.').text }</echo>"),
+                ("latex->save", "<let name=\"paper\" value=\"```latex\n  \\section*{Introduction}\n  Some ideas.\n  ```\" />\n<do>$paper->save('paper.tex')</do>"));
         }
     }
 }

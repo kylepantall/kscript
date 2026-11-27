@@ -36,6 +36,7 @@ namespace KScript.Web
             });
             Page(p, new ElementInfo("placeholder", "What a lazy or deferred live component shows before it loads.", ContentKind.Markup)
             {
+                Example = "<live id=\"report\" lazy>\n  <placeholder><p>Loading the report…</p></placeholder>\n  <state name=\"day\" value=\"@today()\" />\n  <p>The report for {$day}</p>\n</live>",
                 Context = ElementContext.Page,
                 MustBeInside = new[] { "live" },
             });
@@ -53,12 +54,14 @@ namespace KScript.Web
             Page(p, new ElementInfo("include", "Renders another page file here. Other attributes become its variables.", ContentKind.Empty,
                 new A("path", K.Path, "The file to include, relative to this page.", required: true))
             {
+                Example = "<include path=\"_partials/card.html\" title=\"Welcome\" body=\"Thanks for signing up.\" />",
                 Context = ElementContext.Page,
                 AllowsExtraAttributes = true,
             });
             Page(p, new ElementInfo("layout", "Wraps the page in a layout file. Extra attributes become variables in the layout (`$title`).", ContentKind.Markup,
                 new A("path", K.Path, "The layout file, such as _layout.html.", true))
             {
+                Example = "<layout path=\"_layouts/main.html\" title=\"About us\">\n  <h1>About us</h1>\n  <p>We make tools for people who write scripts.</p>\n</layout>",
                 AllowsExtraAttributes = true,
                 Context = ElementContext.Page,
             });
@@ -80,6 +83,7 @@ namespace KScript.Web
             });
             Page(p, new ElementInfo("markdown", "Renders its Markdown text (with `{ }` values, escaped) to HTML.", ContentKind.Template)
             {
+                Example = "<markdown>\n# Hello, {$name}\n\nYou have **{$count}** new messages.\n</markdown>",
                 Context = ElementContext.Page,
             });
 
@@ -98,6 +102,13 @@ namespace KScript.Web
             p.Field(KType.PageVisit, "text", KType.String, "The words on the page as it is now, without tags and with runs of spaces made one.");
             p.Field(KType.PageVisit, "path", KType.String, "The address visited.");
             p.Field(KType.PageVisit, "status", KType.Number, "The HTTP status of the last render.");
+            p.Examples(
+                ("page_visit->click", "<let name=\"page\" value=\"@visit('/counter')->click('Add one')->click('Add one')\" />\n<expect value=\"$page.text\" contains=\"'2'\" />"),
+                ("page_visit->change", "<let name=\"page\" value=\"@visit('/settings')->change('Email me updates')\" />\n<expect value=\"$page.text\" contains=\"'Saved'\" />"),
+                ("page_visit->press", "<let name=\"page\" value=\"@visit('/tasks')->fill('draft', 'Buy milk')->press('enter', in: 'New task')\" />\n<expect value=\"$page.text\" contains=\"'Buy milk'\" />"),
+                ("page_visit->submit", "<let name=\"page\" value=\"@visit('/signup')->fill('email', 'joan@example.com')->submit('Sign up')\" />\n<expect value=\"$page.text\" contains=\"'Check your email'\" />"),
+                ("page_visit->fill", "<let name=\"page\" value=\"@visit('/tasks')->fill('draft', 'Buy milk')->click('Add')\" />\n<expect value=\"$page.text\" contains=\"'Buy milk'\" />"),
+                ("page_visit->classes", "<let name=\"page\" value=\"@visit('/tasks')->click('Buy milk')\" />\n<expect value=\"$page->classes('Buy milk')\" contains=\"'done'\" />"));
 
             p.Command("emit_event", "name, data?, target?", "Sends an event from a live action to the page's live blocks. A target limits it to one block ID.", KType.Null, EmitEvent,
                 "@emit_event('items-changed', data: $item.id, target: 'summary')");

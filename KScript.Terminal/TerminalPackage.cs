@@ -63,7 +63,11 @@ namespace KScript.Terminal
                 Example = "<confirm into=\"sure\">Delete the files?</confirm>",
             }, Confirm);
 
-            p.Element(new ElementInfo("clear", "Clears the terminal.", ContentKind.Empty) { Context = ElementContext.Script }, run =>
+            p.Element(new ElementInfo("clear", "Clears the terminal.", ContentKind.Empty)
+            {
+                Context = ElementContext.Script,
+                Example = "<clear />\n<echo>A fresh screen</echo>",
+            }, run =>
             {
                 if (run.Host.IsInteractive)
                 {

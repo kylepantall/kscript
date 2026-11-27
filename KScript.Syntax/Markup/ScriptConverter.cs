@@ -1006,6 +1006,11 @@ namespace KScript.Syntax.Markup
                 {
                     return null;
                 }
+                // A flag that is on is its bare name: model Post(timestamps, soft_deletes).
+                if (a.Name is "mixin" or "auto_create" or "timestamps" or "soft_deletes" && IsYes(value))
+                {
+                    return a.Name;
+                }
                 return a.Name is "unique" or "index" or "hidden" or "guarded"
                     ? a.Name + ": " + (value.StartsWith('[') ? value : "[" + string.Join(", ", value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0)) + "]")
                     : null;

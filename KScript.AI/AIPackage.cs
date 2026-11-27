@@ -127,6 +127,9 @@ namespace KScript.AI
             p.Field(KType.Chat, "model", KType.String, "The model the chat uses.");
             p.Field(KType.Chat, "system", KType.String, "The system prompt, or null.");
             p.Method(KType.Chat, "reset", "", "Forgets the conversation (keeps the system prompt).", KType.Chat, Chat("reset"));
+            p.Examples(
+                ("chat->ask", "<let name=\"chat\" value=\"@chat('Answer in one word.')\" />\n<echo>{ $chat->ask('What colour is the sky?') }</echo>\n<echo>{ $chat->ask('And grass?') }</echo>\n<let name=\"rating\" value=\"$chat->ask('Rate this review: Loved it!', schema: { stars: 'int 1-5' })\" />\n<echo>{ $rating.stars } stars</echo>"),
+                ("chat->reset", "<let name=\"chat\" value=\"@chat('You are a helpful assistant.')\" />\n<do>$chat->ask('Remember the number 7.')</do>\n<do>$chat->reset()</do>\n<echo>{ $chat.history->count() } messages</echo>"));
 
             p.Element(new ElementInfo("llm", "Sends its text as a prompt to a language model (Claude) and stores the answer. @llm(prompt, ...) takes the same options and returns the answer instead, for a prompt that is already a value.", ContentKind.Template,
                 new A("into", K.DeclareVariable, "The variable that receives the answer.", true),
