@@ -100,6 +100,11 @@ namespace KScript.Testing
 
             p.Command("fail", "message?", "Fails the test now.", KType.Null, c =>
                 throw new KScriptException(c.Has(0) ? c.Str(0) : "@fail() was called.", AssertionType));
+            p.Examples(
+                ("@with_clock", "<test name=\"a new year starts on 1 January\">\n  <let name=\"year\" value=\"@with_clock('2027-01-01'->to_date(), fn() => @today().year)\" />\n  <expect value=\"$year\" equals=\"2027\" />\n</test>"),
+                ("@with_environment", "<test name=\"reads the region from the environment\">\n  <let name=\"region\" value=\"@with_environment({ REGION: 'eu-west' }, fn() => @env('REGION'))\" />\n  <expect value=\"$region\" equals=\"'eu-west'\" />\n</test>"),
+                ("@assert_response", "<test name=\"the API lists people\">\n  <do>@assert_response(@api('http://localhost:8080/api/people'), status: 200, headers: { 'Content-Type': 'application/json' })</do>\n</test>"),
+                ("@fail", "<test name=\"every price is positive\">\n  <for each=\"price\" in=\"[3, 5, 8]\">\n    <if $price le 0>\n      <do>@fail('Found a price of {$price}')</do>\n    </if>\n  </for>\n</test>"));
 
             p.Command("assert", "condition, message?", "Fails the test unless the condition is true. A failed comparison shows the value of each side. message is what to say instead.", KType.Bool, c =>
             {

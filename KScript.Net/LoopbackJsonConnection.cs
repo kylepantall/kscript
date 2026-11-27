@@ -49,6 +49,10 @@ namespace KScript.Net
             p.Method(KType.LoopbackJsonStream, "read", "", "Reads one UTF-8 JSON object (up to 256 KiB) within the active transaction's deadline.",
                 KType.Map, (t, c) => ((TransactionStream)t).Read());
             p.Examples(("@with_loopback_json", "@with_loopback_json(8765, fn(connection) => $connection->transaction(fn(stream) => $stream->read()))"));
+            p.Examples(
+                ("loopback_json_connection->transaction", "@with_loopback_json(8765, fn(connection) => $connection->transaction(fn(stream) => $stream->read()))"),
+                ("loopback_json_stream->send", "@with_loopback_json(8765, fn(connection) => $connection->transaction(fn(stream) => $stream->send({ command: 'ping' })))"),
+                ("loopback_json_stream->read", "<let name=\"reply\" value=\"@with_loopback_json(8765, fn(connection) => $connection->transaction(fn(stream) => $stream->read()))\" />\n<echo>{ $reply.status }</echo>"));
         }
 
         internal static LoopbackJsonConnection Connect(int port, TimeSpan timeout, CancellationToken cancellation)

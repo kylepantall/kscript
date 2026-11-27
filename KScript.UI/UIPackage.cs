@@ -159,6 +159,7 @@ namespace KScript.UI
             p.Element(new ElementInfo("Spacer", "Empty space.", ContentKind.Empty,
                 new A("size", K.Expression, "How much space, in pixels (default 12)."))
             {
+                Example = "<Column>\n  <Text>Above</Text>\n  <Spacer size=\"24\" />\n  <Text>Below</Text>\n</Column>",
                 Context = ElementContext.Script,
             }, run => UIElements.Node(run, "Spacer", text: false));
 
@@ -176,6 +177,7 @@ namespace KScript.UI
                 UIElements.RequestClose();
                 return null;
             });
+            p.Examples(("@close_window", "<KScript.Window title=\"Are you sure?\" width=\"300\" height=\"140\">\n  <Text>Delete the draft?</Text>\n  <Button on_click=\"@close_window()\">Cancel</Button>\n</KScript.Window>"));
         }
 
         private static void Layout(PackageBuilder p, string name, string description, params A[] own)

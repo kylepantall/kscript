@@ -74,9 +74,6 @@ public sealed class DocsTests
     private static readonly Regex DataAttribute = new Regex(@"data-(xml|kscript)=""([^""]*)""", RegexOptions.Compiled);
     private static readonly Regex InputAttribute = new Regex(@"data-input=""([^""]*)""", RegexOptions.Compiled);
 
-    /// <summary>The packages whose commands and methods all need an example, because the docs can run them.</summary>
-    private static readonly string[] RunnablePackages = { "KScript.Core", "KScript.Math", "KScript.IO", "KScript.Terminal", "KScript.Markdown" };
-
     /// <summary>Every runnable example on the site, in each format it is shown in.</summary>
     public static IEnumerable<(string Page, string Format, string Code, string Input)> Examples()
     {
@@ -151,14 +148,17 @@ public sealed class DocsTests
     }
 
     [Fact]
-    public void Every_command_and_method_the_docs_can_run_has_an_example()
+    public void Every_built_in_command_method_and_element_has_an_example()
     {
+        // The reference shows each entry's example, so nothing that ships is left without one. Planned entries
+        // (no package yet) aren't on the site.
         var catalog = LanguageCatalog.Default;
         var missing = catalog.Commands.Concat(catalog.Methods)
-            .Where(c => RunnablePackages.Contains(c.Package) && string.IsNullOrWhiteSpace(c.Example))
+            .Where(c => c.Package != null && string.IsNullOrWhiteSpace(c.Example))
             .Select(c => c.Kind == CallableKind.Method ? c.ReceiverType + "->" + c.Name : "@" + c.Name)
+            .Concat(catalog.Elements.Where(e => !e.Planned && string.IsNullOrWhiteSpace(e.Example)).Select(e => "<" + e.Name + ">"))
             .ToList();
-        Assert.True(missing.Count == 0, "These need an example (p.Examples in their package): " + string.Join(", ", missing));
+        Assert.True(missing.Count == 0, "These need an example (p.Examples in their package, or Example on the element): " + string.Join(", ", missing));
     }
 
     [Fact]

@@ -152,6 +152,7 @@ namespace KScript.Runtime
                 new A("description", K.Text, "What the field holds, shown on hover and completion."),
                 new A(TypeBody.PrivateWord, K.Bool, "true keeps the field to the type's own methods: other code can't read, set or pass it. In a .kscript file, `private count: int`."))
             {
+                Example = "<type name=\"Repo\">\n  <field name=\"name\" type=\"string\" />\n  <field name=\"stars\" type=\"int(min: 0)\" from=\"stargazers_count\" />\n  <field name=\"topics\" type=\"string[]\" default=\"[]\" />\n</type>\n<let name=\"repo\" value=\"Repo({ name: 'kscript', stargazers_count: 42 })\" />\n<echo>{ $repo.name } has { $repo.stars } stars and { $repo.topics->count() } topics</echo>",
                 MustBeInside = new[] { "type", "error", "model", "job", "construct" },
             }, run => throw run.Error($"<field> must be directly inside <type>, <error>, <model> or <job>.", null, "Syntax"));
 
@@ -216,7 +217,10 @@ namespace KScript.Runtime
                 return ok;
             });
 
-            p.Element(new ElementInfo("guard", "Checks a precondition. When the test is false, its body must leave the current flow.", ContentKind.Statements, Test), run =>
+            p.Element(new ElementInfo("guard", "Checks a precondition. When the test is false, its body must leave the current flow.", ContentKind.Statements, Test)
+            {
+                Example = "<fn name=\"half\" params=\"n: number\">\n  <guard test=\"$n ge 0\">\n    <return value=\"0\" />\n  </guard>\n  <return value=\"$n / 2\" />\n</fn>\n<echo>{ @half(10) } { @half(-4) }</echo>",
+            }, run =>
             {
                 if (!Values.Truthy(run.Eval("test")))
                 {
@@ -228,6 +232,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("elif", "Runs when the earlier <if>/<elif> tests were false and this test is true.", ContentKind.Statements, Test)
             {
+                Example = "<let name=\"n\" value=\"7\" />\n<if $n lt 5>\n  <echo>small</echo>\n</if>\n<elif $n lt 10>\n  <echo>medium</echo>\n</elif>\n<else>\n  <echo>large</echo>\n</else>",
                 MustFollow = new[] { "if", "elif" },
             }, run =>
             {
@@ -240,6 +245,7 @@ namespace KScript.Runtime
 
             p.Element(new ElementInfo("else", "Runs when the earlier <if>/<elif> tests were all false, or after a <for> that had nothing to loop over.", ContentKind.Statements)
             {
+                Example = "<let name=\"names\" value=\"[]\" />\n<for each=\"name\" in=\"$names\">\n  <echo>$name</echo>\n</for>\n<else>\n  <echo>Nobody here</echo>\n</else>",
                 MustFollow = new[] { "if", "elif", "for" },
             }, run =>
             {
@@ -275,8 +281,14 @@ namespace KScript.Runtime
                 return null;
             });
 
-            p.Element(new ElementInfo("break", "Leaves the innermost loop.", ContentKind.Empty), run => throw new BreakSignal { Module = run.Module, Offset = run.Element.Span.Start });
-            p.Element(new ElementInfo("continue", "Skips to the next turn of the innermost loop.", ContentKind.Empty), run => throw new ContinueSignal { Module = run.Module, Offset = run.Element.Span.Start });
+            p.Element(new ElementInfo("break", "Leaves the innermost loop.", ContentKind.Empty)
+            {
+                Example = "<for each=\"n\" in=\"1..100\">\n  <if $n gt 3>\n    <break />\n  </if>\n  <echo>$n</echo>\n</for>",
+            }, run => throw new BreakSignal { Module = run.Module, Offset = run.Element.Span.Start });
+            p.Element(new ElementInfo("continue", "Skips to the next turn of the innermost loop.", ContentKind.Empty)
+            {
+                Example = "<for each=\"n\" in=\"1..6\">\n  <if $n % 2 eq 0>\n    <continue />\n  </if>\n  <echo>$n</echo>\n</for>",
+            }, run => throw new ContinueSignal { Module = run.Module, Offset = run.Element.Span.Start });
 
             p.Element(new ElementInfo("match", "Compares one value against several cases. Inside, `$it` is the value.", ContentKind.Statements,
                 new A("value", K.Expression, "The value to compare.", true))
@@ -288,11 +300,13 @@ namespace KScript.Runtime
                 new A("is", K.ExpressionList, "Values to compare with, comma separated."),
                 new A("when", K.Expression, "A condition."))
             {
+                Example = "<let name=\"n\" value=\"12\" />\n<match $n>\n  <case is=\"1, 2\"><echo>a couple</echo></case>\n  <case when=\"$n gt 9\"><echo>lots</echo></case>\n  <default><echo>a few</echo></default>\n</match>",
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error($"<case> must be directly inside <match>.", null, "Syntax"));
 
             p.Element(new ElementInfo("default", "The branch of <match> that runs when no case matched. In a .kscript file it is the arm `_ => ...`.", ContentKind.Statements)
             {
+                Example = "<let name=\"day\" value=\"'Tuesday'\" />\n<match $day>\n  <case is=\"'Saturday', 'Sunday'\"><echo>Weekend</echo></case>\n  <default><echo>Weekday</echo></default>\n</match>",
                 MustBeInside = new[] { "match" },
             }, run => throw run.Error($"<default> must be directly inside <match>.", null, "Syntax"));
 
@@ -333,6 +347,7 @@ namespace KScript.Runtime
             p.Element(new ElementInfo("return", "Ends the function with a value.", ContentKind.Empty,
                 new A("value", K.Expression, "The result. Without it the function returns null."))
             {
+                Example = "<fn name=\"area\" params=\"w: number, h: number\">\n  <return value=\"$w * $h\" />\n</fn>\n<echo>{ @area(3, 4) }</echo>",
                 MustBeInside = new[] { "fn" },
             }, run =>
             {
@@ -377,11 +392,13 @@ namespace KScript.Runtime
                 new A("when", K.Expression, "Only handle errors for which this is true, such as `$err.status == 404`."),
                 new A("type", K.ErrorType, "Only handle errors of these types, or types that extend them: `NotFound`, `[IO, Network]`. Error catches everything."))
             {
+                Example = "<try>\n  <throw type=\"NotFound\" message=\"No such order\" />\n  <catch type=\"NotFound\" as=\"e\">\n    <echo>{ $e.type } ({ $e.status }): { $e.message }</echo>\n  </catch>\n</try>",
                 MustBeInside = new[] { "try", "fn", "type", "model" },
             }, run => null);
 
             p.Element(new ElementInfo("finally", "Runs after the <try> body and any <catch>, whether or not there was an error.", ContentKind.Statements)
             {
+                Example = "<try>\n  <echo>working</echo>\n  <throw message=\"Oops\" />\n  <catch as=\"err\"><echo>caught: { $err.message }</echo></catch>\n  <finally><echo>cleaned up</echo></finally>\n</try>",
                 MustBeInside = new[] { "try" },
             }, run => null);
 
@@ -441,6 +458,7 @@ namespace KScript.Runtime
                 new A("key", K.Text, "The key in the enclosing map."),
                 new A("value", K.Expression, "The value as an expression, instead of text."))
             {
+                Example = "<collection name=\"order\">\n  <item key=\"id\">42</item>\n  <item key=\"lines\">\n    <item>Tea</item>\n    <item>Cake</item>\n  </item>\n</collection>\n<echo>{ $order.id }: { $order.lines }</echo>",
                 MustBeInside = new[] { "collection", "item" },
             }, run => throw run.Error($"<item> must be inside <collection>.", null, "Syntax"), ownsContent: true);
         }
