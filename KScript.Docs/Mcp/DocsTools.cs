@@ -126,7 +126,7 @@ namespace KScript.Docs.Mcp
 
         #region Search
 
-        private sealed record Entry(string Title, string Kind, string Section, string Path, string Text);
+        private sealed record Entry(string Title, string Kind, string Section, string Path, string Text, string More = "");
 
         private List<Entry> index;
 
@@ -139,14 +139,18 @@ namespace KScript.Docs.Mcp
             foreach (DocPage page in docs.Site.Pages.Where(p => p.Source != null))
             {
                 string markdown = docs.Page(page.Path, "kscript");
-                foreach (Match m in Regex.Matches(markdown, @"^#{2,3} (.+)\n(.*?)(?=^#{1,3} |\z)", RegexOptions.Multiline | RegexOptions.Singleline))
+                // A guide topic's own words, before its first heading, so a name used only there is found too.
+                if (page.ParentPath != null)
+                    sections[page.Path] = Regex.Match(markdown, @"\A#[^\n]*\n(.*?)(?=^#{2,3} |\z)", RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value;
+                foreach (Match m in Regex.Matches(markdown, @"^#{2,3} ([^\n]+)\n(.*?)(?=^#{1,3} |\z)", RegexOptions.Multiline | RegexOptions.Singleline))
                 {
                     string heading = Regex.Replace(m.Groups[1].Value, @"[`*]|\[([^\]]*)\]\([^)]*\)", "$1").Trim();
                     var toc = page.Toc.FirstOrDefault(t => t.Text == heading);
                     if (toc.Id != null) sections[page.Path + "#" + toc.Id] = m.Groups[2].Value;
                 }
             }
-            return docs.Site.Search.Select(s => new Entry(s.Title, s.Kind, s.Section, s.Url, s.Kind == "heading" && sections.TryGetValue(s.Url, out string body) ? body : s.Text ?? string.Empty)).ToList();
+            return docs.Site.Search.Select(s => new Entry(s.Title, s.Kind, s.Section, s.Url, s.Kind == "heading" && sections.TryGetValue(s.Url, out string body) ? body : s.Text ?? string.Empty,
+                s.Kind == "page" && sections.TryGetValue(s.Url, out string intro) ? intro.ToLowerInvariant() : string.Empty)).ToList();
         }
 
         private static readonly Regex Word = new Regex(@"[A-Za-z0-9_.$@<>-]+", RegexOptions.Compiled);
@@ -172,6 +176,8 @@ namespace KScript.Docs.Mcp
                     if (title.Contains(bare, StringComparison.Ordinal)) score += 6;
                     int count = Regex.Matches(text, Regex.Escape(bare)).Count;
                     score += Math.Min(count, 4);
+                    // A topic's own words count a little, so a name used only there is still found.
+                    if (count == 0 && e.More.Contains(bare, StringComparison.Ordinal)) { count = 1; score += 1; }
                     if (title.Contains(bare, StringComparison.Ordinal) || count > 0) matched++;
                 }
                 if (matched == 0) continue;
@@ -258,6 +264,7 @@ namespace KScript.Docs.Mcp
                 AddElement(bare);
                 AddMethods(bare, type);
                 AddVariable(bare);
+                AddPackageModel(bare);
             }
 
             if (found.Count > 0) return new ToolResult(string.Join("\n---\n\n", found));
@@ -283,6 +290,21 @@ namespace KScript.Docs.Mcp
                 if (!string.IsNullOrWhiteSpace(receiver) && methods.Any(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Trim())))
                     methods = methods.Where(m => KType.AcceptsMethod(m.ReceiverType, m.Name, receiver.Trim())).ToList();
                 found.AddRange(methods.Select(m => docs.Callable(m, format)));
+            }
+
+            // A model or mixin a package ships as a KScript script, such as KScript.Auth's Ownable.
+            void AddPackageModel(string model)
+            {
+                foreach (KScript.Runtime.PackageSource source in catalog.PackageSources)
+                {
+                    Match declared = Regex.Match(source.Text, @"^model\s+" + Regex.Escape(model) + @"\b(\((?<options>[^)]*)\))?", RegexOptions.Multiline);
+                    if (!declared.Success) continue;
+                    bool mixin = Regex.IsMatch(declared.Groups["options"].Value, @"(^|,)\s*mixin\s*(,|$)");
+                    string what = mixin ? "mixin" : "model";
+                    found.Add($"# {model}\n\nPackage: {source.Package}\n\nA built-in {what}, written in KScript. Import {source.Package} and use it with "
+                        + (mixin ? $"`model Note extends {model} {{ ... }}`" : $"`{model}->where(...)`")
+                        + $". Every built-in model and mixin: {DocsMarkdown.UriOf("/guide/data/built-in-models-and-mixins")}\n\n```kscript\n{source.Text.TrimEnd()}\n```\n");
+                }
             }
 
             void AddVariable(string variable)

@@ -212,6 +212,17 @@ namespace KScript.Docs.Mcp
         private static string Cell(string text) => Regex.Replace(text ?? string.Empty, @"\s+", " ").Replace("|", "\\|").Trim();
 
         /// <summary>One element: its attributes, where it goes, and an example.</summary>
+        /// <summary>What lookup adds to a model: bases, which options a model keeps, scopes and the built-in mixins.</summary>
+        private const string ModelExtras = """
+
+            Extending: `model Page extends Publishable { ... }`, or a list of bases, `extends [UID, Publishable(timestamps: false)]`, where an option on a base changes it for this use. A model takes its bases' fields, `validate` rules, methods, scopes and options (later bases win, and the model's own options win over all of them). It keeps its own `table`, `connection` and `auto_create`, and it is only a mixin if it says `mixin` itself. Guide: kscript://docs/guide/data/models#extending-models
+
+            Scopes: a method whose first parameter is `query`, such as `fn live(query) => $query->where(published: true)`, is a scope. Call it on the model, a query or a relation: `Post->live()->count()`. Guide: kscript://docs/guide/data/queries#scopes
+
+            Built in: KScript.Auth ships the `Ownable` mixin (`lookup Ownable`). KScript.Data ships none; `timestamps` and `soft_deletes` are options. Every one: kscript://docs/guide/data/built-in-models-and-mixins
+
+            """;
+
         public string Element(ElementInfo e, string format, int level = 1)
         {
             string name = DocsSite.ElementName(e);
@@ -231,6 +242,7 @@ namespace KScript.Docs.Mcp
             {
                 var code = new StringBuilder($"{new string('#', level)} {e.Name}\n\nPackage: {e.Package}\n{Deprecated(e.Deprecated)}\n{codeHelp}\n{Agent(e.Agent)}");
                 AppendOptions(code, CodeStatementHelp.Options(e));
+                if (e.Name == "model") code.Append(ModelExtras);
                 if (e.Example != null) code.Append(Example(e.Example, format));
                 return code.ToString();
             }

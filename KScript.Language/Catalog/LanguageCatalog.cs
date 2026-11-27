@@ -36,6 +36,9 @@ namespace KScript.Language.Catalog
         private readonly List<PackageSource> packageSources = new List<PackageSource>();
 
         /// <summary>The scripts a package ships, whose declarations every script that imports it sees.</summary>
+        /// <summary>Every KScript script the packages ship (such as KScript.Auth's Ownable mixin).</summary>
+        public IReadOnlyList<PackageSource> PackageSources => packageSources;
+
         public IEnumerable<PackageSource> SourcesOf(string package) => packageSources.Where(s => string.Equals(s.Package, package, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>The package script at a path, or null.</summary>

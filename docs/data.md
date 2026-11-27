@@ -77,35 +77,53 @@ A model's options go in the brackets after its name, like the options of every o
 
 ### Extending models
 
-Use `extends` to share fields, methods, validation and model options. A concrete model keeps its own table and connection. Add `mixin` to a reusable declaration that has no table.
+Use `extends` to share fields, `validate` rules, methods, scopes and options. Add `mixin` to a reusable declaration that has no table of its own.
 
 ```kscript
 import KScript.Data
 
+/// Gives a model a uid as its key.
 model UID(mixin, key: 'uid') {
   uid: uuid = @uuid()
 }
 
-model SoftDeletable(mixin, soft_deletes)
-model Auditable(mixin, timestamps)
+/// Things that can be published.
+model Publishable(mixin, timestamps, index: [published_at]) {
+  published_at?: date
 
-model Entry extends UID {
-  title: string
+  fn published(query) => $query->where(fn(p) => $p.published_at != null)
 }
 
-model Note(table: 'notes', auto_create) extends [Entry, SoftDeletable, Auditable] {
+model Page(auto_create) extends [UID, Publishable] {
   title: string(min: 1, max: 200)
-  body: string = ''
 }
 
-note = Note->create(title: 'Draft')
-echo $note.uid
+page = Page->create(title: 'About', published_at: @now())
+echo Page->published()->count()
+echo $page.uid
 ```
 
-KScript.Auth ships a mixin of its own, `Ownable`, which keeps each row to the user or guest who made it and adds the `->mine()` scope. See [Guests and owners](auth.md#guests-and-owners).
+What a model takes from its bases, and what stays its own:
 
-Options from later bases take precedence over earlier bases. Put a literal option on a base reference to change it for this use, as in `extends [Entry, Auditable(timestamps: false)]`. Options on the new model take precedence over its bases. Each table, connection and `auto_create` setting belongs to its own concrete declaration. XML writes the base list in the model's `with` attribute.
+| From its bases | Its own |
+| --- | --- |
+| Fields, `validate` rules, `fn` methods and [scopes](#scopes). A field or method of the model itself replaces one of the same name. | `table`, `connection` and `auto_create`: each concrete model has its own table. |
+| Options such as `key`, `timestamps`, `soft_deletes`, `unique`, `index`, `hidden`, `guarded` and `extra`. Later bases take precedence over earlier ones, and the model's own options over all of them. | `mixin`: a model that extends a mixin is not a mixin unless it says so. |
 
+Put a literal option on a base to change it for this use: `extends [UID, Publishable(timestamps: false)]`. XML writes the base list in the model's `with` attribute.
+
+KScript.Data ships no mixins of its own: `timestamps` and `soft_deletes` are options, so `model Post(soft_deletes)` is all a model needs. KScript.Auth ships one, `Ownable`. See [Built-in models and mixins](#built-in-models-and-mixins).
+
+### What a model gets
+
+| What | Declared as | Called as |
+| --- | --- | --- |
+| Its own methods | `fn excerpt() => ...` | On a record: `$post->excerpt()`. `$this` and the fields are the record's. |
+| [Scopes](#scopes) | `fn live(query) => $query->where(...)` | On the model, a query or a relation: `Post->live()`, `$query->live()`, `$ada->posts()->live()`. |
+| `validate` rules | `validate` in the block | When a record is made or saved. |
+| [Query methods](#queries) | built in | On the model or a query: `Post->where(...)`, `->order_by()`, `->with_trashed()`, `->count()`. |
+| [Record methods](#adding-and-saving) | built in | On a record: `->save()`, `->update()`, `->delete()`, `->restore()`, `->fresh()`. |
+| [Relations](#relations) | a field of another model | On a record: `$post.author`, `$ada->posts()`. |
 
 How each type is stored:
 
@@ -122,6 +140,28 @@ How each type is stored:
 | lists, maps and other types | JSON. |
 
 An optional field (`age?: int`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
+
+## Built-in models and mixins
+
+These come with a package: import the package and `extends` them. You don't declare them yourself. `lookup Ownable` (in `kscript mcp`) shows the source.
+
+| Name and package | What it adds | Options | Usage | Same as a model option |
+| --- | --- | --- | --- | --- |
+| `Ownable` (KScript.Auth) | `owner: string`, indexed and guarded, set from whoever makes the record and fixed after that. The `->mine(as?:)` scope and `->is_mine()`. | None. | `model Note extends Ownable { ... }`, with `import KScript.Auth`. See [Guests and owners](auth.md#guests-and-owners). | None. |
+
+KScript.Data itself ships no models or mixins. What a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` adds `deleted_at` with `->with_trashed()`, `->only_trashed()` and `->restore()`, and `timestamps` adds `created_at` and `updated_at`. A mixin that sets one is a line, if a project wants the name:
+
+```kscript
+import KScript.Data
+
+model SoftDeletable(mixin, soft_deletes)
+
+model Post extends SoftDeletable {
+  title: string
+}
+```
+
+KScript.Auth can also keep its users in a model of the project's own. See [Users in a model](auth.md#users-in-a-model).
 
 ## Adding and saving
 
@@ -216,6 +256,28 @@ Names and values are a shorter way to write equality: `->where(status: 'paid', c
 | `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
 | `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
 | `->sql()` | The SQL and parameters the query would run, without running it. |
+
+### Scopes
+
+A scope is a model method whose first parameter is `query`: a named query step of the model's own. It is called on the model, on a query, and on a relation, and gets the query to add to. It returns the query, so more steps can follow:
+
+```kscript
+import KScript.Data
+
+model Article {
+  title: string
+  views: int = 0
+  published: bool = false
+
+  fn live(query) => $query->where(published: true)
+  fn popular(query, over: int = 100) => $query->where(fn(a) => $a.views > $over)
+}
+
+$db->create_table(Article)
+echo Article->live()->popular(over: 10)->count()
+```
+
+Other parameters work as they do in any function: `->popular(over: 10)`. A scope from a [mixin](#extending-models) is the model's own, and `kscript check` knows a scope wherever it is called from, including other files.
 
 ### Changing many rows
 
@@ -350,25 +412,9 @@ mine = Post->where(author: $ada)->get()
 
 On a list relation, `->count()`, `->any()`, `->is_empty()`, `->all()`, `->sum()`, `->average()`, `->min()` and `->max()` become SQL, each with an optional lambda on the related record. On one record, its fields can be read (`$p.author.name`), it can be compared with a record (`$p.author == $ada`), and with null.
 
-### Scopes
+### Scopes on relations
 
-A scope is a model method whose first parameter is `query`. It is called on the model, on a query, and on a relation, and gets the query to add to:
-
-```kscript
-import KScript.Data
-
-model Article {
-  title: string
-  views: int = 0
-  published: bool = false
-
-  fn live(query) => $query->where(published: true)
-  fn popular(query, over: int = 100) => $query->where(fn(a) => $a.views > $over)
-}
-
-$db->create_table(Article)
-echo Article->live()->popular(over: 10)->count()
-```
+A [scope](#scopes) works on a relation too, and keeps to the relation's records: `$ada->posts()->live()->count()`.
 
 ## Transactions
 
