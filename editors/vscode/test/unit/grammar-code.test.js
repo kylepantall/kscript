@@ -326,3 +326,35 @@ test('casts highlight the type and preserve import aliases and named arguments',
   assert.match(scopeOf(tokens, 'Product'), /entity\.name\.type\.kscript/);
   assert.doesNotMatch(scopeOf(tokens, 'as', 2), /keyword\.operator\.word\.kscript/);
 });
+
+test('a root path before a later quoted / is not a regex, so quotes and brackets stay paired', async () => {
+  const lines = [
+    "test(name: \"a cookie that isn't a guest id\") {",
+    "  reply = @api(/, options: { headers: { Cookie: 'sb_guest=../../etc' } })",
+    '  expect($reply.cookies.sb_guest->is_a(uuid), equals: true)',
+    "  expect($reply->header('x-content-type-options'), equals: 'nosniff')",
+    '}',
+    "found = $text->find_all(/name=\"_token\" value=\"[^\"]+\"/)",
+    "parts = $csv->split(/,/)",
+  ];
+  const tokens = tokenize(await load(), lines.join('\n'));
+  assert.match(scopeOf(tokens, '/'), /string\.unquoted\.path\.kscript/);
+  assert.match(scopeOf(tokens, 'headers'), /entity\.other\.attribute-name\.kscript/);
+  assert.match(scopeOf(tokens, 'sb_guest=../../etc'), /string\.quoted\.single\.kscript/);
+  // Every -> is the same operator, and no bracket after line 2 is swallowed by a string or regex.
+  const arrows = tokens.filter((t) => t.text === '->');
+  assert.strictEqual(arrows.length, 4);
+  for (const a of arrows) assert.match(a.scopes, /keyword\.operator\.kscript$/);
+  for (const t of tokens.filter((t) => /[(){}]/.test(t.text) && !/['"]/.test(t.text))) {
+    assert.doesNotMatch(t.scopes, /string|regexp/, `bracket token ${JSON.stringify(t.text)} is inside ${t.scopes}`);
+  }
+  // Regexes that only look like paths still are regexes.
+  assert.match(scopeOf(tokens, '/name="_token" value="[^"]+"/'), /string\.regexp\.kscript/);
+  assert.match(scopeOf(tokens, '/,/'), /string\.regexp\.kscript/);
+});
+
+test('a call inside a statement call does not end the statement early', async () => {
+  const tokens = tokenize(await load(), "expect($reply->header('content-type'), matches: '^image/png')");
+  assert.match(scopeOf(tokens, ')', 1), /punctuation\.definition\.attributes\.end\.kscript/);
+  assert.doesNotMatch(scopeOf(tokens, ')'), /punctuation\.definition\.attributes\.end/);
+});
