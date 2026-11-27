@@ -96,6 +96,16 @@ namespace KScript.Runtime
         public string Description { get; }
         public Func<Interpreter, Module, object> Value { get; }
         public KScriptPackage Package { get; }
+
+        /// <summary>The keys a map variable always has (<c>$os.name</c>), so the editor offers and describes them.</summary>
+        public IReadOnlyList<ValueFieldInfo> Fields { get; private set; } = Array.Empty<ValueFieldInfo>();
+
+        /// <summary>Describes the keys this map variable always has: <c>("name", KType.String, "windows, macos or linux.")</c>.</summary>
+        public VariableDefinition WithFields(params (string Name, string Type, string Description)[] fields)
+        {
+            Fields = fields.Select(f => new ValueFieldInfo(Type, f.Name, f.Type, f.Description) { Package = Package.Name }).ToList();
+            return this;
+        }
     }
 
     /// <summary>

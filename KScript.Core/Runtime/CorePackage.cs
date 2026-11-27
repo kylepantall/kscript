@@ -923,13 +923,23 @@ namespace KScript.Runtime
                 ["temp"] = Path.GetTempPath(),
                 ["separator"] = Path.DirectorySeparatorChar.ToString(),
                 ["newline"] = Environment.NewLine,
-            });
+            }).WithFields(
+                ("name", KType.String, "The operating system: windows, macos or linux (other elsewhere)."),
+                ("user", KType.String, "The name of the user running the script."),
+                ("machine", KType.String, "The computer's name."),
+                ("home", KType.String, "The user's home folder."),
+                ("temp", KType.String, "The folder for temporary files."),
+                ("separator", KType.String, "The folder separator in paths: / or \\."),
+                ("newline", KType.String, "The line ending: \\n, or \\r\\n on Windows."));
             p.Variable("script", KType.Map, "This script: $script.path, $script.dir, $script.name.", (i, m) => new Dictionary<string, object>
             {
                 ["path"] = m.Path,
                 ["dir"] = m.Directory,
                 ["name"] = m.Path != null ? Path.GetFileName(m.Path) : null,
-            });
+            }).WithFields(
+                ("path", KType.String, "The full path of this script file, or null when it has no file."),
+                ("dir", KType.String, "The folder this script is in."),
+                ("name", KType.String, "This script's file name, such as tidy.kscript, or null when it has no file."));
         }
 
         #endregion
