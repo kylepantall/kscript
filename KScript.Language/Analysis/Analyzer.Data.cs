@@ -77,7 +77,16 @@ namespace KScript.Language.Analysis
             {
                 string name = parent.Name;
                 MarkupElement declaration = TypeElementNamed(name);
-                if (declaration == null || RefinedRoot(declaration) != null || IsEnumName(name))
+                if (declaration == null && result.RootScope.Lookup(name, model.Span.Start) == null
+                    && catalog.Packages.Keys.FirstOrDefault(p => catalog.SourcesOf(p).Any(s => s.Text.Contains("model " + name + "(", StringComparison.Ordinal))) is string shipping)
+                {
+                    // Ownable ships with KScript.Auth: the fix is the import.
+                    TextChange import = ImportChange(result, shipping);
+                    Report(TrimmedSpan(attribute.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
+                        $"{name} comes with {shipping}. Import it: import {shipping}.",
+                        import != null ? new[] { new QuickFix($"Import {shipping}", import) } : null);
+                }
+                else if (declaration == null || RefinedRoot(declaration) != null || IsEnumName(name))
                     Report(TrimmedSpan(attribute.Value), DiagnosticSeverity.Error, DiagnosticCodes.InvalidAttributeValue,
                         $"'{name}' must name an imported or declared model, model mixin or record type.");
                 else if (ReachesModel(declaration, new HashSet<MarkupElement>()))

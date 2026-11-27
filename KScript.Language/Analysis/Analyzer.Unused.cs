@@ -475,7 +475,7 @@ namespace KScript.Language.Analysis
                 return;
             }
             Symbol alias = result.Symbols.FirstOrDefault(s => s.Kind == SymbolKind.Import && s.DeclaringElement == e);
-            if ((alias != null && uses[alias].Any()) || PackageUsed(package)
+            if ((alias != null && uses[alias].Any()) || PackageUsed(package) || PackageSourceUsed(package)
                 || (package == "KScript.Web" && result.Markup.DescendantElements()
                     .Any(type => type.Name == "type" && type.GetAttributeValue("extends") == ComponentScript.Contract)))
             {
@@ -487,6 +487,16 @@ namespace KScript.Language.Analysis
                 return;
             }
             Report(TrimmedSpan(value), DiagnosticSeverity.Warning, DiagnosticCodes.UnusedImport, $"Nothing from {package} is used.", new[] { RemoveElementFix(e, "Remove the import") });
+        }
+
+        /// <summary>True if the script uses something one of the package's own scripts declares: <c>extends Ownable</c>, or a call.</summary>
+        private bool PackageSourceUsed(string package)
+        {
+            var declared = result.Symbols.Where(s => catalog.SourceAt(s.SourcePath)?.Package == package).ToList();
+            if (declared.Count == 0) return false;
+            var names = new HashSet<string>(declared.Select(s => s.Name), StringComparer.Ordinal);
+            return declared.Any(s => uses[s].Any())
+                || result.Markup.DescendantElements().Any(x => WithNames(x).Any(n => names.Contains(TypeInference.WithoutTypeArguments(n))));
         }
 
         /// <summary>True if the script uses an element, command, method or variable of the package, or of a package that needs it.</summary>

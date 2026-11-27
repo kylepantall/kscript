@@ -432,9 +432,18 @@ namespace KScript.Projects
         /// <summary>The relying party domain. Null uses the origin's host.</summary>
         public string PasskeyRpId { get; set; }
 
+        /// <summary>Seconds a browser keeps its @guest() id (a year by default).</summary>
+        public double GuestLifetime { get; set; } = 365 * 24 * 60 * 60;
+
+        /// <summary>The guest id cookie's name.</summary>
+        public string GuestCookie { get; set; } = "ks_guest";
+
+        /// <summary>True moves a guest's rows of Ownable models to their account when they sign in.</summary>
+        public bool AdoptGuest { get; set; }
+
         public static readonly string[] SameSiteValues = { "Lax", "Strict", "None" };
 
-        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime", "passkey_origin", "passkey_rp_id", "passkey_signup");
+        public static readonly string[] SettingNames = KScript.Runtime.Conventions.Settings("auth", "token_env", "login", "home", "sessions", "folder", "users", "lifetime", "remember", "cookie", "secure", "same_site", "csrf", "attempts", "lockout", "reset_lifetime", "passkey_origin", "passkey_rp_id", "passkey_signup", "guest_lifetime", "guest_cookie", "adopt_guest");
     }
 
     public sealed class ProjectConfig
@@ -1501,6 +1510,9 @@ namespace KScript.Projects
                 case "remember": auth.Remember = Duration(a.Value, name, config) ?? auth.Remember; break;
                 case "lockout": auth.Lockout = Duration(a.Value, name, config) ?? auth.Lockout; break;
                 case "reset_lifetime": auth.ResetLifetime = Duration(a.Value, name, config) ?? auth.ResetLifetime; break;
+                case "guest_lifetime": auth.GuestLifetime = Duration(a.Value, name, config) ?? auth.GuestLifetime; break;
+                case "guest_cookie": auth.GuestCookie = String(a.Value, name, config) ?? auth.GuestCookie; break;
+                case "adopt_guest": auth.AdoptGuest = Bool(a.Value, name, config) ?? auth.AdoptGuest; break;
                 default:
                     config.Warnings.Add($"unknown setting '{name}' (expected {string.Join(", ", AuthSettings.SettingNames)}).");
                     break;

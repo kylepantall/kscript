@@ -31,6 +31,8 @@ namespace KScript.Auth
         private Dictionary<string, object> tokenUser;
         private Dictionary<string, object> freshUser;
         private bool freshLoaded;
+        private string guestId;
+        private bool guestLoaded, sendGuest, clearGuest;
 
         private AuthRequest(AuthApp app, Dictionary<string, object> request)
         {
@@ -335,6 +337,7 @@ namespace KScript.Auth
             session["stored"] = record != null;
             session[Remember] = remember;
             session[Csrf] = AuthApp.NewSecret();
+            NoteAdoption();
             freshLoaded = true;
             freshUser = copy;
             dirty = sendCookie = true;
@@ -358,6 +361,63 @@ namespace KScript.Auth
             freshUser = null;
             dirty = sendCookie = false;
             clearCookie = true;
+        }
+
+        /// <summary>
+        /// The browser's guest id (a uuid), from its guest cookie. With <paramref name="create"/>, a browser without
+        /// one is given one, sent in a long-lived cookie when the request is answered. A test's @acting_as_guest() id
+        /// wins.
+        /// </summary>
+        public string Guest(bool create)
+        {
+            if (Request.TryGetValue(Policies.GuestKey, out object acting) && acting is string id) return id;
+            if (!guestLoaded)
+            {
+                guestLoaded = true;
+                if (Guid.TryParse(Cookie(App.Settings.GuestCookie), out Guid known)) guestId = known.ToString("D");
+            }
+            if (guestId == null && create)
+            {
+                RequestHooks.RequireWritableCookies(Request);
+                guestId = Guid.NewGuid().ToString("D");
+                sendGuest = true;
+                clearGuest = false;
+            }
+            return guestId;
+        }
+
+        /// <summary>The session key holding the guest whose rows wait to be moved to the signed-in user.</summary>
+        private const string Adopt = "adopt_guest", Adopted = "adopted";
+
+        /// <summary>
+        /// At sign-in, with http.auth.adopt_guest: remembers the browser's guest so its rows of Ownable models move to
+        /// the user, and takes the guest cookie away.
+        /// </summary>
+        private void NoteAdoption()
+        {
+            if (!App.Settings.AdoptGuest || Guest(create: false) is not string guest) return;
+            session[Adopt] = "guest:" + guest;
+            session[Adopted] = new List<object>();
+            guestId = null;
+            sendGuest = false;
+            clearGuest = true;
+        }
+
+        /// <summary>
+        /// Moves the rows of the owned models this run knows from the guest who signed in to <paramref name="owner"/>,
+        /// each model once a session: models other files declare move when they are first used.
+        /// </summary>
+        internal void AdoptGuestRows(CallContext call, string owner)
+        {
+            Dictionary<string, object> s = Session(create: false);
+            if (s == null || s.GetValueOrDefault(Adopt) is not string from) return;
+            if (s.GetValueOrDefault(Adopted) is not List<object> done) s[Adopted] = done = new List<object>();
+            var tables = done.Select(Values.ToStr).ToList();
+            if (KScript.Data.ModelInfo.AdoptOwner(call, from, owner, tables) > 0 || tables.Count != done.Count)
+            {
+                s[Adopted] = tables.Cast<object>().ToList();
+                dirty = true;
+            }
         }
 
         /// <summary>Remembers the address a guest wanted, for @intended() after they sign in. Only paths on this site are kept.</summary>
@@ -385,7 +445,7 @@ namespace KScript.Auth
 
         private void CheckPendingCookie()
         {
-            if (sendCookie || clearCookie)
+            if (sendCookie || clearCookie || sendGuest || clearGuest)
                 throw new KScriptException("An action that changes the session cookie cannot start streaming.", "Context");
         }
 
@@ -413,13 +473,15 @@ namespace KScript.Auth
             {
                 cookies.Add(CookieHeader(string.Empty, 0));
             }
+            if (clearGuest) cookies.Add(CookieHeader(string.Empty, 0, App.Settings.GuestCookie));
+            else if (sendGuest) cookies.Add(CookieHeader(guestId, App.Settings.GuestLifetime, App.Settings.GuestCookie));
             return cookies;
         }
 
-        private string CookieHeader(string value, double? maxAge)
+        private string CookieHeader(string value, double? maxAge, string name = null)
         {
             AuthSettings s = App.Settings;
-            string header = $"{s.Cookie}={value}; Path=/; HttpOnly; SameSite={s.SameSite}";
+            string header = $"{name ?? s.Cookie}={value}; Path=/; HttpOnly; SameSite={s.SameSite}";
             if (maxAge != null) header += "; Max-Age=" + ((long)maxAge.Value).ToString(CultureInfo.InvariantCulture);
             if (maxAge == 0) header += "; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
             // SameSite=None only works on Secure cookies, so it makes the cookie Secure too.

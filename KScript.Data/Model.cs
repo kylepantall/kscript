@@ -104,6 +104,46 @@ namespace KScript.Data
 
         public HashSet<string> Guarded { get; } = new HashSet<string>(StringComparer.Ordinal);
 
+        /// <summary>
+        /// The column that says whose a record is, for a model that extends an owner mixin (KScript.Auth's Ownable),
+        /// or null. ->create() fills it from the current owner, and it can't be changed once the record is made.
+        /// </summary>
+        public string OwnerColumn { get; private set; }
+
+        /// <summary>The names of the mixins that give a model an owner column, by the package that ships each one.</summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> OwnerMixins = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Says that the mixin <paramref name="name"/>, declared by one of <paramref name="package"/>'s own scripts, gives
+        /// the models that extend it the owner column <c>owner</c>. KScript.Auth calls it for Ownable.
+        /// </summary>
+        public static void OwnerMixin(string package, string name) => OwnerMixins[name] = package;
+
+        /// <summary>
+        /// The current owner (KScript.Auth's @owner()), or null when there isn't one, such as outside a request. Set by
+        /// the package that ships the owner mixin.
+        /// </summary>
+        public static Func<CallContext, object> CurrentOwner { get; set; }
+
+        /// <summary>
+        /// Moves the rows of every owned model this run has declared, whose table isn't in <paramref name="done"/> yet,
+        /// from one owner to another (a guest's to the account they signed in to), and adds their tables to it. Returns
+        /// how many rows moved.
+        /// </summary>
+        public static double AdoptOwner(CallContext call, string from, string to, List<string> done)
+        {
+            double moved = 0;
+            foreach (ModelInfo model in Owned(call.Interpreter).Where(m => !done.Contains(m.Table)).ToList())
+            {
+                moved += Query.Adopt(call, model, from, to);
+                done.Add(model.Table);
+            }
+            return moved;
+        }
+
+        /// <summary>Every owned model the interpreter has declared.</summary>
+        public static IEnumerable<ModelInfo> Owned(Interpreter interpreter) => DeclaredBy(interpreter).Where(m => m.OwnerColumn != null && m.Table != null);
+
         private List<Column> columns;
 
         /// <summary>The model a record or type value belongs to, or null. Its relations are worked out first.</summary>
@@ -376,6 +416,11 @@ namespace KScript.Data
                 Options = options,
             };
             model.DeclaredFields.UnionWith(type.Fields.Select(f => f.Name));
+            // Ownable (from KScript.Auth's own script) and the models built on it have an owner column.
+            if (mixin && OwnerMixins.TryGetValue(type.Name, out string ownerPackage)
+                && run.Module.Path == System.IO.Path.Combine(PackageSource.Root, ownerPackage, System.IO.Path.GetFileName(run.Module.Path ?? string.Empty)))
+                model.OwnerColumn = "owner";
+            model.OwnerColumn ??= parents.Select(p => p.Model?.OwnerColumn).FirstOrDefault(c => c != null);
             foreach (var entry in type.Bases.Select(DefinitionOf).Where(b => b != null))
             {
                 foreach (var relation in entry.RelationArgs)

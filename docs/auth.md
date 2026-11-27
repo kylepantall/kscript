@@ -505,6 +505,60 @@ model User(timestamps, unique: [email], hidden: [password]) {
 
 Then a user is a row of the `users` table, and `@user()`, `@register` and `@users()` give you the model's record, so its relations and methods work: `@user().posts`. The password field holds the hash KScript.Auth makes; `hidden: [password]` keeps it out of JSON. Ids are the model's keys. Sessions, API tokens and reset tokens are still files in the app's state folder.
 
+## Guests and owners
+
+Some apps let people use them before they sign up: a board of notes, a basket, a draft. KScript.Auth gives every browser a guest id, and the `Ownable` mixin keeps each row to whoever made it, guest or user.
+
+```kscript
+import KScript.Data
+import KScript.Auth
+import KScript.Http
+
+/// A note on someone's board.
+model Note(timestamps) extends Ownable {
+  title: string
+}
+
+Routes {
+  Get(path: /notes) { return Note->mine()->order_by(id)->get() }
+  Post(path: /notes) { return Note->create(title: $json.title) }
+  Get(path: /notes/{id}) { return Note->mine()->find_or_fail($id) }
+}
+```
+
+`Ownable` comes with KScript.Auth, so there is nothing to declare: importing the package is enough. It adds:
+
+| Member | What it does |
+| --- | --- |
+| `owner: string` | Who the row belongs to: `user:<id>` or `guest:<uuid>`. It is indexed, set when the row is made, and can't be changed afterwards (`->update(owner:)` is refused). |
+| `->mine(as?:)` | A scope: the rows of whoever is making the request. `as:` names someone else: a user, a user's id, or an owner text such as `'guest:…'`. |
+| `->is_mine()` | Whether this record belongs to whoever is making the request. |
+
+`Note->create()` fills `owner` in itself, so a request can't make a row for someone else: giving a different `owner:` is a `Forbidden` error. Outside a request (a seeder, a job, `kscript run`), nobody is making the request, so name the owner: `Note->create(title: 'Welcome', owner: @owner(as: $user))` and `Note->mine(as: $user)`. Without one, both are `Unauthorized` errors.
+
+- `@guest()` is this browser's guest id, a `uuid`. The first call makes one and sends it in the `ks_guest` cookie (`http.auth.guest_cookie`), which lasts `http.auth.guest_lifetime` (a year). It is `null` when someone is signed in, and outside a request.
+- `@owner(as?:)` is the owner text for whoever is making the request: `user:<id>` when someone is signed in, otherwise `guest:<uuid>`. Outside a request it is `null`. `as:` turns a user, an id or an owner text into one.
+
+### Keeping a guest's rows when they sign up
+
+With `"adopt_guest": true` in `http.auth`, signing in (with `@login`, `@attempt` or a passkey) moves the guest's rows to their account. It happens once per model, the first time each model is used after sign-in, and includes soft-deleted rows. The guest cookie is cleared. With it off (the default), a guest's rows stay theirs, and the account starts empty.
+
+### Testing as a guest
+
+`@acting_as_guest(id?:)` makes the rest of the test run as a guest, in the test and in the routes it calls with `@api(/...)`. It returns the guest's id: a new one each call, or the `uuid` you give it. `@acting_as(...)` switches back to a user.
+
+```kscript
+import KScript.Auth
+import KScript.Net
+
+test(name: 'guests see only their own notes') {
+  @acting_as_guest()
+  @api('/api/notes', post: { title: 'milk' })
+  @acting_as_guest()
+  expect(@api('/api/notes')->json(), equals: [])
+}
+```
+
 ## Password resets
 
 `@reset_token(email)` starts a reset and returns a token for a link, or `null` when no user has that email. Tell the person the same thing either way, so the page doesn't show who has an account. The token works once, for `http.auth.reset_lifetime` (an hour), and a new one replaces the last. `@reset_password(token, password)` checks the new password, sets it, and ends the user's sessions. It returns the user, or `null` when the token is wrong, used or too old.
@@ -585,6 +639,9 @@ Every setting has a safe default, so set only what you want to change. Times are
 | `passkey_origin` | disabled | The public HTTPS origin that can register and use passkeys. Local development accepts `http://localhost` with an optional port. |
 | `passkey_signup` | `false` | Allow a guest to create a passwordless account by verifying a new passkey. Requires `passkey_origin`. |
 | `passkey_rp_id` | origin hostname | The relying party domain for credentials. |
+| `guest_lifetime` | `365d` | How long a browser keeps its [`@guest()`](#guests-and-owners) id. |
+| `guest_cookie` | `ks_guest` | The guest id cookie's name. |
+| `adopt_guest` | `false` | `true` moves a guest's rows of [Ownable](#guests-and-owners) models to their account when they sign in. |
 | `token_env` | `API_TOKEN` | The environment variable with the shared token the `auth` middleware also accepts. |
 
 The password rules are the `password` type's, under `types` (see [Types and validation](types.md)). `@register`, `@reset_password` and `->set_password` use them, and so do typed fields such as `password: password` in a `type`.

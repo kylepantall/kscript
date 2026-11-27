@@ -1,0 +1,30 @@
+// Notes belong to whoever wrote them: a guest before they sign up, a user
+// after (KScript.Auth's Ownable mixin).
+import KScript.Auth
+import KScript.Data
+import KScript.Net
+import "../models/note.kscript"
+
+describe(name: 'Notes') {
+  test(name: 'each guest sees only their own notes') {
+    first = @acting_as_guest()
+    @api('/api/notes', post: { text: 'milk' })
+    @api('/api/notes', post: { text: 'eggs' })
+    expect(@api('/api/notes')->json(), equals: ['milk', 'eggs'])
+
+    @acting_as_guest()
+    expect(@api('/api/notes')->json(), equals: [])
+    expect(Note->mine(as: "guest:{ $first }")->count(), equals: 2)
+  }
+
+  test(name: "a note's owner is whoever made it") {
+    user = @register('cy@example.test', 'correct-horse-battery-9')
+    @acting_as($user)
+    note = @api('/api/notes', post: { text: 'bread' })->json()
+    expect($note.owner, equals: "user:{ $user.id }")
+    expect(Note->find($note.id)->is_mine(), equals: true)
+    expect_error(type: Forbidden) {
+      Note->find($note.id)->update(owner: 'user:0')
+    }
+  }
+}

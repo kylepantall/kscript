@@ -102,6 +102,8 @@ note = Note->create(title: 'Draft')
 echo $note.uid
 ```
 
+KScript.Auth ships a mixin of its own, `Ownable`, which keeps each row to the user or guest who made it and adds the `->mine()` scope. See [Guests and owners](auth.md#guests-and-owners).
+
 Options from later bases take precedence over earlier bases. Put a literal option on a base reference to change it for this use, as in `extends [Entry, Auditable(timestamps: false)]`. Options on the new model take precedence over its bases. Each table, connection and `auto_create` setting belongs to its own concrete declaration. XML writes the base list in the model's `with` attribute.
 
 

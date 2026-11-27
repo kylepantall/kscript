@@ -907,6 +907,13 @@ namespace KScript.Language.Analysis
             {
                 ReportDeprecatedCall(applicable[0], $"->{name}", nameSpan, count >= 0 ? args : null, 0, region);
             }
+            if (name == "dispatch" && args != null && region != null && applicable.Any(m => m.Package == "KScript.Queue")
+                && args.Any(a => a.Name == "delay") && args.FirstOrDefault(a => a.Name == "at") is ArgumentNode at)
+            {
+                // One says when the job runs: at: would win, and delay: would be dropped without a word.
+                Report(region.Source.ToSource(at.Span), DiagnosticSeverity.Error, DiagnosticCodes.ArgumentCount,
+                    "->dispatch() takes delay: (how long to wait) or at: (when to run), not both.");
+            }
             if (count >= 0 && args != null && CheckNamedArguments($"{arrow}{name}()", args, 0, SlotsOf(applicable, receiver.Type != KType.Any), region, nameSpan))
             {
                 return;

@@ -1,0 +1,14 @@
+// Written by kscript db diff from the models. Read it, change it if you need
+// to, then run kscript db migrate.
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'notes') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'owner', type: string, max: 80)
+    Field(name: 'text', type: string, max: 200)
+    Field(name: 'created_at', type: date, optional)
+    Field(name: 'updated_at', type: date, optional)
+    Index(columns: [owner])
+  }
+}

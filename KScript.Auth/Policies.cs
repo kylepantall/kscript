@@ -117,9 +117,39 @@ namespace KScript.Auth
         {
             if (!host.Items.ContainsKey(ActingKey)) host.AfterTest.Add(() => host.Items.Remove(ActingKey));
             host.Items[ActingKey] = user;
-            if (AuthRequest.Current(host) is AuthRequest auth) auth.Request[ActingKey] = user;
+            AuthRequest auth = AuthRequest.Current(host);
+            if (auth != null) auth.Request[ActingKey] = user;
+            if (user != null)
+            {
+                // Acting as a user ends acting as a guest.
+                host.Items.Remove(GuestKey);
+                auth?.Request.Remove(GuestKey);
+            }
             return user;
         }
+
+        /// <summary>Where a test's <c>@acting_as_guest()</c> keeps the guest id it acts as (on the host, and on the request).</summary>
+        public const string GuestKey = "KScript.Auth.ActingAsGuest";
+
+        /// <summary>
+        /// Acts as a guest until the test ends: no one is signed in, and <c>@guest()</c> is <paramref name="id"/> (a new
+        /// uuid when it is null). Returns the guest id.
+        /// </summary>
+        public static string ActAsGuest(KScriptHost host, string id)
+        {
+            if (id != null && !Guid.TryParse(id, out _))
+                throw new KScriptException($"@acting_as_guest() takes a guest id, which is a uuid, not '{id}'.", "Argument");
+            id = (id != null ? Guid.Parse(id) : Guid.NewGuid()).ToString("D");
+            ActAs(host, null);
+            if (!host.Items.ContainsKey(GuestKey)) host.AfterTest.Add(() => host.Items.Remove(GuestKey));
+            host.Items[GuestKey] = id;
+            if (AuthRequest.Current(host) is AuthRequest auth) auth.Request[GuestKey] = id;
+            return id;
+        }
+
+        /// <summary>The guest id a test acts as, or null.</summary>
+        internal static string ActingGuest(KScriptHost host) =>
+            host.Items.TryGetValue(GuestKey, out object id) ? id as string : null;
 
         /// <summary>Runs a &lt;policy&gt;: checks it and keeps its functions for its model.</summary>
         public static void Declare(ElementRun run)

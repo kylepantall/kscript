@@ -104,6 +104,29 @@ namespace KScript.Data
         public static Dictionary<string, object> Fillable(ModelInfo model, Dictionary<string, object> values) =>
             model.Guarded.Count == 0 ? values : values.Where(kv => !model.Guarded.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
+        /// <summary>
+        /// The owner a new record of an owned model gets: the current owner (who is signed in, or the guest). Naming
+        /// another owner is refused. With no current owner, such as in a seeder or a job, the owner must be named.
+        /// </summary>
+        private static object Owner(CallContext call, ModelInfo model, object given)
+        {
+            string column = model.OwnerColumn;
+            given = Values.Unwrap(given);
+            object current = ModelInfo.CurrentOwner?.Invoke(call);
+            if (current != null)
+            {
+                if (given != null && !Equals(Values.ToStr(given), Values.ToStr(current)))
+                    throw new KScriptException($"A {model.Name} gets its {column} from who is making it, so it can't be made for someone else. Leave {column} out.", "Forbidden");
+                return current;
+            }
+            return given ?? throw new KScriptException(
+                $"A new {model.Name} needs an owner, and there is no one signed in and no guest here. Outside a request, name one: {model.Name}->create({column}: @owner(as: $user), ...).", "Unauthorized");
+        }
+
+        /// <summary>The error for changing the owner column of a record that has been made.</summary>
+        internal static KScriptException OwnerIsFixed(ModelInfo model) =>
+            new KScriptException($"{model.Name}.{model.OwnerColumn} is set when the record is made and can't be changed.", "Forbidden");
+
         /// <summary><c>User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
         public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
@@ -115,6 +138,7 @@ namespace KScript.Data
         internal static Record Prepare(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
             Dictionary<string, object> fill = (fillable ? Fillable(model, values) : values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
+            if (model.OwnerColumn != null) fill[model.OwnerColumn] = Owner(call, model, values.GetValueOrDefault(model.OwnerColumn));
             // A belongs-to record given (author: $user) is its key: the model it is may be one this model's file
             // doesn't import (it was loaded from the models folder), so its type can't be checked by name here.
             foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo))
@@ -285,6 +309,7 @@ namespace KScript.Data
             ModelInfo model = ModelInfo.Of(record);
             foreach (KeyValuePair<string, object> v in values)
             {
+                if (v.Key == model.OwnerColumn && !Equals(Values.ToStr(Values.Unwrap(v.Value)), Values.ToStr(record.GetValueOrDefault(v.Key)))) throw OwnerIsFixed(model);
                 if (model.Guarded.Contains(v.Key)) continue;
                 if (model.Type.Field(v.Key) is null) model.Need(v.Key, " for ->update()");
                 record.Set(call.Interpreter, v.Key, v.Value is BareWord w ? w.Name : v.Value);

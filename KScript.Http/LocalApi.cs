@@ -40,6 +40,8 @@ namespace KScript.Http
             // A test's @acting_as() reaches the routes it calls, as the test database's transaction does.
             if (!request.ContainsKey(KScript.Auth.Policies.ActingKey) && host != null && host.Items.TryGetValue(KScript.Auth.Policies.ActingKey, out object acting))
                 request[KScript.Auth.Policies.ActingKey] = acting;
+            if (!request.ContainsKey(KScript.Auth.Policies.GuestKey) && host != null && host.Items.TryGetValue(KScript.Auth.Policies.GuestKey, out object guest))
+                request[KScript.Auth.Policies.GuestKey] = guest;
             // A Cookie header the call sends itself is read into $request.cookies, as a server does.
             if (!request.ContainsKey("cookies") && ((Dictionary<string, object>)request["headers"]).GetValueOrDefault("cookie") is object cookieHeader)
                 request["cookies"] = ParseCookies(Values.ToStr(cookieHeader));
@@ -119,6 +121,7 @@ namespace KScript.Http
                 to["cookies"] = new Dictionary<string, object>(cookies, StringComparer.Ordinal);
             if (from.GetValueOrDefault("ip") is object ip) to["ip"] = ip;
             if (from.TryGetValue(KScript.Auth.Policies.ActingKey, out object acting)) to.TryAdd(KScript.Auth.Policies.ActingKey, acting);
+            if (from.TryGetValue(KScript.Auth.Policies.GuestKey, out object guest)) to.TryAdd(KScript.Auth.Policies.GuestKey, guest);
         }
 
         /// <summary>A Cookie header (<c>a=1; b=two</c>) as a map of names to values. The first of a repeated name wins.</summary>

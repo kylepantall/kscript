@@ -108,6 +108,36 @@ namespace KScript.Runtime
         }
     }
 
+    /// <summary>A script a package ships, such as KScript.Auth's ownable.kscript. It has a path of its own that is never on disk.</summary>
+    public sealed class PackageSource
+    {
+        /// <summary>The folder package scripts appear to be in. Nothing is ever written there.</summary>
+        public static readonly string Root = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "kscript-package-sources"));
+
+        public PackageSource(string package, string fileName, string text)
+        {
+            Package = package;
+            FileName = fileName;
+            Text = text;
+            Path = System.IO.Path.Combine(Root, package, fileName);
+        }
+
+        public string Package { get; }
+        public string FileName { get; }
+        public string Text { get; }
+
+        /// <summary>Where the script appears to be: under <see cref="Root"/>, in a folder named for its package.</summary>
+        public string Path { get; }
+
+        /// <summary>True for the path of a package's script.</summary>
+        public static bool IsSource(string path) =>
+            path != null && path.StartsWith(Root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+        /// <summary>The package script at a path, among the packages given, or null.</summary>
+        public static PackageSource At(string path, IEnumerable<KScriptPackage> packages) =>
+            IsSource(path) ? packages.SelectMany(p => p.Sources).FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.Ordinal)) : null;
+    }
+
     /// <summary>
     /// A package of elements, commands, methods and variables, such as KScript.Terminal or KScript.Math. Scripts
     /// only see the packages they import (KScript.Core is always there), and a package's assembly is only loaded
@@ -124,6 +154,7 @@ namespace KScript.Runtime
         private readonly Dictionary<string, VariableDefinition> variables = new Dictionary<string, VariableDefinition>(StringComparer.Ordinal);
         private readonly Dictionary<string, EchoFormatter> echoFormats = new Dictionary<string, EchoFormatter>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> requires = new List<string>();
+        private readonly List<PackageSource> sources = new List<PackageSource>();
         private readonly Dictionary<string, LogProviderType> logProviders = new Dictionary<string, LogProviderType>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The full name, such as KScript.Terminal.</summary>
@@ -152,6 +183,12 @@ namespace KScript.Runtime
         /// <summary>Packages that are imported along with this one.</summary>
         public IReadOnlyList<string> Requires { get { EnsureRegistered(); return requires; } }
 
+        /// <summary>
+        /// Scripts the package ships, whose declarations (such as KScript.Auth's Ownable model) every script that
+        /// imports the package sees, as if it had imported them itself.
+        /// </summary>
+        public IReadOnlyList<PackageSource> Sources { get { EnsureRegistered(); return sources; } }
+
         internal void EnsureRegistered()
         {
             if (registered) return;
@@ -177,6 +214,7 @@ namespace KScript.Runtime
                     variables.Clear();
                     echoFormats.Clear();
                     requires.Clear();
+                    sources.Clear();
                     logProviders.Clear();
                     throw;
                 }
@@ -411,6 +449,13 @@ namespace KScript.Runtime
 
             /// <summary>Another package that is always imported with this one.</summary>
             public void Requires(string packageName) => package.requires.Add(packageName);
+
+            /// <summary>
+            /// A script written in KScript that the package ships (<paramref name="fileName"/> names it in errors and the
+            /// editor). Its top-level declarations reach every script that imports the package; a script's own
+            /// declaration of the same name wins.
+            /// </summary>
+            public void Source(string fileName, string text) => package.sources.Add(new PackageSource(package.Name, fileName, text));
         }
     }
 

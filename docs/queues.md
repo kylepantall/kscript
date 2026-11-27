@@ -85,7 +85,7 @@ SendWelcome(user_id: 9, email: 'bo@example.com')->run()
 ```
 
 - `Job(...)->dispatch()` queues the job with its own options.
-- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. It returns `null` for a unique job that is already queued, and on the `sync` connection, where the job has already run and nothing is queued. `kscript test` uses `sync`, so code that reads `$queued.id` should allow for `null` there, or use `@fake_queue()`.
+- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. Give one or the other: both is an error, from `kscript check` and when the code runs. It returns `null` for a unique job that is already queued, and on the `sync` connection, where the job has already run and nothing is queued. `kscript test` uses `sync`, so code that reads `$queued.id` should allow for `null` there, or use `@fake_queue()`.
 - `->run()` runs `handle` here and now, with no queue and no retries. Errors reach the caller.
 
 A job's fields are given by name and checked against its declaration, both by the editor and when it runs.
