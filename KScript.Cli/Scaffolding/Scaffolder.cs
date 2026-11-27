@@ -424,6 +424,10 @@ namespace KScript.Scaffolding
                     return Items(value).All(a => System.Text.RegularExpressions.Regex.IsMatch(a, @"\A[A-Za-z_]\w*\s*=\s*\S")) ? null : "constants written as name = value, such as \"max_items = 10, page_size = 25\"";
                 case "file":
                     return value.Length > 0 && value != "true" && File.Exists(Path.Combine(root, value)) ? null : "a file in the project (there is none at that path)";
+                case "message":
+                    // The shell has already swapped "{$id}" for "{}" when the message was in double quotes.
+                    if (System.Text.RegularExpressions.Regex.IsMatch(value, @"\{\s*\}")) return "a message whose {…} name a field, such as 'No order {$id}' (in single quotes, so the shell leaves $id alone)";
+                    return value.Contains('"') ? "a message without double quotes" : null;
                 case "locale":
                     return System.Text.RegularExpressions.Regex.IsMatch(value, @"\A[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})*\z") ? null : "a locale such as fr or en-GB";
                 default:

@@ -10,9 +10,9 @@ usage: <Name> [--base string] [--pattern "/^[A-Z]{3}-\d{4}$/"] [--min 3] [--max 
 --not: Values that are never allowed, comma separated
 --normalize: An expression that tidies the value, as $value, before it is checked, such as "$value->trim()->upper()"
 --validate: Any other check, with the message to show when it fails: "test, 'message'"
-example: kscript make native Sku --pattern "/^[A-Z]{3}-\d{4}$/" --normalize "$value->trim()->upper()"
+example: kscript make native Sku --pattern '/^[A-Z]{3}-\d{4}$/' --normalize '$value->trim()->upper()'
 example: kscript make native Percent --base int --min 0 --max 100
-example: kscript make native CompanySite --base url --validate "$value.host->ends_with('example.com'), 'Use a company site'"
+example: kscript make native CompanySite --base url --validate '$value.host->ends_with("example.com"), "Use a company site"'
 example: kscript make native Username --base handle --max 16 --not @admin,@root
 defaults: base=string
 to: {{ paths.natives }}/{{ dir }}{{ kebab }}{{ ext }}
