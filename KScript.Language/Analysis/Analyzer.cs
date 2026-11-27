@@ -1037,7 +1037,7 @@ namespace KScript.Language.Analysis
                 {
                     // <button on-click="count += 1">: statements run on the server when the event fires.
                     // $event describes the browser event the handler runs for: its fields depend on the handler.
-                    Scope handlerScope = new Scope(scope, e.Span);
+                    Scope handlerScope = new Scope(scope, attr.Span);
                     handlerScope.Declare(EventSymbol(e, attr.Name), e.Span.Start);
                     if (HandlerShorthands.IsShorthand(attr.ValueText))
                     {
@@ -1388,7 +1388,7 @@ namespace KScript.Language.Analysis
                     break;
                 case AttributeKind.Statements:
                 {
-                    Scope handlerScope = new Scope(scope, e.Span);
+                    Scope handlerScope = new Scope(scope, attr.Span);
                     handlerScope.Declare(EventSymbol(e, attr.Name), e.Span.Start);
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                     break;

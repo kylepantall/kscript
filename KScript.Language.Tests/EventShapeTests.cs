@@ -142,6 +142,31 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void Each_handler_on_one_tag_gets_its_own_event_whatever_the_order()
+        {
+            // #205: the second handler on a tag was checked against the first handler's $event.
+            var board = Write("Board", """
+                <div @on-click(title = $event.value) @on-drop(title = $event.drag_value)>a</div>
+                <div @on-dblclick(title = 'x') @on-drop(title = $event.drag_value)>b</div>
+                <div @on-click(title = $event.key) @on-dragend(title = $event.z)>c</div>
+                <div @on-click(title = $event.key) @on-event(title = $event.source) event-name="x"></div>
+                <ul @on-click(title = $event.key) @on-sort(moved = $event.order)><li sort-item="a">a</li></ul>
+                """);
+
+            Assert.DoesNotContain(board.Analysis.Diagnostics, d => d.Code == "KS5010");
+            Assert.Contains("drag_value", FieldsAfter(board, "@on-drop(title = $event."));
+            Assert.DoesNotContain("drag_value", FieldsAfter(board, "@on-click(title = $event."));
+            Assert.Contains("order", FieldsAfter(board, "moved = $event."));
+        }
+
+        [Fact]
+        public void A_handler_field_from_the_wrong_handler_on_the_same_tag_is_still_reported()
+        {
+            var board = Write("Board", "<div @on-drop(title = $event.drag_value) @on-click(title = $event.drag_value)>a</div>");
+            Assert.Single(board.Analysis.Diagnostics, d => d.Message.StartsWith("event has no field 'drag_value'", StringComparison.Ordinal));
+        }
+
+        [Fact]
         public void A_field_the_event_does_not_have_is_reported()
         {
             var board = Write("Board", "<button @on-click(title = $event.dta)>Go</button>");

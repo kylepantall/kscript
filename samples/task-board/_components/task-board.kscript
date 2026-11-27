@@ -49,7 +49,9 @@ type TaskBoard extends Component {
       <li
         @each($tasks, as: task)
         @if(($filter == 'all' or not $done->contains($task)) and $task->lower()->contains($search->lower()))>
-        <span @class({ $done->contains($task): ['done', 'struck'] })>{$task}</span>
+        <span
+          @class({ $done->contains($task): ['done', 'struck'] })
+          @drag(copy: true, value: $task)>{$task}</span>
         <button
           type="button"
           @on-click(call: $finish, with: [$task], emit: 'task-finished')>Finish {$task}</button>
@@ -58,6 +60,10 @@ type TaskBoard extends Component {
           @on-click(remove: $task, from: $tasks, confirm: 'Remove this task?')>Remove {$task}</button>
       </li>
     </ul>
+    <p
+      class="drop"
+      @on-dblclick(set: $note, to: 'Drag a task here to finish it')
+      @on-drop(call: $finish, with: [$event.drag_value])>Drop a task here to finish it</p>
     <p>Added {$added} · Showing {$filter} · {$view} · Goal {$goal}</p>
     <p @if($note)>{$note}</p>
     ```
