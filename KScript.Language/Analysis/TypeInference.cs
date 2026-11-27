@@ -557,6 +557,12 @@ namespace KScript.Language.Analysis
         private Symbol FunctionNamed(string name, int offset)
         {
             Symbol s = result.ScopeAt(offset).Lookup(name, offset, includeMethods: true);
+            if (s == null && name.IndexOf('.') is int dot and > 0
+                && result.ScopeAt(offset).Lookup(name.Substring(0, dot), offset) is { Kind: SymbolKind.Import } import)
+            {
+                // @notes.find(...): a function of a script imported with an alias returns what it returns there.
+                import.Members.TryGetValue(name.Substring(dot + 1), out s);
+            }
             return s?.Kind == SymbolKind.Function ? s : null;
         }
 
