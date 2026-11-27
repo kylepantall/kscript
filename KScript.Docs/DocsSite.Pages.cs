@@ -62,9 +62,9 @@ namespace KScript.Docs
                     foreach (CliOption o in c.Options) sb.Append($"<tr><td><code>{Html.H(o.Name)}</code></td><td>{Html.H(o.Description)}</td></tr>");
                     sb.Append("</tbody></table></div>");
                 }
-                if (c.Example != null)
+                if (c.Examples != null)
                 {
-                    sb.Append("<div class=\"example\"><div class=\"example-label\">Example</div>").Append(Html.Code(c.Example, "sh")).Append("</div>");
+                    sb.Append("<div class=\"example\"><div class=\"example-label\">Examples</div>").Append(Html.Commands(c.Examples.Select(e => (e.Command, e.Does)))).Append("</div>");
                 }
                 if (c.Name == "make")
                     sb.Append("<p class=\"hint\">Every type it makes, with its options: <a href=\"/cli/make\">kscript make commands</a>.</p>");

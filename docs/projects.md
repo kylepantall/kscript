@@ -257,8 +257,8 @@ import "lib/isolink-connect/client.kscript" as connect
 For a publisher outside the built-in catalog and trusted owners, register its specific repository in your project. You can then install by bare name or select that publisher directly. For example, if your team publishes a `slugs` library in `acme/kscript-libraries`, run both commands from the project.
 
 ```sh
-kscript repo add acme/kscript-libraries
-kscript lib add acme/kscript-libraries@slugs
+kscript repo add acme/kscript-libraries        # add a repository that publishes libraries
+kscript lib add acme/kscript-libraries@slugs   # install its slugs library
 ```
 
 The first command also accepts the repository's HTTPS URL. It records the registration in `.kscript/repos/` beside the nearest `kscript.json`, or in the current folder for standalone scripts. Commit the registration to share it with teammates. The second command downloads `libraries/slugs/` from the registered repository's default branch. A script in the site root can then use `import "lib/slugs/index.kscript" as slugs` with the default layout.
@@ -422,8 +422,7 @@ git submodule add https://github.com/acme/slug-tools.git libraries/slugs
 `kscript make <type> <name>` creates a file where the project keeps that kind of file, makes any folder it needs, and writes scripts in the project's format. [kscript make commands](/cli/make) lists every type with its options and examples, and so does `kscript make --list`; `kscript make <type> --help` shows one.
 
 ```sh
-kscript make route users                              # adds Get(path: /users, to: @users.index) to routes/web.kscript,
-                                                      # and makes controllers/users.kscript with index()
+kscript make route users                              # adds Get(path: /users, to: @users.index) to routes/web.kscript, and makes controllers/users.kscript with index()
 kscript make route "users/{id}" --where "id: int"     # Get(…, to: @users.show), and adds show(id) to the controller
 kscript make route users --method post --api          # Post(…, to: @users.store) in routes/api.kscript, served under /api
 kscript make route people --resource --api            # Resource(path: /people, to: people), with all five functions

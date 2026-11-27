@@ -555,10 +555,10 @@ Converting one number with `as int`, a typed variable (`n: int = 3.9`) or an `in
 `kscript make native` writes a refinement type to `natives/` that works like a built-in one. Every script in the project can use it without an import, the same way the `extensions/` folder works. Values of it are written without quotes where the type reads text, they are checked wherever the type is used (assignments, arguments, a call of the type and request bodies), and the editor checks the values written in code:
 
 ```sh
-kscript make native Sku --pattern '/^[A-Z]{3}-\d{4}$/' --normalize '$value->trim()->upper()'
-kscript make native Percent --base int --min 0 --max 100
-kscript make native Username --base handle --max 16 --not @admin,@root
-kscript make native CompanySite --base url --validate '$value.host->ends_with("example.com"), "Use a company site"'
+kscript make native Sku --pattern '/^[A-Z]{3}-\d{4}$/' --normalize '$value->trim()->upper()'   # text in a pattern, tidied first
+kscript make native Percent --base int --min 0 --max 100   # a whole number from 0 to 100
+kscript make native Username --base handle --max 16 --not @admin,@root   # a handle, with names that aren't allowed
+kscript make native CompanySite --base url --validate '$value.host->ends_with("example.com"), "Use a company site"'   # a URL with a rule of its own
 ```
 
 The first one writes `natives/sku.kscript`:

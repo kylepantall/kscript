@@ -215,7 +215,7 @@ namespace KScript.Docs
                 if (language == "try") language = guide.FenceLanguage;
                 bool runnable = info.Contains("try") && (language == "xml" || language == "kscript");
                 string code = m.Groups[3].Value;
-                blocks.Add(runnable ? Html.Try(code, language) : Html.Code(code, language));
+                blocks.Add(runnable ? Html.Try(code, language) : (language == "sh" ? Html.CommandTable(code) : null) ?? Html.Code(code, language));
                 return $"\n<div data-block=\"{blocks.Count - 1}\"></div>\n";
             });
 
