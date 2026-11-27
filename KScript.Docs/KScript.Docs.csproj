@@ -20,6 +20,8 @@
     <!-- The guides are the repository's docs/*.md, built into the binary so kscript docs works offline. -->
     <EmbeddedResource Include="..\docs\*.md" WithCulture="false" LogicalName="KScript.Docs.Guides.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\*" WithCulture="false" LogicalName="KScript.Docs.Assets.%(Filename)%(Extension)" />
+    <!-- The kscript.json schema the editor checks with: the settings reference is made from it. -->
+    <EmbeddedResource Include="..\editors\vscode\schemas\kscript.schema.json" WithCulture="false" LogicalName="KScript.Docs.Schemas.kscript.schema.json" />
   </ItemGroup>
 
   <ItemGroup>

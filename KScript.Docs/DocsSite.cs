@@ -40,6 +40,9 @@ namespace KScript.Docs
 
         internal string ParentPath { get; init; }
         internal string TopicMarkdown { get; init; }
+
+        /// <summary>The page as Markdown, for pages made from code that the MCP server serves as they are.</summary>
+        internal string Markdown { get; set; }
         internal List<DocPage> Topics { get; } = new();
     }
 
@@ -150,6 +153,7 @@ namespace KScript.Docs
                 if (markdown != null) site.AddGuide(guide, markdown);
             }
             site.AddReference();
+            site.AddBuiltinPages();
             site.AddCli();
             site.AddMakeCommands();
             site.AddPlayground();

@@ -105,10 +105,17 @@ namespace KScript.Docs
                 index.Append($"<a class=\"card\" href=\"{TypeSlug(type)}\"><strong>{Html.H(type)}</strong><span>{(fieldCount > 0 ? $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}, " : "")}{count} method{(count == 1 ? "" : "s")}. {Html.Inline(TypeDescriptions.GetValueOrDefault(type, string.Empty))}</span></a>");
             }
             index.Append("</div><h2 id=\"variables\">Built-in variables</h2><p>Variables that exist without being declared, such as <code>$args</code>: see <a href=\"/reference/variables\">Built-in variables</a>.</p>");
+            index.Append("<h2 id=\"more\">Types, errors and settings</h2><div class=\"cards\">");
+            index.Append("<a class=\"card\" href=\"/reference/types\"><strong>Built-in types</strong><span>string, int, date, email, url, money, duration and every other type you can declare.</span></a>");
+            index.Append("<a class=\"card\" href=\"/reference/errors\"><strong>Error types</strong><span>Every error KScript throws, what it extends and the HTTP status it answers with.</span></a>");
+            index.Append("<a class=\"card\" href=\"/reference/settings\"><strong>kscript.json settings</strong><span>Every project setting, its type and its default.</span></a>");
+            index.Append("<a class=\"card\" href=\"/reference/index\"><strong>A to Z</strong><span>Everything built in, in one list: statements and their options, commands, methods, types and settings.</span></a>");
+            index.Append("</div>");
             var indexPage = new DocPage { Path = "/reference", Title = "Reference", NavTitle = "Overview", Section = "Reference", Description = "Every package, element, command, method and variable.", Body = index.ToString() };
             indexPage.Toc.Add((2, "packages", "Packages"));
             indexPage.Toc.Add((2, "methods", "Methods by type"));
             indexPage.Toc.Add((2, "variables", "Built-in variables"));
+            indexPage.Toc.Add((2, "more", "Types, errors and settings"));
             Add(indexPage);
 
             foreach (string package in PackageNames) AddPackagePage(package);

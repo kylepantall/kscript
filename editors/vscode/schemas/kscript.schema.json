@@ -437,6 +437,7 @@
         },
         "failed": {
           "type": "object",
+          "description": "What happens to jobs that fail every try.",
           "additionalProperties": false,
           "properties": {
             "keep": { "type": ["string", "number"], "default": "7d", "description": "How long failed jobs are kept, such as \"7d\" or a number of seconds." }
@@ -444,6 +445,7 @@
         },
         "worker": {
           "type": "object",
+          "description": "How kscript worker runs jobs.",
           "additionalProperties": false,
           "properties": {
             "concurrency": { "type": "integer", "minimum": 1, "default": 1, "description": "How many jobs a worker runs at once." },

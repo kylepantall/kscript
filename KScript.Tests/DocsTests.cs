@@ -246,6 +246,57 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_built_in_type_error_type_and_setting_has_a_reference_entry()
+    {
+        // These pages are made from the code that defines each thing, so a new one shows up by itself. The test
+        // keeps it that way, and makes a new basic type say what it holds.
+        string types = Site.Value.Find("/reference/types").Body;
+        foreach (string type in KScript.Runtime.Values.DeclarableTypes)
+        {
+            Assert.Contains($"id=\"type-{Html.Slug(type)}\"", types);
+            Assert.True(KScript.Metadata.NativeTypes.Get(type) != null || DocsSite.BasicTypeDescriptions.ContainsKey(type), $"Say what a {type} holds in DocsSite.BasicTypeDescriptions.");
+        }
+
+        string errors = Site.Value.Find("/reference/errors").Body;
+        foreach (string name in KScript.Runtime.ErrorTypes.BuiltIn.Values.Select(e => e.Name).Distinct())
+            Assert.Contains($"id=\"error-{Html.Slug(name)}\"", errors);
+        Assert.Contains("<td><code>ModelNotFound</code></td><td><a href=\"#error-notfound\"><code>NotFound</code></a></td><td>404</td>", errors);
+
+        string settings = Site.Value.Find("/reference/settings").Body;
+        var all = DocsSite.Settings().ToList();
+        Assert.Contains(all, s => s.Path == "serve.port");
+        Assert.Contains(all, s => s.Path == "http.auth.lifetime");
+        foreach (var (path, schema) in all)
+        {
+            Assert.Contains($"<code>{path}</code>", settings);
+            Assert.True(path.StartsWith("types.", StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(schema["description"]?.GetValue<string>()), $"Describe {path} in kscript.schema.json.");
+        }
+    }
+
+    [Fact]
+    public void The_a_to_z_lists_everything_built_in()
+    {
+        string index = Site.Value.Find("/reference/index").Body;
+        Assert.Contains("<code>soft_deletes</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("<code>mixin</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("href=\"/reference/errors#error-uniqueviolation\"", index);
+        Assert.Contains("href=\"/reference/settings#setting-serve-port\"", index);
+        Assert.Contains("href=\"/cli#cli-serve\"", index);
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (CallableInfo c in LanguageCatalog.Default.Commands.Where(c => !c.Planned))
+            Assert.Contains(entries, e => e.Name == "@" + c.Name);
+        foreach (ElementInfo e in LanguageCatalog.Default.Elements.Where(e => !e.Planned))
+            Assert.Contains(entries, entry => entry.Url.EndsWith("#" + DocsSite.ElementAnchor(e), StringComparison.Ordinal));
+
+        // The MCP server serves the same pages as Markdown.
+        var markdown = new KScript.Docs.Mcp.DocsMarkdown(Site.Value);
+        Assert.Contains("| `UniqueViolation` | `Conflict` | 409 |", markdown.Page("/reference/errors", "kscript"));
+        Assert.Contains("`soft_deletes`", markdown.Page("/reference/index", "kscript"));
+        Assert.Contains("| `serve.port` |", markdown.Page("/reference/settings", "kscript"));
+        Assert.Contains("| `email` |", markdown.Page("/reference/types", "kscript"));
+    }
+
+    [Fact]
     public void Every_page_has_an_address_the_site_serves()
     {
         // The site's route takes letters, digits, / _ and - (DocsSite.RoutesFile), so money[] is at money-list.
