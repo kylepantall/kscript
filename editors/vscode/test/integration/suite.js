@@ -209,7 +209,7 @@ async function liveAttributeScopes(folder) {
     const tokens = await vscode.commands.executeCommand('_workbench.captureSyntaxTokens', doc.uri);
     const directives = tokens.filter(token => /keyword\.control\.directive\.kscript/.test(token.t)).map(token => token.c);
     assert.deepStrictEqual(directives, ['@live-action', 'on-action', 'live-action', 'on-action', 'live-disable',
-      '@bind', '@on-click', '@live-disable'], file);
+      '@bind', '@on-click', '@live-disable'], file + '\n' + tokens.filter(token => /@|\(/.test(token.c)).map(token => JSON.stringify(token.c) + ' ' + token.t).join('\n'));
     assert.ok(tokens.some(token => token.c === 'title' && /entity\.other\.attribute-name\.html/.test(token.t)), file);
     assert.ok(tokens.some(token => token.c === 'count' && /meta\.embedded\.expression\.kscript.*support\.function\.kscript/.test(token.t)), file);
   }
