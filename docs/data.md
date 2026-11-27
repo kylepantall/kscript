@@ -143,7 +143,7 @@ An optional field (`age?: int`) is a column that can be null. A computed field (
 
 ## Built-in models and mixins
 
-These come with a package: import the package and `extends` them. You don't declare them yourself. `lookup Ownable` (in `kscript mcp`) shows the source.
+These come with a package: import the package and `extends` them. You don't declare them yourself. `lookup Ownable` (in `kscript mcp`) shows the source. The reference lists every one with its fields and methods, and every option a model takes: [Models and mixins](/reference/models).
 
 | Name and package | What it adds | Options | Usage | Same as a model option |
 | --- | --- | --- | --- | --- |
