@@ -245,6 +245,15 @@ namespace KScript.Pages
             (int start, string number, string args) = candidates[0];
             Match block = StartTag.Matches(Html).Where(t => t.Index < start && t.Groups[2].Value.Contains("data-ks-live=\"", StringComparison.Ordinal) && ElementEnd(t) > start)
                 .LastOrDefault() ?? throw call.Error($"{call.Display}: '{label}' isn't inside a live block, so it has nothing to run.", "Context");
+            Run(call, eventName, label, block, number, args, ev ?? new Dictionary<string, object> { ["type"] = eventName }, 0);
+        }
+
+        /// <summary>The most times events may set off other events (one block's handler emitting to the next), as in the browser.</summary>
+        private const int MaxEventHops = 16;
+
+        /// <summary>Runs handler <paramref name="number"/> of <paramref name="block"/>, redraws it, then delivers the events it emitted.</summary>
+        private void Run(CallContext call, string eventName, string label, Match block, string number, string args, Dictionary<string, object> ev, int hop)
+        {
             int blockEnd = ElementEnd(block);
             string blockHtml = Html[block.Index..blockEnd];
             var blockBinds = binds.Where(b => blockHtml.Contains($"data-ks-bind=\"{Values.HtmlEscape(b.Key)}\"", StringComparison.Ordinal))
@@ -263,15 +272,17 @@ namespace KScript.Pages
                 ["state"] = System.Net.WebUtility.HtmlDecode(Attribute(block, "data-ks-state") ?? string.Empty),
                 ["args"] = args == null ? null : System.Net.WebUtility.HtmlDecode(args),
                 ["binds"] = blockBinds,
-                ["event"] = ev ?? new Dictionary<string, object> { ["type"] = eventName },
+                ["event"] = ev,
             };
             // A component inside another, on a page a route served, sends its ancestors' state, as the browser does.
             if (parents.Count > 0 && Attribute(block, "data-ks-route") != null) payload["parents"] = parents;
             string json = Values.ToJson(payload);
+            string source = Attribute(block, "id") is string id ? System.Net.WebUtility.HtmlDecode(id) : null;
             if (Attribute(block, "data-ks-route") is string proof)
             {
-                FireRouted(call, eventName, label, json, System.Net.WebUtility.HtmlDecode(proof), block.Index, blockEnd);
+                bool redrawn = FireRouted(call, eventName, label, json, System.Net.WebUtility.HtmlDecode(proof), block.Index, blockEnd);
                 foreach (string key in blockBinds.Keys) binds.Remove(key);
+                if (redrawn) DeliverEvents(call, block.Index, source, hop);
                 return;
             }
             PageResult result = PageServer.HandleLive(site, json, new Dictionary<string, object>());
@@ -279,13 +290,73 @@ namespace KScript.Pages
             if (result.Status != 200) throw call.Error($"{call.Display} on '{label ?? eventName}' failed ({result.Status}): {result.Body}", "Http");
             foreach (string key in blockBinds.Keys) binds.Remove(key);
             Html = Html[..block.Index] + result.Body + Html[blockEnd..];
+            DeliverEvents(call, block.Index, source, hop);
+        }
+
+        /// <summary>
+        /// The events a handler emitted with @emit_event() (the redrawn block's data-ks-events): each goes to the block
+        /// with its target: id, or to every block, and runs that block's first on-event listener for the name, as the
+        /// browser does (#202).
+        /// </summary>
+        private void DeliverEvents(CallContext call, int blockStart, string source, int hop)
+        {
+            Match sender = StartTag.Match(Html, blockStart);
+            if (!sender.Success || sender.Index != blockStart || Attribute(sender, "data-ks-events") is not string encoded) return;
+            // The attribute is read once, as the browser removes it.
+            Html = Html[..sender.Index] + Regex.Replace(sender.Value, @"\sdata-ks-events=""[^""]*""", string.Empty) + Html[(sender.Index + sender.Length)..];
+            if (hop >= MaxEventHops || PageLive.ParseJson(System.Net.WebUtility.HtmlDecode(encoded)) is not List<object> effects) return;
+            foreach (Dictionary<string, object> effect in effects.OfType<Dictionary<string, object>>())
+            {
+                string name = effect.GetValueOrDefault("name") is object n ? Values.ToStr(n) : null;
+                string target = effect.GetValueOrDefault("target") is object t ? Values.ToStr(t) : null;
+                // Each recipient is found again, by its id, since the one before may have changed the page.
+                var recipients = StartTag.Matches(Html).Where(IsBlock).Select(m => System.Net.WebUtility.HtmlDecode(Attribute(m, "data-ks-live"))).ToList();
+                foreach (string live in recipients)
+                {
+                    Match recipient = StartTag.Matches(Html).FirstOrDefault(m => IsBlock(m) && System.Net.WebUtility.HtmlDecode(Attribute(m, "data-ks-live")) == live);
+                    if (recipient == null) continue;
+                    if (target != null && (Attribute(recipient, "id") is not string id || System.Net.WebUtility.HtmlDecode(id) != target)) continue;
+                    Match listener = OwnedBy(recipient).FirstOrDefault(m => Attribute(m, "data-ks-on-event") != null
+                        && (Attribute(m, "event-name") is not string only || System.Net.WebUtility.HtmlDecode(only) == name));
+                    if (listener == null) continue;
+                    string number = Attribute(listener, "data-ks-on-event");
+                    var ev = new Dictionary<string, object>(StringComparer.Ordinal)
+                    {
+                        ["type"] = "component",
+                        ["name"] = name,
+                        ["data"] = effect.GetValueOrDefault("data"),
+                        ["source"] = source,
+                        ["hop"] = (double)(hop + 1),
+                    };
+                    Run(call, "event", name, recipient, number, Attribute(listener, "data-ks-args-" + number) ?? Attribute(listener, "data-ks-args"), ev, hop + 1);
+                }
+            }
+        }
+
+        private static bool IsBlock(Match tag) => tag.Groups[2].Value.Contains("data-ks-live=\"", StringComparison.Ordinal);
+
+        /// <summary>The start tags inside a live block that belong to it, not to a block inside it.</summary>
+        private IEnumerable<Match> OwnedBy(Match block)
+        {
+            int end = ElementEnd(block);
+            var inner = new List<(int Start, int End)>();
+            foreach (Match tag in StartTag.Matches(Html).Where(t => t.Index > block.Index && t.Index < end))
+            {
+                if (inner.Any(r => tag.Index >= r.Start && tag.Index < r.End)) continue;
+                if (IsBlock(tag))
+                {
+                    inner.Add((tag.Index, ElementEnd(tag)));
+                    continue;
+                }
+                yield return tag;
+            }
         }
 
         /// <summary>
         /// A live action on a page a route served: posted to the page's own address with its proof, as the browser does,
         /// so the route's middleware and controller run again before the handler.
         /// </summary>
-        private void FireRouted(CallContext call, string eventName, string label, string json, string proof, int blockStart, int blockEnd)
+        private bool FireRouted(CallContext call, string eventName, string label, string json, string proof, int blockStart, int blockEnd)
         {
             var extra = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
@@ -299,13 +370,13 @@ namespace KScript.Pages
             {
                 // The fragment is the block's new HTML.
                 Html = Html[..blockStart] + response.Body + Html[blockEnd..];
-                return;
+                return true;
             }
             if (response.Status is >= 200 and < 400)
             {
                 // Anything else (a redirect, a whole page) makes the browser load the page again.
                 FollowRedirects(call, response.Status is >= 300 ? response : Routed(call, "GET", Path, null) ?? response);
-                return;
+                return false;
             }
             throw call.Error($"{call.Display} on '{label ?? eventName}' failed ({response.Status}): {response.Body}", "Http");
         }

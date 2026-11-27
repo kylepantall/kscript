@@ -189,6 +189,22 @@ namespace KScript.Language.Tests
             Assert.Equal(files.ReadText(path).LastIndexOf("label", StringComparison.Ordinal), unused.Span.Start);
         }
 
+        [Theory]
+        [InlineData("echo @zoo.make('Ziggy')->shown()")]
+        [InlineData("for z in [@zoo.make('Ziggy')] {\n  echo $z->shown()\n}")]
+        public void AMethodCalledOnARecordFromAnotherScriptsFunctionIsUsed(string call)
+        {
+            // main never names types/zebra: it reaches Zebra through lib/zoo (#201).
+            MemoryFiles files = new MemoryFiles()
+                .Add(At("zoo", "kscript.json"), "{ \"name\": \"r6\" }")
+                .Add(At("zoo", "types", "zebra.kscript"), "type Zebra {\n  name: string\n\n  fn shown() => $name\n  fn hidden() => $name\n}\n")
+                .Add(At("zoo", "lib", "zoo.kscript"), "import \"../types/zebra.kscript\"\n\n/// @public\nfn make(name: string) => Zebra(name: $name)\n")
+                .Add(At("zoo", "main.kscript"), "import \"lib/zoo.kscript\" as zoo\n\n" + call + "\n");
+            ProjectUsage.ClearCache();
+            string path = At("zoo", "types", "zebra.kscript");
+            Assert.Equal(new[] { "KS6002:hidden" }, Unused(Analyzer.Analyze(files.ReadText(path), path, files)));
+        }
+
         [Fact]
         public void OneImporterIsNamed()
         {

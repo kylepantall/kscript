@@ -1,0 +1,11 @@
+/// A prize with a place.
+type Medal {
+  place: int
+
+  /// The place in words.
+  fn spoken() => match $place {
+    1 => 'gold'
+    2 => 'silver'
+    _ => 'bronze'
+  }
+}

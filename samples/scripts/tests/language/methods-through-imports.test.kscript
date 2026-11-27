@@ -1,0 +1,17 @@
+// The prize's type comes from a file this test never names. Its method still
+// counts as called, so kscript check --warnings-as-errors passes (#201).
+import "../../lib/awards.kscript" as awards
+
+test(name: 'a method on a record from another script counts as called') {
+  expect(@awards.for_place(1)->spoken(), equals: 'gold')
+}
+
+test(name: 'a list of those records keeps their type') {
+  prizes = [@awards.for_place(2), @awards.for_place(3)]
+  expect($prizes[0]->spoken(), equals: 'silver')
+  words = []
+  for prize in $prizes {
+    words = $words->push($prize->spoken())
+  }
+  expect($words, equals: ['silver', 'bronze'])
+}

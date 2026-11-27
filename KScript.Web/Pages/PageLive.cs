@@ -78,7 +78,7 @@ namespace KScript.Pages
             return ParseJson(json) as Dictionary<string, object> ?? new Dictionary<string, object>();
         }
 
-        private static object ParseJson(string json)
+        internal static object ParseJson(string json)
         {
             try { return Values.ParseJson(json); }
             catch (KScriptException) { throw new PageException("Invalid live request."); }
