@@ -4,31 +4,9 @@
   "injectionSelector": "L:text.html meta.tag -source -comment -string -meta.attribute-value.kscript -meta.embedded.expression.kscript -markup.fenced_code -markup.inline.raw, L:source.kscript-code meta.embedded.block.html meta.tag -comment -string -meta.attribute-value.kscript -meta.embedded.expression.kscript -source.js -source.css",
   "patterns": [
     {
-      "begin": "(?<!\\S)(@(?i:on-(?:action|cancel|change|click|close|dblclick|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)))\\s*(\\()",
+      "begin": "(?<!\\S)(@(?i:on-(?:action|cancel|change|click|close|dblclick|dragend|drop|enter|escape|event|focusin|focusout|init|input|keydown|keyup|pointercancel|pointerdown|pointerup|sort|submit|tick|visible)|live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|bind(?:-on)?|sort-(?:item|axis)|drop-(?:files|class)|prevent-default|event-name|every|class(?:-if)?|focus|autogrow|pending|drag|show|if|each))\\s*(\\()",
       "beginCaptures": {
         "1": { "name": "keyword.control.directive.kscript" },
-        "2": { "name": "punctuation.section.arguments.begin.kscript" }
-      },
-      "end": "\\)",
-      "endCaptures": { "0": { "name": "punctuation.section.arguments.end.kscript" } },
-      "contentName": "meta.embedded.expression.kscript",
-      "patterns": [{ "include": "#handler-body" }]
-    },
-    {
-      "begin": "(?<!\\S)(@(?i:live-(?:action|client|cloak|confirm|dirty|disable|error|id|ignore|key|loading|navigate(?:-once)?|offline|portal|replace|stream|upload|use-[\\w-]+)|bind(?:-on)?|sort-(?:item|axis)|drop-(?:files|class)|prevent-default|event-name|every|class(?:-if)?|focus|autogrow|pending|drag|show|if|each))\\s*(\\()",
-      "beginCaptures": {
-        "1": { "name": "keyword.control.directive.kscript" },
-        "2": { "name": "punctuation.section.arguments.begin.kscript" }
-      },
-      "end": "\\)",
-      "endCaptures": { "0": { "name": "punctuation.section.arguments.end.kscript" } },
-      "contentName": "meta.embedded.expression.kscript",
-      "patterns": [{ "include": "#handler-body" }]
-    },
-    {
-      "begin": "(?<!\\S)(@[A-Za-z][\\w-]*)\\s*(\\()",
-      "beginCaptures": {
-        "1": { "name": "entity.name.function.kscript" },
         "2": { "name": "punctuation.section.arguments.begin.kscript" }
       },
       "end": "\\)",
