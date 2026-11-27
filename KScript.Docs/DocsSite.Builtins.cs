@@ -218,9 +218,11 @@ namespace KScript.Docs
                 if (DeclarationElements.Contains(e.Name))
                 {
                     foreach (var a in e.Attributes.Where(a => a.Name is not ("name" or "description")))
-                        yield return new IndexEntry(a.Name, $"option of {CodeName(e)}", url, a.Description);
+                        yield return new IndexEntry(a.Name, $"option of {CodeName(e)}", e.Name == "model" ? ModelsPath + "#option-" + Html.Slug(a.Name) : url, a.Description);
                 }
             }
+            foreach (PackageDeclaration d in PackageDeclarations())
+                yield return new IndexEntry(d.Name, $"{d.What} in {d.Package}", ModelsPath + "#" + d.Anchor, Summary(d.Element));
             foreach (CallableInfo c in Catalog.Commands.Where(c => !c.Planned))
                 yield return new IndexEntry("@" + c.Name, "command in " + c.Package, PackageSlug(c.Package) + "#" + CommandAnchor(c), c.Description);
             foreach (string type in MethodTypes)

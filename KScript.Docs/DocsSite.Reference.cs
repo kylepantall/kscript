@@ -105,17 +105,18 @@ namespace KScript.Docs
                 index.Append($"<a class=\"card\" href=\"{TypeSlug(type)}\"><strong>{Html.H(type)}</strong><span>{(fieldCount > 0 ? $"{fieldCount} field{(fieldCount == 1 ? "" : "s")}, " : "")}{count} method{(count == 1 ? "" : "s")}. {Html.Inline(TypeDescriptions.GetValueOrDefault(type, string.Empty))}</span></a>");
             }
             index.Append("</div><h2 id=\"variables\">Built-in variables</h2><p>Variables that exist without being declared, such as <code>$args</code>: see <a href=\"/reference/variables\">Built-in variables</a>.</p>");
-            index.Append("<h2 id=\"more\">Types, errors and settings</h2><div class=\"cards\">");
+            index.Append("<h2 id=\"more\">Types, models, errors and settings</h2><div class=\"cards\">");
             index.Append("<a class=\"card\" href=\"/reference/types\"><strong>Built-in types</strong><span>string, int, date, email, url, money, duration and every other type you can declare.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/errors\"><strong>Error types</strong><span>Every error KScript throws, what it extends and the HTTP status it answers with.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/settings\"><strong>kscript.json settings</strong><span>Every project setting, its type and its default.</span></a>");
+            index.Append("<a class=\"card\" href=\"/reference/models\"><strong>Models and mixins</strong><span>Every option a model takes, such as soft_deletes, and every built-in model and mixin, such as Ownable.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/index\"><strong>A to Z</strong><span>Everything built in, in one list: statements and their options, commands, methods, types and settings.</span></a>");
             index.Append("</div>");
             var indexPage = new DocPage { Path = "/reference", Title = "Reference", NavTitle = "Overview", Section = "Reference", Description = "Every package, element, command, method and variable.", Body = index.ToString() };
             indexPage.Toc.Add((2, "packages", "Packages"));
             indexPage.Toc.Add((2, "methods", "Methods by type"));
             indexPage.Toc.Add((2, "variables", "Built-in variables"));
-            indexPage.Toc.Add((2, "more", "Types, errors and settings"));
+            indexPage.Toc.Add((2, "more", "Types, models, errors and settings"));
             Add(indexPage);
 
             foreach (string package in PackageNames) AddPackagePage(package);
@@ -198,6 +199,20 @@ namespace KScript.Docs
                 sb.Append("<h2 id=\"variables\">Variables</h2>");
                 page.Toc.Add((2, "variables", "Variables"));
                 sb.Append(VariablesTable(variables));
+            }
+            var declared = PackageDeclarations().Where(d => d.Package == package).ToList();
+            if (declared.Count > 0 || package == "KScript.Data")
+            {
+                sb.Append("<h2 id=\"models\">Models and mixins</h2>");
+                page.Toc.Add((2, "models", "Models and mixins"));
+                if (declared.Count > 0)
+                {
+                    sb.Append($"<p>{Html.H(package)} ships these, written in KScript:</p><ul>");
+                    foreach (PackageDeclaration d in declared)
+                        sb.Append($"<li><a href=\"{ModelsPath}#{d.Anchor}\"><code>{Html.H(d.Name)}</code></a>, a {d.What}: {Html.Inline(Shorten(Summary(d.Element)))}</li>");
+                    sb.Append("</ul>");
+                }
+                sb.Append($"<p>Every option a model takes and every built-in mixin: <a href=\"{ModelsPath}\">Models and mixins</a>.</p>");
             }
             page.Body = sb.ToString();
             Add(page);

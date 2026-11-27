@@ -295,6 +295,33 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_model_option_and_built_in_mixin_has_a_reference_entry()
+    {
+        // Made from the model element's options and the packages' own KScript scripts, so a new mixin shows up by itself.
+        DocPage models = Site.Value.Find("/reference/models");
+        foreach (AttributeInfo a in LanguageCatalog.Default.GetElement("model").Attributes.Where(a => a.Name is not ("name" or "description")))
+            Assert.Contains($"<tr id=\"option-{Html.Slug(a.Name)}\"><td><code>{a.Name}</code></td>", models.Body);
+
+        var declared = Site.Value.PackageDeclarations().ToList();
+        Assert.Contains(declared, d => d.Name == "Ownable" && d.IsMixin && d.Package == "KScript.Auth");
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (var d in declared)
+        {
+            Assert.Contains($"id=\"{d.Anchor}\"", models.Body);
+            Assert.Contains(entries, e => e.Name == d.Name && e.Url == "/reference/models#" + d.Anchor);
+            Assert.Contains(Site.Value.Search, s => s.Title == d.Name && s.Url == "/reference/models#" + d.Anchor);
+            Assert.Contains($"href=\"/reference/models#{d.Anchor}\"", Site.Value.Find("/reference/" + d.Package.Substring(8).ToLowerInvariant()).Body);
+        }
+
+        Assert.Contains("<code>owner</code></td><td><code>string(max: 80)</code>", models.Body);
+        Assert.Contains("<code>Note-&gt;mine(as: any = null)</code>", models.Body);
+        Assert.Contains(entries, e => e.Name == "soft_deletes" && e.Url == "/reference/models#option-soft-deletes");
+        Assert.Contains(Site.Value.Search, s => s.Title == "soft_deletes" && s.Kind == "option of model");
+        Assert.Contains("href=\"/reference/models\"", Site.Value.Find("/reference/data").Body);
+        Assert.Contains("### Ownable", new KScript.Docs.Mcp.DocsMarkdown(Site.Value).Page("/reference/models", "kscript"));
+    }
+
+    [Fact]
     public void The_a_to_z_lists_everything_built_in()
     {
         string index = Site.Value.Find("/reference/index").Body;
