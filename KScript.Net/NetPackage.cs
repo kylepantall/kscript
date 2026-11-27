@@ -242,6 +242,15 @@ namespace KScript.Net
             p.AgentNotes(
                 ("@api", new AgentNotes(pitfall: "A 4xx or 5xx status doesn't throw: chain ->check() (throws Network) or test .is_ok.",
                     prefer: "@api($url, as: Type) (the same as ->check()->json(as: Type)) to fail fast and check the data's shape.")));
+
+            p.Examples(
+                ("response->check", "<let name=\"order\" value=\"@api('https://api.example.com/orders/42')->check()->json()\" />\n<echo>{ $order.id }</echo>"),
+                ("response->header", "<let name=\"response\" value=\"@api('https://example.com')\" />\n<echo>{ $response->header('Content-Type') }</echo>"),
+                ("response->json", "<type name=\"Todo\" fields=\"id: int, title: string, completed: bool\" />\n<let name=\"todo\" value=\"@api('https://jsonplaceholder.typicode.com/todos/1')->json(as: Todo)\" />\n<echo>{ $todo.title }</echo>"),
+                ("@parse_query", "<let name=\"query\" value=\"@parse_query('page=2&amp;tag=a&amp;tag=b')\" />\n<echo>{ $query.page } { $query.tag }</echo>"),
+                ("@query_string", "<let name=\"filters\" value=\"{ page: 2, tag: ['a', 'b'] }\" />\n<echo>{ @query_string($filters) }</echo>"),
+                ("@http_client", "<let name=\"github\" value=\"@http_client('https://api.github.com', { headers: { Accept: 'application/vnd.github+json' } })\" />\n<let name=\"repo\" value=\"$github('/repos/dotnet/runtime')->json()\" />\n<echo>{ $repo.full_name }</echo>"),
+                ("@with_http_stub", "<let name=\"name\" value=\"@with_http_stub(fn(request) => { status: 200, body: { name: 'stub' } }, fn() => @api('https://api.example.com/me')->json().name)\" />\n<echo>{ $name }</echo>"));
         }
 
         /// <summary>The named shorthands of @api, after url and options, in their places in the signature.</summary>

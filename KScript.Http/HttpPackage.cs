@@ -195,6 +195,19 @@ namespace KScript.Http
                 p.Field(KType.HttpResponse, f.Name, f.Type, f.Description);
             foreach (var m in HttpResponse.Methods)
                 p.Method(KType.HttpResponse, m.Name, m.Params, m.Description, m.Returns, (t, c) => ((HttpResponse)t).TryCallMethod(c, m.Name, out object r) ? r : null);
+            p.Examples(
+                ("http_response->header", "<let name=\"response\" value=\"@redirect('/login')\" />\n<echo>{ $response.status } { $response->header('Location') }</echo>"),
+                ("http_response->json", "<let name=\"response\" value=\"@response({ saved: true }, status: 201)\" />\n<echo>{ $response->json().saved }</echo>"),
+                ("http_response->with_status", "<fn name=\"store\" params=\"request\">\n  <return value=\"@response({ saved: true })->with_status(201)\" />\n</fn>"),
+                ("http_response->with_header", "<fn name=\"secure_headers\" params=\"request, next\">\n  <return value=\"$next($request)->with_header('X-Frame-Options', 'DENY')\" />\n</fn>"),
+                ("http_response->with_type", "<fn name=\"export\" params=\"request\">\n  <return value=\"@response('name,email')->with_type('text/csv')\" />\n</fn>"),
+                ("http_response->with_etag", "<fn name=\"show\" params=\"request\">\n  <return value=\"@response({ id: 1, title: 'Hello' })->with_etag()\" />\n</fn>"),
+                ("http_response->with_cache", "<fn name=\"index\" params=\"request\">\n  <return value=\"@view('posts/index')->with_cache(300)\" />\n</fn>"),
+                ("@routes", "<for each=\"route\" in=\"@routes(kind: 'page')\">\n  <echo>{ $route.path }</echo>\n</for>"),
+                ("@route_is", "<if @route_is('posts.show')>\n  <echo>Reading a post</echo>\n</if>"),
+                ("@route_match", "<let name=\"found\" value=\"@route_match('/posts/42')\" />\n<echo>{ $found.status } { $found.route } { $found.parameters }</echo>"),
+                ("@asset_url", "<echo>{ @asset_url('css/site.css') }</echo>"),
+                ("@sitemap", "<let name=\"paths\" value=\"['/', '/about', '/posts/hello']\" />\n<echo>{ @sitemap($paths, 'https://example.com') }</echo>"));
 
             p.Variable("request", KType.Request,
                 "The HTTP request. Inside a matched route it also contains the client ip, parsed json, combined input and route name.",

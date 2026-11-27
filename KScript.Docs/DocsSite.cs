@@ -40,6 +40,9 @@ namespace KScript.Docs
 
         internal string ParentPath { get; init; }
         internal string TopicMarkdown { get; init; }
+
+        /// <summary>The page as Markdown, for pages made from code that the MCP server serves as they are.</summary>
+        internal string Markdown { get; set; }
         internal List<DocPage> Topics { get; } = new();
     }
 
@@ -149,7 +152,9 @@ namespace KScript.Docs
                 string markdown = readGuide(guide.File);
                 if (markdown != null) site.AddGuide(guide, markdown);
             }
+            site.AddContents();
             site.AddReference();
+            site.AddBuiltinPages();
             site.AddCli();
             site.AddMakeCommands();
             site.AddPlayground();
@@ -215,7 +220,7 @@ namespace KScript.Docs
                 if (language == "try") language = guide.FenceLanguage;
                 bool runnable = info.Contains("try") && (language == "xml" || language == "kscript");
                 string code = m.Groups[3].Value;
-                blocks.Add(runnable ? Html.Try(code, language) : Html.Code(code, language));
+                blocks.Add(runnable ? Html.Try(code, language) : (language == "sh" ? Html.CommandTable(code) : null) ?? Html.Code(code, language));
                 return $"\n<div data-block=\"{blocks.Count - 1}\"></div>\n";
             });
 

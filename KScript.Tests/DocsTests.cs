@@ -74,9 +74,6 @@ public sealed class DocsTests
     private static readonly Regex DataAttribute = new Regex(@"data-(xml|kscript)=""([^""]*)""", RegexOptions.Compiled);
     private static readonly Regex InputAttribute = new Regex(@"data-input=""([^""]*)""", RegexOptions.Compiled);
 
-    /// <summary>The packages whose commands and methods all need an example, because the docs can run them.</summary>
-    private static readonly string[] RunnablePackages = { "KScript.Core", "KScript.Math", "KScript.IO", "KScript.Terminal", "KScript.Markdown" };
-
     /// <summary>Every runnable example on the site, in each format it is shown in.</summary>
     public static IEnumerable<(string Page, string Format, string Code, string Input)> Examples()
     {
@@ -151,14 +148,32 @@ public sealed class DocsTests
     }
 
     [Fact]
-    public void Every_command_and_method_the_docs_can_run_has_an_example()
+    public void Command_examples_show_as_a_table_of_command_and_what_it_does()
     {
+        string cli = Site.Value.Find("/cli").Body;
+        Assert.Contains("<div class=\"table commands\">", cli);
+        Assert.Contains("<code class=\"sh\">kscript db migrate</code></td><td>Runs the migrations that haven't run yet.</td>", cli);
+
+        // A shell block in a guide whose every line is a command with a # comment is the same table.
+        string table = KScript.Docs.Html.CommandTable("kscript queue failed   # the failed jobs\nkscript queue retry 42 # put one back (or --all)\n");
+        Assert.Contains("<code class=\"sh\">kscript queue failed</code></td><td>The failed jobs.</td>", table);
+        Assert.Contains("<td>Put one back (or --all)</td>", table);
+        Assert.Null(KScript.Docs.Html.CommandTable("kscript serve\n# Serving on http://localhost:8080\n"));
+        Assert.Contains("class=\"table commands\"", Site.Value.Find("/guide/queues").Body);
+    }
+
+    [Fact]
+    public void Every_built_in_command_method_and_element_has_an_example()
+    {
+        // The reference shows each entry's example, so nothing that ships is left without one. Planned entries
+        // (no package yet) aren't on the site.
         var catalog = LanguageCatalog.Default;
         var missing = catalog.Commands.Concat(catalog.Methods)
-            .Where(c => RunnablePackages.Contains(c.Package) && string.IsNullOrWhiteSpace(c.Example))
+            .Where(c => c.Package != null && string.IsNullOrWhiteSpace(c.Example))
             .Select(c => c.Kind == CallableKind.Method ? c.ReceiverType + "->" + c.Name : "@" + c.Name)
+            .Concat(catalog.Elements.Where(e => !e.Planned && string.IsNullOrWhiteSpace(e.Example)).Select(e => "<" + e.Name + ">"))
             .ToList();
-        Assert.True(missing.Count == 0, "These need an example (p.Examples in their package): " + string.Join(", ", missing));
+        Assert.True(missing.Count == 0, "These need an example (p.Examples in their package, or Example on the element): " + string.Join(", ", missing));
     }
 
     [Fact]
@@ -228,6 +243,75 @@ public sealed class DocsTests
         Assert.Contains("Other options become variables", Site.Value.Find("/reference/web").Body);
         var docs = new KScript.Docs.Mcp.DocsMarkdown(Site.Value);
         Assert.Contains("Other attributes are more fields of the source", docs.Element(LanguageCatalog.Default.GetElement("Source"), "xml"));
+    }
+
+    [Fact]
+    public void Every_built_in_type_error_type_and_setting_has_a_reference_entry()
+    {
+        // These pages are made from the code that defines each thing, so a new one shows up by itself. The test
+        // keeps it that way, and makes a new basic type say what it holds.
+        string types = Site.Value.Find("/reference/types").Body;
+        foreach (string type in KScript.Runtime.Values.DeclarableTypes)
+        {
+            Assert.Contains($"id=\"type-{Html.Slug(type)}\"", types);
+            Assert.True(KScript.Metadata.NativeTypes.Get(type) != null || DocsSite.BasicTypeDescriptions.ContainsKey(type), $"Say what a {type} holds in DocsSite.BasicTypeDescriptions.");
+        }
+
+        string errors = Site.Value.Find("/reference/errors").Body;
+        foreach (string name in KScript.Runtime.ErrorTypes.BuiltIn.Values.Select(e => e.Name).Distinct())
+            Assert.Contains($"id=\"error-{Html.Slug(name)}\"", errors);
+        Assert.Contains("<td><code>ModelNotFound</code></td><td><a href=\"#error-notfound\"><code>NotFound</code></a></td><td>404</td>", errors);
+
+        string settings = Site.Value.Find("/reference/settings").Body;
+        var all = DocsSite.Settings().ToList();
+        Assert.Contains(all, s => s.Path == "serve.port");
+        Assert.Contains(all, s => s.Path == "http.auth.lifetime");
+        foreach (var (path, schema) in all)
+        {
+            Assert.Contains($"<code>{path}</code>", settings);
+            Assert.True(path.StartsWith("types.", StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(schema["description"]?.GetValue<string>()), $"Describe {path} in kscript.schema.json.");
+        }
+    }
+
+    [Fact]
+    public void The_contents_page_lists_every_heading_in_every_guide()
+    {
+        // Made from the guides' headings, so a new section (such as the built-in mixins) is listed by itself.
+        DocPage contents = Site.Value.Find("/guide");
+        foreach (DocPage guide in Site.Value.Pages.Where(p => p.Source != null && p.ParentPath == null))
+        {
+            Assert.Contains($"href=\"{guide.Path}\"", contents.Body);
+            Assert.True(guide.Toc.Count > 0 && guide.Toc[0].Level == 2, $"{guide.Path} should start its headings with a ## topic.");
+            foreach (var (level, id, _) in guide.Toc)
+                Assert.True(contents.Body.Contains($"href=\"{guide.Path}/{id}\"") || contents.Body.Contains($"href=\"{guide.Path}#{id}\""), $"{guide.Path}#{id} is missing from the contents.");
+        }
+
+        Assert.Contains(">Built-in models and mixins</a>", contents.Body);
+        Assert.Contains("Built-in models and mixins", new KScript.Docs.Mcp.DocsMarkdown(Site.Value).Page("/guide", "kscript"));
+        Assert.Equal("/guide", Site.Value.Pages[Site.Value.Pages.FindIndex(p => p.Path == "/") + 1].Path);
+    }
+
+    [Fact]
+    public void The_a_to_z_lists_everything_built_in()
+    {
+        string index = Site.Value.Find("/reference/index").Body;
+        Assert.Contains("<code>soft_deletes</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("<code>mixin</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("href=\"/reference/errors#error-uniqueviolation\"", index);
+        Assert.Contains("href=\"/reference/settings#setting-serve-port\"", index);
+        Assert.Contains("href=\"/cli#cli-serve\"", index);
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (CallableInfo c in LanguageCatalog.Default.Commands.Where(c => !c.Planned))
+            Assert.Contains(entries, e => e.Name == "@" + c.Name);
+        foreach (ElementInfo e in LanguageCatalog.Default.Elements.Where(e => !e.Planned))
+            Assert.Contains(entries, entry => entry.Url.EndsWith("#" + DocsSite.ElementAnchor(e), StringComparison.Ordinal));
+
+        // The MCP server serves the same pages as Markdown.
+        var markdown = new KScript.Docs.Mcp.DocsMarkdown(Site.Value);
+        Assert.Contains("| `UniqueViolation` | `Conflict` | 409 |", markdown.Page("/reference/errors", "kscript"));
+        Assert.Contains("`soft_deletes`", markdown.Page("/reference/index", "kscript"));
+        Assert.Contains("| `serve.port` |", markdown.Page("/reference/settings", "kscript"));
+        Assert.Contains("| `email` |", markdown.Page("/reference/types", "kscript"));
     }
 
     [Fact]

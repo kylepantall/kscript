@@ -32,7 +32,10 @@ namespace KScript.Style
 
         protected override void Register(PackageBuilder p)
         {
-            p.Element(new ElementInfo("css_text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template), run =>
+            p.Element(new ElementInfo("css_text", "CSS text in a stylesheet, with {$name} and { @fn() } filled in. kscript writes these for you around the KScript elements in a .ks.css file.", ContentKind.Template)
+            {
+                Example = "<css_text>font-size: {@rem(24)};</css_text>",
+            }, run =>
             {
                 run.Host.Write(Stylesheets.Interpolate(run.Content, run.Interpreter, run.Scope, run.Module));
                 return null;
@@ -104,6 +107,17 @@ namespace KScript.Style
                     Flatten(c.Map(0), c.Has(1) ? c.Str(1) : null, lines);
                     return string.Join("\n", lines);
                 }, ":root {\n  { @css_vars($theme.colors, 'color') }\n}");
+
+            p.Examples(
+                ("@down", "@media {@down('md')} { .sidebar { display: none; } }"),
+                ("@between", "@media {@between('sm', 'lg')} { .grid { grid-template-columns: 1fr 1fr; } }"),
+                ("@rem", ".title { font-size: {@rem(24)}; margin-bottom: {@rem(12)}; }"),
+                ("@lighten", ".button:hover { background: {@lighten('#3355ff', '10%')}; }"),
+                ("@darken", ".button:active { background: {@darken('#3355ff', 0.1)}; }"),
+                ("@mix", ".muted { color: {@mix('#3355ff', 'white', 0.3)}; }"),
+                ("@alpha", ".overlay { background: {@alpha('black', 0.5)}; }"),
+                ("@contrast_color", ".badge { background: #ffcc00; color: {@contrast_color('#ffcc00')}; }"),
+                ("@css_var", ".card { padding: {@css_var('space-md', '16px')}; }"));
         }
 
         private static Action<KScriptHost> Sandbox(KScriptHost parent) => h =>

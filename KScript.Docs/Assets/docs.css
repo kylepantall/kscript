@@ -192,6 +192,24 @@ kbd { font-size: .8em; border: 1px solid var(--border); border-bottom-width: 2px
 .doc tr:last-child td { border-bottom: 0; }
 .doc td code { white-space: nowrap; }
 
+/* Command line examples: the command, highlighted, beside what it does */
+.doc .commands td:first-child { width: 1%; }
+.doc .commands code.sh { display: inline-block; padding: 3px 8px; background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.doc .commands code.sh::before { content: "$ "; color: var(--fg-faint); }
+
+/* The A to Z index: one compact line per name */
+.doc table.index td { padding: 5px 12px; }
+.doc table.index td:first-child { width: 1%; white-space: nowrap; }
+.doc table.index td:nth-child(2) { width: 1%; white-space: nowrap; font-size: 13px; color: var(--fg-faint); }
+/* The contents page: topics, with their sub-headings run together under each */
+.doc ul.contents { columns: 2 280px; column-gap: 32px; padding-left: 1.2em; }
+.doc ul.contents > li { break-inside: avoid; margin-bottom: 6px; }
+.doc ul.contents ul { padding-left: 0; list-style: none; font-size: 13px; }
+.doc ul.contents ul li { display: inline; }
+.doc ul.contents ul li + li::before { content: " · "; color: var(--fg-faint); }
+.doc p.letters { display: flex; flex-wrap: wrap; gap: 6px; }
+.doc p.letters a { min-width: 1.8em; text-align: center; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; text-decoration: none; }
+
 /* Code */
 .code { margin: 0 0 1.2em; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-code); overflow: hidden; }
 .code-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--fg-faint); }

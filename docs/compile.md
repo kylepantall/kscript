@@ -11,7 +11,7 @@ kscript compile hello.kscript                        # dist/linux-x64/hello on L
 kscript compile                                      # the project's app (the "app" section of kscript.json)
 kscript compile --target all                         # every platform at once
 kscript compile --target mac-arm64,win-x64           # some of them
-kscript compile counter.kscript --name "Counter" --out build
+kscript compile counter.kscript --name "Counter" --out build   # a program called Counter, in build/
 ```
 
 Each program is one file. The exception is a Mac desktop app, which is an `.app` folder around one file. The program holds the script, the scripts it imports and every other file in its folder or project, such as data, pages and pictures, so `<import path>`, `@read_text` and pages work as they do with `kscript`. The arguments a program is started with are the script's `$args`.

@@ -65,7 +65,7 @@ public sealed class CliConventionTests : IDisposable
     {
         foreach (CliCommand c in CliReference.Commands)
         {
-            string text = string.Join("\n", new[] { c.Usage, c.Summary, c.Details, c.Example }.Concat(c.Options.SelectMany(o => new[] { o.Name, o.Description })).Where(t => t != null));
+            string text = string.Join("\n", new[] { c.Usage, c.Summary, c.Details }.Concat(c.Examples?.Select(e => e.Command + "\n" + e.Does) ?? Enumerable.Empty<string>()).Concat(c.Options.SelectMany(o => new[] { o.Name, o.Description })).Where(t => t != null));
             foreach (Match m in Regex.Matches(text, @"(?<![\w-])--[A-Za-z][\w-]*")) yield return (c.Name, m.Value);
         }
         foreach (CliOption o in CliReference.GlobalOptions)
@@ -135,13 +135,32 @@ public sealed class CliConventionTests : IDisposable
     }
 
     [Fact]
+    public void Every_command_has_examples_that_say_what_they_do()
+    {
+        // The docs show them as a table of command and what it does, and kscript help <command> under Examples.
+        foreach (CliCommand c in CliReference.Commands)
+        {
+            Assert.True(c.Examples is { Count: > 0 }, $"kscript {c.Name} needs examples.");
+            foreach (CliExample e in c.Examples)
+            {
+                Assert.Matches(@"^(kscript|claude) ", e.Command);
+                Assert.False(string.IsNullOrWhiteSpace(e.Does), $"{e.Command} needs to say what it does.");
+                Assert.True(char.IsUpper(e.Does[0]) && e.Does.EndsWith('.'), $"Say what {e.Command} does in a sentence: {e.Does}");
+            }
+        }
+    }
+
+    [Fact]
     public void The_help_names_scripts_as_kscript_files()
     {
         // .ks.xml is only named where the XML form itself is the subject (convert, and the lists of both extensions).
-        foreach (CliCommand c in CliReference.Commands.Where(c => c.Example != null && c.Name != "convert"))
+        foreach (CliCommand c in CliReference.Commands.Where(c => c.Name != "convert"))
         {
-            Assert.DoesNotContain(".ks.xml", c.Example);
-            Assert.DoesNotMatch(@"\.(ks|xml)\b", c.Example.Replace(".kscript", string.Empty).Replace("openapi.yaml", string.Empty));
+            foreach (CliExample e in c.Examples)
+            {
+                Assert.DoesNotContain(".ks.xml", e.Command);
+                Assert.DoesNotMatch(@"\.(ks|xml)\b", e.Command.Replace(".kscript", string.Empty).Replace("openapi.yaml", string.Empty));
+            }
         }
         string help = Kscript("--help").Out;
         Assert.DoesNotContain("routes.ks.xml", help);

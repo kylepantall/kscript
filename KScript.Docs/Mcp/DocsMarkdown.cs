@@ -72,6 +72,7 @@ namespace KScript.Docs.Mcp
             if (path == "/cli/make") return MakeCommands();
             if (path == "/reference") return ReferenceIndex(format);
             if (path == "/reference/variables") return Variables(Catalog.BuiltInVariables.Keys);
+            if (Site.Find(path)?.Markdown is string generated) return generated;
             if (path.StartsWith("/reference/methods/", StringComparison.Ordinal))
             {
                 string type = Catalog.MemberTypes.FirstOrDefault(t => DocsSite.TypeSlug(t) == path);
@@ -392,7 +393,11 @@ namespace KScript.Docs.Mcp
             {
                 sb.Append($"\n## {(c.Name == "run" ? "Running a script" : c.Name == "version" ? "--version and --help" : "kscript " + c.Name)}\n\n```sh\n{c.Usage}\n```\n\n{c.Summary}\n");
                 foreach (CliOption o in c.Options) sb.Append($"- `{o.Name}`: {o.Description}\n");
-                if (c.Example != null) sb.Append($"\nExample:\n\n```sh\n{c.Example}\n```\n");
+                if (c.Examples != null)
+                {
+                    sb.Append("\n| Command | What it does |\n| --- | --- |\n");
+                    foreach (CliExample e in c.Examples) sb.Append($"| `{e.Command}` | {e.Does} |\n");
+                }
             }
             return sb.ToString();
         }

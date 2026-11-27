@@ -21,7 +21,7 @@ kscript update                    # install the latest release if it's newer
 kscript update --check            # only report whether there is one
 kscript update --version v0.2.0   # install a specific release
 kscript update --no-ide           # leave the editor extension alone
-kscript --version
+kscript --version                 # the version you have
 ```
 
 `kscript update` replaces the binary in place. On Windows the running `kscript.exe` is renamed to `kscript.exe.old` and deleted the next time kscript starts. It uses `GITHUB_TOKEN` if set, to avoid GitHub's rate limit.
@@ -55,7 +55,7 @@ Install the KScript extension into VS Code, Cursor, VSCodium or Windsurf:
 ```sh
 kscript ide install           # every editor it finds; or name one: kscript ide install cursor
 kscript ide                   # list the editors it found
-kscript ide uninstall
+kscript ide uninstall         # remove the extension again
 ```
 
 The extension shows errors as you type and adds completion, hover, go to definition, rename and highlighting for scripts and `kscript serve` pages. It works out types as it goes: `$person.` and `$name->` offer the fields and methods of that value (including what your own functions return), inlay hints show the types you didn't write, and thin lines divide a script into blocks like a notebook. It runs `kscript lsp` from your installed `kscript`, so keep that current with `kscript update`. To use a different `kscript`, set `kscript.server.path` in the editor's settings.

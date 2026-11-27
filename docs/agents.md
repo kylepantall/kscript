@@ -30,8 +30,8 @@ The generated `AGENTS.md` gives coding agents required project conventions and a
 Define an item key once and use it as the type of the request field.
 
 ```sh
-kscript make native ItemKey --base string --normalize '$value->trim()' --pattern '/^item_[a-zA-Z]+$/'
-kscript make request CreateItem --fields 'key: ItemKey'
+kscript make native ItemKey --base string --normalize '$value->trim()' --pattern '/^item_[a-zA-Z]+$/'   # a native type for item keys
+kscript make request CreateItem --fields 'key: ItemKey'   # a request body that uses it
 ```
 
 The default layout puts these files in `natives/item-key.kscript` and `requests/create-item.kscript`. The request can use `ItemKey` directly. A controller imports the request file and declares `fn store(json: CreateItem)`. A malformed key fails request validation before the controller runs. A worker or CLI command can take `key: ItemKey` and get the same checks.
@@ -206,6 +206,6 @@ Add `kscript agents --check` next to `kscript check`, so a pull request that cha
 docs:
 
 ```sh
-kscript check --warnings-as-errors
-kscript agents --check
+kscript check --warnings-as-errors   # fail on any problem, warnings too
+kscript agents --check               # fail when AGENTS.md is out of date
 ```

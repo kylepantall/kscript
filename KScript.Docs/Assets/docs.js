@@ -197,7 +197,9 @@
     return src.split('\n').map(function (line) {
       var hash = line.search(/(^|\s)#/);
       var code = hash < 0 ? line : line.slice(0, hash), comment = hash < 0 ? '' : line.slice(hash);
-      var html = esc(code).replace(/^(\s*)(kscript|dotnet|curl|irm|tar|xattr|npm|git)\b/, '$1' + span('cmd', '$2'))
+      var html = esc(code).replace(/^(\s*)(kscript|claude|dotnet|curl|irm|tar|xattr|npm|git)\b( [a-z][a-z-]*(?= |$))?/, function (_, space, cmd, sub) {
+          return space + span('cmd', cmd) + (sub ? ' ' + span('kw', sub.slice(1)) : '');
+        })
         .replace(/(\s)(--?[\w-]+)/g, '$1' + span('attr', '$2'));
       return html + (comment ? span('com', esc(comment)) : '');
     }).join('\n');
@@ -322,7 +324,7 @@
 
   document.querySelectorAll('.doc :not(pre) > code').forEach(function (code) {
     if (code.childElementCount) return;
-    var html = highlightInline(code.textContent);
+    var html = code.classList.contains('sh') ? hlShell(code.textContent) : highlightInline(code.textContent);
     if (html !== null) code.innerHTML = html;
   });
 

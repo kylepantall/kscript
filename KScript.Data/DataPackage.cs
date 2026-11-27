@@ -13,7 +13,7 @@ namespace KScript.Data
     /// KScript.Data: <c>model</c> declarations, a query builder whose conditions are lambdas compiled to SQL,
     /// transactions, and raw SQL whose <c>{ }</c> values are always parameters. SQLite is the database.
     /// </summary>
-    public sealed class DataPackage : KScriptPackage
+    public sealed partial class DataPackage : KScriptPackage
     {
         /// <summary>The project-relative SQLite file used when no database connection is configured.</summary>
         public const string DefaultDatabaseFile = DatabaseSettings.DefaultFile;
@@ -37,6 +37,7 @@ namespace KScript.Data
             RegisterRecords(p);
             RegisterDatabase(p);
             Migrations.MigrationElements.Register(p);
+            RegisterExamples(p);
         }
 
         #region Models

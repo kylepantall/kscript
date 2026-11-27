@@ -66,6 +66,36 @@ namespace KScript.Docs
         };
 
         /// <summary>
+        /// Command line examples as a table: each command, highlighted as shell, beside what it does.
+        /// </summary>
+        public static string Commands(IEnumerable<(string Command, string Does)> examples)
+        {
+            var sb = new StringBuilder("<div class=\"table commands\"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody>");
+            foreach (var (command, does) in examples)
+                sb.Append("<tr><td><code class=\"sh\">").Append(H(command)).Append("</code></td><td>").Append(Inline(does)).Append("</td></tr>");
+            return sb.Append("</tbody></table></div>").ToString();
+        }
+
+        private static readonly Regex CommentedCommand = new Regex(@"^((?:kscript|claude)\s\S.*?)\s+#\s+(\S.*)$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// A shell block in a guide whose every line is a kscript command with a # comment, as a <see cref="Commands"/>
+        /// table (the comment says what it does), or null for any other block.
+        /// </summary>
+        public static string CommandTable(string code)
+        {
+            var rows = new List<(string, string)>();
+            foreach (string line in code.Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0))
+            {
+                Match m = CommentedCommand.Match(line);
+                if (!m.Success) return null;
+                string does = m.Groups[2].Value;
+                rows.Add((m.Groups[1].Value, char.ToUpperInvariant(does[0]) + does.Substring(1) + (does.EndsWith('.') || does.EndsWith(')') ? "" : ".")));
+            }
+            return rows.Count > 0 ? Commands(rows) : null;
+        }
+
+        /// <summary>
         /// A read-only code block with a copy button. An XML or .kscript script is given in both formats when it converts,
         /// and the page shows the reader's format (<see cref="DocsSite.Format"/> until they pick the other).
         /// </summary>

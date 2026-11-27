@@ -491,7 +491,10 @@ namespace KScript.Caching
                 ("cache->increment", "<do>$cache->increment('visits'); $cache->increment('visits', by: 2)</do>\n<echo>{ $cache->get('visits') }</echo>"),
                 ("cache->ttl", "<do>$cache->set('code', 1234, ttl: 1m)</do>\n<echo>{ $cache->ttl('code') } left</echo>"),
                 ("cache->keys", "<do>$cache->set('a', 1); $cache->set('b', 2)</do>\n<echo>{ $cache->keys() }</echo>"),
-                ("cache->clear", "<echo>{ $cache->clear() } keys removed</echo>"));
+                ("cache->clear", "<echo>{ $cache->clear() } keys removed</echo>"),
+                ("cache->set_if_absent", "<echo>{ $cache->set_if_absent('lock:report', 'me', ttl: 1m) } { $cache->set_if_absent('lock:report', 'you') }</echo>"),
+                ("cache->group", "<let name=\"users\" value=\"$cache->group('users')\" />\n<do>$users->set('1', 'Joan')</do>\n<echo>{ $users->get('1') } { $cache->get('1', default: 'not in the main cache') }</echo>"),
+                ("cache->clear_group", "<do>$cache->group('users')->set('1', 'Joan')</do>\n<echo>{ $cache->clear_group('users') } removed</echo>"));
         }
     }
 }
