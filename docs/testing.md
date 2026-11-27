@@ -223,7 +223,7 @@ samples/task-board has a page whose buttons are all handler shorthands, with a t
 
 ```sh
 kscript test                              # every test in the project
-kscript test tests/cart tests/api.test.kscript
+kscript test tests/cart tests/api.test.kscript   # a folder and a file
 kscript test --filter "cart › adds"       # only tests whose full name contains the text (any case)
 kscript test --timeout 30                 # seconds per test (0: no limit)
 kscript test --junit test-results.xml     # also write a JUnit XML report

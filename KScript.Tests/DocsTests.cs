@@ -148,6 +148,21 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Command_examples_show_as_a_table_of_command_and_what_it_does()
+    {
+        string cli = Site.Value.Find("/cli").Body;
+        Assert.Contains("<div class=\"table commands\">", cli);
+        Assert.Contains("<code class=\"sh\">kscript db migrate</code></td><td>Runs the migrations that haven't run yet.</td>", cli);
+
+        // A shell block in a guide whose every line is a command with a # comment is the same table.
+        string table = KScript.Docs.Html.CommandTable("kscript queue failed   # the failed jobs\nkscript queue retry 42 # put one back (or --all)\n");
+        Assert.Contains("<code class=\"sh\">kscript queue failed</code></td><td>The failed jobs.</td>", table);
+        Assert.Contains("<td>Put one back (or --all)</td>", table);
+        Assert.Null(KScript.Docs.Html.CommandTable("kscript serve\n# Serving on http://localhost:8080\n"));
+        Assert.Contains("class=\"table commands\"", Site.Value.Find("/guide/queues").Body);
+    }
+
+    [Fact]
     public void Every_built_in_command_method_and_element_has_an_example()
     {
         // The reference shows each entry's example, so nothing that ships is left without one. Planned entries

@@ -60,8 +60,8 @@ For a containerised development site, add a Compose file and run `kscript serve`
 Create a component for an existing model, or create the two files together.
 
 ```sh
-kscript make component NoteCard --model Note --fields title,body
-kscript make model Note --fields "title: string, body: string" --component
+kscript make component NoteCard --model Note --fields title,body   # a component that shows a Note
+kscript make model Note --fields "title: string, body: string" --component   # a model, and a component for it
 ```
 
 The first command writes `_components/note-card.kscript`. A page renders it with `<note-card record="{$note}" />`, where `$note` is a model row.

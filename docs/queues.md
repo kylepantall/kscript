@@ -174,7 +174,7 @@ If a worker stops in the middle of a job (the machine restarts, say), the job is
 
 ```sh
 kscript worker                                   # the default connection and queues, until Ctrl+C
-kscript worker --queue high,default --concurrency 4
+kscript worker --queue high,default --concurrency 4   # high before default, four jobs at a time
 kscript worker --stop-when-empty                 # run what is there, then stop
 kscript worker --once                            # one job, for cron
 kscript serve --with-worker                      # a worker inside the server

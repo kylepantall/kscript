@@ -468,7 +468,7 @@ The routes already say everything an API document needs, so KScript writes one f
 
 ```sh
 kscript openapi                          # JSON
-kscript openapi --output yaml --out openapi.yaml
+kscript openapi --output yaml --out openapi.yaml   # YAML, written to openapi.yaml
 ```
 
 The document is OpenAPI 3.1. Each part comes from the code:
