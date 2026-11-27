@@ -183,7 +183,7 @@ namespace KScript.Language.Analysis
         private Symbol BuiltIn(string name, IEnumerable<ValueFieldInfo> extraFields = null)
         {
             (string type, string description) = catalog.BuiltInVariables[name];
-            TypeShape shape = ShapeWithFields(type, catalog.FieldsOf(type).Values.Concat(extraFields ?? Enumerable.Empty<ValueFieldInfo>()));
+            TypeShape shape = ShapeWithFields(type, catalog.FieldsOf(type).Values.Concat(catalog.FieldsOfVariable(name)).Concat(extraFields ?? Enumerable.Empty<ValueFieldInfo>()));
             Symbol symbol = new Symbol { Name = name, Kind = SymbolKind.BuiltIn, Shape = shape, Description = description };
             result.Symbols.Add(symbol);
             return symbol;
@@ -873,7 +873,7 @@ namespace KScript.Language.Analysis
 
                 case "on":
                     AnalyzeAttributes(e, info, scope);
-                    inner.Declare(BuiltIn("event"), e.ContentSpan.Start);
+                    inner.Declare(EventSymbol(e, null), e.ContentSpan.Start);
                     WalkChildren(e.Children, inner, markupMode);
                     return;
 
@@ -1036,9 +1036,9 @@ namespace KScript.Language.Analysis
                 if (component == null && attr.Name.StartsWith("on-", StringComparison.OrdinalIgnoreCase) && Kind != DocumentKind.Script)
                 {
                     // <button on-click="count += 1">: statements run on the server when the event fires.
-                    // $event (value, checked, key) describes the browser event the handler runs for.
+                    // $event describes the browser event the handler runs for: its fields depend on the handler.
                     Scope handlerScope = new Scope(scope, e.Span);
-                    handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    handlerScope.Declare(EventSymbol(e, attr.Name), e.Span.Start);
                     if (HandlerShorthands.IsShorthand(attr.ValueText))
                     {
                         AnalyzeShorthands(attr, e, handlerScope);
@@ -1389,7 +1389,7 @@ namespace KScript.Language.Analysis
                 case AttributeKind.Statements:
                 {
                     Scope handlerScope = new Scope(scope, e.Span);
-                    handlerScope.Declare(BuiltIn("event"), e.Span.Start);
+                    handlerScope.Declare(EventSymbol(e, attr.Name), e.Span.Start);
                     AnalyzeStatements(attr.Value, e, attr, handlerScope, declare: false, requireEffect: true);
                     break;
                 }

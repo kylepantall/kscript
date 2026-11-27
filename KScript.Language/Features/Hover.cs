@@ -501,10 +501,11 @@ namespace KScript.Language.Features
                     break;
             }
             sb.Append("\n```");
-            if (s.Shape.Fields.Count > 0 && s.Kind != SymbolKind.Import && s.Shape.Type != KType.Map)
+            if (s.Shape.Fields.Count > 0 && s.Kind != SymbolKind.Import && (s.Shape.Type != KType.Map || s.Shape.Name != null))
             {
-                // Built-in values such as $request or $err: their type name doesn't show the fields.
-                sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Keys.Select(k => "`" + k + "`")));
+                // Built-in values such as $request, $err or $event: their type name doesn't show the fields, so list
+                // them with their types. Hovering a field (.data) gives its description.
+                sb.Append("\n\nFields: ").Append(string.Join(", ", s.Shape.Fields.Values.Select(f => "`" + f.Name + (f.Shape.IsVague ? string.Empty : ": " + f.Shape.Display(1)) + "`")));
             }
             DocComment doc = s.Kind is SymbolKind.Function or SymbolKind.Constant or SymbolKind.Variable ? s.Doc : null;
             if (s.Kind == SymbolKind.Function && s.DocumentationWithErrors() is { Length: > 0 } functionDoc)

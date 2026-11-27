@@ -27,6 +27,7 @@ namespace KScript.Language.Catalog
         private readonly Dictionary<string, CallableInfo> commands = new Dictionary<string, CallableInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, RetiredInfo> retiredCommands = new Dictionary<string, RetiredInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly List<CallableInfo> methods = new List<CallableInfo>();
+        private readonly Dictionary<string, IReadOnlyList<ValueFieldInfo>> variableFields = new Dictionary<string, IReadOnlyList<ValueFieldInfo>>(StringComparer.Ordinal);
         private readonly Dictionary<string, (string Type, string Description)> builtInVariables = new Dictionary<string, (string, string)>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> variablePackages = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, ValueFieldInfo>> typeFields = new Dictionary<string, Dictionary<string, ValueFieldInfo>>();
@@ -120,6 +121,10 @@ namespace KScript.Language.Catalog
         public IReadOnlyDictionary<string, (string Type, string Description)> BuiltInVariables => builtInVariables;
 
         /// <summary>The package that provides a built-in variable (null for ones every script and page has).</summary>
+        /// <summary>The keys a built-in map variable always has (<c>$os.name</c>), or none.</summary>
+        public IReadOnlyList<ValueFieldInfo> FieldsOfVariable(string name) =>
+            name != null && variableFields.TryGetValue(name, out IReadOnlyList<ValueFieldInfo> fields) ? fields : Array.Empty<ValueFieldInfo>();
+
         public string PackageOfVariable(string name) => name != null && variablePackages.TryGetValue(name, out string p) ? p : null;
 
         /// <summary>The package's name as written in &lt;import&gt;, or null if there is no such package.</summary>
@@ -211,6 +216,7 @@ namespace KScript.Language.Catalog
             {
                 if (builtInVariables.ContainsKey(v.Name)) continue;
                 builtInVariables[v.Name] = (v.Type, v.Description);
+                if (v.Fields.Count > 0) variableFields[v.Name] = v.Fields;
                 if (package.Name != "KScript.Core") variablePackages[v.Name] = package.Name;
             }
         }
@@ -287,7 +293,7 @@ namespace KScript.Language.Catalog
 
         private void AddVariables()
         {
-            builtInVariables.TryAdd("event", (KType.Map, "The DOM event inside <on>: value, key, target."));
+            builtInVariables.TryAdd("event", (KType.Map, "The event a handler runs for, in on-* attributes and `<on>` blocks: `$event.value`, `$event.key`, `$event.data`... Its fields depend on the handler."));
 
             foreach ((string name, string type, string description) in new[]
             {
