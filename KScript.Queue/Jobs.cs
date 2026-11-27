@@ -271,6 +271,9 @@ namespace KScript.Queueing
 
         public static readonly string[] Names = { "delay", "at", "queue", "connection" };
 
+        /// <summary>The error for a dispatch given both a delay and a time: one says when the job runs.</summary>
+        public const string BothTimes = "->dispatch() takes delay: (how long to wait) or at: (when to run), not both.";
+
         public static DispatchOptions From(CallContext call, int first)
         {
             var options = new DispatchOptions();
@@ -280,8 +283,10 @@ namespace KScript.Queueing
                     throw new KScriptException($"->dispatch() has no option '{pair.Key}'. It takes {string.Join(", ", Names.Select(n => n + ":"))}.", "Argument");
             }
             object delay = call.Arg(first, "delay");
-            if (delay != null) options.Delay = Durations.Seconds(delay, "delay");
             object at = call.Arg(first + 1, "at");
+            if (delay != null && at != null)
+                throw new KScriptException(BothTimes, "Argument");
+            if (delay != null) options.Delay = Durations.Seconds(delay, "delay");
             if (at != null)
             {
                 options.At = at switch

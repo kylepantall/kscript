@@ -33,6 +33,14 @@ namespace KScript.Language.Catalog
         private readonly Dictionary<string, Dictionary<string, ValueFieldInfo>> typeFields = new Dictionary<string, Dictionary<string, ValueFieldInfo>>();
         private readonly Dictionary<string, string> packages = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<string>> packageRequires = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<PackageSource> packageSources = new List<PackageSource>();
+
+        /// <summary>The scripts a package ships, whose declarations every script that imports it sees.</summary>
+        public IEnumerable<PackageSource> SourcesOf(string package) => packageSources.Where(s => string.Equals(s.Package, package, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>The package script at a path, or null.</summary>
+        public PackageSource SourceAt(string path) =>
+            PackageSource.IsSource(path) ? packageSources.FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.Ordinal)) : null;
 
         public static LanguageCatalog Default => DefaultInstance.Value;
 
@@ -195,6 +203,7 @@ namespace KScript.Language.Catalog
         {
             packages[package.Name] = package.Description;
             packageRequires[package.Name] = package.Requires.Select(PackageRegistry.Normalise).ToList();
+            packageSources.AddRange(package.Sources);
 
             foreach (ElementDefinition e in package.Elements.Values)
             {

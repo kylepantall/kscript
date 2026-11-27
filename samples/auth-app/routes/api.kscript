@@ -3,10 +3,15 @@
 import KScript.Http
 import KScript.Auth
 import "../controllers/accounts.kscript" as accounts
+import "../controllers/notes.kscript" as notes
 
 Routes {
   // API tokens (kscript make auth --api): POST an email and password for a
   // token, then send it as Authorization: Bearer.
   Post(path: /tokens, to: @accounts.issue_token)
   Get(path: /me, to: @accounts.me, middleware: auth)
+  // Notes work before signing up: each browser gets a guest id, and a note
+  // belongs to its guest or user (see Guests and owners in docs/auth.md).
+  Get(path: /notes, to: @notes.index)
+  Post(path: /notes, to: @notes.store)
 }

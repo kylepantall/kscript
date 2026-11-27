@@ -1,0 +1,8 @@
+import KScript.Data
+import KScript.Auth
+
+/// A note kept for whoever wrote it, signed in or not. Ownable gives it an
+/// owner and the ->mine() scope.
+model Note(timestamps) extends Ownable {
+  text: string(min: 1, max: 200)
+}

@@ -266,6 +266,9 @@ namespace KScript.Auth
             ["passkey_origin"] = s.PasskeyOrigin,
             ["passkey_signup"] = s.PasskeySignup,
             ["passkey_rp_id"] = s.PasskeyRpId,
+            ["guest_lifetime"] = s.GuestLifetime,
+            ["guest_cookie"] = s.GuestCookie,
+            ["adopt_guest"] = s.AdoptGuest,
         };
 
         #region Secrets

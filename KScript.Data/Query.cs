@@ -387,6 +387,20 @@ namespace KScript.Data
                 + $"Read the keys first, then change those rows: ->where({key}: $query->pluck({key}))->{method}(...).", "Argument");
         }
 
+        /// <summary>The method name <see cref="Adopt"/> reports in errors.</summary>
+        private const string Adopting = "adopt";
+
+        /// <summary>
+        /// Moves every row of an owned model from one owner to another, deleted rows too: a guest's rows become the
+        /// account's when the guest signs in. Returns how many rows moved.
+        /// </summary>
+        public static double Adopt(CallContext call, ModelInfo model, string from, string to)
+        {
+            var rows = new Query(Database.For(call, model), model.Table, model).WithTrashed("with");
+            rows = rows.And(rows.Equalities(new[] { new KeyValuePair<string, object>(model.OwnerColumn, from) }, Adopting));
+            return rows.Update(call, new[] { new KeyValuePair<string, object>(model.OwnerColumn, to) }, method: Adopting);
+        }
+
         /// <summary>UPDATE ... SET for every row the query reads. Returns how many rows changed.</summary>
         public double Update(CallContext call, IEnumerable<KeyValuePair<string, object>> values, bool converted = false, string method = "update")
         {

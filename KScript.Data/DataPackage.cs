@@ -230,7 +230,12 @@ namespace KScript.Data
             new("chunk", "size: number, work: fn", "Reads the rows a batch at a time and calls work with each batch (and its number from 0): for going through more rows than fit in memory. Return false from work to stop.", KType.Null,
                 (q, c) => { q.Chunk(c, Count(c.Arg(0), "->chunk() size"), c.Fn(1)); return null; }),
             new("update", "values...", "Sets columns on every row that matches, without reading them: `->update(active: false)`. Returns how many rows changed.", KType.Number,
-                (q, c) => q.Update(c, q.Model != null ? Records.Fillable(q.Model, ValuesOf(c, "update")) : ValuesOf(c, "update")), Bare: true),
+                (q, c) =>
+                {
+                    Dictionary<string, object> values = ValuesOf(c, "update");
+                    if (q.Model?.OwnerColumn is string owner && values.ContainsKey(owner)) throw Records.OwnerIsFixed(q.Model);
+                    return q.Update(c, q.Model != null ? Records.Fillable(q.Model, values) : values);
+                }, Bare: true),
             new("increment", "column, by?: number", "Adds to a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,
                 (q, c) => q.Increment(c, Word(c.Arg(0), "->increment()"), c.Num(1, 1)), Bare: true),
             new("decrement", "column, by?: number", "Takes away from a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,

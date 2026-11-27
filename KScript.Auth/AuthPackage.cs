@@ -97,6 +97,15 @@ namespace KScript.Auth
             AuthRequest.Current(c.Host) ?? throw c.Error($"{c.Display} works while kscript serve handles a request (in a route's controller, middleware or a page).", "Context");
 
         /// <summary>The app's sign-in state for a call: the request's app, else the one for the script's folder.</summary>
+        /// <summary>A script KScript.Auth ships, from its embedded resources.</summary>
+        private static string Embedded(string name)
+        {
+            using Stream stream = typeof(AuthPackage).Assembly.GetManifestResourceStream("KScript.Auth.Sources." + name)
+                ?? throw new InvalidOperationException($"KScript.Auth is missing its script {name}.");
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
         internal static AuthApp App(CallContext c) =>
             AuthRequest.Current(c.Host)?.App ?? AuthApp.ForFolder(c.Module?.Directory ?? c.Host.WorkingDirectory);
 
@@ -140,6 +149,18 @@ namespace KScript.Auth
                     Policies.Authorize(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"));
                     return c.Arg(1, "target");
                 }, "<do>@authorize(update, $post)</do>").Info.KeepsBareWords = true;
+            p.Source("ownable.kscript", Embedded("ownable.kscript"));
+            KScript.Data.ModelInfo.OwnerMixin(Name, "Ownable");
+            KScript.Data.ModelInfo.CurrentOwner = c => Owners.Of(c, null);
+            p.Command("guest", "", "The browser's guest id: a uuid kept in a long-lived cookie (http.auth.guest_lifetime, a year by default), made the first time it is read. Null once someone is signed in, and outside a request. @owner() is the guest when no one is signed in.",
+                SemanticTypes.Uuid, c => Owners.Guest(c.Host, create: true) is string id ? Owners.Uuid(id) : null,
+                "<echo>{ @guest() }</echo>");
+            p.Command("owner", "as?: any", "Who owns what this request makes: user:<id> for the signed-in user, else guest:<uuid> for the browser (see @guest()). Null outside a request. as: names one instead: a user, or an owner value. Ownable models keep it in their owner column.",
+                KType.String, c => Owners.Of(c, c.Arg(0, "as")),
+                "<echo>{ @owner() }</echo>");
+            p.Command("acting_as_guest", "id?: uuid", "In a test, acts as a guest until the test ends, in the test and in routes it calls with @api(/...) or @visit(): no one is signed in, and @guest() is this id (a new one when it is left out). Returns the guest id.",
+                SemanticTypes.Uuid, c => Owners.Uuid(Policies.ActAsGuest(c.Host, c.Arg(0, "id") is object id ? Values.ToStr(Values.Unwrap(id)) : null)),
+                "<do>@acting_as_guest()</do>");
             p.Command("acting_as", "user", "In a test, sets who @can, @authorize and @user() ask about until the test ends, in the test and in routes it calls with @api(/...): @acting_as($editor). Pass null to act as a guest.",
                 KType.Any, c => Policies.ActAs(c.Host, Values.Unwrap(c.Arg(0, "user"))), "<do>@acting_as({ id: 1, role: 'editor' })</do>");
 

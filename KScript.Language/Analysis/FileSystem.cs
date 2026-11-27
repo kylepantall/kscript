@@ -61,6 +61,32 @@ namespace KScript.Language.Analysis
         }
     }
 
+    /// <summary>
+    /// Another file system, plus the scripts packages ship (KScript.Auth's ownable.kscript), at their paths under
+    /// <see cref="KScript.Runtime.PackageSource.Root"/>, so they are read like any imported script.
+    /// </summary>
+    internal sealed class PackageSourceFiles : IFileSystem
+    {
+        private readonly IFileSystem inner;
+        private readonly Catalog.LanguageCatalog catalog;
+
+        public PackageSourceFiles(IFileSystem inner, Catalog.LanguageCatalog catalog)
+        {
+            this.inner = inner;
+            this.catalog = catalog;
+        }
+
+        /// <summary>The file system with package scripts added, once.</summary>
+        public static IFileSystem Over(IFileSystem files, Catalog.LanguageCatalog catalog) =>
+            files is PackageSourceFiles ? files : new PackageSourceFiles(files, catalog);
+
+        public bool FileExists(string path) => catalog.SourceAt(path) != null || inner.FileExists(path);
+        public bool DirectoryExists(string path) => inner.DirectoryExists(path);
+        public string ReadText(string path) => catalog.SourceAt(path)?.Text ?? inner.ReadText(path);
+        public IEnumerable<string> ListFiles(string directory, string pattern) => inner.ListFiles(directory, pattern);
+        public IEnumerable<string> ListDirectories(string directory) => inner.ListDirectories(directory);
+    }
+
     /// <summary>A file system with no files, for analysing text that isn't saved anywhere.</summary>
     public sealed class EmptyFileSystem : IFileSystem
     {

@@ -111,6 +111,8 @@ namespace KScript.Runtime
                 foreach (ValueFieldDefinition f in package.Fields) module.Fields[f.Receiver + ":" + f.Name] = f;
                 foreach (var v in package.Variables) module.Variables[v.Key] = v.Value;
                 foreach (var f in package.EchoFormats) module.EchoFormats[f.Key] = f.Value;
+                // A module made for a page is already running: the package's scripts go in at once, below its globals.
+                if (module.HasRun && module.Globals?.Parent is Scope packaged) DeclarePackageSources(module, package, packaged);
             }
             if ((alias == null || package == Packages.Core) && module.UnqualifiedCommandPackages.Add(package))
             {
@@ -182,7 +184,7 @@ namespace KScript.Runtime
             var module = new Module(this, path, source, MarkupParser.Parse(source, DocumentKind.Page)) { HasRun = true };
             ConfigValue.PrepareProject(Host, module.Directory);
             module.ProjectExtensions = ProjectExtensionsFor(module);
-            module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
+            module.Globals = new Scope(new Scope(module.ProjectExtensions?.NativeScope));
             AddPackage(module, Packages.Core, null);
             foreach (string name in Options.DefaultPackages.Concat(packages ?? Enumerable.Empty<string>()))
             {
@@ -726,7 +728,14 @@ namespace KScript.Runtime
             {
                 ConfigValue.PrepareProject(Host, module.Directory);
                 module.ProjectExtensions = ProjectExtensionsFor(module);
-                module.Globals = new Scope(module.ProjectExtensions?.NativeScope);
+                // What the imported packages' own scripts declare sits between the natives and the script's
+                // globals, so a script's own declaration of the same name wins.
+                Scope packaged = new Scope(module.ProjectExtensions?.NativeScope);
+                module.Globals = new Scope(packaged);
+                foreach (KScriptPackage package in module.packages.ToList())
+                {
+                    DeclarePackageSources(module, package, packaged);
+                }
                 foreach (VariableDefinition v in module.Variables.Values)
                 {
                     module.Globals.Declare(v.Name, v.Value(this, module));
@@ -746,6 +755,28 @@ namespace KScript.Runtime
             {
                 module.Running = false;
                 module.HasRun = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs the scripts a package ships (once per interpreter) and declares what they export in
+        /// <paramref name="scope"/>. A package's own script doesn't see its scripts this way, or it would import itself.
+        /// </summary>
+        private void DeclarePackageSources(Module module, KScriptPackage package, Scope scope)
+        {
+            foreach (PackageSource source in package.Sources)
+            {
+                if (PackageSource.IsSource(module.Path) && module.Path.StartsWith(System.IO.Path.Combine(PackageSource.Root, package.Name), StringComparison.Ordinal)) continue;
+                if (!modulesByPath.TryGetValue(source.Path, out Module imported))
+                {
+                    imported = LoadText(source.Text, source.Path);
+                }
+                RunModule(imported);
+                foreach (KeyValuePair<string, object> export in imported.Exports)
+                {
+                    if (!scope.TryGet(export.Key, out object existing) || !ReferenceEquals(existing, export.Value))
+                        scope.Declare(export.Key, export.Value);
+                }
             }
         }
 

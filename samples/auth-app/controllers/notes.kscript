@@ -1,0 +1,10 @@
+// Notes for guests and users alike. Ownable fills in the owner and ->mine()
+// keeps each list to whoever is asking.
+import KScript.Data
+import "../models/note.kscript"
+
+/// GET /api/notes: the asker's notes, oldest first.
+fn index() => Note->mine()->order_by(id)->pluck(text)
+
+/// POST /api/notes: adds a note for the asker.
+fn store(json: map) => Note->create(text: $json.text ?? '')

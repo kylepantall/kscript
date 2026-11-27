@@ -23,3 +23,5 @@ curl localhost:8080/api/me -H "Authorization: Bearer ks_..."
 ```
 
 Users and sessions are kept in the app's own data and state folders, not in this folder.
+
+Notes work before anyone signs up. `models/note.kscript` extends KScript.Auth's `Ownable`, so each note belongs to the guest or user who wrote it, and `GET /api/notes` (`controllers/notes.kscript`) lists only the asker's own with `Note->mine()`. `tests/notes.test.kscript` shows two guests and a user each seeing their own. See Guests and owners in docs/auth.md.

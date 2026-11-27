@@ -211,7 +211,10 @@
             "passkey_origin": { "type": "string", "format": "uri", "description": "The public HTTPS origin for passkeys, or http://localhost with an optional development port. Setting this enables passkeys." },
             "passkey_signup": { "type": "boolean", "default": false, "description": "Allows new accounts to sign up with a passkey. Requires passkey_origin." },
             "passkey_rp_id": { "type": "string", "description": "An optional relying party domain, such as example.com. Defaults to the passkey origin's hostname." },
-            "reset_lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1h", "description": "How long a password reset token works." }
+            "reset_lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "1h", "description": "How long a password reset token works." },
+            "guest_lifetime": { "type": ["number", "string"], "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[smhdwSMHDW]?\\s*$", "default": "365d", "description": "How long a browser keeps its @guest() id." },
+            "guest_cookie": { "type": "string", "default": "ks_guest", "description": "The guest id cookie's name." },
+            "adopt_guest": { "type": "boolean", "default": false, "description": "Moves a guest's rows of Ownable models to their account when they sign in." }
           }
         },
         "throttle": {

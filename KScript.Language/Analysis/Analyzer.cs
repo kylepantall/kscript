@@ -27,8 +27,8 @@ namespace KScript.Language.Analysis
         private Analyzer(SourceText source, string path, DocumentKind kind, IFileSystem files, LanguageCatalog catalog)
         {
             this.source = source;
-            this.files = files ?? DiskFileSystem.Instance;
             this.catalog = catalog ?? LanguageCatalog.Default;
+            this.files = PackageSourceFiles.Over(files ?? DiskFileSystem.Instance, this.catalog);
             directory = path != null ? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) : null;
             result = new DocumentAnalysis(source, path, kind, MarkupParser.Parse(source, kind, path));
             CodeArguments.Normalise(result.Markup, this.catalog.GetElement);
@@ -105,6 +105,7 @@ namespace KScript.Language.Analysis
             HoistFunctions(root);
             HoistProjectNatives(root);
             HoistProjectModels(root);
+            HoistPackageSources(root);
             ApplyKnownTypes(root);
             HoistTypes(root);
             HoistExtensions(root);
@@ -280,14 +281,32 @@ namespace KScript.Language.Analysis
             }
         }
 
-        private void HoistImport(MarkupElement e, Scope root)
+        /// <summary>
+        /// What the packages this file imports declare in their own scripts (KScript.Auth's Ownable), as if the file
+        /// imported each script: the runtime gives them to it the same way. A package's own script doesn't import itself.
+        /// </summary>
+        private void HoistPackageSources(Scope root)
         {
-            string src = e.GetAttributeValue("path")?.Trim();
-            string full = ResolvePath(src);
+            string self = result.Path != null && KScript.Runtime.PackageSource.IsSource(result.Path) ? result.Path : null;
+            foreach (MarkupElement e in result.Markup.RootElements.FirstOrDefault()?.ChildElements.Where(x => x.Name == "import" && x.GetAttribute("package") != null) ?? Enumerable.Empty<MarkupElement>())
+            {
+                string package = catalog.FindPackage(e.GetAttributeValue("package")?.Trim() ?? string.Empty);
+                foreach (KScript.Runtime.PackageSource source in package == null ? Enumerable.Empty<KScript.Runtime.PackageSource>() : catalog.SourcesOf(package))
+                {
+                    if (self != null && self.StartsWith(System.IO.Path.Combine(KScript.Runtime.PackageSource.Root, source.Package), StringComparison.Ordinal)) continue;
+                    HoistImport(e, root, source);
+                }
+            }
+        }
+
+        private void HoistImport(MarkupElement e, Scope root, KScript.Runtime.PackageSource packaged = null)
+        {
+            string src = packaged?.Package ?? e.GetAttributeValue("path")?.Trim();
+            string full = packaged?.Path ?? ResolvePath(src);
             Dictionary<string, (FunctionParameter[] Params, ExternalLocation Location, string Description)> exported = ReadExports(full);
             Dictionary<string, (ExternalLocation Location, string Description)> constants = ReadConstantExports(full);
 
-            MarkupAttribute asAttr = e.GetAttribute("as");
+            MarkupAttribute asAttr = packaged != null ? null : e.GetAttribute("as");
             if (!string.IsNullOrWhiteSpace(asAttr?.ValueText))
             {
                 TextSpan span = TrimmedSpan(asAttr.Value);
@@ -341,13 +360,13 @@ namespace KScript.Language.Analysis
                 root.Declare(alias, 0);
             }
 
-            MarkupAttribute namesAttr = e.GetAttribute("names");
+            MarkupAttribute namesAttr = packaged != null ? null : e.GetAttribute("names");
             if (namesAttr?.Value == null)
             {
                 // <import path="lib.ks.xml" /> with neither as nor names brings in every exported function.
                 if (string.IsNullOrWhiteSpace(asAttr?.ValueText) && exported != null)
                 {
-                    MarkupAttribute srcAttr = e.GetAttribute("path");
+                    MarkupAttribute srcAttr = e.GetAttribute(packaged != null ? "package" : "path");
                     TextSpan at = srcAttr?.Value != null ? TrimmedSpan(srcAttr.Value) : e.NameSpan;
                     foreach (var export in exported)
                     {

@@ -1221,4 +1221,14 @@ public sealed class QueueTests : StorageFixture
         Assert.Equal("Bare", bare.RootElements.First().ChildElements.Single().GetAttributeValue("name"));
         Assert.Contains("job Empty {\n  a: int\n}", ScriptConverter.ToCode(MarkupParser.Parse(new SourceText("<kscript><job name=\"Empty\" fields=\"a: int\" /></kscript>"), DocumentKind.Script, "z.ks.xml")).Text);
     }
+
+    [Fact]
+    public void Dispatch_takes_a_delay_or_a_time_not_both()
+    {
+        FileOf("jobs/poll.kscript", "job Poll {\n  n: int\n\n  fn handle() {\n    echo $n\n  }\n}\n");
+        var error = CodeFails("import \"jobs/poll.kscript\"\nPoll(n: 1)->dispatch(delay: 5m, at: @now())");
+        Assert.Equal(DispatchOptions.BothTimes, error.Message);
+        Assert.Equal("Argument", error.Type);
+        Assert.Empty(Driver().Waiting(null));
+    }
 }

@@ -1,0 +1,24 @@
+import KScript.Data
+import KScript.Auth
+
+/// Rows that belong to one owner, who is the signed-in user or the browser's
+/// guest. A model that extends Ownable gets an owner column, filled from
+/// @owner() when a record is made and never changed after, the mine() scope and
+/// ->is_mine().
+model Ownable(mixin, index: [owner], guarded: [owner]) {
+  /// Whose record it is: user:<id> or guest:<uuid>, as @owner() gives it.
+  owner: string(max: 80)
+
+  /// Keeps the current owner's rows. Outside a request (a test, job or
+  /// script), name the owner: ->mine(as: $user).
+  fn mine(query, as: any = null) {
+    owner = @owner(as: $as)
+    guard $owner != null else {
+      throw Unauthorized "->mine() needs someone signed in, or a guest. Outside a request, name the owner, such as ->mine(as: the user)."
+    }
+    return $query->where(owner: $owner)
+  }
+
+  /// True when the record belongs to the current owner.
+  fn is_mine() => $owner == @owner()
+}
