@@ -46,6 +46,10 @@ namespace KScript.Http
             if (!request.ContainsKey("cookies") && ((Dictionary<string, object>)request["headers"]).GetValueOrDefault("cookie") is object cookieHeader)
                 request["cookies"] = ParseCookies(Values.ToStr(cookieHeader));
 
+            // An ordinary form post's fields are read from its body into $request.form (and so _token), as a server does.
+            if (!request.ContainsKey("form") && PageServer.IsUrlEncodedForm(Values.ToStr(((Dictionary<string, object>)request["headers"]).GetValueOrDefault("content-type"))))
+                request["form"] = PageServer.UrlEncodedForm(Values.ToStr(request.GetValueOrDefault("body")));
+
             bool routesOnly = request.Remove(LocalRequests.RoutesOnlyKey);
             PageResult result = app.Handle(request);
             if (result == null && routesOnly) return null;
