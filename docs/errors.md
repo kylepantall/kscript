@@ -211,7 +211,7 @@ echo "Hello { $name }"   // right
 
 ## KS5004
 
-**A call has too few or too many arguments.** The message shows what the function takes. An argument with `?` or a default can be left out.
+**A call has too few or too many arguments.** The message shows what the function takes. An argument with `?` or a default can be left out. For a [one-of group](language.md#one-of-a-group) such as `add|remove: file`, pass one of its names: `@file(4, add: $f)`.
 
 ## KS5005
 
@@ -240,7 +240,7 @@ Text that reads as a number is converted (`'5' - 1` is 4), `+` joins text and `'
 
 ## KS5008
 
-**A named argument is given twice, or a word is used as a flag on a parameter that isn't true/false.** Give each argument once, and give other parameters a value: `name: value`.
+**A named argument is given twice, a word is used as a flag on a parameter that isn't true/false, or a call passes two members of a [one-of group](language.md#one-of-a-group).** Give each argument once, and give other parameters a value: `name: value`. A group's members are passed by name, one at a time: `@file(4, add: $f)`, not `@file(4, add: $f, remove: $g)`. The quick fix removes the second.
 
 ## KS5009
 

@@ -20,7 +20,7 @@ namespace KScript.LanguageServer
     public sealed partial class KScriptLanguageServer
     {
         public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type", "regexp" };
-        public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary" };
+        public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary", "oneOf" };
 
         private readonly JsonRpcConnection connection;
         private readonly Workspace workspace;
@@ -520,15 +520,21 @@ namespace KScript.LanguageServer
                 JsonArray ps = new JsonArray();
                 // Each parameter is sent as its [start, end) in the signature's label, found left to right after the '(',
                 // so the editor highlights the right one even when its text also appears earlier (a type, the name).
+                // The members of a one-of group all highlight the whole group, so they share its range.
                 int from = Math.Max(0, s.Label.IndexOf('(') + 1);
-                foreach ((string label, string doc) in s.Parameters)
+                string lastHighlight = null;
+                int lastAt = -1;
+                for (int i = 0; i < s.Parameters.Count; i++)
                 {
-                    int at = s.Label.IndexOf(label, from, StringComparison.Ordinal);
+                    (string own, string doc) = s.Parameters[i];
+                    string label = s.Highlights?[i] ?? own;
+                    int at = label == lastHighlight ? lastAt : s.Label.IndexOf(label, from, StringComparison.Ordinal);
                     JsonObject pj = new JsonObject { ["label"] = at < 0 ? label : new JsonArray(at, at + label.Length) };
                     if (at >= 0)
                     {
                         from = at + label.Length;
                     }
+                    (lastHighlight, lastAt) = (label, at);
                     if (doc != null) pj["documentation"] = doc;
                     ps.Add((JsonNode)pj);
                 }

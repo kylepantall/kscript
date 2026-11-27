@@ -170,6 +170,13 @@ namespace KScript.Language.Features
             int best = help.Signatures.FindIndex(s => s.Parameters.Count >= count || s.Parameters.Any(p => p.Label.EndsWith("...")));
             help.ActiveSignature = best < 0 ? 0 : best;
             help.ActiveParameter = active;
+            if (help.Signatures[help.ActiveSignature].ParameterGroups is IReadOnlyList<int> groups)
+            {
+                // A group's members are passed by name, so the nth positional argument is the nth parameter outside a group.
+                int positional = piped + args.Arguments.Count(a => a.Name == null && a.Span.End < index);
+                List<int> open = Enumerable.Range(0, groups.Count).Where(i => groups[i] < 0).ToList();
+                help.ActiveParameter = positional < open.Count ? open[positional] : groups.Count;
+            }
             return help;
         }
 

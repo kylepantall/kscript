@@ -81,10 +81,13 @@ namespace KScript.Runtime
 
             internal string RawItemText { get; init; }
 
+            /// <summary>A member of a one-of group (<c>add|remove: file</c>), which a call passes by name only.</summary>
+            public bool NamedOnly { get; init; }
+
             /// <summary>A list of an enum (<c>sizes: Size[]</c>), whose items can be written bare.</summary>
             public bool IsEnumList => ItemValues != null && ItemValues.Count > 0;
 
-            public static Slot From(ParameterInfo p) => new Slot(p.Name, !p.Optional && !p.Variadic, p.Variadic, p.Values, RawText: KScript.Metadata.NativeTypes.Get(p.Type)?.RawKind ?? (p.Type == "word" ? "word" : null));
+            public static Slot From(ParameterInfo p) => new Slot(p.Name, !p.Optional && !p.Variadic && !p.InGroup, p.Variadic, p.Values, RawText: KScript.Metadata.NativeTypes.Get(p.Type)?.RawKind ?? (p.Type == "word" ? "word" : null)) { NamedOnly = p.InGroup };
         }
 
         /// <summary>
@@ -96,7 +99,7 @@ namespace KScript.Runtime
         {
             if (info.Signatures.Count == 0) return Plain(call);
             bool simple = call.Named.Count == 0 && !call.Args.Any(a => a is BareWord || a is LatePositional || a is BareList);
-            if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0)))
+            if (simple && !info.Signatures.Any(s => s.Parameters.Any(p => p.Values.Count > 0 || p.InGroup)))
                 return ForNativeParameters(call, info.Signatures[0]);
 
             KScriptException first = null;
@@ -108,6 +111,11 @@ namespace KScript.Runtime
                     List<Slot> slots = signature.Parameters.Select(Slot.From).ToList();
                     if (TryResolve(call, slots, lenient: true, out object[] args, out HashSet<int> skipped, out Dictionary<string, object> rest, out KScriptException error, info.KeepsBareWords, infer: attempt == 1))
                     {
+                        if (GroupProblem(call, signature, args, skipped) is string problem)
+                        {
+                            first ??= new KScriptException(problem, "Argument");
+                            continue;
+                        }
                         var bound = new CallContext(call.Interpreter, call.Name, args, rest, call.Scope, call.Module, call.IsMethod, skipped)
                         {
                             ParameterNames = signature.Parameters.Select(p => p.Name).ToList(),
@@ -206,6 +214,33 @@ namespace KScript.Runtime
             return info.Signatures.OrderBy(s => names.All(n => s.Parameters.Any(p => !p.Variadic && p.Name == n) || s.Parameters.Any(p => p.Variadic)) ? 0 : 1);
         }
 
+        /// <summary>A call that passed two members of a one-of group, or none of a required one.</summary>
+        private static string GroupProblem(CallContext call, Signature signature, object[] args, HashSet<int> skipped)
+        {
+            foreach (List<ParameterInfo> group in signature.Groups)
+            {
+                int passed = group.Count(p =>
+                {
+                    int i = IndexOf(signature, p);
+                    // null, and false for a yes/no member (delete: false), pass nothing.
+                    return i < args.Length && !skipped.Contains(i) && Values.Unwrap(args[i]) is not (null or false);
+                });
+                if (KScript.Syntax.ParameterList.GroupProblem(call.Display, group.Select(p => p.Name).ToList(), group[0].GroupOptional, passed) is string problem)
+                    return problem;
+            }
+            return null;
+        }
+
+        private static int IndexOf(Signature signature, ParameterInfo parameter)
+        {
+            for (int i = 0; i < signature.Parameters.Count; i++)
+                if (ReferenceEquals(signature.Parameters[i], parameter)) return i;
+            return -1;
+        }
+
+        private static KScriptException NamedOnlyError(CallContext call, Slot slot) =>
+            new KScriptException($"{call.Display} takes '{slot.Name}' by name, as one of a group: write {slot.Name}: and the value.", "Argument");
+
         private static bool TryResolve(CallContext call, List<Slot> slots, bool lenient, out object[] args, out HashSet<int> skipped,
             out Dictionary<string, object> rest, out KScriptException error, bool keepBare = false, bool infer = true)
         {
@@ -299,6 +334,13 @@ namespace KScript.Runtime
                 return false;
             }
 
+            int namedOnly = slots.FindIndex(s => s.NamedOnly);
+            if (namedOnly >= 0 && positional.Count > namedOnly)
+            {
+                error = NamedOnlyError(call, slots[namedOnly]);
+                return false;
+            }
+
             var bound = new List<object>(positional);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (KeyValuePair<string, object> pair in named)
@@ -357,6 +399,11 @@ namespace KScript.Runtime
                         error = NotAValue(call, bare2, target, slots);
                         return false;
                     }
+                }
+                if (target?.NamedOnly == true)
+                {
+                    error = NamedOnlyError(call, target);
+                    return false;
                 }
                 if (target == null && !lenient)
                 {

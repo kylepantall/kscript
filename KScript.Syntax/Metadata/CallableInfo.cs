@@ -48,6 +48,16 @@ namespace KScript.Metadata
         /// <summary>Set when the parameter is deprecated; it still works, with a warning.</summary>
         public Deprecation Deprecated { get; internal set; }
 
+        /// <summary>
+        /// Which one-of group the parameter is in, or -1. A call passes exactly one member of a group, by name
+        /// (<c>post|put|patch|delete: any</c>), or at most one when <see cref="GroupOptional"/>.
+        /// </summary>
+        public int Group { get; init; } = -1;
+
+        public bool GroupOptional { get; init; }
+
+        public bool InGroup => Group >= 0;
+
         public bool IsFlag => Type == KType.Bool;
 
         public bool AcceptsModel => Type is KType.Model or ModelOrString;
@@ -82,7 +92,14 @@ namespace KScript.Metadata
             return true;
         }
 
-        public string FunctionLabel => $"fn({string.Join(", ", Parameters.Select(p => p.Label))})";
+        public string FunctionLabel => $"fn({Label})";
+
+        /// <summary>The parameters as written, with each one-of group as one entry: <c>url, post|put?: any</c>.</summary>
+        public string Label => KScript.Syntax.ParameterList.Label(Parameters, p => p.Group, p => p.GroupOptional, p => p.Name,
+            p => p.Values.Count > 0 ? string.Join(" | ", p.Values) : p.Type, p => p.Label);
+
+        /// <summary>The members of each one-of group, in order.</summary>
+        public IEnumerable<List<ParameterInfo>> Groups => Parameters.Where(p => p.InGroup).GroupBy(p => p.Group).Select(g => g.ToList());
 
         /// <summary>
         /// Parses "a, b?, rest..." into a signature. A parameter may give a type, "recursive?: bool", or the values it
@@ -93,6 +110,13 @@ namespace KScript.Metadata
             if (string.IsNullOrWhiteSpace(parameters))
             {
                 return new Signature();
+            }
+            if (parameters.Contains('|') && KScript.Syntax.ParameterList.Read(parameters) is var entries && entries.Any(e => e.InGroup))
+            {
+                // One-of groups: "url, post|put|patch|delete?: any", "(delay: duration | at: date)?".
+                return new Signature(entries.Select(e => e.InGroup
+                    ? new ParameterInfo(e.Name, optional: true, type: e.Type) { Group = e.Group, GroupOptional = e.GroupOptional }
+                    : Parse(parameters.Substring(e.Start, e.Length)).Parameters[0]).ToArray());
             }
             return new Signature(parameters.Split(',').Select(p => p.Trim()).Select(p =>
             {
@@ -182,6 +206,6 @@ namespace KScript.Metadata
 
         public string Prefix => Kind == CallableKind.Method ? "->" : "@";
 
-        public IEnumerable<string> Labels => Signatures.Select(s => $"{Prefix}{Name}({string.Join(", ", s.Parameters.Select(p => p.Label))})");
+        public IEnumerable<string> Labels => Signatures.Select(s => $"{Prefix}{Name}({s.Label})");
     }
 }

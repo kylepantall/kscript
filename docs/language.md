@@ -185,6 +185,34 @@ echo "{ @join_path(base: $folder, ['archive', $name]) }"
 
 Positional arguments fill parameters in order, and each `name: value` fills the parameter of that name, so you can skip optional ones in between. A positional argument written after named ones fills the first parameter still empty, which is how `@join_path(base: $folder, [...])` reads. Naming a parameter that doesn't exist, or giving one twice, is an error with a "did you mean" hint. The editor completes parameter names after `(` or `,`.
 
+### One of a group
+
+Some parameters are alternatives: a call passes exactly one of them. Join their names with `|`:
+
+```kscript try
+fn file(note_id: int, add|remove: string, notify: bool = true) {
+  change = $add != null ? "Added { $add }" : "Removed { $remove }"
+  told = $notify ? ', and told its owner' : ''
+  return "{ $change } on note { $note_id }{ $told }"
+}
+
+echo @file(4, add: 'plan.png')
+echo @file(4, remove: 'old.png', notify: false)
+```
+
+`@file(4, add: $a, remove: $b)` is an error ("@file() takes add: or remove:, not both"), and so is `@file(4)` ("needs add: or remove:"). `kscript check` reports both before the code runs. The members of a group are always named, and the ones a call doesn't pass are `null` in the body. Passing `null` (or `false`) for one counts as not passing it.
+
+| Written | Means |
+| --- | --- |
+| `add\|remove: file` | Exactly one of `add` and `remove`, both files. |
+| `at\|after?: date` | At most one: the `?` after the last name lets a call pass neither. |
+| `text: string \| template: Template` | Exactly one, each with its own type. |
+| `(text: string \| template: Template)?` | The same in brackets, with `?` for at most one. |
+
+A group whose members have different types needs brackets when other parameters sit beside it, so it's clear where the group ends: `fn send(to: email, (text: string | template: Template), at|after?: date)`. Brackets are allowed around any group. A member can't have a default of its own.
+
+Built-in commands use groups too. `@api()` takes one of `post:`, `put:`, `patch:` and `delete:`, and a job's `->dispatch()` takes `delay:` or `at:`, not both. Signature help shows a group as one slot, completion stops offering the other members once one is written, and the editor gives a group's names one colour.
+
 ### Flags
 
 A true/false parameter can be written as a bare word: `recursive` sets it to true and `not recursive` to false, so calls read like a sentence.

@@ -271,8 +271,8 @@ namespace KScript.Queueing
 
         public static readonly string[] Names = { "delay", "at", "queue", "connection" };
 
-        /// <summary>The error for a dispatch given both a delay and a time: one says when the job runs.</summary>
-        public const string BothTimes = "->dispatch() takes delay: (how long to wait) or at: (when to run), not both.";
+        /// <summary>The error for a dispatch given both a delay and a time: (delay: duration | at: date)? is one group.</summary>
+        public static readonly string BothTimes = KScript.Syntax.ParameterList.GroupProblem("->dispatch()", new[] { "delay", "at" }, optional: true, passed: 2);
 
         public static DispatchOptions From(CallContext call, int first)
         {

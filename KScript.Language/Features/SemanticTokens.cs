@@ -302,6 +302,20 @@ namespace KScript.Language.Features
             }
             AddTypeNameTokens(analysis, tokens);
 
+            // One-of groups (add|remove: file) share one colour: their names where declared and passed, and their bars.
+            if (analysis.OneOfSpans.Count > 0)
+            {
+                var oneOf = analysis.OneOfSpans.GroupBy(span => span.Start).ToDictionary(g => g.Key, g => g.First());
+                var marked = new HashSet<int>();
+                for (int i = 0; i < tokens.Count; i++)
+                    if (oneOf.TryGetValue(tokens[i].Span.Start, out TextSpan part) && tokens[i].Span.Length == part.Length)
+                    {
+                        tokens[i] = new SemanticToken(tokens[i].Span, tokens[i].Type, tokens[i].Modifiers | SemanticTokenModifiers.OneOf);
+                        marked.Add(part.Start);
+                    }
+                foreach (TextSpan part in oneOf.Values.Where(p => !marked.Contains(p.Start)))
+                    tokens.Add(new SemanticToken(part, part.Length == 1 ? SemanticTokenType.Operator : SemanticTokenType.Parameter, SemanticTokenModifiers.OneOf));
+            }
             return tokens.Where(t => t.Span.Length > 0).GroupBy(t => t.Span.Start).Select(g => g.First()).OrderBy(t => t.Span.Start).ToList();
         }
     }

@@ -73,8 +73,8 @@ namespace KScript.Language.Tests
             var both = WithoutUnused(Check(job + "Ping(n: 1)->dispatch(delay: 5m, at: @now())\n"));
             var d = Assert.Single(both.Diagnostics);
             Assert.Equal(DiagnosticSeverity.Error, d.Severity);
-            Assert.Equal("->dispatch() takes delay: (how long to wait) or at: (when to run), not both.", d.Message);
-            Assert.Equal("at: @now()", (job + "Ping(n: 1)->dispatch(delay: 5m, at: @now())\n").Substring(d.Span.Start, d.Span.Length));
+            Assert.Equal("->dispatch() takes delay: or at:, not both.", d.Message);
+            Assert.Equal("at", (job + "Ping(n: 1)->dispatch(delay: 5m, at: @now())\n").Substring(d.Span.Start, d.Span.Length));
         }
     }
 }

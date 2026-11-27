@@ -1,0 +1,43 @@
+// One-of groups: a call passes exactly one of add: and remove:, and at most
+// one of at: and after:. The members it doesn't pass are null.
+fn file(note_id: int, add|remove: string, notify: bool = true) {
+  change = $add != null ? "added { $add }" : "removed { $remove }"
+  told = $notify ? ', told' : ''
+  return "{ $note_id }: { $change }{ $told }"
+}
+
+fn remind(who: string, (text: string | minutes: int), at|after?: string) {
+  what = $text ?? "{ $minutes } minutes"
+  when = $at ?? $after ?? 'now'
+  return "{ $who }: { $what }, { $when }"
+}
+
+describe(name: 'One-of parameters') {
+  test(name: 'takes either member of a group') {
+    expect(@file(4, add: 'plan.png'), equals: '4: added plan.png, told')
+    expect(
+      @file(4, remove: 'old.png', notify: false),
+      equals: '4: removed old.png'
+    )
+    expect(
+      @file(remove: 'old.png', note_id: 5),
+      equals: '5: removed old.png, told'
+    )
+  }
+
+  test(name: 'a member passed as null is not passed') {
+    expect(
+      @file(6, add: null, remove: 'x.png'),
+      equals: '6: removed x.png, told'
+    )
+  }
+
+  test(name: 'members can have different types, and a group can be optional') {
+    expect(@remind('ada', text: 'stand up'), equals: 'ada: stand up, now')
+    expect(
+      @remind('ben', minutes: 5, after: 'lunch'),
+      equals: 'ben: 5 minutes, lunch'
+    )
+    expect(@remind('cy', text: 'call', at: '9am'), equals: 'cy: call, 9am')
+  }
+}
