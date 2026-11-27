@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A path such as `/` passed before a later argument that holds a `/` in quotes (`@api(/, options: { headers: { Cookie: 'a/b' } })`) is no longer coloured as a regex, which had swapped every quote after it and left `->`, `(` and `{` coloured wrongly or red for the rest of the file. A call inside a statement call (`expect($reply->header('x'), ...)`) no longer ends the statement early, and a map key before `{` is no longer coloured as a tag.
+
 - **Run Script** uses `Ctrl+F5` and reports failures in the terminal with file and line links. **Check** reports code diagnostics in Problems.
 
 - Words joined by `-`, `+`, `/` or `.`, such as `my-post`, `api.corp.com` and `1.4.2`, are recognised by a type's `pattern` like single words, and so are patterns on types built on `domain`, `semver` and other native types written as words.
