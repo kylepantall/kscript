@@ -66,6 +66,14 @@ namespace KScript.Language.Tests
             Assert.Contains(message, Messages(declaration));
 
         [Fact]
+        public void AHelperCanPassItsOwnArgumentsStraightOn()
+        {
+            // Variables may be null, so only two values are an error here; the interpreter checks the rest.
+            AssertClean(Check(Board + "fn change(id: int, add: string = null, remove: string = null) => @file($id, add: $add, remove: $remove)\necho @change(1, add: 'a')\n"));
+            AssertClean(Check("import KScript.Net\n\nfn call(post: any = null, put: any = null) => @api('/x', post: $post, put: $put)\necho @call(post: 1)\n"));
+        }
+
+        [Fact]
         public void AMixedGroupOnItsOwnNeedsNoBrackets() =>
             AssertClean((Check("fn f(text: string | template: int) {\n  echo \"{ $text } { $template }\"\n}\n@f(template: 2)\n")));
 

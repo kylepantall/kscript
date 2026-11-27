@@ -518,9 +518,14 @@ namespace KScript.Language.Analysis
                     if (filled.TryGetValue(x.Index, out ArgumentNode named) && named?.Name != null)
                         result.OneOfSpans.Add(region.Source.ToSource(named.NameSpan));
                 List<string> names = group.Select(x => x.Slot.Name).ToList();
-                var passed = group.Where(x => filled.TryGetValue(x.Index, out ArgumentNode a) && a != null && a.Value is not LiteralNode { Kind: LiteralKind.Null } && a.Value is not LiteralNode { Kind: LiteralKind.Bool, Value: "false" })
+                var given = group.Where(x => filled.TryGetValue(x.Index, out ArgumentNode a) && a != null && a.Value is not LiteralNode { Kind: LiteralKind.Null } && a.Value is not LiteralNode { Kind: LiteralKind.Bool, Value: "false" })
                     .Select(x => filled[x.Index]).OrderBy(a => a.Span.Start).ToList();
-                string problem = KScript.Syntax.ParameterList.GroupProblem(display, names, group.First().Slot.GroupOptional, passed.Count);
+                // A variable or call may be null (a helper passing its own post: $post, put: $put straight on), so two
+                // members are only an error here when both are values; the interpreter checks the rest when it runs.
+                var passed = given.Where(a => a.Value is LiteralNode or ListNode or MapNode or LambdaNode).ToList();
+                string problem = given.Count == 0
+                    ? KScript.Syntax.ParameterList.GroupProblem(display, names, group.First().Slot.GroupOptional, 0)
+                    : passed.Count > 1 ? KScript.Syntax.ParameterList.GroupProblem(display, names, group.First().Slot.GroupOptional, passed.Count) : null;
                 if (problem == null) continue;
                 ArgumentNode extra = passed.Count > 1 ? passed[1] : null;
                 Report(extra != null ? region.Source.ToSource(extra.Name != null ? extra.NameSpan : extra.Span) : callSpan, DiagnosticSeverity.Error,
