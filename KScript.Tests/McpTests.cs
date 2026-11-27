@@ -414,6 +414,28 @@ public sealed class McpTests : IDisposable
         Assert.True(Call(server, "lookup").IsError);
     }
 
+    [Fact]
+    public void Models_mixins_and_scopes_are_found_and_looked_up()
+    {
+        // #211: search_docs found nothing for "mixin" or "SoftDeletable", and lookup <model> said nothing about extends or scopes.
+        McpServer server = Server();
+        Assert.Contains("kscript://docs/guide/data/built-in-models-and-mixins", Call(server, "search_docs", new { query = "mixin", limit = 3 }).Text);
+        Assert.Contains("kscript://docs/guide/data/built-in-models-and-mixins", Call(server, "search_docs", new { query = "SoftDeletable", limit = 3 }).Text);
+        Assert.Contains("kscript://docs/guide/data/queries#scopes", Call(server, "search_docs", new { query = "model scope", limit = 3 }).Text);
+        Assert.Contains("kscript://docs/guide/data/models#extending-models", Call(server, "search_docs", new { query = "extends model", limit = 3 }).Text);
+
+        string model = Call(server, "lookup", new { name = "<model>" }).Text;
+        Assert.Contains("extends [UID, Publishable(timestamps: false)]", model);
+        Assert.Contains("It keeps its own `table`, `connection` and `auto_create`", model);
+        Assert.Contains("kscript://docs/guide/data/queries#scopes", model);
+        Assert.Contains("lookup Ownable", model);
+
+        var (ownable, error) = Call(server, "lookup", new { name = "Ownable" });
+        Assert.False(error);
+        Assert.StartsWith("# Ownable\n\nPackage: KScript.Auth\n\nA built-in mixin", ownable);
+        Assert.Contains("fn mine(query", ownable);
+    }
+
     #endregion
 
     #region Tools: make, check, format, convert, run
