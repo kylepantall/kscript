@@ -1,0 +1,10 @@
+// Bookmarks for the imported-records test: a library function returns a record
+// whose list field holds records with methods of their own.
+import "../types/bookmark.kscript"
+import "../types/link.kscript"
+
+/// The bookmark with this title.
+fn find(title: string) => Bookmark(
+  title: $title,
+  links: [Link(url: 'https://example.com/a'), Link(url: 'http://example.org')]
+)

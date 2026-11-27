@@ -1,0 +1,7 @@
+import "link.kscript"
+
+/// A titled list of links.
+type Bookmark {
+  title: string
+  links: Link[] = []
+}

@@ -1,0 +1,7 @@
+/// A link saved on a bookmark.
+type Link {
+  url: string
+
+  /// The address without its scheme, for showing.
+  fn address() => $url->replace(/^https?:\/\//, '')
+}
