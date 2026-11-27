@@ -141,6 +141,18 @@ namespace KScript.Language.Tests
             Assert.Contains("data", FieldsAfter(board, "@on-event(title = $event."));
         }
 
+        [Theory]
+        [InlineData("@on-click(title = $event.value) @on-drop(title = $event.drag_value)")]
+        [InlineData("@on-dblclick(title = 'x') @on-drop(title = $event.drag_value)")]
+        [InlineData("@on-drop(title = $event.drag_value) @on-click(title = $event.value)")]
+        [InlineData("@on-click(title = $event.key) @on-dragend(title = \"{$event.vx}\") @on-sort(moved = $event.order)")]
+        public void Each_handler_on_a_tag_gets_its_own_event(string handlers)
+        {
+            // #205: the second handler's $event was typed as the first one's.
+            var board = Write("Board", "<div " + handlers + ">x</div>\n<span @drag(copy: true, value: 'a')>a</span>");
+            TestHelpers.AssertClean(board.Analysis);
+        }
+
         [Fact]
         public void A_field_the_event_does_not_have_is_reported()
         {

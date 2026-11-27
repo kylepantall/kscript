@@ -174,8 +174,12 @@
         {
           "match": "(?<![\\w$@.-])(extends)(?![\\w-])(?:[ \\t]+([A-Z]\\w*))?",
           "captures": {
-            "1": { "name": "storage.modifier.kscript" },
-            "2": { "name": "entity.name.type.kscript" }
+            "1": {
+              "name": "storage.modifier.kscript"
+            },
+            "2": {
+              "name": "entity.name.type.kscript"
+            }
           }
         },
         {
@@ -244,6 +248,9 @@
     },
     "expression": {
       "patterns": [
+        {
+          "include": "#namedArgument"
+        },
         {
           "name": "keyword.control.kscript",
           "match": "(?<![\\w$@.-])(try|catch)(?![\\w-])"
@@ -1053,6 +1060,18 @@
           "include": "#expression"
         }
       ]
+    },
+    "namedArgument": {
+      "comment": "A named argument or map key: @range(step: 2), @on-click(call: $add, with: [...]), { name: 'x' }. Not a typed parameter (a: int), which typeAnnotation colours.",
+      "match": "(?<=[(,{])\\s*([A-Za-z_]\\w*)\\s*(:)(?![:=])(?!\\s*(?!(?:not|true|false|null|yes|no)\\b)((?:string|int|float|number|bool|list|map|fn|date|any|email|password|handle|uuid|regex|url|domain|ip|cidr|mac|port|slug|slash_path|semver|mime|hex|base64|jwt|json|phone|country|currency|locale|timezone|duration|date_format|cron|color|iban|card)(?![\\w-])|[A-Z]\\w*)(?=\\s*(?:\\(|\\[\\]|\\?|=|,|\\)|$|from\\b|=>|;|\\}|//)))",
+      "captures": {
+        "1": {
+          "name": "entity.other.attribute-name.kscript"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.kscript"
+        }
+      }
     }
   }
 }
