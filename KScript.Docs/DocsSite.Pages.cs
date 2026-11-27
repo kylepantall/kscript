@@ -11,7 +11,7 @@ namespace KScript.Docs
         {
             var sb = new StringBuilder();
             sb.Append("<div class=\"hero\"><h1>KScript</h1><p class=\"lead\">A small scripting language for automating your computer, building web pages and APIs, and making desktop apps. Scripts are XML or the brace-style <code>.kscript</code> format, and both run on Windows, macOS and Linux.</p>");
-            sb.Append("<p class=\"hero-links\"><a class=\"button primary\" href=\"/guide/getting-started\">Get started</a><a class=\"button\" href=\"/reference\">Reference</a><a class=\"button\" href=\"/playground\">Playground</a></p></div>");
+            sb.Append("<p class=\"hero-links\"><a class=\"button primary\" href=\"/guide/getting-started\">Get started</a><a class=\"button\" href=\"/guide\">Contents</a><a class=\"button\" href=\"/reference\">Reference</a><a class=\"button\" href=\"/playground\">Playground</a></p></div>");
             sb.Append("<h2 id=\"try-it\">Try it</h2><p>Every example marked <em>Run</em> can be edited and run right here. It runs on your computer, in a sandbox: its own empty folder, no network, and a time limit. Switch between XML and <code>.kscript</code> to see the same script in both formats.</p>");
             sb.Append(Html.Try(HelloExample));
             sb.Append("<h2 id=\"guides\">Guides</h2><div class=\"cards\">");

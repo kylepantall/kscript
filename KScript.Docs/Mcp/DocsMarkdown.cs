@@ -72,6 +72,7 @@ namespace KScript.Docs.Mcp
             if (path == "/cli/make") return MakeCommands();
             if (path == "/reference") return ReferenceIndex(format);
             if (path == "/reference/variables") return Variables(Catalog.BuiltInVariables.Keys);
+            if (Site.Find(path)?.Markdown is string generated) return generated;
             if (path.StartsWith("/reference/methods/", StringComparison.Ordinal))
             {
                 string type = Catalog.MemberTypes.FirstOrDefault(t => DocsSite.TypeSlug(t) == path);
