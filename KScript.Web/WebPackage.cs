@@ -36,7 +36,7 @@ namespace KScript.Web
             });
             Page(p, new ElementInfo("placeholder", "What a lazy or deferred live component shows before it loads.", ContentKind.Markup)
             {
-                Example = "<live id=\"stats\" lazy>\n  <placeholder><p>Loading the numbers…</p></placeholder>\n  <state name=\"visits\" value=\"@visits_today()\" />\n  <p>{$visits} visits today</p>\n</live>",
+                Example = "<live id=\"report\" lazy>\n  <placeholder><p>Loading the report…</p></placeholder>\n  <state name=\"day\" value=\"@today()\" />\n  <p>The report for {$day}</p>\n</live>",
                 Context = ElementContext.Page,
                 MustBeInside = new[] { "live" },
             });
