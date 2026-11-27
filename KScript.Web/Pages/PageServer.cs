@@ -734,8 +734,7 @@ namespace KScript.Pages
                 // An ordinary form post: $request.body keeps the text as sent, and the fields are read from it.
                 using var reader = new StreamReader(request.Body, Encoding.UTF8);
                 body = await reader.ReadToEndAsync();
-                using var fields = new Microsoft.AspNetCore.WebUtilities.FormReader(body);
-                foreach (var kv in await fields.ReadFormAsync(request.HttpContext.RequestAborted)) form[kv.Key] = RequestValue(kv.Value);
+                foreach (var kv in UrlEncodedForm(body)) form[kv.Key] = kv.Value;
             }
             else if (readBody == null && (request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding") ||
                      request.HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true))
@@ -762,9 +761,24 @@ namespace KScript.Pages
             return built;
         }
 
-        private static bool IsUrlEncodedForm(HttpRequest request) =>
-            System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(request.ContentType, out var type) &&
+        private static bool IsUrlEncodedForm(HttpRequest request) => IsUrlEncodedForm(request.ContentType);
+
+        /// <summary>Whether a Content-Type header names an ordinary form post (application/x-www-form-urlencoded).</summary>
+        public static bool IsUrlEncodedForm(string contentType) =>
+            System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(contentType, out var type) &&
             string.Equals(type.MediaType, "application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// The fields of an ordinary form post body (<c>name=Ann&amp;tag=a&amp;tag=b</c>), as $request.form holds them:
+        /// text, or a list of texts for a name sent more than once. kscript serve and in-process @api both read forms here.
+        /// </summary>
+        public static Dictionary<string, object> UrlEncodedForm(string body)
+        {
+            var form = new Dictionary<string, object>();
+            using var fields = new Microsoft.AspNetCore.WebUtilities.FormReader(body ?? string.Empty);
+            foreach (var kv in fields.ReadForm()) form[kv.Key] = RequestValue(kv.Value);
+            return form;
+        }
 
         /// <summary>A query or form value: text, or a list of texts when the name was sent more than once (?tag=a&amp;tag=b).</summary>
         internal static object RequestValue(Microsoft.Extensions.Primitives.StringValues values) =>
