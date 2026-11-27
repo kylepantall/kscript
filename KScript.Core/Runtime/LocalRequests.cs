@@ -28,12 +28,35 @@ namespace KScript.Runtime
         /// </summary>
         public static Func<KScriptHost, string, Dictionary<string, object>, LocalResponse> Handler { get; set; }
 
+        /// <summary>
+        /// A request key: when it is set and no route of the app matches, <see cref="Handler"/> answers null instead of a
+        /// 404, so the caller (@visit) can look for a file page there instead.
+        /// </summary>
+        public const string RoutesOnlyKey = "KScript.LocalRequests.RoutesOnly";
+
         /// <summary>Sends a request to the app the script in <paramref name="folder"/> belongs to.</summary>
         public static LocalResponse Send(KScriptHost host, string folder, Dictionary<string, object> request)
         {
             if (Handler == null) PackageRegistry.Default.Get("KScript.Http");
             if (Handler == null)
                 throw new KScriptException("A path such as '/api/notes' is a request to this app, which needs KScript.Http, and it isn't installed. Give a full http:// address instead.", "Network");
+            return Nested(host, folder, request);
+        }
+
+        /// <summary>
+        /// Like <see cref="Send"/>, but null when KScript.Http isn't installed or no route of the project answers the
+        /// path: @visit('/') then renders a file page.
+        /// </summary>
+        public static LocalResponse TrySendToRoutes(KScriptHost host, string folder, Dictionary<string, object> request)
+        {
+            if (Handler == null) PackageRegistry.Default.Get("KScript.Http");
+            if (Handler == null) return null;
+            request[RoutesOnlyKey] = true;
+            return Nested(host, folder, request);
+        }
+
+        private static LocalResponse Nested(KScriptHost host, string folder, Dictionary<string, object> request)
+        {
             if (depth.Value >= MaxDepth)
                 throw new KScriptException($"Requests to this app are nested more than {MaxDepth} deep. Does a route call itself with @api()?", "Network");
             depth.Value++;

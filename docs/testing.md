@@ -181,7 +181,7 @@ Use it for scripts that do their work at the top level or call `exit`. A test th
 
 ### Pages
 
-`@visit(path)` (from KScript.Web) renders a page of the project as a browser gets it: the site is `serve.root` in the nearest kscript.json. Its live handlers run on the server as they would in a browser, so a test can click through a page:
+`@visit(path)` (from KScript.Web) renders a page of the project as a browser gets it, the way `kscript serve` answers it: the project's routes first (a `view:` route, or a controller that returns `@view(...)`, with their middleware), then the file pages under `serve.root` in the nearest kscript.json. Its live handlers run on the server as they would in a browser, so a test can click through a page:
 
 - `->click(text)` runs the on-click handler of the button or link with that text (or `aria-label` or `title`).
 - `->change(text)` runs the on-change handler of the input whose `<label>` has that text, such as a checkbox.
@@ -189,6 +189,23 @@ Use it for scripts that do their work at the top level or call `exit`. A test th
 - `.text` is the words on the page, `.html` its HTML, and `->classes(text)` the classes of the element whose own text that is.
 
 Each of these returns the page, so they chain. A page that isn't there is a `NotFound` error.
+
+A visit to a route keeps the cookies the app sets (a guest cookie, the session) for its clicks, and follows redirects as a browser does: `.path` is where it ended up. `@acting_as()` signs the visit in, as it does for `@api(/...)`, and `@visit(path, { headers: { Cookie: 'guest=abc' } })` sends headers of its own (`bearer:` sends a token):
+
+```kscript
+import KScript.Web
+import KScript.Auth
+
+test(name: "a guest is sent to sign in") {
+  expect(@visit('/account').path, equals: '/login')
+}
+
+test(name: "the account page makes a token") {
+  @acting_as(@register('ada@example.test', 'correct-horse-battery-9'))
+  page = @visit('/account')->fill('name', 'laptop')->submit('Make a token')
+  expect($page.text, contains: 'Your new token is')
+}
+```
 
 ```kscript
 import KScript.Web
