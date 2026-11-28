@@ -648,20 +648,21 @@ A name in `catch` or `throw` that is neither declared nor built in still works (
 
 ## Settings: $config
 
-In the editor, hover over a project JSON or YAML setting such as `$config.passkeys.url` to see its type. Go to Definition on `url` opens the key in the project file that supplies it. This also works inside interpolated strings such as `"{$config.passkeys.url}/{$kind}/finish"`. Go to Definition on `$kind` opens the variable or parameter declaration.
+`$config` holds the app's own settings, such as its name, its database and its cache. Every script, page, route and test can read it without an import. The settings live in one place: the `config` section of `kscript.json`.
 
-Every script can read settings through `$config` without an import. For example, a project that lists `config.yaml` under `config.files` can read these settings:
-
-```yaml
-# config.yaml
-database:
-  host: localhost
-  port: 5432
-features: [search, cart]
+```json
+{
+  "name": "shop",
+  "config": {
+    "app": { "name": "Shop" },
+    "database": { "connections": { "main": { "url": "sqlite:data/shop.sqlite" } } },
+    "features": ["search", "cart"]
+  }
+}
 ```
 
 ```kscript
-echo "{$config.database.host}:{$config.database.port}"
+echo $config.app.name
 timeout = $config->get('http.timeout', 30) // a path, and a default when it isn't set
 if $config->has('features') {
   echo "{ $config.features->join(', ') }"
@@ -669,56 +670,57 @@ if $config->has('features') {
 key = $config->require('api.key') // stops with a clear message when it's missing
 ```
 
-Money arithmetic reads directed exchange rates from `money.exchange_rates` in these settings. For example, `money.exchange_rates.EUR.GBP` supplies pounds per euro when adding a euro amount to a pound balance. See [Money](types.md#money) for the configuration and a runnable example.
+A setting that isn't there is `null`, so `$config.port ?? 8080` works. Names don't depend on case, so `$config.app.name` and `$config.APP.NAME` are the same setting. In the editor, hovering over `$config.app.name` shows its type, and Go to Definition opens the key in the file that supplies it, inside interpolated strings too.
 
-**Project sources.** List settings files in the manifest. Without `config.files`, a project loads optional `.env` and its environment variant. Standalone scripts outside a project also support the existing `config.json` and `config.yaml` discovery.
+Packages read their own parts of `$config`: KScript.Data reads `database`, KScript.Cache reads `cache`, `$log` reads `logging`, translations read `i18n`, and money arithmetic reads `money.exchange_rates` (see [Money](types.md#money)).
 
-```json
+**Environments.** The same app often needs other settings in another place: an in-memory database for tests, or a real server in production. Put those in `kscript.<env>.json` beside `kscript.json`. Its `config` section is laid over the one in `kscript.json`, and maps merge field by field, so it only needs the settings that change:
+
+```jsonc
+// kscript.test.json
 {
-  "config": { "files": ["config/config.kscript", ".env?"] }
-}
-```
-
-A config script exports `configure(environment)`. The loader calls it with the selected environment, or `development` when none is set. The function returns a map. Its values keep their KScript types, and paths inside the script resolve from its own folder.
-
-```kscript
-fn configure(environment: string) {
-  return {
-    http: { timeout: $environment == 'production' ? 8s : 30s }
-    name: @env('APP_NAME', default: 'My app')
+  "config": {
+    "database": { "connections": { "main": { "url": "sqlite::memory:" } } }
   }
 }
 ```
 
-The app sees the returned fields through `$config`. The configuration script can use `@env()`, `$env`, and imported functions or packages. It can load data with `@read_yaml()` from KScript.IO. `$config` becomes available to the app once configuration has finished loading.
+Choose the environment with `kscript --env staging script.kscript` or `KSCRIPT_ENV=staging`. `kscript test` uses `test.env` from `kscript.json` (see [Testing](testing.md)). `$config->environment()` gives the environment, or null when none is chosen. An environment's file holds only a `config` section: everything else belongs in `kscript.json`.
 
-**YAML expressions.** To use YAML as a config source, set `"files": ["settings.yaml", ".env?"]`. Quoted scalars can contain KScript expressions in `{ }`. A whole expression keeps its type. An expression surrounded by text is interpolated. `{{` and `}}` emit literal braces. Use the explicit `!kscript` tag for a whole expression and quote the braces when the expression contains YAML punctuation.
-
-```yaml
-http:
-  timeout: !kscript { 8s }
-  retries: '{ $environment == "production" ? 2 : 0 }'
-  label: 'api-{ $environment }-{{literal}}'
-```
-
-YAML expressions can use `$environment`, `$env`, and Core functions such as `@env()`. Files read directly with `@read_yaml()` are plain data.
-
-**Environments.** Select one with `kscript --env staging script.kscript`, `KSCRIPT_ENV=staging`, or the manifest's `config.environment`. The loader applies named base files in order, then matching variants such as `config.staging.kscript`, `settings.staging.yaml` and `.env.staging`. Optional user settings and prefixed process environment variables apply last. Maps merge field by field.
-
-**Environment variables.** With a prefix, variables override the files, and `__` nests: with `config(prefix: APP_)`, `APP_DATABASE__HOST=db.internal` sets `database.host`. Names don't depend on case, so `$config.database.host` and `$config.DATABASE.HOST` are the same setting. Values such as `true`, `false` and `8080` become booleans and numbers.
-
-**.env files** hold `NAME=value` lines, with `#` comments, `export` in front if you like, `'single quotes'` taken as written, and `"double quotes"` that allow `\n` and can span lines. `${NAME}` and `${NAME:-default}` use another variable, in .env files and in text in JSON and YAML files. Values from .env files also become environment variables unless one is already set, so `@env('ANTHROPIC_API_KEY')` and KScript.AI find a key kept in `.env`.
-
-**`config`** reads the settings again with other options. Without `into`, it changes `$config`:
+**Settings that need code: config.kscript.** JSON can't read an environment variable or work something out. For those settings, add `config.kscript` beside `kscript.json` (`config.ks.xml` in an XML project). It defines `configure(environment)`, which gets the environment (or `development` when none is chosen) and returns a map. That map is laid over the JSON settings, so it only needs the settings that need code:
 
 ```kscript
-config(env: "production", prefix: "SHOP_", files: ['settings', 'secrets.yaml?', '.env'], root: "conf", defaults: { server: { port: 8080 } }, require: ['database.host', 'api.key'])
-config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
+// config.kscript
+fn configure(environment: string) {
+  url = @env('DATABASE_URL', default: '')
+  return {
+    database: { connections: { main: $url->is_blank() ? {} : { url: $url } } }
+    http: { timeout: $environment == 'production' ? 8s : 30s }
+  }
+}
 ```
 
-`files` lists the base files (a name without an extension means .json, .yaml and .yml, and a name ending in `?` may be missing). `$config->environment()` gives the environment, `$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `$text->yaml()`, `$value->to_yaml()` and `@parse_env(text)` work on text, and KScript.IO adds `@read_yaml(path)`, `@read_env(path)` and `@write_yaml(path, value)`.
+The values keep their KScript types, so `8s` stays a duration. The script can use `@env()`, `$env`, imported files and packages such as KScript.IO, and paths in it start from its own folder. It runs once, the first time a script reads `$config`, and it can't read `$config` itself. `kscript make config base` writes a starting `config.kscript`, and `kscript make config staging` writes `kscript.staging.json`.
 
-Pages served by `kscript serve` read project settings and can use `@env()` for configured .env values. They leave the process environment alone, and `kscript serve` never serves `config.*` files or any `.yaml`, `.yml` or `.env` file. Keep secrets in `.env` or in YAML, because a JSON file named after an environment (such as `staging.json`) is served like any other file.
+The layers, later ones winning: the `config` section of `kscript.json`, then `kscript.<env>.json`, then `config.kscript`. A script outside a project reads `config.kscript` from its own folder.
+
+**.env files** keep secrets out of the project's files. `.env` (and `.env.<env>` for an environment) beside `kscript.json` holds `NAME=value` lines, with `#` comments, `export` in front if you like, `'single quotes'` taken as written, and `"double quotes"` that allow `\n` and can span lines. `${NAME}` and `${NAME:-default}` use another variable. The values are read with `@env('NAME')`, usually in `config.kscript`, and they also become environment variables unless one is already set, so KScript.AI finds `ANTHROPIC_API_KEY` in `.env`. Keep `.env` files out of git.
+
+**The person's own settings.** A desktop app can let the person change a setting without touching the project: with `"app": { "user_config": true }` in `kscript.json`, `config.json` in the app's config folder is laid over everything else (see [App folders](storage.md)).
+
+**`config`** reads settings again with other options, or reads another set of settings into a variable. Without `into`, it changes `$config`:
+
+```kscript
+config(env: "production")
+config(files: ['themes/dark.json'], into: theme) // a separate set of settings in $theme
+config(files: ['settings.json', 'secrets.kscript?', '.env?'], prefix: "SHOP_", defaults: { server: { port: 8080 } }, require: ['database.host'])
+```
+
+`files` lists other files to read instead of the project's: JSON files of settings, config scripts and `.env` files, in order, each followed by its version for the environment (`settings.staging.json`). A name without an extension means its `.json` file, and a name ending in `?` may be missing. With `prefix`, environment variables override the files and `__` nests: `SHOP_DATABASE__HOST=db.internal` sets `database.host`, and values such as `true`, `false` and `8080` become booleans and numbers. `root` is the folder the files are in, `defaults` fills in settings no file sets, `require` lists settings that must be set, and `user: true` also reads the person's own settings.
+
+`$config->sources()` lists the files that were read, `$config->all()` gives every setting as a map, and `$config->reload()` reads them again. `@parse_env(text)` parses .env text, and KScript.IO adds `@read_env(path)`.
+
+`kscript serve` never serves `kscript.json`, `kscript.<env>.json`, scripts, `.env` files, or `config.*` JSON files. Pages read the project's settings and can use `@env()` for values in its `.env` files, but they leave the process environment alone.
 
 ## Logging: $log
 
@@ -744,24 +746,21 @@ try {
 
 Levels are `trace`, `debug`, `info`, `warn`, `error` and `fatal`. **Providers** decide where entries go, and are usually set in config:
 
-```yaml
-# config.yaml
-logging:
-  level: info                 # the lowest level written (default info)
-  levels:
-    db: debug                 # per category; db also covers db.queries
-  providers:
-    - type: console           # stderr, coloured at a terminal; stream: stdout, format: json, time: HH:mm:ss.fff
-      level: warn
-    - type: file              # text, or json lines; roll: daily writes app-2026-11-20.log
-      path: logs/app.log
-      format: json
-    - fn: notify              # a fn in the script, called with each entry
-      level: error
-    - type: http              # from KScript.Net: POSTs entries as JSON, batch at a time
-      url: https://logs.example.com/ingest
-      headers: { Authorization: "Bearer ${LOG_TOKEN}" }
-      batch: 20
+```jsonc
+// kscript.json
+{
+  "config": {
+    "logging": {
+      "level": "info",              // the lowest level written (default info)
+      "levels": { "db": "debug" },  // per category; db also covers db.queries
+      "providers": [
+        { "type": "console", "level": "warn" },                  // stderr, coloured at a terminal; stream: stdout, format: json, time: HH:mm:ss.fff
+        { "type": "file", "path": "logs/app.log", "format": "json" }, // text, or json lines; roll: daily writes app-2026-11-20.log
+        { "fn": "notify", "level": "error" }                     // a fn in the script, called with each entry
+      ]
+    }
+  }
+}
 ```
 
 `log_provider(…)` adds one from a script, with the same options (`replace` removes the ones already set up, including the default console one). A `memory` provider keeps entries for `$log->entries()`, which is handy in tests. Entries that a provider holds back, such as an http batch, are sent when the script ends or on `$log->flush()`. A provider that fails is reported once on stderr, and the others carry on.

@@ -5,7 +5,7 @@ using KScript.Runtime;
 
 namespace KScript.Tests;
 
-/// <summary>$config, &lt;config&gt;, YAML and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
+/// <summary>$config, &lt;config&gt;, YAML text and .env. Tests in one class run one at a time, so the environment variables they set don't collide.</summary>
 public sealed class ConfigTests : IDisposable
 {
     private readonly string dir = Path.Combine(Path.GetTempPath(), "kscript-config-" + Guid.NewGuid().ToString("N"));
@@ -50,16 +50,59 @@ public sealed class ConfigTests : IDisposable
         Assert.Throws<KScriptException>(() => Run(body, options, setup));
 
     [Fact]
-    public void Projects_without_config_files_only_load_dotenv()
+    public void Projects_read_the_config_section_of_kscript_json_and_dotenv_feeds_env()
     {
         string key = Unique("FROM_ENV");
-        FileOf("kscript.json", "{}");
+        FileOf("kscript.json", """{ "name": "shop", "config": { "app": { "name": "Shop" }, "port": 8080 } }""");
         FileOf("config.yaml", "ignored: true");
+        FileOf("config.json", """{ "ignored": true }""");
         FileOf(".env", $"{key}=ready\n");
-        string output = Run($"<echo>{{@env('{key}')}} {{$env.{key}}} {{$config.ignored ?? 'absent'}}</echo>",
+        string output = Run($"<echo>{{@env('{key}')}} {{$env.{key}}} {{$config.app.name}} {{$config.port + 1}} {{$config.ignored ?? 'absent'}} {{$config.{key} ?? 'not in config'}}</echo>",
             setup: host => host.FileRoot = dir);
-        Assert.Equal("ready ready absent\n", output);
+        Assert.Equal("ready ready Shop 8081 absent not in config\n", output);
         Assert.Null(Environment.GetEnvironmentVariable(key));
+    }
+
+    [Fact]
+    public void Environment_files_lay_their_config_section_over_kscript_json()
+    {
+        FileOf("kscript.json", """{ "config": { "db": { "host": "localhost", "port": 5432 }, "level": "debug" } }""");
+        FileOf("kscript.stage.json", """{ "$schema": "x", "config": { "db": { "host": "stage-db" } } }""");
+        FileOf(".env", "TOKEN=base\n");
+        FileOf(".env.stage", "TOKEN=stage\n");
+        string output = Run("<echo>{$config->environment()} {$config.db.host}:{$config.db.port} {$config.level}</echo>" +
+            "<for each=\"s\" in=\"$config->sources()\"><echo>{$s.name} {$s.kind}</echo></for>",
+            new ConfigOptions { Environment = "stage", ExportEnv = false });
+        Assert.Equal("stage stage-db:5432 debug\nkscript.json file\nkscript.stage.json file\n.env env-file\n.env.stage env-file\n", output);
+        Assert.Equal("localhost\n", Run("<echo>{$config.db.host}</echo>", new ConfigOptions { ExportEnv = false }));
+
+        FileOf("kscript.bad.json", """{ "config": {}, "serve": { "port": 1 } }""");
+        Assert.Contains("kscript.bad.json can only hold a \"config\" section", Fails("<echo>{$config.db}</echo>", new ConfigOptions { Environment = "bad" }).Message);
+        FileOf("kscript.list.json", """{ "config": [1] }""");
+        Assert.Contains("The \"config\" section of kscript.list.json should hold settings by name", Fails("<echo>{$config.db}</echo>", new ConfigOptions { Environment = "list" }).Message);
+        FileOf("kscript.text.json", "[]");
+        Assert.Contains("kscript.text.json should hold an object", Fails("<echo>{$config.db}</echo>", new ConfigOptions { Environment = "text" }).Message);
+    }
+
+    [Fact]
+    public void Config_kscript_is_laid_over_the_json_settings()
+    {
+        string key = Unique("SECRET");
+        FileOf("kscript.json", """{ "config": { "app": { "name": "Shop", "debug": true }, "key": "none" } }""");
+        FileOf("kscript.production.json", """{ "config": { "app": { "debug": false } } }""");
+        FileOf(".env", $"{key}=from-env\n");
+        FileOf("config.kscript", $$"""
+            fn configure(environment: string) {
+              return { key: @env('{{key}}'), timeout: $environment == 'production' ? 8s : 30s }
+            }
+            """);
+        Assert.Equal("Shop false from-env duration 8s\n", Run(
+            "<echo>{$config.app.name} {$config.app.debug} {$config.key} {$config.timeout->type()} {$config.timeout}</echo>",
+            new ConfigOptions { Environment = "production", ExportEnv = false }));
+        Assert.Equal("true 30s\n", Run("<echo>{$config.app.debug} {$config.timeout}</echo>", new ConfigOptions { ExportEnv = false }));
+        Assert.True(ConfigLoader.IsConfiguredScript(new ConfigOptions { Root = dir }, Path.Combine(dir, "config.kscript")));
+        Assert.False(ConfigLoader.IsConfiguredScript(new ConfigOptions { Root = dir }, Path.Combine(dir, "other.kscript")));
+        Assert.False(ConfigLoader.IsConfiguredScript(new ConfigOptions(), Path.Combine(dir, "config.kscript")));
     }
 
     [Fact]
@@ -72,49 +115,33 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
-    public void Manifest_config_script_uses_the_environment_and_can_read_local_yaml()
+    public void Config_scripts_listed_in_files_use_the_environment_and_can_read_local_files()
     {
         string key = Unique("TIMEOUT_LABEL");
-        FileOf("kscript.json", """{"config":{"files":["settings/config.kscript",".env?"],"environment":"production"}}""");
         FileOf(".env", $"{key}=live\n");
-        FileOf("settings/limits.yaml", "retries: 2");
+        FileOf("settings/limits.json", """{ "retries": 2 }""");
         FileOf("settings/config.kscript", $$"""
             import KScript.IO
             fn configure(environment: string) {
               return {
                 timeout: $environment == 'production' ? 8s : 30s
                 label: @env('{{key}}')
-                limits: @read_yaml('limits.yaml')
+                limits: @read_json('limits.json')
               }
             }
             """);
         Assert.Equal("duration 8s live 2\n", Run(
+            "<config files=\"settings/config.kscript, .env?\" env=\"production\" />" +
             "<echo>{$config.timeout->type()} {$config.timeout} {$config.label} {$config.limits.retries}</echo>",
             setup: host => host.FileRoot = dir));
+        Assert.True(ConfigLoader.IsConfiguredScript(new ConfigOptions { Root = dir, Files = new List<string> { "settings/config.kscript" } }, Path.Combine(dir, "settings", "config.staging.kscript")));
         Assert.Null(Environment.GetEnvironmentVariable(key));
-    }
-
-    [Fact]
-    public void Explicit_yaml_supports_expressions_and_literal_braces()
-    {
-        string key = Unique("LITERAL");
-        Env(key, "{ $missing }");
-        FileOf("kscript.json", """{"config":{"files":["app.yaml"],"environment":"production"}}""");
-        FileOf("app.yaml", """
-            timeout: !kscript { 8s }
-            retries: '{ $environment == "production" ? 2 : 0 }'
-            label: 'api-{ $environment }-{{literal}}'
-            external: '${TEST_ENV_NAME}'
-            map: { enabled: true }
-            """.Replace("TEST_ENV_NAME", key, StringComparison.Ordinal));
-        Assert.Equal("duration 8s 2 api-production-{literal} { $missing } true\n",
-            Run("<echo>{$config.timeout->type()} {$config.timeout} {$config.retries} {$config.label} {$config.external} {$config.map.enabled}</echo>"));
     }
 
     [Fact]
     public void Failed_config_reload_preserves_the_previous_settings()
     {
-        FileOf("kscript.json", """{"config":{"files":["config.kscript"]}}""");
+        FileOf("kscript.json", "{}");
         FileOf("config.kscript", "fn configure(environment: string) => { value: 42 }");
         Assert.Equal("42\n", Run("""
             <import package="KScript.IO" />
@@ -124,44 +151,28 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
-    public void Config_reads_json_yaml_and_env_files_from_the_script_folder()
+    public void Scripts_outside_a_project_read_config_kscript_and_dotenv_from_their_folder()
     {
-        FileOf("config.json", "{ \"name\": \"shop\", \"server\": { \"port\": 8080, \"host\": \"localhost\" } }");
-        FileOf("config.yaml", "server:\n  host: example.com\nfeatures: [search, cart]\n");
-        FileOf(".env", "API_KEY=abc123\nDEBUG=true\n");
-        string output = Run("<echo>{$config.name} {$config.server.host}:{$config.server.port} {$config.features[1]} {$config.api_key} {$config.DEBUG}</echo>",
-            new ConfigOptions { ExportEnv = false });
-        Assert.Equal("shop example.com:8080 cart abc123 true\n", output);
+        FileOf("config.json", "{ \"ignored\": true }");
+        FileOf("config.ks.xml", "<kscript><fn name=\"configure\" params=\"environment: string\"><return value=\"{ name: 'shop', key: @env('API_KEY') }\" /></fn></kscript>");
+        FileOf(".env", "API_KEY=abc123\n");
+        string output = Run("<echo>{$config.name} {$config.key} {$config.ignored ?? 'absent'}</echo>", new ConfigOptions { ExportEnv = false });
+        Assert.Equal("shop abc123 absent\n", output);
     }
 
     [Fact]
-    public void Environment_files_layer_over_the_base_files()
+    public void Listed_files_have_environment_versions()
     {
-        FileOf("config.yaml", "db:\n  host: localhost\n  port: 5432\nlevel: debug\n");
-        FileOf("config.stage.json", "{ \"level\": \"info\" }");
-        FileOf("stage.yaml", "db:\n  host: stage-db\n");
-        FileOf(".env", "TOKEN=base\n");
-        FileOf(".env.stage", "TOKEN=stage\n");
-        string output = Run("<echo>{$config->environment()} {$config.db.host}:{$config.db.port} {$config.level} {$config.token}</echo>" +
-            "<for each=\"s\" in=\"$config->sources()\"><echo>{$s.name} {$s.kind}</echo></for>",
-            new ConfigOptions { Environment = "stage", ExportEnv = false });
-        Assert.Equal("stage stage-db:5432 info stage\nconfig.yaml file\n.env env-file\nconfig.stage.json file\n.env.stage env-file\nstage.yaml file\n", output);
-    }
-
-    [Fact]
-    public void Kyles_example_names_staging_yaml_and_env_stage()
-    {
-        FileOf("staging.yaml", "theme: dark\n");
-        FileOf(".env.stage", "REGION=eu\n");
-        Assert.Equal("dark\n", Run("<config env=\"staging\" export_env=\"no\" /><echo>{$config.theme}</echo>"));
-        Assert.Equal("eu\n", Run("<config env=\"stage\" export_env=\"no\" /><echo>{$config.region}</echo>"));
+        FileOf("settings.json", "{ \"theme\": \"light\", \"size\": 1 }");
+        FileOf("settings.staging.json", "{ \"theme\": \"dark\" }");
+        Assert.Equal("dark 1\n", Run("<config files=\"settings\" env=\"staging\" export_env=\"no\" /><echo>{$config.theme} {$config.size}</echo>"));
     }
 
     [Fact]
     public void Prefixed_environment_variables_win_and_nest_with_double_underscores()
     {
         string prefix = Unique("APP_");
-        FileOf("config.yaml", "database:\n  host: localhost\n  port: 5432\n");
+        FileOf("kscript.json", """{ "config": { "database": { "host": "localhost", "port": 5432 } } }""");
         Env(prefix + "DATABASE__HOST", "db.internal");
         Env(prefix + "DATABASE__POOL__SIZE", "20");
         Env(prefix + "FEATURE", "false");
@@ -171,16 +182,15 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
-    public void Env_files_strip_the_prefix_and_values_can_refer_to_variables()
+    public void Env_file_values_can_refer_to_variables()
     {
-        string prefix = Unique("APP_");
         string home = Unique("HOME");
         Env(home, "/srv");
-        FileOf(".env", $"{prefix}DATA__DIR=${{{home}}}/data\nexport GREETING='Hello ${{NOT_EXPANDED}}'\nNAME=\"Ann\\nLee\" # a comment\nPLAIN=one two # comment\nEMPTY=\nFALLBACK=${{MISSING_{home}:-guest}}\n");
-        FileOf("config.yaml", $"paths:\n  logs: ${{{home}}}/logs\n");
-        string output = Run("<echo>{$config.data.dir}|{$config.greeting}|{$config.name}|{$config.plain}|{$config.empty}|{$config.fallback}|{$config.paths.logs}</echo>",
-            new ConfigOptions { Prefix = prefix, ExportEnv = false });
-        Assert.Equal("/srv/data|Hello ${NOT_EXPANDED}|Ann\nLee|one two||guest|/srv/logs\n", output);
+        FileOf(".env", $"DATA_DIR=${{{home}}}/data\nexport GREETING='Hello ${{NOT_EXPANDED}}'\nNAME=\"Ann\\nLee\" # a comment\nPLAIN=one two # comment\nEMPTY=\nFALLBACK=${{MISSING_{home}:-guest}}\n");
+        FileOf("config.kscript", "fn configure(environment: string) => { data: @env('DATA_DIR'), greeting: @env('GREETING'), name: @env('NAME'), plain: @env('PLAIN'), empty: @env('EMPTY'), fallback: @env('FALLBACK') }");
+        string output = Run("<echo>{$config.data}|{$config.greeting}|{$config.name}|{$config.plain}|{$config.empty}|{$config.fallback}</echo>",
+            new ConfigOptions { ExportEnv = false });
+        Assert.Equal("/srv/data|Hello ${NOT_EXPANDED}|Ann\nLee|one two||guest\n", output);
     }
 
     [Fact]
@@ -191,15 +201,16 @@ public sealed class ConfigTests : IDisposable
         Env(existing, "kept");
         variables.Add(fresh);
         FileOf(".env", $"{fresh}=from-file\n{existing}=replaced\n");
-        Assert.Equal("from-file kept\nfrom-file replaced\n", Run($"<echo>{{$config.{fresh}}} {{@env('{existing}')}}</echo><echo>{{@env('{fresh}')}} {{$config.{existing}}}</echo>"));
+        // Reading $config loads the .env files.
+        Assert.Equal("from-file kept\n", Run($"<do>$config->all()</do><echo>{{@env('{fresh}')}} {{@env('{existing}')}}</echo>"));
         Assert.Equal("from-file", Environment.GetEnvironmentVariable(fresh));
     }
 
     [Fact]
     public void Config_element_changes_files_defaults_and_requirements()
     {
-        FileOf("settings/app.yaml", "name: Shop\n");
-        FileOf("settings/app.production.yaml", "name: Shop (live)\n");
+        FileOf("settings/app.json", "{ \"name\": \"Shop\" }");
+        FileOf("settings/app.production.json", "{ \"name\": \"Shop (live)\" }");
         string output = Run("<config root=\"settings\" files=\"app, secrets.json?\" env=\"production\" defaults=\"{ name: 'x', port: 80 }\" require=\"name\" />" +
             "<echo>{$config.name} {$config.port} {$config->get('port')} {$config->get('missing', 'd')} {$config->all()->count()}</echo>");
         Assert.Equal("Shop (live) 80 80 d 2\n", output);
@@ -208,44 +219,45 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void Config_to_keeps_its_own_settings_and_leaves_config_alone()
     {
-        FileOf("config.yaml", "who: main\n");
-        FileOf("other.yaml", "who: other\n");
-        Assert.Equal("other main\n", Run("<config files=\"other.yaml\" into=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
+        FileOf("kscript.json", """{ "config": { "who": "main" } }""");
+        FileOf("other.json", "{ \"who\": \"other\" }");
+        Assert.Equal("other main\n", Run("<config files=\"other.json\" into=\"o\" /><echo>{$o.who} {$config.who}</echo>"));
     }
 
     [Fact]
     public void Methods_get_has_require_all_and_reload()
     {
-        FileOf("config.yaml", "servers:\n  - name: a\n  - name: b\nzero: 0\n");
+        FileOf("kscript.json", """{ "config": { "servers": [{ "name": "a" }, { "name": "b" }], "zero": 0 } }""");
         string output = Run("<import package=\"KScript.IO\" />" +
             "<echo>{$config->get('servers.1.name')} {$config->get('servers.5.name', 'none')} {$config->get('servers.x', 'bad')} {$config->has('zero')} {$config->has('nope')} {$config->require('zero')} {$config->all()->keys()->count()} {$config.nothing ?? 'null'}</echo>" +
-            "<do>@write_text('config.yaml', 'servers: []')</do><echo>{$config->reload()->get('servers')->count()}</echo>");
+            "<do>@write_text('kscript.json', '{ \"config\": { \"servers\": [] } }')</do><echo>{$config->reload()->get('servers')->count()}</echo>");
         Assert.Equal("b none bad true false 0 2 null\n0\n", output);
     }
 
     [Fact]
     public void Missing_settings_explain_where_to_set_them()
     {
-        FileOf("config.yaml", "a: 1\n");
-        Assert.Contains("'db.host' is required but not set. Add it to config.yaml or set APP_DB__HOST", Fails("<config prefix=\"APP_\" /><echo>{$config->require('db.host')}</echo>").Message);
-        Assert.Contains("'db.host' is required but not set. Add it to config.yaml.", Fails("<echo>{$config->require('db.host')}</echo>").Message);
-        Assert.Contains("These settings are required but not set: db.host, key. Add them to config.yaml, or set APP_DB__HOST, APP_KEY.", Fails("<config prefix=\"APP_\" require=\"db.host, key, a\" />").Message);
-        File.Delete(Path.Combine(dir, "config.yaml"));
-        Assert.Contains("Add them to config.yaml.", Fails("<config require=\"x\" />").Message);
+        FileOf("kscript.json", """{ "config": { "a": 1 } }""");
+        const string home = "the \"config\" section of kscript.json (or config.kscript)";
+        Assert.Contains($"'db.host' is required but not set. Add it to {home} or set APP_DB__HOST", Fails("<config prefix=\"APP_\" /><echo>{$config->require('db.host')}</echo>").Message);
+        Assert.Contains($"'db.host' is required but not set. Add it to {home}.", Fails("<echo>{$config->require('db.host')}</echo>").Message);
+        Assert.Contains($"These settings are required but not set: db.host, key. Add them to {home}, or set APP_DB__HOST, APP_KEY.", Fails("<config prefix=\"APP_\" require=\"db.host, key, a\" />").Message);
+        Assert.Contains("Add them to settings.json or more.kscript.", Fails("<config files=\"settings.json?, more.kscript?, .env?\" require=\"x\" />").Message);
+        Assert.Contains("Add them to a config file.", Fails("<config files=\".env?\" require=\"x\" />").Message);
     }
 
     [Fact]
     public void Bad_files_and_options_are_reported()
     {
         Assert.Contains("There is no config file 'app' or 'b.json'", Fails("<config files=\"app, b.json, , c?\" />").Message);
+        FileOf("app.yaml", "a: 1\n");
+        Assert.Contains("There is no config file 'app'", Fails("<config files=\"app\" />").Message);
         Assert.Contains("can only use letters", Fails("<config env=\"../x\" />").Message);
         Assert.Contains("needs a map", Fails("<config defaults=\"[1]\" />").Message);
-        FileOf("list.yaml", "- 1\n- 2\n");
-        Assert.Contains("list.yaml should hold settings by name", Fails("<config files=\"list.yaml\" />").Message);
+        FileOf("list.json", "[1, 2]");
+        Assert.Contains("list.json should hold settings by name", Fails("<config files=\"list.json\" />").Message);
         FileOf("bad.json", "{ nope");
         Assert.Contains("bad.json: Not valid JSON", Fails("<config files=\"bad.json\" />").Message);
-        FileOf("bad.yaml", "a: [1, 2\n");
-        Assert.Contains("Not valid YAML (bad.yaml, line", Fails("<config files=\"bad.yaml\" />").Message);
         FileOf("bad.env", "this is not a setting\n");
         Assert.Contains("bad.env line 1: expected NAME=value", Fails("<config files=\"bad.env\" />").Message);
     }
@@ -253,10 +265,13 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void Empty_files_and_a_whole_config_as_text()
     {
-        FileOf("config.yaml", "");
-        FileOf("config.json", "{ \"a\": { \"b\": 1 } }");
+        FileOf("kscript.json", "{ \"config\": { \"a\": { \"b\": 1 } } }");
+        FileOf("empty.json", "null");
         Assert.Equal("{\n  \"a\": {\n    \"b\": 1\n  }\n}\n", Run("<echo>{$config}</echo>"));
-        Assert.Equal("config.json config.yaml\n", Run("<echo>{ $config->sources()->map(fn(s) => $s.name)->join(' ') }</echo>"));
+        Assert.Equal("kscript.json\n", Run("<echo>{ $config->sources()->map(fn(s) => $s.name)->join(' ') }</echo>"));
+        FileOf("kscript.json", "{}");
+        Assert.Equal("{}\n", Run("<echo>{$config}</echo>"));
+        Assert.Equal("empty.json\n", Run("<config files=\"empty.json\" /><echo>{ $config->sources()->map(fn(s) => $s.name)->join(' ') }</echo>"));
     }
 
     [Fact]
@@ -265,7 +280,8 @@ public sealed class ConfigTests : IDisposable
         string name = Unique("SANDBOXED");
         variables.Add(name);
         FileOf(".env", $"{name}=secret\n");
-        Assert.Equal("secret\n", Run($"<echo>{{$config.{name}}}</echo>", setup: h => h.FileRoot = dir));
+        FileOf("config.kscript", $"fn configure(environment: string) => {{ value: @env('{name}') }}");
+        Assert.Equal("secret\n", Run("<echo>{$config.value}</echo>", setup: h => h.FileRoot = dir));
         Assert.Null(Environment.GetEnvironmentVariable(name));
         Assert.Contains("is outside", Fails("<config root=\"..\" />", setup: h => h.FileRoot = dir).Message);
     }
@@ -273,8 +289,8 @@ public sealed class ConfigTests : IDisposable
     [Fact]
     public void KSCRIPT_ENV_picks_the_environment_when_nothing_else_does()
     {
-        FileOf("config.yaml", "env: base\n");
-        FileOf("qa.yaml", "env: qa\n");
+        FileOf("kscript.json", """{ "config": { "env": "base" } }""");
+        FileOf("kscript.qa.json", """{ "config": { "env": "qa" } }""");
         string before = Environment.GetEnvironmentVariable("KSCRIPT_ENV");
         try
         {
@@ -291,23 +307,17 @@ public sealed class ConfigTests : IDisposable
     }
 
     [Fact]
-    public void Kscript_json_config_section()
+    public void Kscript_json_config_section_takes_any_settings()
     {
-        FileOf("kscript.json", "{ \"config\": { \"environment\": \"prod\", \"files\": [\"app.yaml\"], \"prefix\": \"SHOP_\", \"root\": \"conf\", \"required\": [\"name\"], \"extra\": 1 } }");
+        FileOf("kscript.json", "{ \"config\": { \"environment\": \"prod\", \"files\": [\"app.yaml\"], \"anything\": { \"else\": 1 } } }");
         ProjectConfig project = ProjectConfig.Load(Path.Combine(dir, "kscript.json"));
-        Assert.Equal("prod", project.Config.Environment);
-        Assert.Contains("unknown setting 'config.extra' (expected environment, files, prefix, root, required or user).", project.Warnings);
+        Assert.Empty(project.Warnings);
         ConfigOptions options = project.ConfigOptions("prod");
-        Assert.Equal(new[] { "app.yaml" }, options.Files);
-        Assert.Equal("SHOP_", options.Prefix);
-        Assert.Equal(Path.Combine(dir, "conf"), options.Root);
-        Assert.Equal(new[] { "name" }, options.Required);
-
-        FileOf("conf/app.yaml", "name: base\n");
-        FileOf("conf/app.prod.yaml", "name: live\n");
-        Assert.Equal("live\n", Run("<echo>{$config.name}</echo>", options));
+        Assert.Null(options.Files);
+        Assert.Equal("prod", options.Environment);
+        Assert.Equal(dir, options.Root);
+        Assert.Equal("prod 1\n", Run("<echo>{$config.environment} {$config.anything.else}</echo>", options));
         Assert.Null(ProjectConfig.Default(dir).ConfigOptions().Root);
-
         Assert.Contains("config should be an object", ProjectConfig.Parse("{ \"config\": 1 }", Path.Combine(dir, "kscript.json")).Warnings[0]);
     }
 
@@ -395,12 +405,14 @@ public sealed class ConfigTests : IDisposable
     {
         FileOf("config.json", "{}");
         FileOf("config.staging.json", "{}");
+        FileOf("kscript.staging.json", "{}");
         FileOf("staging.yaml", "a: 1");
         FileOf("data.json", "{}");
         FileOf("prod.env", "A=1");
         var site = new KScript.Pages.PageSite(dir);
         Assert.Equal(KScript.Pages.PageRoute.RouteKind.NotFound, site.Resolve("/config.json").Kind);
         Assert.Equal(KScript.Pages.PageRoute.RouteKind.NotFound, site.Resolve("/config.staging.json").Kind);
+        Assert.Equal(KScript.Pages.PageRoute.RouteKind.NotFound, site.Resolve("/kscript.staging.json").Kind);
         Assert.Equal(KScript.Pages.PageRoute.RouteKind.NotFound, site.Resolve("/staging.yaml").Kind);
         Assert.Equal(KScript.Pages.PageRoute.RouteKind.NotFound, site.Resolve("/prod.env").Kind);
         Assert.Equal(KScript.Pages.PageRoute.RouteKind.Static, site.Resolve("/data.json").Kind);

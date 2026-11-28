@@ -5,8 +5,6 @@ using KScript.Projects;
 using KScript.Runtime;
 using KScript.Syntax;
 using KScript.Syntax.Text;
-using YamlDotNet.Core;
-using YamlDotNet.RepresentationModel;
 
 namespace KScript.Language.Features;
 
@@ -36,15 +34,19 @@ public sealed partial class LanguageService
             var options = project?.ConfigOptions() ?? new ConfigOptions { Environment = Environment.GetEnvironmentVariable("KSCRIPT_ENV") };
             var layers = ConfigLoader.ProjectLayers(options, options.Root ?? scriptDir, options.Environment, Files.FileExists, out _);
             ConfigKey found = null;
-            foreach (var layer in layers.Where(l => !l.EnvFile))
+            foreach (var layer in layers.Where(l => l.Kind != ConfigLayerKind.EnvFile))
             {
                 string path = Path.GetFullPath(layer.Path);
                 string relative = Path.GetRelativePath(projectDir, path);
                 if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
                 string text = Files.ReadText(path);
                 if (text == null) continue;
-                var key = ConfigLoader.IsScript(path) ? ScriptKey(text, path, names)
-                    : path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? JsonKey(text, names) : YamlKey(text, names);
+                var key = layer.Kind switch
+                {
+                    ConfigLayerKind.Script => ScriptKey(text, path, names),
+                    ConfigLayerKind.Manifest => JsonKey(text, names.Prepend("config").ToList()),
+                    _ => JsonKey(text, names),
+                };
                 if (!key.Supplied) continue;
                 if (key.Key == null) { found = null; continue; } // A later scalar replaced a map that held this key.
                 var source = new SourceText(text);
@@ -53,7 +55,7 @@ public sealed partial class LanguageService
             }
             return found;
         }
-        catch (Exception ex) when (ex is ProjectConfigException or JsonException or YamlException or IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception ex) when (ex is ProjectConfigException or JsonException or IOException or UnauthorizedAccessException or ArgumentException)
         {
             return null;
         }
@@ -118,50 +120,5 @@ public sealed partial class LanguageService
             reader.Skip();
         }
         return found;
-    }
-
-    private static (bool Supplied, KeySpan Key) YamlKey(string text, IReadOnlyList<string> names)
-    {
-        var stream = new YamlStream();
-        stream.Load(new StringReader(text));
-        if (stream.Documents.Count != 1 || stream.Documents[0].RootNode is not YamlMappingNode root) return default;
-        YamlNode node = root;
-        for (int index = 0; index < names.Count; index++)
-        {
-            string name = names[index];
-            if (node is not YamlMappingNode map) return (true, null);
-            var entry = YamlEntry(map, name, new HashSet<YamlNode>(ReferenceEqualityComparer.Instance));
-            if (entry.Key == null) return default;
-            node = entry.Value;
-            if (index == names.Count - 1)
-            {
-                var key = (YamlScalarNode)entry.Key;
-                int quote = key.Style is ScalarStyle.SingleQuoted or ScalarStyle.DoubleQuoted ? 1 : 0;
-                var span = TextSpan.FromBounds((int)key.Start.Index + quote, (int)key.End.Index - quote);
-                string type = node switch
-                {
-                    YamlMappingNode => "map", YamlSequenceNode => "list",
-                    YamlScalarNode { Style: ScalarStyle.Plain } scalar => Values.TypeOf(Yaml.PlainScalar(scalar.Value)),
-                    _ => "string",
-                };
-                return (true, new KeySpan(span, type));
-            }
-        }
-        return default;
-    }
-
-    private static KeyValuePair<YamlNode, YamlNode> YamlEntry(YamlMappingNode map, string name, HashSet<YamlNode> seen)
-    {
-        if (!seen.Add(map)) return default;
-        var direct = map.Children.LastOrDefault(p => p.Key is YamlScalarNode key && name.Equals(key.Value, StringComparison.OrdinalIgnoreCase));
-        if (direct.Key != null) return direct;
-        var merged = map.Children.FirstOrDefault(p => p.Key is YamlScalarNode { Value: "<<" }).Value;
-        IEnumerable<YamlNode> sources = merged is YamlSequenceNode sequence ? sequence.Children : new[] { merged };
-        foreach (var source in sources.OfType<YamlMappingNode>())
-        {
-            var inherited = YamlEntry(source, name, seen);
-            if (inherited.Key != null) return inherited;
-        }
-        return default;
     }
 }

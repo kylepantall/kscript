@@ -1145,20 +1145,7 @@ public sealed class DataConnectionTests : DataFixture
     [Fact]
     public void ConnectionsComeFromTheConfig()
     {
-        FileOf("config.yaml", """
-            database:
-              default: main
-              connections:
-                main:
-                  url: sqlite:db/main.sqlite
-                reports:
-                  url: "sqlite::memory:"
-                plain:
-                  file: db/plain.sqlite
-                driver:
-                  driver: sqlite
-                  database: db/driver.sqlite
-            """);
+        FileOf("kscript.json", """{"config": {"database": {"default": "main", "connections": {"main": {"url": "sqlite:db/main.sqlite"}, "reports": {"url": "sqlite::memory:"}, "plain": {"file": "db/plain.sqlite"}, "driver": {"driver": "sqlite", "database": "db/driver.sqlite"}}}}}""");
         string[] lines = Lines("""
             model Hit(connection: "reports") {
               page: string
@@ -1185,7 +1172,7 @@ public sealed class DataConnectionTests : DataFixture
     [Fact]
     public void UnknownConnectionsSuggestTheClosest()
     {
-        FileOf("config.yaml", "database:\n  connections:\n    reports:\n      url: sqlite:r.sqlite\n");
+        FileOf("kscript.json", """{"config": {"database": {"connections": {"reports": {"url": "sqlite:r.sqlite"}}}}}""");
         KScriptException e = Fails("@db(connection: report)");
         Assert.Equal("Config", e.Type);
         Assert.Contains("Did you mean reports?", e.Message);
@@ -1213,7 +1200,7 @@ public sealed class DataConnectionTests : DataFixture
     [InlineData("postgres://localhost:99999/app", "as its port")]
     public void UnknownDriversAreConfigErrors(string url, string message)
     {
-        FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
+        FileOf("kscript.json", """{"config": {"database": {"connections": {"main": {"url": """ + System.Text.Json.JsonSerializer.Serialize(url) + "}}}}}");
         KScriptException e = Fails("echo $db");
         Assert.Equal("Config", e.Type);
         Assert.Contains(message, e.Message);
@@ -1223,7 +1210,7 @@ public sealed class DataConnectionTests : DataFixture
     public void AFileThatCantBeOpenedIsAConnectionError()
     {
         File.WriteAllText(Path.Combine(Project, "blocked"), "a file, not a folder");
-        FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:blocked/app.sqlite\n");
+        FileOf("kscript.json", """{"config": {"database": {"connections": {"main": {"url": "sqlite:blocked/app.sqlite"}}}}}""");
         KScriptException e = Fails("echo $db->tables()");
         Assert.Equal("Connection", e.Type);
     }

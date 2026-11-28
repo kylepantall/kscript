@@ -1124,8 +1124,7 @@ public sealed class QueueTests : StorageFixture
     [Fact]
     public void ADatabaseQueueCanUseANamedDatabaseConnection()
     {
-        FileOf("config.json", "{ \"database\": { \"connections\": { \"jobs\": { \"url\": \"sqlite:data/jobs.sqlite\" } } } }");
-        UseDatabase("\", \"config\": { \"files\": [\"config.json\"] }, \"queue\": { \"default\": \"db\", \"connections\": { \"db\": { \"driver\": \"database\", \"connection\": \"jobs\" }, \"lost\": { \"driver\": \"database\", \"connection\": \"nope\" } } } }");
+        UseDatabase("\", \"config\": { \"database\": { \"connections\": { \"jobs\": { \"url\": \"sqlite:data/jobs.sqlite\" } } } }, \"queue\": { \"default\": \"db\", \"connections\": { \"db\": { \"driver\": \"database\", \"connection\": \"jobs\" }, \"lost\": { \"driver\": \"database\", \"connection\": \"nope\" } } } }");
         Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 2, email: 'b@example.com')->dispatch()");
         Assert.True(File.Exists(Path.Combine(Project, "data", "jobs.sqlite")));
         Assert.False(File.Exists(Path.Combine(Project, "data", "app.sqlite")));

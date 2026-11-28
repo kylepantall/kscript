@@ -1,0 +1,25 @@
+--- make
+unless: db is none
+---
+// Settings read from environment variables when the app starts. The map this
+// returns is laid over the "config" section of kscript.json. Tests use the
+// settings in kscript.test.json instead.
+fn configure(environment: string) {
+  if $environment == 'test' {
+    return {}
+  }
+  url = @env('DATABASE_URL', default: '')
+{{#if db is sqlite}}
+  main = $url->is_blank() ? {} : { url: $url }
+{{else}}
+  main = $url->is_blank()
+    ? { host: @env('DB_HOST', default: 'localhost'), password: @env('DB_PASSWORD', default: 'secret') }
+    : { url: $url }
+{{/if}}
+  return {
+    database: { connections: { main: $main } }
+{{#if cache}}
+    cache: { store: @env('CACHE_STORE', default: 'memory') }
+{{/if}}
+  }
+}

@@ -7,23 +7,23 @@ namespace KScript.Runtime
 {
     public sealed partial class CorePackage
     {
-        /// <summary>Settings: $config, &lt;config&gt;, and YAML and .env text.</summary>
+        /// <summary>Settings: $config, &lt;config&gt;, and .env text.</summary>
         private static void RegisterConfig(PackageBuilder p)
         {
             p.Variable("config", KType.Config,
-                "The project's settings from kscript.json config.files, or .env by default: $config.database.host.",
+                "The project's settings: the \"config\" section of kscript.json, with kscript.<env>.json and config.kscript laid over it: $config.database.host.",
                 (i, m) => ConfigValue.For(i.Host, m.Directory));
 
             p.Element(new ElementInfo("config",
                 "Reads the script's settings with other options: an environment, other files, a prefix for environment variables, defaults and required settings. Without `into`, it changes $config.",
                 ContentKind.Empty,
-                new A("env", K.Template, "The environment, such as staging or production. Its files (staging.yaml, config.staging.json, .env.staging) are layered over the base files. Default: kscript --env, or KSCRIPT_ENV."),
-                new A("files", K.Template, "The base files, as a list: `['config.kscript', 'settings.yaml?', '.env?']` (in XML, `config.kscript, settings.yaml?, .env?`). A name without an extension means .json, .yaml and .yml. End a name with ? if it may be missing.") { NameList = true },
+                new A("env", K.Template, "The environment, such as staging or production. Its files (kscript.staging.json, .env.staging) are layered over the base files. Default: kscript --env, or KSCRIPT_ENV."),
+                new A("files", K.Template, "Other files to read, as a list: `['settings.json', 'secrets.kscript?', '.env?']` (in XML, `settings.json, secrets.kscript?, .env?`). JSON files hold settings, a .kscript file defines configure(environment), and .env files feed @env(). A name without an extension means its .json file. End a name with ? if it may be missing.") { NameList = true },
                 new A("prefix", K.Text, "Environment variables with this prefix override the files: with prefix=\"APP_\", APP_DATABASE__HOST sets database.host."),
                 new A("root", K.Path, "The folder the files are in. Default: the script's folder."),
                 new A("defaults", K.Expression, "A map of settings used when no file sets them."),
                 new A("require", K.Text, "Settings that must be set, as a list: `['database.host', 'api.key']` (in XML, `database.host, api.key`).") { NameList = true },
-                new A("user", K.Bool, "true also reads the person's own settings: config.json (or .yaml) in the app's config folder (see KScript.Storage), layered over the other files."),
+                new A("user", K.Bool, "true also reads the person's own settings: config.json in the app's config folder (see KScript.Storage), layered over the other files."),
                 new A("export_env", K.Bool, "no stops values in .env files becoming environment variables (they always do for @env() unless this is no)."),
                 new A("into", K.DeclareVariable, "Store the settings in this variable instead of changing $config."))
             {

@@ -177,7 +177,7 @@ async function interpolatedLinks(folder) {
 
   for (const [anchor, destination, line, column] of [
     ['$kind', file, 1, lines[1].indexOf('kind:')],
-    ['.url', settings, 1, 2],
+    ['.url', settings, 3, 7],
   ]) {
     const position = new vscode.Position(1, lines[1].indexOf(anchor) + 2);
     const found = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', doc.uri, position);
