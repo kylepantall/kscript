@@ -5,7 +5,7 @@ namespace KScript.Runtime
     /// <c>Size.small</c> is 'small' and <c>'small' in Size</c> works. As a parameter type (<c>params="size: Size"</c>)
     /// it limits the argument to those values, which calls may then write bare: <c>@pack(large)</c>.
     /// </summary>
-    public sealed class EnumType : Dictionary<string, object>, IDeclaredType
+    public sealed class EnumType : Dictionary<string, object>, IDeclaredType, Dependencies.IDeclaredSource
     {
         public EnumType(string name, IEnumerable<string> names) : base(StringComparer.Ordinal)
         {
@@ -14,6 +14,13 @@ namespace KScript.Runtime
         }
 
         public string Name { get; }
+
+        internal Module Module { get; init; }
+        internal int? DeclarationOffset { get; init; }
+
+        /// <summary>Where it was declared, so reaching it can be recorded (see <see cref="Dependencies.DependencyTrace"/>).</summary>
+        Module Dependencies.IDeclaredSource.DeclaredIn => DeclarationOffset == null ? null : Module;
+        int Dependencies.IDeclaredSource.DeclaredAt => DeclarationOffset ?? 0;
 
         public IReadOnlyList<string> Names => Keys.ToList();
 

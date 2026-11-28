@@ -110,6 +110,10 @@ namespace KScript.Runtime
                 "A GitHub token `kscript update` and `kscript ide install` send with their requests, so they aren't limited the way requests without one are, such as on a shared CI runner.",
                 "GITHUB_TOKEN=ghp_... kscript update", "/guide/install"),
 
+            new Variable("CI", "Running scripts", "`kscript test` in a project runs only the tests a change since the last run can affect",
+                "Set by CI services such as GitHub Actions. When it is set (and not `false` or `0`), `kscript test` runs every test, as `--all` does.",
+                "CI=true kscript test", "/guide/testing"),
+
             new Variable("NO_COLOR", "Terminal output", "colours are used in a terminal",
                 "Set to anything and kscript, `echo` and KScript.Terminal print without colours.",
                 "NO_COLOR=1 kscript test", "/guide/testing"),

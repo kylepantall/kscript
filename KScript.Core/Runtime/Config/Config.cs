@@ -109,7 +109,7 @@ namespace KScript.Runtime
             string Lookup(string name) => host.EnvironmentVariable(name) ?? (dotenv.TryGetValue(name, out string v) ? v : null);
             foreach (var layer in layers.Where(l => l.EnvFile))
             {
-                var pairs = DotEnv.Parse(File.ReadAllText(layer.Path), Lookup, Path.GetFileName(layer.Path));
+                var pairs = DotEnv.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(layer.Path), Lookup, Path.GetFileName(layer.Path));
                 envValues[layer.Path] = pairs;
                 foreach (var pair in pairs) dotenv[pair.Key] = pair.Value;
             }
@@ -141,7 +141,7 @@ namespace KScript.Runtime
                 bool script = IsScript(layer.Path);
                 bool json = layer.Path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
                 bool expressions = !script && !json && options.Files != null && !user.Contains(layer.Path);
-                string text = script ? null : File.ReadAllText(layer.Path);
+                string text = script ? null : KScript.Runtime.Dependencies.DependencyTrace.ReadText(layer.Path);
                 object parsed = script ? ConfigEvaluation.RunScript(host, layer.Path, environment, dotenv)
                     : json ? ParseJson(text, fileName)
                     : expressions ? ConfigEvaluation.ReadYaml(host, layer.Path, text, environment, dotenv, Lookup)

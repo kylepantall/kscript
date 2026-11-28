@@ -223,6 +223,7 @@ namespace KScript.Runtime
 
         public object Call(CallContext call)
         {
+            Dependencies.DependencyTrace.Reached(Module, Element.Span.Start);
             Scope scope = Closure.Child();
             try
             {
