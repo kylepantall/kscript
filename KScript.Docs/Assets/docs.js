@@ -151,10 +151,20 @@
     + "|^(\\s*)(min|max|pattern|one_of|not|validate|normalize|parse)(?=\\s*:\\s*(?![A-Za-z_][\\w.\\[\\]?]*\\s*(?:=|$)))"
     + "|\\b(type|enum)(\\s+)([A-Za-z_]\\w*)(?:(\\s+with\\s*\\[)([^\\]\\n]*)(\\]))?"
     + "|\\b(if|elif|else|for|in|at|while|match|when|fn|return|try|catch|finally|throw|import|from|as|const|echo|break|continue|exit|and|or|not|yes|no|true|false|null|type|enum|with|construct(?=\\())\\b"
-    + "|\\b([A-Z][\\w.]*|[a-z_][\\w-]*)(?=\\s*[({])", 'gm');
+    + "|\\b([A-Z][\\w.]*|[a-z_][\\w-]*)(?=\\??\\s*[({])", 'gm');
   // ```lang ... ``` blocks: text up to a closing fence of the same length, with the language or <Type> after the fence.
   var FENCE = /(`{3,})([^\n`]*)\n[\s\S]*?\n[ \t]*\1(?!`)/g;
+  // A method signature, a fn line with no body (fn label(): string;), is shown in italics, as in the editor.
+  var SIGNATURE = /^\s*(?:(?:override|private)\s+)?fn\s+[A-Za-z_][\w-]*\??\s*\([^\n]*;\s*$/;
   function hlKscript(src) {
+    var html = hlKscriptBlocks(src), lines = html.split('\n'), source = src.split('\n');
+    if (lines.length !== source.length) return html;
+    return lines.map(function (line, i) {
+      return SIGNATURE.test(source[i]) && (line.match(/<span/g) || []).length === (line.match(/<\/span>/g) || []).length
+        ? '<span class="sig">' + line + '</span>' : line;
+    }).join('\n');
+  }
+  function hlKscriptBlocks(src) {
     var out = '', last = 0, m, fence = new RegExp(FENCE.source, 'g');
     while ((m = fence.exec(src))) {
       out += hlKscriptCode(src.slice(last, m.index));

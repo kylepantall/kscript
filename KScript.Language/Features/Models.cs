@@ -167,6 +167,9 @@ namespace KScript.Language.Features
 
         /// <summary>A part of a one-of group (<c>add|remove: file</c>), where it is declared and where a call names it.</summary>
         OneOf = 8,
+
+        /// <summary>A part of a method signature, a <c>fn</c> line with no body (<c>fn label(): string;</c>). Editors show it in italics.</summary>
+        Signature = 16,
     }
 
     public readonly struct SemanticToken

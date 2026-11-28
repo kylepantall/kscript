@@ -20,7 +20,7 @@ namespace KScript.LanguageServer
     public sealed partial class KScriptLanguageServer
     {
         public static readonly string[] TokenTypes = { "variable", "parameter", "function", "method", "property", "keyword", "operator", "string", "number", "namespace", "type", "regexp" };
-        public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary", "oneOf" };
+        public static readonly string[] TokenModifiers = { "declaration", "readonly", "defaultLibrary", "oneOf", "signature" };
 
         private readonly JsonRpcConnection connection;
         private readonly Workspace workspace;

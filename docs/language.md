@@ -268,7 +268,7 @@ Use `$.name` to look up a value in the current scope. It resolves the same name 
 
 ### Method signatures
 
-A type can declare a method signature with `;` after the header, and another type can implement it with `extends`. A `?` after a signature's method name makes that method optional. The checker reports any missing required method or mismatch in its parameter names, parameter types, or return type.
+A type may declare a method without writing its body: end the `fn` line with `;` where the `=>` or `{ }` would go. That line is a method signature, and another type that `extends` this one must implement it. A `?` after the method's name, as in `fn details?(): string;`, makes the method optional. The editor and these docs show signature lines in italics, so you can tell them from methods with a body at a glance. The checker reports any missing required method or mismatch in its parameter names, parameter types, or return type.
 
 ```kscript
 type Summary {

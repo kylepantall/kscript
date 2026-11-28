@@ -328,3 +328,6 @@ td .deprecation { margin: 0 0 4px; }
 .fmt-switch { flex: none; }
 .fmt-switch button { font-size: 12.5px; padding: 4px 10px; }
 @media (max-width: 720px) { .fmt-switch button { padding: 3px 7px; font-size: 11.5px; } }
+
+/* A method signature (fn label(): string;) is in italics, as in the editor. */
+.sig { font-style: italic; }

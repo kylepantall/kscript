@@ -126,6 +126,20 @@ namespace KScript.Language.Tests
         }
 
         [Fact]
+        public void MethodSignaturesAreMarkedSoEditorsCanShowThemInItalics()
+        {
+            string text = "type Summary {\n  fn label(prefix: string): string;\n  fn details?(): string;\n  fn shout() => 'hi'\n}\n";
+            DocumentAnalysis analysis = Check(text);
+            var tokens = Service.GetSemanticTokens(analysis);
+            List<string> marked = tokens.Where(t => t.Modifiers.HasFlag(SemanticTokenModifiers.Signature)).Select(t => text.Substring(t.Span.Start, t.Span.Length)).ToList();
+            Assert.Contains("label", marked);
+            Assert.Contains("details", marked);
+            Assert.Contains("prefix", marked);
+            Assert.DoesNotContain("shout", marked);
+            Assert.Contains("signature", KScript.LanguageServer.KScriptLanguageServer.TokenModifiers);
+        }
+
+        [Fact]
         public void TheSharedReaderKeepsEachGroupTogether()
         {
             var problems = new List<ParameterProblem>();

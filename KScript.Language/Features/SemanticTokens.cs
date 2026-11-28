@@ -316,6 +316,16 @@ namespace KScript.Language.Features
                 foreach (TextSpan part in oneOf.Values.Where(p => !marked.Contains(p.Start)))
                     tokens.Add(new SemanticToken(part, part.Length == 1 ? SemanticTokenType.Operator : SemanticTokenType.Parameter, SemanticTokenModifiers.OneOf));
             }
+            // Method signatures (fn label(): string;) are shown in italics, so a method with no body stands out from one with a body.
+            foreach (MarkupElement fn in analysis.Markup.DescendantElements().Where(e => e.Name == "fn" && e.GetAttribute("signature") != null))
+            {
+                TextSpan whole = fn.Span;
+                for (int i = 0; i < tokens.Count; i++)
+                    if (tokens[i].Span.Start >= whole.Start && tokens[i].Span.End <= whole.End)
+                        tokens[i] = new SemanticToken(tokens[i].Span, tokens[i].Type, tokens[i].Modifiers | SemanticTokenModifiers.Signature);
+                if (fn.GetAttribute("name") is { Value: not null } name && !tokens.Any(t => t.Span.Start == name.Value.SourceSpan.Start))
+                    tokens.Add(new SemanticToken(name.Value.SourceSpan, SemanticTokenType.Method, SemanticTokenModifiers.Declaration | SemanticTokenModifiers.Signature));
+            }
             return tokens.Where(t => t.Span.Length > 0).GroupBy(t => t.Span.Start).Select(g => g.First()).OrderBy(t => t.Span.Start).ToList();
         }
     }

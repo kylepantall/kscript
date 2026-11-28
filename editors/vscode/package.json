@@ -396,6 +396,13 @@
       }
     ],
     "configurationDefaults": {
+      "editor.semanticTokenColorCustomizations": {
+        "rules": {
+          "*.signature:kscript": {
+            "italic": true
+          }
+        }
+      },
       "[kscript]": {
         "editor.defaultFormatter": "kylepantall.kscript",
         "editor.semanticHighlighting.enabled": true,
@@ -429,6 +436,10 @@
       {
         "id": "oneOf",
         "description": "A part of a one-of parameter group, such as add|remove: file. Its names and bars share one colour."
+      },
+      {
+        "id": "signature",
+        "description": "A part of a method signature: a fn line with no body, such as fn label(): string;. Shown in italics."
       }
     ],
     "semanticTokenScopes": [
