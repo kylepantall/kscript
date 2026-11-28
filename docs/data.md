@@ -277,9 +277,9 @@ A computed field, such as `label => $first + ' ' + $last`, isn't stored at all. 
 
 ## Built-in models and mixins
 
-Some packages come with models and mixins you can extend straight away. Import the package, then extend the mixin. You don't declare it yourself.
+A model gets its behaviour in two ways. Most of it is switched on with an [option](#model-options), such as `timestamps` or `soft_deletes`, so there is nothing to extend. The rest comes from a mixin that a package ships, written in KScript, which you extend rather than declare.
 
-Today, one ships: KScript.Auth's `Ownable`, for rows that belong to one person. A model that extends it gets an `owner` field, filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
+Today, one package mixin ships: KScript.Auth's `Ownable`, for rows that belong to one person. A model that extends it gets an `owner` field, filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
 
 ```kscript
 import KScript.Data
@@ -290,9 +290,11 @@ model Note extends Ownable {
 }
 ```
 
-Then `Note->mine()->get()` reads only the current person's notes. See [Guests and owners](auth.md#guests-and-owners) for the whole story. The reference lists every built-in mixin with its fields and methods: [Models and mixins](/reference/models). In `kscript mcp`, `lookup Ownable` shows its source.
+Then `Note->mine()->get()` reads only the current person's notes. See [Guests and owners](auth.md#guests-and-owners) for the whole story. In `kscript mcp`, `lookup Ownable` shows its source.
 
-KScript.Data itself ships no mixins, because what a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` and `timestamps`. If your project prefers the name, a mixin that sets the option is one line:
+The [Models and mixins](/reference/models) reference lists all of it: every option with an example, every mixin a package ships with its fields and methods, and the tables KScript keeps in your database for itself (`kscript_migrations` and the database queue's `kscript_jobs`, `kscript_failed_jobs` and `kscript_job_locks`).
+
+If your project prefers a mixin's name to an option, a mixin that sets the option is one line:
 
 ```kscript
 import KScript.Data

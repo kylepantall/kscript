@@ -299,8 +299,11 @@ public sealed class DocsTests
     {
         // Made from the model element's options and the packages' own KScript scripts, so a new mixin shows up by itself.
         DocPage models = Site.Value.Find("/reference/models");
-        foreach (AttributeInfo a in LanguageCatalog.Default.GetElement("model").Attributes.Where(a => a.Name is not ("name" or "description")))
-            Assert.Contains($"<tr id=\"option-{Html.Slug(a.Name)}\"><td><code>{a.Name}</code></td>", models.Body);
+        foreach (AttributeInfo a in DocsSite.ModelOptions(LanguageCatalog.Default.GetElement("model")))
+        {
+            Assert.True(DocsSite.OptionExamples.ContainsKey(a.Name), $"Give the model option {a.Name} an example in DocsSite.OptionExamples.");
+            Assert.Contains($"<h3 id=\"option-{Html.Slug(a.Name)}\"><code>{a.Name}</code></h3>", models.Body);
+        }
 
         var declared = Site.Value.PackageDeclarations().ToList();
         Assert.Contains(declared, d => d.Name == "Ownable" && d.IsMixin && d.Package == "KScript.Auth");
@@ -314,6 +317,11 @@ public sealed class DocsTests
         }
 
         Assert.Contains("<code>owner</code></td><td><code>string(max: 80)</code>", models.Body);
+        // The tables KScript keeps are listed by the names the code uses.
+        string[] tables = { KScript.Data.Migrations.Migrator.Table, KScript.Queueing.DatabaseQueueDriver.JobsTable, KScript.Queueing.DatabaseQueueDriver.FailedTable, KScript.Queueing.DatabaseQueueDriver.LocksTable };
+        Assert.Equal(tables.OrderBy(t => t), DocsSite.KeptTables.Select(t => t.Table).OrderBy(t => t));
+        foreach (string table in tables)
+            Assert.Contains($"id=\"table-{Html.Slug(table)}\"", models.Body);
         Assert.Contains("<code>Note-&gt;mine(as: any = null)</code>", models.Body);
         Assert.Contains(entries, e => e.Name == "soft_deletes" && e.Url == "/reference/models#option-soft-deletes");
         Assert.Contains(Site.Value.Search, s => s.Title == "soft_deletes" && s.Kind == "option of model");
