@@ -145,7 +145,8 @@ namespace KScript.Runtime.Dependencies
         /// <summary>A short, stable fingerprint of some text.</summary>
         public static string Hash(string text)
         {
-            byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(text ?? string.Empty));
+            // Line endings don't count, so a checkout that turns \n into \r\n changes nothing.
+            byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes((text ?? string.Empty).Replace("\r\n", "\n")));
             return Convert.ToHexString(digest, 0, 12).ToLowerInvariant();
         }
 
