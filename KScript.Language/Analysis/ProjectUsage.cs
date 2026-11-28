@@ -58,12 +58,12 @@ namespace KScript.Language.Analysis
             var texts = new List<(string File, string Text)>();
             foreach (string file in ProjectFiles(root ?? folder, recursive: root != null, files))
             {
-                if (!SamePath(file, target) && files.ReadText(file) is string other)
+                if (!SamePath(file, target) && files.ReadToScan(file) is string other)
                 {
                     texts.Add((file, other));
                 }
             }
-            HashSet<string> reaching = Reaching(texts, stem);
+            HashSet<string> reaching = Reaching(texts, stem, files);
 
             foreach ((string file, string other) in texts)
             {
@@ -74,6 +74,7 @@ namespace KScript.Language.Analysis
                 {
                     continue;
                 }
+                files.Used(file, other);
 
                 var (uses, imports) = UsesOf(file, other, target, text, files, catalog);
                 if (companion || imports.Any(i => SamePath(i, target)))
@@ -102,7 +103,7 @@ namespace KScript.Language.Analysis
         /// returns a Zebra from types/zebra, so main's ->shown() is a use of zebra's method. Only files found this way are
         /// analysed, so the search stays a text scan for the rest.
         /// </summary>
-        private static HashSet<string> Reaching(List<(string File, string Text)> texts, string stem)
+        private static HashSet<string> Reaching(List<(string File, string Text)> texts, string stem, IFileSystem files)
         {
             var reaching = new HashSet<string>(StringComparer.Ordinal);
             var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { stem };
@@ -113,7 +114,13 @@ namespace KScript.Language.Analysis
                 string name = pending.Dequeue();
                 foreach ((string file, string text) in texts)
                 {
-                    if (reaching.Contains(file) || text.IndexOf(name, StringComparison.OrdinalIgnoreCase) < 0)
+                    if (reaching.Contains(file))
+                    {
+                        continue;
+                    }
+                    bool found = text.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0;
+                    files.Scanned(file, name, found);
+                    if (!found)
                     {
                         continue;
                     }

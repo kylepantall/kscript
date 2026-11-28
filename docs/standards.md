@@ -117,6 +117,17 @@ kscript check --fix scripts/report.kscript
 kscript check --warnings-as-errors         # for CI: fail on warnings too
 ```
 
+## Checking only what changed
+
+In a project, `kscript check` remembers what it found in each file, and everything the check of that file looked at: the scripts it imports, its components and layouts, the folders it listed, and the other files it searched for uses of its functions. The next check analyses a file again only when the file changed, or something it looked at did. Every other file gives the problems it gave last time, so checking a big project after one edit takes a fraction of the time.
+
+```sh
+kscript check                             # analyses only what changed since the last check
+kscript check --all                       # analyses every file
+```
+
+Saving `lib/billing.kscript` checks it again, along with the scripts that import it and any file that now mentions one of its functions. Changing `kscript.json` or a standard checks everything again, and so does a new version of kscript. The record is kept in `.kscript/cache/check.json`, and that folder ignores itself, so git never sees it.
+
 ## Seeing the result
 
 `kscript check --print-config [file-or-folder]` prints the settings that apply to a file or folder, after its

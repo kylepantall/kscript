@@ -596,7 +596,7 @@ namespace KScript
                     return KScript.LanguageServer.CheckCommand.PrintConfig(rest.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)), Out);
                 }
                 string format = "text";
-                bool warningsAsErrors = false, fix = false;
+                bool warningsAsErrors = false, fix = false, checkAll = false;
                 var paths = new List<string>();
                 for (int i = 1; i < args.Length; i++)
                 {
@@ -608,6 +608,7 @@ namespace KScript
                     }
                     if (a == "--warnings-as-errors") warningsAsErrors = true;
                     else if (a == "--fix") fix = true;
+                    else if (a == "--all") checkAll = true;
                     else if (a == "--output" || a.StartsWith("--output=", StringComparison.Ordinal))
                     {
                         format = a == "--output" ? (i + 1 < args.Length ? args[++i] : null) : a.Substring(9);
@@ -619,12 +620,12 @@ namespace KScript
                     }
                     else if (a.StartsWith("--", StringComparison.Ordinal))
                     {
-                        Error.WriteLine($"Unknown option '{a}' for kscript check. Use --warnings-as-errors, --fix, --output text|json or --print-config.");
+                        Error.WriteLine($"Unknown option '{a}' for kscript check. Use --warnings-as-errors, --fix, --all, --output text|json or --print-config.");
                         return ExitCodes.Usage;
                     }
                     else paths.Add(a);
                 }
-                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: warningsAsErrors, json: format == "json", fix: fix);
+                return KScript.LanguageServer.CheckCommand.Run(paths, Out, warningsAsErrors: warningsAsErrors, json: format == "json", fix: fix, all: checkAll);
             }
 
             if (args.Length > 0 && args[0] == "watch")
