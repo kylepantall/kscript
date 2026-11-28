@@ -128,8 +128,14 @@ test('kscript.json and standard files are validated with the bundled schemas', (
   const urls = pkg.contributes.jsonValidation.map((v) => v.url);
   assert.ok(urls.includes('./schemas/kscript.schema.json'));
   assert.ok(urls.includes('./schemas/kscript-standard.schema.json'));
+  assert.ok(urls.includes('./schemas/kscript-environment.schema.json'));
   for (const v of pkg.contributes.jsonValidation) {
     const schema = JSON.parse(fs.readFileSync(path.join(root, v.url), 'utf8'));
+    if (v.url === './schemas/kscript-environment.schema.json') {
+      // kscript.<env>.json holds only a config section, checked with kscript.json's rules.
+      assert.strictEqual(schema.properties.config.$ref, 'kscript.schema.json#/properties/config');
+      continue;
+    }
     assert.ok(schema.properties.lint && schema.properties.format, v.url);
     if (v.url === './schemas/kscript.schema.json') {
       assert.strictEqual(schema.properties.types.properties.password.$ref, '#/definitions/typeRules');

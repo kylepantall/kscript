@@ -12,8 +12,7 @@ public class HttpCoverageTests
     [Fact]
     public void RelocatedAuthStoresAndConfiguredSqliteFilesStayPrivate()
     {
-        using var files = new TempSite(("kscript.json", """{"name":"example","config":{"root":"config","files":["config.yaml"]}}"""),
-            ("config/config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:files/records.bin\n    archive:\n      driver: sqlite3\n      file: files/archive.bin"),
+        using var files = new TempSite(("kscript.json", """{"name":"example","config":{"database":{"connections":{"main":{"url":"sqlite:files/records.bin"},"archive":{"driver":"sqlite3","file":"files/archive.bin"}}}}}"""),
             ("volume/public.txt", "asset"));
         string previousData = Environment.GetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT");
         string previousStorage = Environment.GetEnvironmentVariable(AppFolders.RootVariable);

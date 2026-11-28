@@ -6,7 +6,7 @@
 // kscript notes.kscript
 // kscript notes.kscript clear
 //
-// "config": { "user": true } in kscript.json also reads the person's own
+// "app": { "user_config": true } in kscript.json also reads the person's own
 // config.json from the app's config folder, so $config.greeting can be changed
 // without touching the project.
 import KScript.Storage

@@ -20,9 +20,9 @@
     "version": "1.0.0"
   },
 {{/if}}
-  // Load project settings from the listed files.
+  // The app's own settings, read as $config (such as $config.app.name).
   "config": {
-    "files": ["config/config{{ ext }}", ".env?"]
+    "app": { "name": "{{ title }}" }
   },
   // kscript make writes new scripts and tests in this syntax: kscript (.kscript files) or xml (.ks.xml).
   "make": {

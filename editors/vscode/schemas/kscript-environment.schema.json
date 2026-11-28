@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/kylepantall/kscript/master/editors/vscode/schemas/kscript-environment.schema.json",
+  "title": "KScript environment settings (kscript.<env>.json)",
+  "description": "Settings for one environment, such as kscript.staging.json for kscript --env staging. Its config section is laid over the one in kscript.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "config": { "$ref": "kscript.schema.json#/properties/config" }
+  }
+}

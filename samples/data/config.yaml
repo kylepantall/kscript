@@ -1,6 +1,0 @@
-# The sample keeps its database in memory, so every run starts empty.
-# A real app would use a file: url: sqlite:data/shop.sqlite
-database:
-  connections:
-    main:
-      url: "sqlite::memory:"

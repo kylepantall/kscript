@@ -78,7 +78,8 @@
           "kscript-standard.json"
         ],
         "filenamePatterns": [
-          "*.kscript-standard.json"
+          "*.kscript-standard.json",
+          "kscript.*.json"
         ]
       }
     ],
@@ -294,6 +295,10 @@
       {
         "fileMatch": "kscript.json",
         "url": "./schemas/kscript.schema.json"
+      },
+      {
+        "fileMatch": "kscript.*.json",
+        "url": "./schemas/kscript-environment.schema.json"
       },
       {
         "fileMatch": [

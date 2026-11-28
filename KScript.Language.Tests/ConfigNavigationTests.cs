@@ -6,26 +6,25 @@ namespace KScript.Language.Tests;
 
 public class ConfigNavigationTests
 {
-    [Theory]
-    [InlineData("yaml", "aside: { url: elsewhere }\npasskeys:\n  'URL': private-setting\n", "URL")]
-    [InlineData("json", "{\n  // café 🙂\n  \"aside\": { \"url\": false }, \"passkeys\": { \"other\": \"🙂\", \"U\\u0052L\": \"private-setting\", },\n}", "U\\u0052L")]
-    public void NestedFieldsNavigateToConfiguredKeysAndHoverContainsOnlyTheirType(string extension, string contents, string writtenKey)
+    [Fact]
+    public void NestedFieldsNavigateToKeysInKscriptJsonAndHoverContainsOnlyTheirType()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "project-settings-" + extension);
+        string dir = Path.Combine(Path.GetTempPath(), "project-settings-json");
         string script = Path.Combine(dir, "src", "api.kscript");
-        string config = Path.Combine(dir, "settings", "service." + extension);
+        string manifest = Path.Combine(dir, ProjectConfig.FileName);
+        const string contents = "{\n  // café 🙂\n  \"name\": \"shop\",\n  \"passkeys\": { \"url\": \"not this one\" },\n  \"config\": {\n    \"aside\": { \"url\": false }, \"passkeys\": { \"other\": \"🙂\", \"U\\u0052L\": \"private-setting\", },\n  },\n}";
         const string code = """fn url(kind: string) => "{$config.passkeys.url}/{$kind}" """;
-        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), """{ "config": { "root": "settings", "files": ["service", "optional.json?"] } }""")
-            .Add(config, contents).Add(script, code);
+        var files = new MemoryFiles().Add(manifest, contents).Add(script, code);
         var service = new LanguageService(files: files);
         var analysis = service.Analyze(code, script);
-        foreach (var (field, type, key) in new[] { ("passkeys", "map", "passkeys"), ("url", "string", writtenKey) })
+        foreach (var (field, type, key) in new[] { ("passkeys", "map", "passkeys"), ("url", "string", "U\\u0052L") })
         {
             int offset = code.IndexOf("." + field, StringComparison.Ordinal) + 2;
             var source = new SourceText(contents);
             var location = Assert.Single(service.GetDefinition(analysis, offset));
-            Assert.Equal(config, location.Path);
+            Assert.Equal(manifest, location.Path);
             Assert.Equal(key, contents[source.GetOffset(location.Start.Line, location.Start.Character)..source.GetOffset(location.End.Line, location.End.Character)]);
+            Assert.True(location.Start.Line >= 5, "the key is in the config section, not the top-level passkeys");
             string hover = service.GetHover(analysis, offset).Markdown;
             Assert.Contains(field + ": " + type, hover);
             Assert.DoesNotContain("private-setting", hover);
@@ -44,7 +43,7 @@ public class ConfigNavigationTests
             }
             """;
         const string code = "echo $config.http.timeout";
-        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), """{"config":{"files":["config.kscript"]}}""")
+        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), "{}")
             .Add(settings, config).Add(path, code);
         var service = new LanguageService(files: files);
         var analysis = service.Analyze(code, path);
@@ -62,19 +61,19 @@ public class ConfigNavigationTests
     {
         string dir = Path.Combine(Path.GetTempPath(), "project-setting-overlay");
         string script = Path.Combine(dir, "task.kscript");
-        string baseFile = Path.Combine(dir, "base.yaml");
-        string overrideFile = Path.Combine(dir, "overrides.yml");
+        string manifest = Path.Combine(dir, ProjectConfig.FileName);
+        string overrides = Path.Combine(dir, "config.kscript");
         const string code = """echo "{$config.passkeys.url} {$config.passkeys.secret} {$config.unknown}" """;
-        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), """{"config":{"files":["base","overrides"]}}""")
-            .Add(baseFile, "passkeys: { url: base, secret: true }").Add(overrideFile, "passkeys: { url: active }").Add(script, code);
+        var files = new MemoryFiles().Add(manifest, """{ "config": { "passkeys": { "url": "base", "secret": true } } }""")
+            .Add(overrides, "fn configure(environment: string) => { passkeys: { url: 'active' } }").Add(script, code);
         var service = new LanguageService(files: files);
         var analysis = service.Analyze(code, script);
         int url = code.IndexOf(".url", StringComparison.Ordinal) + 2;
         int secret = code.IndexOf(".secret", StringComparison.Ordinal) + 2;
-        Assert.Equal(overrideFile, Assert.Single(service.GetDefinition(analysis, url)).Path);
-        Assert.Equal(baseFile, Assert.Single(service.GetDefinition(analysis, secret)).Path);
+        Assert.Equal(overrides, Assert.Single(service.GetDefinition(analysis, url)).Path);
+        Assert.Equal(manifest, Assert.Single(service.GetDefinition(analysis, secret)).Path);
         Assert.Empty(service.GetDefinition(analysis, code.IndexOf(".unknown", StringComparison.Ordinal) + 2));
-        files.Add(overrideFile, "passkeys: false");
+        files.Add(overrides, "fn configure(environment: string) => { passkeys: false }");
         Assert.Empty(service.GetDefinition(analysis, url));
         Assert.Empty(service.GetDefinition(analysis, secret));
     }
@@ -85,7 +84,7 @@ public class ConfigNavigationTests
         string dir = Path.Combine(Path.GetTempPath(), "shadow-config");
         string script = Path.Combine(dir, "task.kscript");
         const string code = "fn echo_setting(config: map) => $config.passkeys.url";
-        var files = new MemoryFiles().Add(Path.Combine(dir, "config.yaml"), "passkeys: { url: private-setting }").Add(script, code);
+        var files = new MemoryFiles().Add(Path.Combine(dir, ProjectConfig.FileName), """{ "config": { "passkeys": { "url": "private-setting" } } }""").Add(script, code);
         var service = new LanguageService(files: files);
         Assert.Empty(service.GetDefinition(service.Analyze(code, script), code.IndexOf(".url", StringComparison.Ordinal) + 2));
     }

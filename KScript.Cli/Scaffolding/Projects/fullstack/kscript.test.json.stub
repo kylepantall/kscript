@@ -1,0 +1,14 @@
+// kscript test runs with KSCRIPT_ENV=test, so this "config" section is laid
+// over the one in kscript.json: tests get their own data.
+{
+  "config": {
+{{#if db is none}}
+{{#if examples}}
+    "notes": { "file": "data/test/notes.json" },
+{{/if}}
+{{else}}
+    "database": { "connections": { "main": { "url": "sqlite::memory:" } } },
+{{/if}}
+    "app": { "name": "{{ title }} (tests)" }
+  }
+}
