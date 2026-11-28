@@ -105,44 +105,68 @@ namespace KScript.Data
         public HashSet<string> Guarded { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// The column that says whose a record is, for a model that extends an owner mixin (KScript.Auth's Ownable),
-        /// or null. ->create() fills it from the current owner, and it can't be changed once the record is made.
+        /// True for a model that extends an owner mixin (KScript.Auth's Ownable). Its <see cref="OwnerUser"/> and
+        /// <see cref="OwnerGuest"/> relations say whose a record is: ->create() fills one from the current owner, and
+        /// neither can be changed once the record is made.
         /// </summary>
-        public string OwnerColumn { get; private set; }
+        public bool IsOwned { get; private set; }
 
-        /// <summary>The names of the mixins that give a model an owner column, by the package that ships each one.</summary>
+        /// <summary>The relations of an owned model that say whose a record is: a user's, or a guest's.</summary>
+        public const string OwnerUser = "user", OwnerGuest = "guest";
+
+        /// <summary>The names of the mixins that make a model owned, by the package that ships each one.</summary>
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> OwnerMixins = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Says that the mixin <paramref name="name"/>, declared by one of <paramref name="package"/>'s own scripts, gives
-        /// the models that extend it the owner column <c>owner</c>. KScript.Auth calls it for Ownable.
+        /// Says that the mixin <paramref name="name"/>, declared by one of <paramref name="package"/>'s own scripts (or
+        /// the project's copy of it), makes the models that extend it owned. KScript.Auth calls it for Ownable.
         /// </summary>
         public static void OwnerMixin(string package, string name) => OwnerMixins[name] = package;
 
         /// <summary>
-        /// The current owner (KScript.Auth's @owner()), or null when there isn't one, such as outside a request. Set by
-        /// the package that ships the owner mixin.
+        /// The current owner (who is signed in, else the browser's guest), or null when there isn't one, such as
+        /// outside a request. Set by the package that ships the owner mixin.
         /// </summary>
-        public static Func<CallContext, object> CurrentOwner { get; set; }
+        public static Func<CallContext, ModelInfo, Owner> CurrentOwner { get; set; }
+
+        /// <summary>
+        /// Called before a scope of an owned model runs (->mine()), so the package that ships the owner mixin can
+        /// first move a guest's rows to the account they just signed in to.
+        /// </summary>
+        public static Action<CallContext> OwnedScope { get; set; }
 
         /// <summary>
         /// Moves the rows of every owned model this run has declared, whose table isn't in <paramref name="done"/> yet,
-        /// from one owner to another (a guest's to the account they signed in to), and adds their tables to it. Returns
-        /// how many rows moved.
+        /// from a guest to a user (the account the guest signed in to), and adds their tables to it. Returns how many
+        /// rows moved.
         /// </summary>
-        public static double AdoptOwner(CallContext call, string from, string to, List<string> done)
+        public static double AdoptOwner(CallContext call, object guest, object user, List<string> done)
         {
             double moved = 0;
             foreach (ModelInfo model in Owned(call.Interpreter).Where(m => !done.Contains(m.Table)).ToList())
             {
-                moved += Query.Adopt(call, model, from, to);
+                moved += Query.Adopt(call, model, guest, user);
                 done.Add(model.Table);
             }
             return moved;
         }
 
+        /// <summary>The model called <paramref name="name"/> that a run has declared, or null.</summary>
+        public static ModelInfo Named(Interpreter interpreter, string name) =>
+            Declared.TryGetValue(interpreter, out ConcurrentDictionary<string, ModelInfo> models) && models.TryGetValue(name, out ModelInfo model) ? model : null;
+
+        /// <summary>
+        /// The relation of an owned model that holds a user (<see cref="OwnerUser"/>) or a guest, checked: each must be
+        /// a belongs-to relation, as Ownable declares them.
+        /// </summary>
+        public Relation OwnerRelation(string name)
+        {
+            if (Relation(name) is { Kind: RelationKind.BelongsTo } r) return r;
+            throw new KScriptException($"{Name} is owned, so it needs a {name} field that is a model, such as {name}?: {(name == OwnerUser ? "User" : "Guest")}. Ownable gives it one: put it back in your copy.", "Type");
+        }
+
         /// <summary>Every owned model the interpreter has declared.</summary>
-        public static IEnumerable<ModelInfo> Owned(Interpreter interpreter) => DeclaredBy(interpreter).Where(m => m.OwnerColumn != null && m.Table != null);
+        public static IEnumerable<ModelInfo> Owned(Interpreter interpreter) => DeclaredBy(interpreter).Where(m => m.IsOwned && m.Table != null);
 
         private List<Column> columns;
 
@@ -416,11 +440,9 @@ namespace KScript.Data
                 Options = options,
             };
             model.DeclaredFields.UnionWith(type.Fields.Select(f => f.Name));
-            // Ownable (from KScript.Auth's own script) and the models built on it have an owner column.
-            if (mixin && OwnerMixins.TryGetValue(type.Name, out string ownerPackage)
-                && run.Module.Path == System.IO.Path.Combine(PackageSource.Root, ownerPackage, System.IO.Path.GetFileName(run.Module.Path ?? string.Empty)))
-                model.OwnerColumn = "owner";
-            model.OwnerColumn ??= parents.Select(p => p.Model?.OwnerColumn).FirstOrDefault(c => c != null);
+            // Ownable (from KScript.Auth's own script, or the project's copy of it) and the models built on it are owned.
+            model.IsOwned = mixin && OwnerMixins.TryGetValue(type.Name, out string ownerPackage) && run.Module.PackageOrigin?.Package == ownerPackage
+                || parents.Any(p => p.Model?.IsOwned == true);
             foreach (var entry in type.Bases.Select(DefinitionOf).Where(b => b != null))
             {
                 foreach (var relation in entry.RelationArgs)

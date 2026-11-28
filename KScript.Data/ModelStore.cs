@@ -30,12 +30,17 @@ namespace KScript.Data
         {
             ProjectConfig config = ProjectConfig.FindAndLoad(folder);
             string file = ProjectConfig.ModelFileFor(config.ModelFiles(), name);
-            if (file == null)
-                throw new KScriptException($"{what} is {name}, but there is no {name} model in {config.PathFor("models")}. Make one with kscript make model {name}.", "Config");
             var options = new InterpreterOptions();
             options.DefaultPackages.AddRange(config.Packages);
             var interpreter = new Interpreter(host, options: options);
-            Module module = interpreter.Load(file);
+            // A model a package ships (KScript.Auth's User) is used as it is until the project has its own copy.
+            PackageSource shipped = file == null ? interpreter.Packages.LoadAll().SelectMany(p => p.Sources).FirstOrDefault(s => ProjectConfig.ModelFileFor(new[] { s.FileName }, name) != null) : null;
+            if (file == null && shipped == null)
+                throw new KScriptException($"{what} is {name}, but there is no {name} model in {config.PathFor("models")}. Make one with kscript make model {name}, or publish one a package ships with kscript publish.", "Config");
+            // A shipped model is declared for a script of the project that imports its package, so its records are
+            // kept in the project's database.
+            Module module = file != null ? interpreter.Load(file)
+                : interpreter.LoadText($"import {shipped.Package}\n", Path.Combine(config.Directory, "kscript-" + shipped.Name + ".kscript"));
             interpreter.RunModule(module);
             ModelInfo model = ModelInfo.DeclaredBy(interpreter).FirstOrDefault(m => m.Name == name)
                 ?? throw new KScriptException($"{what} is {name}, but {Path.GetFileName(file)} doesn't declare a model called {name}.", "Config");

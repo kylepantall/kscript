@@ -105,27 +105,81 @@ namespace KScript.Data
             model.Guarded.Count == 0 ? values : values.Where(kv => !model.Guarded.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
 
         /// <summary>
-        /// The owner a new record of an owned model gets: the current owner (who is signed in, or the guest). Naming
-        /// another owner is refused. With no current owner, such as in a seeder or a job, the owner must be named.
+        /// Fills in whose a new record of an owned model is: the current owner (who is signed in, else the guest) sets
+        /// its user or its guest, and naming another owner is refused. With no current owner, such as in a seeder or
+        /// a job, one of user: and guest: must be given. A guest is stored the first time it owns something.
         /// </summary>
-        private static object Owner(CallContext call, ModelInfo model, object given)
+        private static void FillOwner(CallContext call, ModelInfo model, Dictionary<string, object> values, Dictionary<string, object> fill)
         {
-            string column = model.OwnerColumn;
-            given = Values.Unwrap(given);
-            object current = ModelInfo.CurrentOwner?.Invoke(call);
+            Relation user = model.OwnerRelation(ModelInfo.OwnerUser), guest = model.OwnerRelation(ModelInfo.OwnerGuest);
+            object Given(Relation r)
+            {
+                object v = Values.Unwrap(values.GetValueOrDefault(r.Name) ?? values.GetValueOrDefault(r.ForeignKey));
+                return v is Record target ? ModelInfo.KeyOfTarget(r, target) : v;
+            }
+            object givenUser = Given(user), givenGuest = Given(guest);
+            Owner current = ModelInfo.CurrentOwner?.Invoke(call, model);
+            Owner owner;
             if (current != null)
             {
-                if (given != null && !Equals(Values.ToStr(given), Values.ToStr(current)))
-                    throw new KScriptException($"A {model.Name} gets its {column} from who is making it, so it can't be made for someone else. Leave {column} out.", "Forbidden");
-                return current;
+                object mine = current.Relation == ModelInfo.OwnerUser ? givenUser : givenGuest, other = current.Relation == ModelInfo.OwnerUser ? givenGuest : givenUser;
+                if (other != null || (mine != null && !SameKey(mine, current.Key)))
+                    throw new KScriptException($"A {model.Name} gets its owner from who is making it, so it can't be made for someone else. Leave {user.Name} and {guest.Name} out.", "Forbidden");
+                owner = current;
             }
-            return given ?? throw new KScriptException(
-                $"A new {model.Name} needs an owner, and there is no one signed in and no guest here. Outside a request, name one: {model.Name}->create({column}: @owner(as: $user), ...).", "Unauthorized");
+            else if (givenUser != null && givenGuest != null)
+                throw new KScriptException($"A {model.Name} belongs to a user or a guest, not both. Give {user.Name}: or {guest.Name}:.", "Argument");
+            else if (givenUser != null || givenGuest != null)
+                owner = new Owner(givenUser != null ? ModelInfo.OwnerUser : ModelInfo.OwnerGuest, givenUser ?? givenGuest);
+            else
+                throw new KScriptException(
+                    $"A new {model.Name} needs an owner, and there is no one signed in and no guest here. Outside a request, name one: {model.Name}->create({user.Name}: $user, ...).", "Unauthorized");
+            foreach (Relation r in new[] { user, guest })
+            {
+                fill.Remove(r.Name);
+                fill[r.ForeignKey] = r.Name == owner.Relation ? owner.Key : null;
+            }
+            if (owner.Relation == ModelInfo.OwnerGuest) StoreGuest(call, guest.Target, owner.Key);
         }
 
-        /// <summary>The error for changing the owner column of a record that has been made.</summary>
+        /// <summary>Adds the guest's row the first time it owns something, so the record's guest points to it.</summary>
+        private static void StoreGuest(CallContext call, ModelInfo guests, object key)
+        {
+            Query rows = new Query(Database.For(call, guests), guests.Table, guests);
+            if (rows.And(rows.Equalities(new[] { new KeyValuePair<string, object>(guests.Key, key) }, "create")).Count(call) > 0) return;
+            Insert(call, guests, Prepare(call, guests, new Dictionary<string, object>(StringComparer.Ordinal) { [guests.Key] = key }, fillable: false));
+        }
+
+        private static bool SameKey(object a, object b) => string.Equals(Values.ToStr(Values.Unwrap(a)), Values.ToStr(Values.Unwrap(b)), StringComparison.Ordinal);
+
+        /// <summary>True when <paramref name="other"/> is the same row as <paramref name="record"/>: a record of its model with its key, or the key.</summary>
+        internal static bool IsSame(Record record, object other)
+        {
+            ModelInfo model = ModelInfo.Of(record);
+            object key = record.GetValueOrDefault(model.Key);
+            other = Values.Unwrap(other);
+            if (key == null || other == null) return false;
+            if (other is Record r) return ModelInfo.Of(r)?.Table == model.Table && SameKey(r.GetValueOrDefault(model.Key), key);
+            return SameKey(other, key);
+        }
+
+        /// <summary>True when an update would change whose an owned record is: its user or guest, or their columns.</summary>
+        internal static bool ChangesOwner(ModelInfo model, string field) =>
+            model.IsOwned && new[] { ModelInfo.OwnerUser, ModelInfo.OwnerGuest }.Any(n => field == n || model.Relation(n)?.ForeignKey == field);
+
+        /// <summary>True when <paramref name="value"/> for an owner field is what the record already has.</summary>
+        private static bool SameOwner(ModelInfo model, Record record, string field, object value)
+        {
+            Relation r = model.Relation(field) ?? model.Relations.Values.First(x => x.ForeignKey == field);
+            value = Values.Unwrap(value);
+            object key = value is Record target ? ModelInfo.KeyOfTarget(r, target) : value;
+            object had = record.GetValueOrDefault(r.ForeignKey);
+            return key == null ? had == null : had != null && SameKey(key, had);
+        }
+
+        /// <summary>The error for changing whose a record of an owned model is, once it has been made.</summary>
         internal static KScriptException OwnerIsFixed(ModelInfo model) =>
-            new KScriptException($"{model.Name}.{model.OwnerColumn} is set when the record is made and can't be changed.", "Forbidden");
+            new KScriptException($"Whose a {model.Name} is ({ModelInfo.OwnerUser} or {ModelInfo.OwnerGuest}) is set when the record is made and can't be changed.", "Forbidden");
 
         /// <summary><c>User->create({...})</c>: checks the values against the model, saves them and returns the record.</summary>
         public static Record Create(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
@@ -138,7 +192,7 @@ namespace KScript.Data
         internal static Record Prepare(CallContext call, ModelInfo model, Dictionary<string, object> values, bool fillable = true)
         {
             Dictionary<string, object> fill = (fillable ? Fillable(model, values) : values).ToDictionary(kv => kv.Key, kv => kv.Value is BareWord w ? w.Name : kv.Value, StringComparer.Ordinal);
-            if (model.OwnerColumn != null) fill[model.OwnerColumn] = Owner(call, model, values.GetValueOrDefault(model.OwnerColumn));
+            if (model.IsOwned) FillOwner(call, model, values, fill);
             // A belongs-to record given (author: $user) is its key: the model it is may be one this model's file
             // doesn't import (it was loaded from the models folder), so its type can't be checked by name here.
             foreach (Relation r in model.Relations.Values.Where(r => r.Kind == RelationKind.BelongsTo))
@@ -309,7 +363,7 @@ namespace KScript.Data
             ModelInfo model = ModelInfo.Of(record);
             foreach (KeyValuePair<string, object> v in values)
             {
-                if (v.Key == model.OwnerColumn && !Equals(Values.ToStr(Values.Unwrap(v.Value)), Values.ToStr(record.GetValueOrDefault(v.Key)))) throw OwnerIsFixed(model);
+                if (ChangesOwner(model, v.Key) && !SameOwner(model, record, v.Key, v.Value)) throw OwnerIsFixed(model);
                 if (model.Guarded.Contains(v.Key)) continue;
                 if (model.Type.Field(v.Key) is null) model.Need(v.Key, " for ->update()");
                 record.Set(call.Interpreter, v.Key, v.Value is BareWord w ? w.Name : v.Value);
@@ -357,4 +411,7 @@ namespace KScript.Data
             return ThisRow(call, model, record).First(call);
         }
     }
+
+    /// <summary>Whose a record of an owned model is: a user's or a guest's (the relation), and their key.</summary>
+    internal sealed record Owner(string Relation, object Key);
 }

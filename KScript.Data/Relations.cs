@@ -599,6 +599,7 @@ namespace KScript.Data
         /// <summary>Runs a scope on a query: <c>fn admins(query) => $query->where(role: admin)</c> makes <c>User->admins()</c>.</summary>
         internal Query ApplyScope(CallContext call, Query query, string name, IReadOnlyList<object> args, IReadOnlyDictionary<string, object> named)
         {
+            if (IsOwned) OwnedScope?.Invoke(call);
             MarkupElement e = Type.OwnMethods[name];
             Scope s = Type.Closure.Child();
             var fn = call.Interpreter.DeclareFunction(e, s, Type.Module, Type.Catches, query);

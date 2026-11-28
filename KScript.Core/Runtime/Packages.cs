@@ -133,6 +133,21 @@ namespace KScript.Runtime
         public static bool IsSource(string path) =>
             path != null && path.StartsWith(Root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
+        /// <summary>The script's name without its ending: <c>user</c> for user.kscript. kscript publish takes it.</summary>
+        public string Name => KScript.Projects.ProjectConfig.ScriptName(FileName);
+
+        /// <summary>
+        /// The project's own copy of this script, which replaces it: a file of the same name in the project's models
+        /// folder (paths.models), such as the models/user.kscript that kscript publish User writes. Null when the
+        /// project has none, or <paramref name="directory"/> isn't in a project.
+        /// </summary>
+        public string ProjectCopy(string directory) =>
+            directory == null || KScript.Projects.ProjectConfig.FindAndLoad(directory) is not KScript.Projects.ProjectConfig config ? null : ProjectCopy(config.ModelFiles());
+
+        /// <summary>The copy of this script among a project's model files, or null.</summary>
+        public string ProjectCopy(IEnumerable<string> modelFiles) =>
+            KScript.Projects.ProjectConfig.ModelFileFor(modelFiles, Name) is string file ? System.IO.Path.GetFullPath(file) : null;
+
         /// <summary>The package script at a path, among the packages given, or null.</summary>
         public static PackageSource At(string path, IEnumerable<KScriptPackage> packages) =>
             IsSource(path) ? packages.SelectMany(p => p.Sources).FirstOrDefault(s => string.Equals(s.Path, path, StringComparison.Ordinal)) : null;

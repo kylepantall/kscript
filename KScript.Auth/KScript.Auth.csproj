@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Sources\ownable.kscript" LogicalName="KScript.Auth.Sources.ownable.kscript" />
+    <EmbeddedResource Include="Sources\user.kscript" LogicalName="KScript.Auth.Sources.user.kscript" />
+    <EmbeddedResource Include="Sources\guest.kscript" LogicalName="KScript.Auth.Sources.guest.kscript" />
   </ItemGroup>
 
   <ItemGroup>

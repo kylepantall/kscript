@@ -1,24 +1,37 @@
 import KScript.Data
 import KScript.Auth
 
-/// Rows that belong to one owner, who is the signed-in user or the browser's
-/// guest. A model that extends Ownable gets an owner column, filled from
-/// @owner() when a record is made and never changed after, the mine() scope and
-/// ->is_mine().
-model Ownable(mixin, index: [owner], guarded: [owner]) {
-  /// Whose record it is: user:<id> or guest:<uuid>, as @owner() gives it.
-  owner: string(max: 80)
+/// Rows that belong to one owner: the signed-in user, or the browser's guest. A model that extends Ownable
+/// gets a user and a guest, one of them filled in from who is making a record and never changed after, the
+/// mine() scope and ->is_mine(). To change them, publish your own copy with kscript publish Ownable.
+model Ownable(mixin, guarded: [user, guest]) {
+  /// The user the record belongs to, or null when a guest made it.
+  user?: User
 
-  /// Keeps the current owner's rows. Outside a request (a test, job or
-  /// script), name the owner: ->mine(as: $user).
+  /// The guest the record belongs to, or null when a signed-in user made it.
+  guest?: Guest
+
+  /// Keeps the current owner's rows. Outside a request (a test, job or script), name the user:
+  /// ->mine(as: $user).
   fn mine(query, as: any = null) {
-    owner = @owner(as: $as)
-    guard $owner != null else {
-      throw Unauthorized "->mine() needs someone signed in, or a guest. Outside a request, name the owner, such as ->mine(as: the user)."
+    owner = $as ?? @user()
+    if $owner != null {
+      return $query->where(user: $owner)
     }
-    return $query->where(owner: $owner)
+    visitor = @guest()
+    guard $visitor != null else {
+      throw Unauthorized "->mine() needs someone signed in, or a guest. Outside a request, name the user, such as ->mine(as: the user)."
+    }
+    return $query->where(guest: $visitor)
   }
 
-  /// True when the record belongs to the current owner.
-  fn is_mine() => $owner == @owner()
+  /// True when the record belongs to whoever is making the request.
+  fn is_mine() {
+    me = @user()
+    if $me != null {
+      return $this.user != null and $this.user->is($me)
+    }
+    visitor = @guest()
+    return $visitor != null and $this.guest != null and $this.guest->is($visitor)
+  }
 }
