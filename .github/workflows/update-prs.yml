@@ -2,7 +2,8 @@ name: Update open pull requests
 
 # CI doesn't run on master (see ci.yml), and the "main" ruleset only lets a pull request merge once it is up to date
 # with master. So when something lands on master, this brings every open pull request up to date and starts its CI
-# again, and a pull request with auto-merge on then merges by itself once it is green.
+# again, and a pull request with auto-merge on then merges by itself once it is green. Pull requests stacked on the
+# one that merged move onto master first.
 #
 # GitHub doesn't start workflows for commits made with GITHUB_TOKEN, so the update alone wouldn't run CI. Running a
 # workflow by hand (workflow_dispatch) is the exception, so this starts CI on the updated branch that way. Its checks
@@ -28,6 +29,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # A stacked pull request targets the branch of the pull request below it. Once that one has merged, point the
+      # stacked one at master, so the next step brings it up to date and runs its CI like any other. (GitHub does this
+      # itself only when it deletes the merged branch.)
+      - name: Retarget pull requests stacked on the one that merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -u
+          gh api "repos/$GH_REPO/commits/${{ github.sha }}/pulls" --jq '.[] | select(.merged_at != null) | .head.ref' |
+          while read -r merged; do
+            gh api --paginate "repos/$GH_REPO/pulls?state=open&base=$merged&per_page=100" --jq '.[].number' |
+            while read -r number; do
+              gh api -X PATCH "repos/$GH_REPO/pulls/$number" -f base=master --silent &&
+                echo "#$number was stacked on $merged; it now targets master"
+            done
+          done
+
       - name: Bring each pull request up to date and run its CI
         env:
           GH_TOKEN: ${{ github.token }}
