@@ -1,6 +1,22 @@
 # AI assistants (MCP)
 
-`kscript mcp` gives AI coding assistants these docs, so they write KScript from the reference of the version you have installed instead of guessing. It is a [Model Context Protocol](https://modelcontextprotocol.io) server: Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Codex, Gemini CLI and most other assistants can use it. It runs on your computer and works offline, and it is built from the same guides and language catalog as `kscript docs` and the editor, so all three always agree.
+## Introduction
+
+AI coding assistants know a lot of languages, but they may not know KScript, or the version you have. `kscript mcp` gives them these docs, so they write KScript from the reference of the version you have installed instead of guessing.
+
+`kscript mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server. Claude Code, Claude Desktop, Cursor, VS Code, Windsurf, Codex, Gemini CLI and most other assistants can use it. It runs on your computer and works offline. It is built from the same guides and language catalog as `kscript docs` and the editor, so all three always agree.
+
+The KScript extension for VS Code finds the server for you. For other assistants, [add it once](#setting-it-up), and the assistant starts it when it needs it:
+
+```sh
+claude mcp add kscript -- kscript mcp   # Claude Code
+```
+
+For docs an assistant reads without a server, made from your own code, see [Coding agents](agents.md) (`kscript agents`).
+
+### Running the server
+
+Assistants start `kscript mcp` themselves, talking to it on stdin and stdout. You may also choose the syntax its examples use, or serve it over HTTP:
 
 ```sh
 kscript mcp                 # the server on stdin and stdout: assistants start it themselves
@@ -8,28 +24,30 @@ kscript mcp --syntax xml    # show examples as XML instead of .kscript
 kscript mcp --http          # serve on http://localhost:4181/mcp instead
 ```
 
-For docs an assistant reads without a server, made from your own code, see [Coding agents](agents.md) (`kscript agents`).
-
-The KScript extension for VS Code discovers the server automatically. For other clients, add it once as shown below. The assistant starts it when it needs it.
-
 ## What the assistant gets
 
-Tools it can call:
+### Tools
 
-| Tool | What it does |
-|---|---|
-| `search_docs` | Searches the guides and the reference: packages, elements, commands, methods, built-in variables and `kscript` commands. |
-| `read_doc` | Reads a whole page as Markdown: a guide (`language`, `code-format`, `web`...), a package (`KScript.IO`), a type's methods (`string methods`), `variables` or `cli`. |
-| `lookup` | Everything about one name: `<for>`, `@read_text`, `list->map`, `$args` or `KScript.Math`. Parameters and their types, the return type, retired v1 names and an example. |
-| `list_make_commands` | The `kscript make` templates of your project (built in and `_templates/`) and the project templates. |
-| `check_code` | Checks code or a file without running it, like `kscript check`, with your project's lint rules. |
-| `format_code` | Formats code or a file like `kscript fmt`, with your project's format settings, and returns the result. |
-| `convert_code` | Converts between XML and `.kscript`, like `kscript convert`. |
-| `run_code` | Runs a short script in the same sandbox as the docs' Run buttons and returns what it printed. |
+The server gives the assistant these tools to call:
+
+- `search_docs` searches the guides and the reference: packages, elements, commands, methods, built-in variables and `kscript` commands.
+- `read_doc` reads a whole page as Markdown: a guide (`language`, `code-format`, `web`...), a package (`KScript.IO`), a type's methods (`string methods`), `variables` or `cli`.
+- `lookup` gives everything about one name, such as `<for>`, `@read_text`, `list->map`, `$args` or `KScript.Math`: its parameters and their types, the return type, retired v1 names and an example.
+- `list_make_commands` lists the `kscript make` templates of your project (built in and `_templates/`) and the project templates.
+- `check_code` checks code or a file without running it, like `kscript check`, with your project's lint rules.
+- `format_code` formats code or a file like `kscript fmt`, with your project's format settings, and returns the result.
+- `convert_code` converts between XML and `.kscript`, like `kscript convert`.
+- `run_code` runs a short script in the same sandbox as the docs' Run buttons, and returns what it printed.
+
+### Resources
 
 Every page is also a resource, such as `kscript://docs/guide/language` or `kscript://docs/reference/io`, for assistants that let you attach resources to a chat.
 
+### Syntax and project
+
 Examples come in your project's syntax: `make.syntax` in `kscript.json`, or `.kscript` outside a project. `--syntax` picks one for every call, and a tool call can ask for the other. The project is the folder the assistant starts the server in; `--dir` names another.
+
+### What the server may touch
 
 Nothing the server does changes your files. `check_code` and `format_code` read a file only when the assistant passes its path, and only a script or page (`.kscript`, `.ks.xml`, `.html`, `.md`) inside the project folder. `run_code` runs in an empty temporary folder with no network and without your environment variables.
 
