@@ -20,7 +20,11 @@ describe(name: 'Pages') {
   }
 
   test(name: 'a signed-in account page makes an API token') {
-    @acting_as(@register('ada@example.test', 'correct-horse-battery-9'))
+    @acting_as(@register(
+      'ada@example.test',
+      'correct-horse-battery-9',
+      name: 'Ada'
+    ))
     page = @visit('/account')
     expect($page.path, equals: '/account')
     page = $page->fill('name', 'laptop')->submit('Make a token')
@@ -29,7 +33,11 @@ describe(name: 'Pages') {
   }
 
   test(name: "the profile page shows the signed-in user's profile") {
-    @acting_as(@register('bea@example.test', 'correct-horse-battery-9'))
+    @acting_as(@register(
+      'bea@example.test',
+      'correct-horse-battery-9',
+      name: 'Bea'
+    ))
     page = @visit('/profile')->click('Show saved bio')
     expect($page.path, equals: '/profile')
     expect($page.text, contains: 'Saved bio:')

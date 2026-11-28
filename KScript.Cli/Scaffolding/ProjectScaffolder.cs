@@ -156,14 +156,22 @@ namespace KScript.Scaffolding
             // Kits the template asks for ("make": ["{{#if auth}}auth{{/if}}"]), made in the new project.
             foreach (string kit in kits)
             {
+                if (string.Equals(kit, "users", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!dryRun) files.AddRange(AuthMaker.UseUserModel(dir, values[ScriptFormat.Option]).Where(f => !files.Contains(f)));
+                    continue;
+                }
                 if (!string.Equals(kit, "auth", StringComparison.OrdinalIgnoreCase))
-                    throw new StubException($"The project template asks for 'make: {kit}', but only auth and docker can be made with a project.");
+                    throw new StubException($"The project template asks for 'make: {kit}', but only auth, users and docker can be made with a project.");
                 if (dryRun)
                 {
                     notes.Add("Note: --dry-run leaves out the sign-in files (kscript make auth), which are made once the project is.");
                     continue;
                 }
-                AuthResult auth = AuthMaker.Make(dir, new Dictionary<string, string> { [ScriptFormat.Option] = values[ScriptFormat.Option] }, force, dryRun: false);
+                // A project without a database keeps its users in files.
+                var authOptions = new Dictionary<string, string> { [ScriptFormat.Option] = values[ScriptFormat.Option] };
+                if (values.TryGetValue("db", out string db) && db == "none") authOptions["users"] = "files";
+                AuthResult auth = AuthMaker.Make(dir, authOptions, force, dryRun: false);
                 foreach (var (_, path) in auth.Files) if (!files.Contains(path) && File.Exists(Path.Combine(dir, path))) files.Add(path);
             }
 

@@ -156,6 +156,20 @@ namespace KScript.Scaffolding
             if (passkeys) configFile ??= Path.Combine(root, "kscript.json");
             string newConfig = passkeys ? PasskeyConfig(config ?? "{}", configFile, options, project) : config != null && !Regex.IsMatch(config, @"""types""\s*:") ? AddPasswordRule(config) : null;
 
+            // The users are kept in the project's own User model (a copy of KScript.Auth's, to change as it needs).
+            // Someone who signs up with a passkey has no email or password, so the passkey kit's copy makes both optional.
+            string userModel = null;
+            bool fileUsers = string.Equals(options.GetValueOrDefault("users"), "files", StringComparison.OrdinalIgnoreCase);
+            Func<string, string> change = passkeys ? PasskeyUser : null;
+            if (!fileUsers && project?.Http.Auth.Users == null)
+            {
+                configFile ??= Path.Combine(root, "kscript.json");
+                string start = newConfig ?? config;
+                newConfig = SetJsonProperty(start ?? AddPasswordRule("{\n}\n"), new[] { "http", "auth", "users" }, JsonConfigEdit.Quote("User"));
+                Publisher.Publishable user = Publisher.Find("User");
+                if (Publisher.Existing(root, project, user) == null) userModel = Publisher.PathFor(project, user, format);
+            }
+
             if (newConfig == config) newConfig = null;
             if (!dryRun)
             {
@@ -172,12 +186,14 @@ namespace KScript.Scaffolding
                     File.WriteAllText(full, text);
                 }
                 if (newConfig != null) File.WriteAllText(configFile, newConfig);
+                if (userModel != null) Publisher.Publish(root, Publisher.Find("User"), options, force: false, dryRun: false, change);
             }
 
             foreach (var (file, _, existed) in routeEdits) result.Files.Add((existed ? "Added to" : "Created", file));
             foreach (string rel in files.Keys.OrderBy(f => f.EndsWith(".html", StringComparison.Ordinal) ? 1 : 0).ThenBy(f => f, StringComparer.Ordinal))
                 result.Files.Add(("Created", rel));
-            if (newConfig != null) result.Files.Add((passkeys ? "Configured passkeys in" : "Added a password rule to", Path.GetRelativePath(root, configFile).Replace('\\', '/')));
+            if (userModel != null) result.Files.Add(("Published", userModel));
+            if (newConfig != null) result.Files.Add((passkeys ? "Configured passkeys in" : "Configured sign-in in", Path.GetRelativePath(root, configFile).Replace('\\', '/')));
 
             result.Next.Add("kscript serve, then open /register to make an account and /account to see it.");
             if (passkeys) result.Next.Add("Set http.auth.passkey_origin to your public HTTPS origin before deploying. Add a backup passkey on /account.");
@@ -191,6 +207,26 @@ namespace KScript.Scaffolding
             }
             return result;
         }
+
+        /// <summary>
+        /// Keeps a new project's users in its own User model: publishes KScript.Auth's User into the models folder
+        /// and names it in http.auth.users. The api project template's "users" kit.
+        /// </summary>
+        public static IEnumerable<string> UseUserModel(string root, string format)
+        {
+            ProjectConfig project = ProjectConfig.FindAndLoad(root);
+            string configFile = project?.FilePath ?? Path.Combine(root, "kscript.json");
+            string config = File.Exists(configFile) ? File.ReadAllText(configFile).Replace("\r\n", "\n") : "{\n}\n";
+            File.WriteAllText(configFile, SetJsonProperty(config, new[] { "http", "auth", "users" }, JsonConfigEdit.Quote("User")));
+            Publisher.Publishable user = Publisher.Find("User");
+            if (Publisher.Existing(root, ProjectConfig.FindAndLoad(root), user) != null) yield break;
+            yield return Publisher.Publish(root, user, new Dictionary<string, string> { [ScriptFormat.Option] = format }, force: false, dryRun: false);
+        }
+
+        /// <summary>KScript.Auth's User with an optional email and password, for people who sign up with a passkey.</summary>
+        internal static string PasskeyUser(string text) => text
+            .Replace("\n  email: email\n", "\n  email?: email\n", StringComparison.Ordinal)
+            .Replace("\n  password: password\n", "\n  password?: password\n", StringComparison.Ordinal);
 
         private static string PasskeyConfig(string json, string file, Dictionary<string, string> options, ProjectConfig project)
         {

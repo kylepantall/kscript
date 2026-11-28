@@ -1,7 +1,7 @@
 import KScript.Data
 
 /// The signed-in account's profile.
-model Profile(unique: [user_id]) {
-  user_id: string
+model Profile(unique: [user]) {
+  user: User
   bio: string(max: 160) = ''
 }

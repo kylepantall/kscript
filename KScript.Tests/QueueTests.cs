@@ -967,6 +967,38 @@ public sealed class QueueTests : StorageFixture
     }
 
     [Fact]
+    public void TheDatabaseDriverUsesTheTablesKScriptJsonNames()
+    {
+        UseDatabase("\", \"queue\": { \"default\": \"database\", \"connections\": { \"database\": { \"driver\": \"database\", \"tables\": { \"jobs\": \"app_jobs\", \"failed\": \"app_failed\", \"locks\": \"app_locks\" } } } } }");
+        Code("import \"jobs/welcome.kscript\"\nWelcome(user_id: 2, email: 'ann@example.com')->dispatch()");
+        Assert.Equal(1L, Sql("SELECT COUNT(*) AS n FROM app_jobs")[0]["n"]);
+        Assert.Equal(0L, Sql("SELECT COUNT(*) AS n FROM app_failed")[0]["n"]);
+        Assert.Equal(0L, Sql("SELECT COUNT(*) AS n FROM app_locks")[0]["n"]);
+        Work();
+        Assert.Contains("#2 attempt 1", JobOutput());
+        Assert.Equal(0L, Sql("SELECT COUNT(*) AS n FROM app_jobs")[0]["n"]);
+    }
+
+    [Fact]
+    public void WithoutAutoCreateTheTablesComeFromTheMigrations()
+    {
+        UseDatabase("\", \"queue\": { \"default\": \"database\", \"connections\": { \"database\": { \"driver\": \"database\", \"auto_create\": false } } } }");
+        var error = Assert.Throws<KScriptException>(() => Driver().QueueNames());
+        Assert.Equal("Config", error.Type);
+        Assert.Contains("keeps its jobs in kscript_jobs, which isn't in the database yet. Run kscript db migrate.", error.Message);
+    }
+
+    [Theory]
+    [InlineData("{ \"tables\": { \"jobs\": \"my jobs\" } }", "queue.connections.db.tables.jobs should be a table name")]
+    [InlineData("{ \"tables\": { \"work\": \"w\" } }", "unknown setting 'queue.connections.db.tables.work' (expected jobs, failed or locks)")]
+    [InlineData("{ \"auto_create\": \"no\" }", "queue.connections.db.auto_create")]
+    public void QueueTableSettingsAreChecked(string extra, string warning)
+    {
+        var config = ProjectConfig.Parse("{ \"queue\": { \"connections\": { \"db\": " + extra.Insert(1, " \"driver\": \"database\",") + " } } }", "kscript.json");
+        Assert.Contains(config.Warnings, w => w.Contains(warning, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void DatabaseJobsRetryFailAndComeBack()
     {
         UseDatabase();

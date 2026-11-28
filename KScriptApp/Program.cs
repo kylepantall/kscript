@@ -715,6 +715,11 @@ namespace KScript
                 new KScript.Output.CliOutput(Error).Error($"'{args[0]}' is written with a space: kscript make {(type.Length == 0 ? "<type>" : type)}{(args.Length > 1 ? " " + string.Join(" ", args.Skip(1)) : string.Empty)}");
                 return ExitCodes.Usage;
             }
+            if (args[0] == "publish")
+            {
+                return KScript.Scaffolding.PublishCommand.Run(args.Skip(1).ToArray(), Out, Error);
+            }
+
             if (args[0] == "make")
             {
                 return KScript.Scaffolding.MakeCommand.Run(args.Skip(1).ToArray(), Out, Error);

@@ -245,7 +245,7 @@ namespace KScript.Data
                 (q, c) =>
                 {
                     Dictionary<string, object> values = ValuesOf(c, "update");
-                    if (q.Model?.OwnerColumn is string owner && values.ContainsKey(owner)) throw Records.OwnerIsFixed(q.Model);
+                    if (q.Model != null && values.Keys.Any(k => Records.ChangesOwner(q.Model, k))) throw Records.OwnerIsFixed(q.Model);
                     return q.Update(c, q.Model != null ? Records.Fillable(q.Model, values) : values);
                 }, Bare: true),
             new("increment", "column, by?: number", "Adds to a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,
@@ -421,6 +421,8 @@ namespace KScript.Data
                     Data.Relation.LoadPaths(c, ModelInfo.Of(r), new[] { r }, Relations(c, "load"));
                     return r;
                 }).Info.KeepsBareWords = true;
+            p.Method(KType.Record, "is", "other", "True when the other record is the same row: a record of the same model with the same key, or that key itself. `$post.author->is(@user())`.", KType.Bool,
+                (t, c) => Records.IsSame(RecordOf(t, c), c.Arg(0)));
             p.Method(KType.Record, "is_saved", "", "True when the record is in the database: it was read from it or has been saved.", KType.Bool,
                 (t, c) => Records.State(RecordOf(t, c))?.Exists == true);
 

@@ -64,7 +64,7 @@ namespace KScript.Docs
         internal static readonly (string Table, string What, string Link)[] KeptTables =
         {
             ("kscript_migrations", "Every migration that has run, with the batch it ran in. `kscript db migrate` and `kscript db rollback` read and write it.", "/guide/data#running-and-rolling-back"),
-            ("kscript_jobs", "Jobs waiting to run, and running, with the database queue driver.", "/guide/queues"),
+            ("kscript_jobs", "Jobs waiting to run, and running, with the database queue driver. The connection's `tables` setting renames the queue's tables, and `kscript publish queue` writes their migration.", "/guide/queues#naming-the-tables-and-making-them-with-migrations"),
             ("kscript_failed_jobs", "Jobs that failed every try, with the database queue driver. `kscript queue failed` lists them.", "/guide/queues"),
             ("kscript_job_locks", "The keys of unique jobs, with the database queue driver.", "/guide/queues"),
         };

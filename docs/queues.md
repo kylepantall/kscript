@@ -166,6 +166,31 @@ The `database` driver keeps waiting and running jobs in a `kscript_jobs` table, 
 { "database": { "connections": { "queue": { "url": "sqlite:data/queue.sqlite" } } } }
 ```
 
+#### Naming the tables, and making them with migrations
+
+`tables` names the tables a database connection uses. Leave out any you don't want to rename:
+
+```jsonc
+// kscript.json
+{
+  "queue": {
+    "connections": {
+      "database": { "driver": "database", "tables": { "jobs": "jobs", "failed": "failed_jobs", "locks": "job_locks" } }
+    }
+  }
+}
+```
+
+To make the tables with the rest of your [migrations](data.md#migrations), instead of the first time a job is dispatched, publish their migration:
+
+```sh
+kscript publish queue                      # the database connection's tables
+kscript publish queue --connection jobs    # another database connection's
+kscript db migrate
+```
+
+`kscript publish queue` writes `database/migrations/<time>_create_queue_tables.kscript`, using the names in `tables`, and sets the connection's `auto_create` to `false`. The driver then leaves the tables to the migration, and says to run `kscript db migrate` if they aren't there yet. Test databases run the migrations, so tests that dispatch to the database queue keep working. A connection that keeps its jobs in another database (`connection`) leaves its tables to the driver, because `kscript db migrate` runs on the default database.
+
 A worker takes a job in one write transaction that reads the next due row and marks it as running, so two workers never get the same job. If the database is busy or can't be reached, the worker says so and tries again after a pause, rather than stopping.
 
 If a worker stops in the middle of a job (the machine restarts, say), the job is held for its timeout plus 30 seconds, then goes back on the queue for the next worker, and counts as a try.
