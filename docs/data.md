@@ -355,6 +355,7 @@ Note->insert([
 Change a record's fields, then call `->save()`. Only the fields that changed are written, along with `updated_at`:
 
 ```kscript
+note = Note->find(1)
 note.pinned = true
 $note->save()
 ```
