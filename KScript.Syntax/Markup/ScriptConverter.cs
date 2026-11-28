@@ -73,29 +73,36 @@ namespace KScript.Syntax.Markup
 
         private static Func<string, ElementInfo> elementsHook;
         private static bool elementsLooked;
+        private static readonly object elementsLock = new();
 
         /// <summary>
         /// Describes each element by name (the language catalog), so values are written the way each argument is
         /// read: text in quotes, values and names bare, lists as arrays, handlers in braces. KScript.Language sets it;
-        /// when it hasn't been set, the catalog is looked up the first time it is needed.
+        /// when it hasn't been set, the catalog is looked up the first time it is needed. The lookup is done under a
+        /// lock, so a conversion on another thread waits for it rather than seeing no catalog and copying values as
+        /// written.
         /// </summary>
         public static Func<string, ElementInfo> Elements
         {
             get
             {
-                if (elementsHook == null && !elementsLooked)
+                if (elementsHook != null || Volatile.Read(ref elementsLooked)) return elementsHook;
+                lock (elementsLock)
                 {
-                    elementsLooked = true;
-                    try
+                    if (elementsHook == null && !elementsLooked)
                     {
-                        Type catalog = Type.GetType("KScript.Language.Catalog.LanguageCatalog, KScript.Language");
-                        object instance = catalog?.GetProperty("Default")?.GetValue(null);
-                        System.Reflection.MethodInfo get = catalog?.GetMethod("GetElement", new[] { typeof(string) });
-                        if (instance != null && get != null) elementsHook = name => (ElementInfo)get.Invoke(instance, new object[] { name });
-                    }
-                    catch (Exception)
-                    {
-                        // No catalog here (the syntax library on its own): values are copied as written.
+                        try
+                        {
+                            Type catalog = Type.GetType("KScript.Language.Catalog.LanguageCatalog, KScript.Language");
+                            object instance = catalog?.GetProperty("Default")?.GetValue(null);
+                            System.Reflection.MethodInfo get = catalog?.GetMethod("GetElement", new[] { typeof(string) });
+                            if (instance != null && get != null) elementsHook = name => (ElementInfo)get.Invoke(instance, new object[] { name });
+                        }
+                        catch (Exception)
+                        {
+                            // No catalog here (the syntax library on its own): values are copied as written.
+                        }
+                        Volatile.Write(ref elementsLooked, true);
                     }
                 }
                 return elementsHook;

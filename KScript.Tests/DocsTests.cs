@@ -740,7 +740,7 @@ public sealed class DocsTests
         Assert.Contains("href=\"/guide/data/queries\"", rendered);
         Assert.Contains("href=\"/guide/data\">", rendered);
         Assert.Contains("data-lang=\"kscript\"", site.Find("/guide/components/component-inputs-rendering-and-slots").Body);
-        Assert.Contains("@contrast_color", site.Find("/guide/stylesheets/stylesheet-cheatsheet").Body);
+        Assert.Contains("@contrast_color", site.Find("/guide/stylesheets/colours").Body);
     }
 
     [Fact]
