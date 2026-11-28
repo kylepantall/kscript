@@ -223,6 +223,8 @@ namespace KScript.Docs
             }
             foreach (PackageDeclaration d in PackageDeclarations())
                 yield return new IndexEntry(d.Name, $"{d.What} in {d.Package}", ModelsPath + "#" + d.Anchor, Summary(d.Element));
+            foreach (IndexEntry d in DirectiveIndexEntries())
+                yield return d;
             foreach (CallableInfo c in Catalog.Commands.Where(c => !c.Planned))
                 yield return new IndexEntry("@" + c.Name, "command in " + c.Package, PackageSlug(c.Package) + "#" + CommandAnchor(c), c.Description);
             foreach (string type in MethodTypes)

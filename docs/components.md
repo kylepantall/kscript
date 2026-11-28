@@ -128,6 +128,8 @@ KScript restores fields the instance changed on later actions. Fields the compon
 
 Put KScript behavior in directives on the opening HTML tag. For example, `@bind($title, on: blur)` takes a field and options, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and checks each option's value. The HTML spellings `bind="$title"` and `on-click="count += 1"` work too. A binding names its field with `$`: `@bind('title')` and `bind="title"` are errors with a quick fix to `@bind($title)`.
 
+Every directive, shorthand, modifier and `$event` field is listed in [Page directives](/reference/directives).
+
 Each directive has one spelling. These older attributes are errors with a quick fix that moves them where they now go:
 
 | Was | Now |
