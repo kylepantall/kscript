@@ -391,14 +391,15 @@ namespace KScript.Data
         private const string Adopting = "adopt";
 
         /// <summary>
-        /// Moves every row of an owned model from one owner to another, deleted rows too: a guest's rows become the
+        /// Moves every row of an owned model from a guest to a user, deleted rows too: a guest's rows become the
         /// account's when the guest signs in. Returns how many rows moved.
         /// </summary>
-        public static double Adopt(CallContext call, ModelInfo model, string from, string to)
+        public static double Adopt(CallContext call, ModelInfo model, object guest, object user)
         {
+            string guestColumn = model.OwnerRelation(ModelInfo.OwnerGuest).ForeignKey, userColumn = model.OwnerRelation(ModelInfo.OwnerUser).ForeignKey;
             var rows = new Query(Database.For(call, model), model.Table, model).WithTrashed("with");
-            rows = rows.And(rows.Equalities(new[] { new KeyValuePair<string, object>(model.OwnerColumn, from) }, Adopting));
-            return rows.Update(call, new[] { new KeyValuePair<string, object>(model.OwnerColumn, to) }, method: Adopting);
+            rows = rows.And(rows.Equalities(new[] { new KeyValuePair<string, object>(guestColumn, guest) }, Adopting));
+            return rows.Update(call, new[] { new KeyValuePair<string, object>(userColumn, user), new KeyValuePair<string, object>(guestColumn, null) }, method: Adopting);
         }
 
         /// <summary>UPDATE ... SET for every row the query reads. Returns how many rows changed.</summary>
