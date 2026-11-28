@@ -89,8 +89,8 @@ public sealed class ProjectTemplateApiTests : IDisposable
         string root = Path.Combine(parent.Root, "shop");
         Assert.Equal(new[]
         {
-            ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.kscript",
-            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "lib/cache.kscript", "middleware/request-id.kscript",
+            ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config.kscript",
+            "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "kscript.test.json", "lib/cache.kscript", "middleware/request-id.kscript",
             "models/note.kscript", "models/user.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
         }, Files(root));
         // Each type has its own file, and the controllers import them.
@@ -104,8 +104,9 @@ public sealed class ProjectTemplateApiTests : IDisposable
         var config = ProjectConfig.Load(Path.Combine(root, "kscript.json"));
         Assert.Empty(config.Warnings);
         Assert.Equal("test", config.Test.Env);
-        Assert.Contains("@env('DATABASE_URL', default: '')", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
-        Assert.Contains("sqlite::memory:", File.ReadAllText(Path.Combine(root, "config", "config.kscript")));
+        Assert.Contains("@env('DATABASE_URL', default: '')", File.ReadAllText(Path.Combine(root, "config.kscript")));
+        Assert.Contains("sqlite::memory:", File.ReadAllText(Path.Combine(root, "kscript.test.json")));
+        Assert.Empty(ProjectConfig.Parse(File.ReadAllText(Path.Combine(root, "kscript.test.json")), Path.Combine(root, "kscript.test.json")).Warnings);
 
         var (tested, report) = Test(root);
         Assert.True(tested == 0, report);
@@ -166,11 +167,13 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.Contains("CMD [\"kscript\", \"serve\", \"--host\", \"0.0.0.0\", \"--port\", \"8080\", \"--migrate\"]", File.ReadAllText(Path.Combine(root, "Dockerfile")));
         Assert.True(File.Exists(Path.Combine(root, ".dockerignore")));
         Assert.Contains("up:\n\tdocker compose up --build", File.ReadAllText(Path.Combine(root, "Makefile")));
-        string generatedConfig = File.ReadAllText(Path.Combine(root, "config", "config.kscript"));
-        Assert.Contains("driver: 'postgres'", generatedConfig);
-        Assert.Contains("database: @env('DB_NAME', default: 'shop')", generatedConfig);
+        string manifest = File.ReadAllText(Path.Combine(root, "kscript.json"));
+        Assert.Contains("\"driver\": \"postgres\"", manifest);
+        Assert.Contains("\"database\": \"shop\"", manifest);
+        string generatedConfig = File.ReadAllText(Path.Combine(root, "config.kscript"));
+        Assert.Contains("host: @env('DB_HOST', default: 'localhost')", generatedConfig);
         Assert.Contains("password: @env('DB_PASSWORD', default: 'secret')", generatedConfig);
-        Assert.Contains("the app keeps its data in postgres, using the connection settings in config/config.kscript (DATABASE_URL can override them)", output);
+        Assert.Contains("the app keeps its data in postgres, using the connection settings in kscript.json (DATABASE_URL can override them, through config.kscript)", output);
         Assert.Contains("docker compose up       run the API and its database in containers", output);
 
         Assert.Equal(0, Make(parent.Root, "lite", "--template", "api", "--docker").Code);
@@ -240,7 +243,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.Equal(new[]
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_components/site-nav.kscript", "_layout.html",
-            "config/config.kscript", "controllers/notes.kscript", "index.html", "kscript.json", "lib/cache.kscript",
+            "config.kscript", "controllers/notes.kscript", "index.html", "kscript.json", "kscript.test.json", "lib/cache.kscript",
             "lib/notes-client.kscript", "models/note.kscript", "notes.html", "requests/note-input.kscript", "routes/api.kscript", "site.css", "tests/api.test.kscript",
             "tests/notes-client.test.kscript",
         }, Files(root));
@@ -608,9 +611,8 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void TestEnvPicksTheEnvironmentTestsRunIn()
     {
         using var site = new TempSite(
-            ("kscript.json", "{ \"config\": { \"root\": \"config\", \"files\": [\"config.yaml\"] }, \"test\": { \"env\": \"test\" } }"),
-            ("config/config.yaml", "where: dev\n"),
-            ("config/config.test.yaml", "where: test\n"),
+            ("kscript.json", "{ \"config\": { \"where\": \"dev\" }, \"test\": { \"env\": \"test\" } }"),
+            ("kscript.test.json", "{ \"config\": { \"where\": \"test\" } }"),
             ("tests/env.test.kscript", "test(name: \"env\") {\n  expect($config.where, equals: 'test')\n  expect(@env('KSCRIPT_ENV'), equals: 'test')\n}\n"));
         var (code, report) = Test(site.Root);
         Assert.True(code == 0, report);
@@ -648,19 +650,18 @@ public sealed class ProjectTemplateApiTests : IDisposable
     }
 
     [Fact]
-    public void RoutesAndPagesReadTheProjectsConfigFolder()
+    public void RoutesAndPagesReadTheProjectsConfig()
     {
         using var site = new TempSite(
-            ("kscript.json", "{ \"config\": { \"root\": \"config\", \"files\": [\"config.yaml\"] } }"),
-            ("config/config.yaml", "app:\n  name: Configured\n"),
+            ("kscript.json", "{ \"config\": { \"app\": { \"name\": \"Configured\" } } }"),
             ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/name\") {\n    return { name: $config.app.name }\n  }\n}\n"),
             ("blog/page.html", "<p>{ $config.app.name }</p>\n"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         Assert.Contains("Configured", Get(app, "/api/name").Body);
         Assert.Contains("<p>Configured</p>", site.Render("blog/page.html").Body);
 
-        // Without config.root, the files are read from the project folder; a broken kscript.json is left to report itself.
-        using var plain = new TempSite(("kscript.json", """{"config":{"files":["config.yaml"]}}"""), ("config.yaml", "app:\n  name: Plain\n"), ("sub/page.html", "<p>{ $config.app.name }</p>\n"));
+        // A page in a subfolder reads the project's config.kscript; a broken kscript.json is left to report itself.
+        using var plain = new TempSite(("kscript.json", "{}"), ("config.kscript", "fn configure(environment: string) => { app: { name: 'Plain' } }"), ("sub/page.html", "<p>{ $config.app.name }</p>\n"));
         Assert.Contains("<p>Plain</p>", plain.Render("sub/page.html").Body);
         using var broken = new TempSite(("kscript.json", "{ nope"), ("page.html", "<p>{ $config->get('x', 'none') }</p>\n"));
         Assert.Contains("<p>none</p>", broken.Render("page.html").Body);
@@ -670,13 +671,13 @@ public sealed class ProjectTemplateApiTests : IDisposable
     public void AServingAppSharesItsStartupConfigBetweenRoutesAndPages()
     {
         using var site = new TempSite(
-            ("kscript.json", """{"config":{"files":["config/config.kscript"]}}"""),
-            ("config/config.kscript", "fn configure(environment: string) => { name: 'Ready' }"),
+            ("kscript.json", "{}"),
+            ("config.kscript", "fn configure(environment: string) => { name: 'Ready' }"),
             ("routes/api.kscript", "import KScript.Http\n\nRoutes {\n  Get(path: \"/name\") {\n    return { name: $config.name }\n  }\n}\n"),
             ("index.html", "<p>{ $config.name }</p>"));
         var app = new HttpApp(site.Root, ProjectConfig.Load(Path.Combine(site.Root, "kscript.json")));
         app.LoadStartupConfig();
-        File.WriteAllText(Path.Combine(site.Root, "config", "config.kscript"), "fn configure(environment: string) => { name: 'Different' }");
+        File.WriteAllText(Path.Combine(site.Root, "config.kscript"), "fn configure(environment: string) => { name: 'Different' }");
 
         Assert.Contains("Ready", Get(app, "/api/name").Body);
         var page = new PageRoute { Kind = PageRoute.RouteKind.Page, File = "index.html" };

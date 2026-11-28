@@ -43,13 +43,14 @@ namespace KScript.Scaffolding
 
         /// <summary>
         /// A rendered file in the chosen format: a .kscript template's output is converted to XML when the format is
-        /// xml, and a path ending in .kscript then ends in .ks.xml. Scripts are then laid out as kscript fmt
+        /// xml (unless it writes another kind of file, such as kscript.staging.json), and a path ending in .kscript then
+        /// ends in .ks.xml. Scripts are then laid out as kscript fmt
         /// would (with the project's format settings, when given), so a new file passes kscript fmt --check whatever
         /// the names put into it. Other files are left alone.
         /// </summary>
         public static (string Path, string Content) Apply(string templateFile, string path, string content, string format, FormatOptions options = null)
         {
-            if (format == Xml && MarkupParser.IsCodePath(templateFile))
+            if (format == Xml && MarkupParser.IsCodePath(templateFile) && IsScript(path))
             {
                 // The parser and converter report problems as diagnostics, never by throwing.
                 ConversionResult result = ScriptConverter.ToXml(CodeParser.Parse(content), nameList: global::KScript.Language.Catalog.LanguageCatalog.Default.IsNameList);
@@ -59,12 +60,13 @@ namespace KScript.Scaffolding
             return (path, Tidy(path, content, options));
         }
 
+        private static bool IsScript(string path) =>
+            path.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase);
+
         /// <summary>A script as kscript fmt lays it out; anything else, or a script it can't format, as it is.</summary>
         public static string Tidy(string path, string content, FormatOptions options = null)
         {
-            string name = path.ToLowerInvariant();
-            bool script = name.EndsWith(".kscript", StringComparison.Ordinal) || name.EndsWith(".ks.xml", StringComparison.Ordinal);
-            if (!script) return content;
+            if (!IsScript(path)) return content;
             FormatResult formatted = Formatter.Format(content, path, options);
             return formatted.Succeeded ? formatted.Text : content;
         }

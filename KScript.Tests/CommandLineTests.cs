@@ -232,9 +232,8 @@ public sealed class CommandLineTests : IDisposable
     [Fact]
     public void Scripts_run_with_their_project_and_environment()
     {
-        Write("proj/kscript.json", "{ \"bogus\": 1, \"config\": { \"files\": [\"config.yaml\"] } }");
-        Write("proj/config.yaml", "greeting: hello");
-        Write("proj/config.staging.yaml", "greeting: hi from staging");
+        Write("proj/kscript.json", "{ \"bogus\": 1, \"config\": { \"greeting\": \"hello\" } }");
+        Write("proj/kscript.staging.json", "{ \"config\": { \"greeting\": \"hi from staging\" } }");
         string script = Write("proj/greet.ks.xml", "<kscript><echo>{ $config.greeting } { $args[0] }</echo></kscript>");
         var (code, output, error) = Kscript("--env", "staging", script, "Ann");
         Assert.True(code == 0, error);

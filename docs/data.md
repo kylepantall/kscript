@@ -768,16 +768,20 @@ For a table with no model, `@db('visits')` is a query whose rows are maps.
 
 ### Configuring connections
 
-With no settings, the database is `data/app.sqlite` in the project folder, or the `DATABASE_URL` environment variable when it's set. To use other databases, list connections in your config:
+With no settings, the database is `data/app.sqlite` in the project folder, or the `DATABASE_URL` environment variable when it's set. To use other databases, list connections under `database` in the `config` section of `kscript.json`:
 
-```yaml
-database:
-  default: main
-  connections:
-    main:
-      url: ${DATABASE_URL:-postgres://app:secret@localhost:5432/app}
-    reports:
-      url: sqlite:data/reports.sqlite
+```json
+{
+  "config": {
+    "database": {
+      "default": "main",
+      "connections": {
+        "main": { "url": "postgres://app:secret@localhost:5432/app" },
+        "reports": { "url": "sqlite:data/reports.sqlite" }
+      }
+    }
+  }
+}
 ```
 
 A model uses another connection with the `connection: reports` option, and `@db(connection: reports)` gives you that database.
@@ -791,7 +795,7 @@ Each database has its own URL:
 
 In a URL, put driver options after `?`, as in `?sslmode=require`, and percent-encode characters such as `@` and `:` in passwords.
 
-You may also give a connection as a map of fields, which is what generated server-database projects do. In `config/config.kscript`:
+You may also give a connection as a map of fields. Settings that come from environment variables go in `config.kscript`, which is laid over `kscript.json` (see [Settings](language.md#settings-config)):
 
 ```kscript
 fn configure(environment: string) {
@@ -806,9 +810,6 @@ fn configure(environment: string) {
   }
   if !$url->is_blank() {
     main = { url: $url }
-  }
-  if $environment == 'test' {
-    main = { url: 'sqlite::memory:' }
   }
   return { database: { connections: { main: $main } } }
 }
@@ -920,7 +921,7 @@ On SQLite and Postgres, each migration runs in a transaction, so one that fails 
 
 Rolling back undoes each step the other way round. A created table is dropped, an added column is dropped, and a dropped table or column comes back as it was, empty. A `Sql` step needs its `down:` for that. When you'd rather say the steps yourself, add a `Down { ... }` block, and rollback runs that block instead. The migrations that have run are recorded in the `kscript_migrations` table, with the batch each ran in.
 
-In the production environment (`config.environment` in `kscript.json`), `migrate`, `rollback` and `seed` ask before they start, and `fresh` won't run without `--force`.
+In the production environment (`kscript db --env production`, or `KSCRIPT_ENV=production`), `migrate`, `rollback` and `seed` ask before they start, and `fresh` won't run without `--force`.
 
 `diff` and `status` see the models on the default connection, in the models folder and [inside components](components.md#types-that-belong-to-a-component). Models on another connection, and changes made by a `Sql` step, are left out, so after a `Sql` step that changes a table, `diff` may suggest changing it back.
 
