@@ -14,6 +14,18 @@ namespace KScript.Language.Analysis
 
         /// <summary>The folders directly inside a folder (for path completion and project-wide checks). None by default.</summary>
         IEnumerable<string> ListDirectories(string directory) => Array.Empty<string>();
+
+        /// <summary>
+        /// A file's text read only to look for a name in it (project-wide checks scan every file this way). A
+        /// <see cref="RecordingFileSystem"/> then depends on what the search found, not on the whole text.
+        /// </summary>
+        string ReadToScan(string path) => ReadText(path);
+
+        /// <summary>Notes what a search of a scanned file found: whether <paramref name="name"/> is in it.</summary>
+        void Scanned(string path, string name, bool found) { }
+
+        /// <summary>Notes that a scanned file's whole text was used after all (it was analysed).</summary>
+        void Used(string path, string text) { }
     }
 
     public sealed class DiskFileSystem : IFileSystem
@@ -85,6 +97,9 @@ namespace KScript.Language.Analysis
         public string ReadText(string path) => catalog.SourceAt(path)?.Text ?? inner.ReadText(path);
         public IEnumerable<string> ListFiles(string directory, string pattern) => inner.ListFiles(directory, pattern);
         public IEnumerable<string> ListDirectories(string directory) => inner.ListDirectories(directory);
+        public string ReadToScan(string path) => catalog.SourceAt(path)?.Text ?? inner.ReadToScan(path);
+        public void Scanned(string path, string name, bool found) => inner.Scanned(path, name, found);
+        public void Used(string path, string text) => inner.Used(path, text);
     }
 
     /// <summary>A file system with no files, for analysing text that isn't saved anywhere.</summary>

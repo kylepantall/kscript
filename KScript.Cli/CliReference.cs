@@ -52,11 +52,12 @@ namespace KScript
                     O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1). Works with every command."),
                 },
                 Ex(("kscript hello.kscript Joan", "Runs hello.kscript with Joan as its first argument ($args[0])."), ("kscript run hello.kscript Joan", "The same, with the command written out."), ("kscript --env staging deploy.kscript", "Runs deploy.kscript with the staging settings (config.staging.yaml and .env.staging).")), "language") { Group = "run" },
-            new CliCommand("check", "kscript check [file-or-folder]... [--fix] [--warnings-as-errors] [--output text|json]",
+            new CliCommand("check", "kscript check [file-or-folder]... [--fix] [--all] [--warnings-as-errors] [--output text|json]",
                 "Check scripts and pages without running them (no path: the current project).",
                 new[]
                 {
                     O("--fix", "Apply the fixes that are always safe (text in quotes, true and false, lists as arrays), then check what is left."),
+                    O("--all", "Analyse every file. Without it, a project's files that nothing has changed for since the last check give the problems they gave then."),
                     O("--warnings-as-errors", "Fail on warnings too, for CI (lint.warnings_as_errors in kscript.json does the same)."),
                     O("--output text|json", "How to print the problems: text (the default), or json with each one's range and its fixes as exact text edits (for coding agents and tools)."),
                     O("--print-config [path]", "Show the lint and format settings that apply, and which standard set each."),

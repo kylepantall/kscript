@@ -19,13 +19,14 @@ namespace KScript.LanguageServer
         /// each problem has its file, 1-based line and column range, severity, code, message and fixes, and each fix
         /// has a title and exact text edits. Usage and settings errors are <c>{ "error": "..." }</c>.
         /// </param>
-        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false, bool fix = false)
+        /// <param name="all">Analyse every file, rather than reuse what the last check found in files nothing has changed for.</param>
+        public static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors = false, bool json = false, bool fix = false, bool all = false)
         {
             if (json)
             {
                 var text = new StringWriter();
                 var report = new JsonReport();
-                int code = Run(paths, text, warningsAsErrors, report, fix);
+                int code = Run(paths, text, warningsAsErrors, report, fix, all);
                 System.Text.Json.Nodes.JsonArray problems = report.Problems;
                 var result = new System.Text.Json.Nodes.JsonObject();
                 if (code == 2)
@@ -47,7 +48,7 @@ namespace KScript.LanguageServer
                 output.WriteLine(result.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
                 return code;
             }
-            return Run(paths, output, warningsAsErrors, null, fix);
+            return Run(paths, output, warningsAsErrors, null, fix, all);
         }
 
         /// <summary>What a check found, for --output json.</summary>
@@ -57,7 +58,7 @@ namespace KScript.LanguageServer
             public int Files { get; set; }
         }
 
-        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report, bool fix = false)
+        private static int Run(IEnumerable<string> paths, TextWriter output, bool warningsAsErrors, JsonReport report, bool fix = false, bool all = false)
         {
             var cli = new KScript.Output.CliOutput(output);
             List<string> given = paths.ToList();
@@ -118,6 +119,9 @@ namespace KScript.LanguageServer
             int fixedCount = 0, fixedFiles = 0;
             bool anyWarningsAsErrors = warningsAsErrors;
             var countedConfigs = new HashSet<string>(StringComparer.Ordinal);
+            // In a project, a file is analysed again only when it, or something its last analysis read, changed.
+            var caches = new Dictionary<string, CheckCache>(StringComparer.Ordinal);
+            var settingsKeys = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var (file, isExplicit) in files.DistinctBy(f => Path.GetFullPath(f.File)).OrderBy(f => f.File, StringComparer.Ordinal))
             {
                 ProjectConfig config;
@@ -158,12 +162,23 @@ namespace KScript.LanguageServer
                         fixedFiles++;
                     }
                 }
-                DocumentAnalysis analysis = Analyzer.Analyze(fileText, file, rules: DocumentRules.ForProject(config?.Directory));
-                // A file named on the command line is checked even if lint.exclude covers it.
-                LintRules.Apply(analysis.Diagnostics, config, isExplicit ? null : file);
-                foreach (Diagnostic d in analysis.Diagnostics.OrderBy(d => d.Span.Start))
+                CheckCache cache = null;
+                string settingsKey = null;
+                if (config?.FilePath != null)
                 {
-                    LinePosition pos = analysis.Source.GetPosition(d.Span.Start);
+                    string root = Path.GetFullPath(config.Directory);
+                    if (!caches.TryGetValue(root, out cache)) caches[root] = cache = all ? CheckCache.Empty() : CheckCache.Load(root);
+                    if (!settingsKeys.TryGetValue(root, out settingsKey)) settingsKeys[root] = settingsKey = KScript.Runtime.Dependencies.SourceFingerprint.Hash(DescribeConfig(config));
+                }
+                List<Diagnostic> found = cache != null
+                    ? cache.Check(file, fileText, settingsKey, fs => Analyzer.Analyze(fileText, file, fs, rules: DocumentRules.ForProject(config?.Directory, fs)).Diagnostics)
+                    : Analyzer.Analyze(fileText, file, rules: DocumentRules.ForProject(config?.Directory)).Diagnostics;
+                var source = new SourceText(fileText);
+                // A file named on the command line is checked even if lint.exclude covers it.
+                LintRules.Apply(found, config, isExplicit ? null : file);
+                foreach (Diagnostic d in found.OrderBy(d => d.Span.Start))
+                {
+                    LinePosition pos = source.GetPosition(d.Span.Start);
                     string severity = d.Severity switch
                     {
                         DiagnosticSeverity.Error => "error",
@@ -174,7 +189,7 @@ namespace KScript.LanguageServer
                     string shown = file.StartsWith("./", StringComparison.Ordinal) || file.StartsWith(".\\", StringComparison.Ordinal) ? file.Substring(2) : file;
                     if (report != null)
                     {
-                        report.Problems.Add((System.Text.Json.Nodes.JsonNode)ProblemJson(shown.Replace('\\', '/'), analysis.Source, d, severity));
+                        report.Problems.Add((System.Text.Json.Nodes.JsonNode)ProblemJson(shown.Replace('\\', '/'), source, d, severity));
                     }
                     else
                     {
@@ -192,8 +207,10 @@ namespace KScript.LanguageServer
                 }
             }
 
+            foreach ((string root, CheckCache cache) in caches) cache.Save(root);
+            int reused = caches.Values.Sum(c => c.Reused);
             if (report != null) report.Files = files.Count;
-            string summary = $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")} checked: {errors} error{(errors == 1 ? string.Empty : "s")}, {warnings} warning{(warnings == 1 ? string.Empty : "s")}.";
+            string summary = $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")} checked{(reused > 0 ? $" ({reused} unchanged)" : string.Empty)}: {errors} error{(errors == 1 ? string.Empty : "s")}, {warnings} warning{(warnings == 1 ? string.Empty : "s")}.";
             bool failed = errors > 0 || (anyWarningsAsErrors && warnings > 0);
             if (report != null) output.WriteLine(summary);
             else
