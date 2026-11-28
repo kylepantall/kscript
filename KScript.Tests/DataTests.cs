@@ -69,7 +69,7 @@ public abstract class DataFixture : IDisposable
     protected const string Users = """
         enum Role { member, editor, admin }
 
-        model User(timestamps, unique: [email], hidden: [password], guarded: [role]) {
+        model User(unique: [email], hidden: [password], guarded: [role]) extends Timestamps {
           name: string(max: 40)
           email: email
           age?: int
@@ -97,8 +97,8 @@ public sealed class DataModelTests : DataFixture
             model UID(mixin, key: 'uid') {
               uid: uuid = @uuid()
             }
-            model Auditable(mixin, timestamps)
-            model SoftDeletable(mixin, soft_deletes)
+            model Auditable(mixin) extends Timestamps
+            model SoftDeletable(mixin) extends SoftDeletes
             model BaseNote(table: 'archived_notes') extends UID {
               title: string
             }
@@ -106,7 +106,7 @@ public sealed class DataModelTests : DataFixture
               title: string(min: 1)
               done: bool = false
             }
-            model Task(auto_create) extends [BaseNote, Auditable(timestamps: false)] {
+            model Task(auto_create) extends BaseNote {
               done: bool = false
             }
 
@@ -289,7 +289,7 @@ public sealed class DataModelTests : DataFixture
         var times = new Queue<DateTime>(new[] { new DateTime(2026, 1, 1, 9, 0, 0), new DateTime(2026, 1, 2, 9, 0, 0) });
         Rows.Clock = () => times.Count > 0 ? times.Dequeue() : new DateTime(2026, 1, 3, 9, 0, 0);
         string[] lines = Lines("""
-            model Note(timestamps) {
+            model Note extends Timestamps {
               text: string
             }
             $db->create_table(Note)
@@ -336,7 +336,7 @@ public sealed class DataModelTests : DataFixture
     public void DeletingAndSoftDeleting()
     {
         string[] lines = Lines("""
-            model Doc(soft_deletes) {
+            model Doc extends SoftDeletes {
               title: string
             }
             model Tmp {
@@ -368,7 +368,7 @@ public sealed class DataModelTests : DataFixture
     public void RecordMethodsNeedSavedModelRecords()
     {
         Assert.Contains("hasn't been saved", Fails(Users + "n = User({ name: 'N', email: 'n@example.com' })\n$n->delete()").Message);
-        Assert.Contains("soft_deletes", Fails(Users + "User->find(1)->restore()").Message);
+        Assert.Contains("SoftDeletes", Fails(Users + "User->find(1)->restore()").Message);
         Assert.Contains("hasn't been saved", Fails(Users + "User({ name: 'N', email: 'n@example.com' })->fresh()").Message);
     }
 
@@ -415,7 +415,7 @@ public sealed class DataModelTests : DataFixture
         FileOf("app.ks.xml", """
             <kscript>
               <import package="KScript.Data" />
-              <model name="Pet" fields="name: string, legs: int = 4" timestamps="yes" unique="name" />
+              <model name="Pet" with="Timestamps" fields="name: string, legs: int = 4" unique="name" />
               <do>$db->create_table(Pet)</do>
               <do>Pet->create(name: 'Rex')</do>
               <transaction>

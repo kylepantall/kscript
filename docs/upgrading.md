@@ -50,7 +50,8 @@ If your script compares `->type()` with `'list'`, switch that test to `->is_a(li
 | `$Repo`, `as: $Repo`, `$User->create(...)` | `Repo`, `as: Repo`, `User->create(...)`: a type is named bare | fix (KS6014) |
 | `Repo->from($data)`, `$Repo->new(name: 'x')`, `$OutOfStock->new(item: 'tea')` | `Repo($data)`, `Repo(name: 'x')`, `OutOfStock(item: 'tea')`: calling the name makes the value | |
 | `age: int?` in a type or model | `age?: int` (`T?` stays for a parameter that may be null) | fix (KS6014) |
-| `model User { timestamps: true … }` | `model User(timestamps, unique: [email]) { … }`: options go in the brackets | fix (KS6014) |
+| `model User { unique: [email] … }` | `model User(unique: [email]) { … }`: options go in the brackets | fix (KS6014) |
+| `model Post(timestamps, soft_deletes) { … }` | `model Post extends [Timestamps, SoftDeletes] { … }`: the built-in mixins from KScript.Data | fix (KS6014) |
 | `catch QueryError`, `catch ConnectionError` | `catch Query`, `catch Connection`: no type's name ends in `Error` | |
 
 Dividing by zero raises `Math` and a position outside a list raises `Index`. Both are built-in types now, so `catch Math` and `catch Index` work and are known to the editor.

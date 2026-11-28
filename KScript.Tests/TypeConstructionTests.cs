@@ -183,7 +183,7 @@ public sealed class TypeConstructionTests : DataFixture
     public void CallingAModelMakesARecordThatIsNotSavedYet()
     {
         string printed = Run("""
-            model Note(timestamps) {
+            model Note extends Timestamps {
               text: string
               pinned: bool = false
             }
@@ -203,7 +203,7 @@ public sealed class TypeConstructionTests : DataFixture
     public void AModelsOptionsWorkInItsBrackets()
     {
         string printed = Run("""
-            model Member(table: "people", timestamps, unique: [email], hidden: [secret]) {
+            model Member(table: "people", unique: [email], hidden: [secret]) extends Timestamps {
               email: email
               secret: string = 'x'
             }

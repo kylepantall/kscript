@@ -41,22 +41,20 @@ namespace KScript.Docs
         }
 
         /// <summary>The options a model takes, without its name and description.</summary>
-        internal static IEnumerable<AttributeInfo> ModelOptions(ElementInfo model) => model.Attributes.Where(a => a.Name is not ("name" or "description"));
+        internal static IEnumerable<AttributeInfo> ModelOptions(ElementInfo model) => model.Attributes.Where(a => a.Name is not ("name" or "description") && !ModelMixins.IsRetiredOption(a.Name));
 
         /// <summary>A short model that uses each option, for its example. A test fails when a new option has none.</summary>
         internal static readonly Dictionary<string, string> OptionExamples = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["fields"] = "model Tag(name: string, colour: string)",
-            ["with"] = "model Dated(mixin, timestamps)\n\nmodel Note extends Dated {\n  text: string\n}",
+            ["with"] = "model Note extends [Timestamps, SoftDeletes] {\n  text: string\n}",
             ["mixin"] = "model Titled(mixin) {\n  title: string(max: 200)\n}\n\nmodel Post extends Titled {\n  body: string\n}",
-            ["auto_create"] = "model Visit(auto_create, timestamps) {\n  path: string\n}",
+            ["auto_create"] = "model Visit(auto_create) {\n  path: string\n}",
             ["table"] = "model Person(table: 'people') {\n  name: string\n}",
             ["connection"] = "model Report(connection: 'reports') {\n  title: string\n}",
             ["key"] = "model Country(key: 'code') {\n  code: string(max: 2)\n  name: string\n}",
-            ["timestamps"] = "model Comment(timestamps) {\n  text: string\n}",
-            ["soft_deletes"] = "model Task(soft_deletes) {\n  title: string\n}",
             ["unique"] = "model Member(unique: [email, [team_id, handle]]) {\n  email: email\n  team_id: int\n  handle: string\n}",
-            ["index"] = "model Order(index: [customer, [status, created_at]], timestamps) {\n  customer: string\n  status: string\n}",
+            ["index"] = "model Order(index: [customer, [status, created_at]]) extends Timestamps {\n  customer: string\n  status: string\n}",
             ["hidden"] = "model Account(hidden: [password]) {\n  email: email\n  password: password\n}",
             ["guarded"] = "model Member(guarded: [role]) {\n  email: email\n  role: string = 'member'\n}",
             ["extra"] = "model Event(extra: keep) {\n  name: string\n}",
@@ -79,22 +77,8 @@ namespace KScript.Docs
             var declarations = PackageDeclarations().ToList();
             var sb = new StringBuilder();
             var md = new StringBuilder("# Models: options and built-in mixins\n\nEvery option a model takes, and every model and mixin the packages ship.\n");
-            sb.Append("<h1>Models: options and built-in mixins</h1><p class=\"lead\">Every option a <code>model</code> takes, such as <code>soft_deletes</code> and <code>mixin</code>, and every model and mixin that comes with a package, such as <code>Ownable</code>. How models work is in <a href=\"/guide/data\">Databases: KScript.Data</a>.</p>");
-            var page = new DocPage { Path = ModelsPath, Title = "Models: options and built-in mixins", NavTitle = "Models and mixins", Section = "Reference", Description = "Every option a model takes (soft_deletes, timestamps, mixin, ...) and every built-in model and mixin, such as Ownable." };
-
-            sb.Append("<h2 id=\"options\">Built-in behaviours</h2><p>Everything else a model can do is switched on with an option in brackets after its name, so there is nothing to extend. An option that is on by itself is a bare word, and options combine: <code>model Task(timestamps, soft_deletes, unique: [title]) { ... }</code>. A mixin may set options too, and a model that extends it gets them.</p>");
-            page.Toc.Add((2, "options", "Built-in behaviours"));
-            md.Append("\n## Built-in behaviours\n\nEverything else a model can do is switched on with an option in brackets after its name.\n");
-            foreach (AttributeInfo a in ModelOptions(model))
-            {
-                string id = "option-" + Html.Slug(a.Name);
-                string example = "import KScript.Data\n\n" + OptionExamples.GetValueOrDefault(a.Name, string.Empty);
-                sb.Append($"<h3 id=\"{id}\"><code>{Html.H(a.Name)}</code></h3><p>{Html.Inline(a.Description)}</p>");
-                sb.Append(Html.Code(example, "kscript"));
-                page.Toc.Add((3, id, a.Name));
-                md.Append($"\n### {a.Name}\n\n{a.Description}\n\n```kscript\n{example}\n```\n");
-                Search.Add(new SearchEntry { Title = a.Name, CodeTitle = a.Name, Url = ModelsPath + "#" + id, Section = "Models", Kind = "option of model", Text = Shorten(Html.Text(Html.Inline(a.Description))) });
-            }
+            sb.Append("<h1>Models: options and built-in mixins</h1><p class=\"lead\">Every mixin that comes with a package, such as <code>Timestamps</code>, <code>SoftDeletes</code> and <code>Ownable</code>, every option a <code>model</code> takes, and the tables KScript keeps. How models work is in <a href=\"/guide/data\">Databases: KScript.Data</a>.</p>");
+            var page = new DocPage { Path = ModelsPath, Title = "Models: options and built-in mixins", NavTitle = "Models and mixins", Section = "Reference", Description = "Every built-in mixin (Timestamps, SoftDeletes, Ownable), every option a model takes, and the tables KScript keeps." };
 
             sb.Append("<h2 id=\"built-in\">Built-in models and mixins</h2><p>These come with a package, written in KScript, and you extend them rather than declare them. Import the package, then extend a mixin to give a model its fields and methods: <code>model Note extends Ownable { ... }</code>. Everything every model gets, such as <code>-&gt;where()</code> and <code>-&gt;save()</code>, is under <a href=\"" + TypeSlug("model") + "\">model methods</a> and <a href=\"" + TypeSlug("record") + "\">record methods</a>.</p>");
             page.Toc.Add((2, "built-in", "Built-in models and mixins"));
@@ -110,10 +94,11 @@ namespace KScript.Docs
 
                 if (d.Kind == "model")
                 {
-                    string use = d.IsMixin ? $"import KScript.Data\nimport {d.Package}\n\nmodel Note extends {d.Name} {{\n  text: string\n}}" : $"import KScript.Data\nimport {d.Package}\n\nrows = {d.Name}->all()";
+                    string imports = d.Package == "KScript.Data" ? "import KScript.Data" : $"import KScript.Data\nimport {d.Package}";
+                    string use = d.IsMixin ? $"{imports}\n\nmodel Note extends {d.Name} {{\n  text: string\n}}" : $"{imports}\n\nrows = {d.Name}->all()";
                     sb.Append(Html.Code(use, "kscript"));
                     md.Append($"\n```kscript\n{use}\n```\n");
-                    string options = string.Join(", ", d.Element.Attributes.Where(a => a.Name is not ("name" or "description")).Select(a => a.ValueText.Trim() is "yes" or "true" ? a.Name : $"{a.Name}: {a.ValueText.Trim()}"));
+                    string options = string.Join(", ", d.Element.Attributes.Where(a => a.Name is not ("name" or "description" or "mixin") && !ModelMixins.IsRetiredOption(a.Name)).Select(a => a.ValueText.Trim() is "yes" or "true" ? a.Name : $"{a.Name}: {a.ValueText.Trim()}"));
                     if (options.Length > 0) sb.Append($"<p>Options: <code>{Html.H(options)}</code>.</p>");
 
                     var fields = d.Element.ChildElements.Where(c => c.Name == "field").ToList();
@@ -148,6 +133,20 @@ namespace KScript.Docs
                         sb.Append("</tbody></table></div>");
                     }
                 }
+            }
+
+            sb.Append("<h2 id=\"options\">Options</h2><p>Settings such as a model's table, key and unique fields are options in brackets after its name. An option that is on by itself is a bare word, and options combine: <code>model Task(auto_create, unique: [title]) extends Timestamps { ... }</code>. A mixin may set options too, and a model that extends it gets them.</p>");
+            page.Toc.Add((2, "options", "Options"));
+            md.Append("\n## Options\n\nSettings such as a model's table, key and unique fields are options in brackets after its name.\n");
+            foreach (AttributeInfo a in ModelOptions(model))
+            {
+                string id = "option-" + Html.Slug(a.Name);
+                string example = "import KScript.Data\n\n" + OptionExamples.GetValueOrDefault(a.Name, string.Empty);
+                sb.Append($"<h3 id=\"{id}\"><code>{Html.H(a.Name)}</code></h3><p>{Html.Inline(a.Description)}</p>");
+                sb.Append(Html.Code(example, "kscript"));
+                page.Toc.Add((3, id, a.Name));
+                md.Append($"\n### {a.Name}\n\n{a.Description}\n\n```kscript\n{example}\n```\n");
+                Search.Add(new SearchEntry { Title = a.Name, CodeTitle = a.Name, Url = ModelsPath + "#" + id, Section = "Models", Kind = "option of model", Text = Shorten(Html.Text(Html.Inline(a.Description))) });
             }
 
             sb.Append("<h2 id=\"tables\">Tables KScript keeps</h2><p>KScript makes these tables in your database itself, the first time it needs them. They aren't models, so you don't query them with <code>-&gt;where()</code>: the commands and guides linked below read them for you. Give your own tables other names.</p>");

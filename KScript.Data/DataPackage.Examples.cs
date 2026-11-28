@@ -10,7 +10,7 @@ namespace KScript.Data
     {
         /// <summary>A model with soft deletes and three tasks, for the query examples.</summary>
         private const string Tasks =
-            "<model name=\"Task\" fields=\"title: string, done: bool = false, points: int = 1\" soft_deletes=\"true\" unique=\"title\" />\n" +
+            "<model name=\"Task\" with=\"SoftDeletes\" fields=\"title: string, done: bool = false, points: int = 1\" unique=\"title\" />\n" +
             "<do>$db->create_table(Task); Task->insert([{ title: 'Write docs', points: 3 }, { title: 'Fix bug', done: true, points: 2 }, { title: 'Ship it', points: 5 }])</do>\n";
 
         /// <summary>Authors and their posts, for the relation examples.</summary>

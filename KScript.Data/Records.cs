@@ -344,7 +344,7 @@ namespace KScript.Data
         public static Record Restore(CallContext call, Record record)
         {
             ModelInfo model = ModelInfo.Of(record);
-            if (!model.SoftDeletes) throw new KScriptException($"->restore() is for models with soft_deletes: true, and {model.Name} doesn't have it.", "Argument");
+            if (!model.SoftDeletes) throw new KScriptException($"->restore() is for models that extend SoftDeletes, and {model.Name} doesn't.", "Argument");
             ThisRow(call, model, record);
             record[ModelInfo.DeletedAt] = null;
             return Save(call, record);

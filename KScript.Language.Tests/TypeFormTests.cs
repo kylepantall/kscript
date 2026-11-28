@@ -130,20 +130,22 @@ namespace KScript.Language.Tests
         [Fact]
         public void AModelsOptionLinesMoveIntoItsBrackets()
         {
-            const string code = "import KScript.Data\n\nmodel User {\n  timestamps: yes\n  unique: [email]\n\n  name: string\n  email: email\n}\n";
-            const string better = "import KScript.Data\n\nmodel User(timestamps, unique: [email]) {\n  name: string\n  email: email\n}\n";
+            const string code = "import KScript.Data\n\nmodel User {\n  auto_create: yes\n  unique: [email]\n\n  name: string\n  email: email\n}\n";
+            const string better = "import KScript.Data\n\nmodel User(auto_create, unique: [email]) {\n  name: string\n  email: email\n}\n";
             List<Diagnostic> found = TypeForms(code);
             // One for each line, and one fix that moves them all.
             Assert.Equal(2, found.Count);
-            Assert.All(found, d => Assert.Contains("model User(timestamps, unique: [email])", d.Message));
+            Assert.All(found, d => Assert.Contains("model User(auto_create, unique: [email])", d.Message));
             Assert.Equal(better, Fixed(code));
             Assert.Empty(Check(better));
         }
 
         [Theory]
-        [InlineData("model Post(table: \"posts\") {\n  soft_deletes: yes\n  title: string\n}\n", "model Post(table: \"posts\", soft_deletes) {\n  title: string\n}\n")]
+        [InlineData("model Post(table: \"posts\") {\n  auto_create: yes\n  title: string\n}\n", "model Post(table: \"posts\", auto_create) {\n  title: string\n}\n")]
         [InlineData("model Post {\n  title: string\n  hidden: [title]\n}\n", "model Post(hidden: [title]) {\n  title: string\n}\n")]
-        [InlineData("model Post {\n  timestamps: no\n  title: string\n}\n", "model Post(timestamps: false) {\n  title: string\n}\n")]
+        [InlineData("model Post {\n  auto_create: no\n  title: string\n}\n", "model Post(auto_create: false) {\n  title: string\n}\n")]
+        // A retired option moves into the brackets, then becomes the mixin it is now.
+        [InlineData("model Post(table: \"posts\") {\n  soft_deletes: yes\n  title: string\n}\n", "model Post(table: \"posts\") extends SoftDeletes {\n  title: string\n}\n")]
         public void OptionLinesJoinTheOptionsAlreadyInBrackets(string code, string better)
         {
             const string import = "import KScript.Data\n\n";

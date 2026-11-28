@@ -136,7 +136,7 @@ public sealed class TypeConventionTests
     [Theory]
     [InlineData("type Repo {\n  name: string\n}\necho '{}'->json(as: $Repo)\n", "Write Repo, without $")]
     [InlineData("type Repo {\n  license: string?\n}\n", "license?: string")]
-    [InlineData("import KScript.Data\n\nmodel User {\n  timestamps: yes\n  name: string\n}\n", "model User(timestamps)")]
+    [InlineData("import KScript.Data\n\nmodel User {\n  auto_create: yes\n  name: string\n}\n", "model User(auto_create)")]
     public void The_long_forms_are_reported(string code, string message)
     {
         string problem = Assert.Single(TypeForms("example.kscript", code, Path.Combine(Root, "example.kscript")));

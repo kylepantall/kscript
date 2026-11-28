@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Sources\*.kscript" LogicalName="KScript.Data.Sources.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KScript.Core\KScript.Core.csproj" />
   </ItemGroup>
 

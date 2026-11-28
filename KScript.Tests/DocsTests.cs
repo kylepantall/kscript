@@ -323,8 +323,12 @@ public sealed class DocsTests
         foreach (string table in tables)
             Assert.Contains($"id=\"table-{Html.Slug(table)}\"", models.Body);
         Assert.Contains("<code>Note-&gt;mine(as: any = null)</code>", models.Body);
-        Assert.Contains(entries, e => e.Name == "soft_deletes" && e.Url == "/reference/models#option-soft-deletes");
-        Assert.Contains(Site.Value.Search, s => s.Title == "soft_deletes" && s.Kind == "option of model");
+        Assert.Contains(entries, e => e.Name == "unique" && e.Url == "/reference/models#option-unique");
+        Assert.Contains(Site.Value.Search, s => s.Title == "unique" && s.Kind == "option of model");
+        // Timestamps and SoftDeletes are mixins KScript.Data ships, and their old options aren't listed.
+        Assert.Contains(declared, d => d.Name == "Timestamps" && d.IsMixin && d.Package == "KScript.Data");
+        Assert.Contains(declared, d => d.Name == "SoftDeletes" && d.IsMixin && d.Package == "KScript.Data");
+        Assert.DoesNotContain(entries, e => e.Name is "timestamps" or "soft_deletes");
         Assert.Contains("href=\"/reference/models\"", Site.Value.Find("/reference/data").Body);
         Assert.Contains("### Ownable", new KScript.Docs.Mcp.DocsMarkdown(Site.Value).Page("/reference/models", "kscript"));
     }
@@ -396,7 +400,9 @@ public sealed class DocsTests
     public void The_a_to_z_lists_everything_built_in()
     {
         string index = Site.Value.Find("/reference/index").Body;
-        Assert.Contains("<code>soft_deletes</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("<code>unique</code></a></td><td class=\"muted\">option of model</td>", index);
+        Assert.Contains("<code>SoftDeletes</code></a></td><td class=\"muted\">mixin in KScript.Data</td>", index);
+        Assert.DoesNotContain("<code>soft_deletes</code>", index);
         Assert.Contains("<code>mixin</code></a></td><td class=\"muted\">option of model</td>", index);
         Assert.Contains("href=\"/reference/errors#error-uniqueviolation\"", index);
         Assert.Contains("href=\"/reference/settings#setting-serve-port\"", index);
@@ -410,7 +416,7 @@ public sealed class DocsTests
         // The MCP server serves the same pages as Markdown.
         var markdown = new KScript.Docs.Mcp.DocsMarkdown(Site.Value);
         Assert.Contains("| `UniqueViolation` | `Conflict` | 409 |", markdown.Page("/reference/errors", "kscript"));
-        Assert.Contains("`soft_deletes`", markdown.Page("/reference/index", "kscript"));
+        Assert.Contains("`SoftDeletes`", markdown.Page("/reference/index", "kscript"));
         Assert.Contains("| `serve.port` |", markdown.Page("/reference/settings", "kscript"));
         Assert.Contains("| `email` |", markdown.Page("/reference/types", "kscript"));
     }

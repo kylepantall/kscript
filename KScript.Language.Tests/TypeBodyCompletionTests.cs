@@ -29,7 +29,7 @@ namespace KScript.Language.Tests
         [Fact]
         public void AModelsBracketsSuggestItsOptions()
         {
-            List<CompletionItem> items = Complete("import KScript.Data\n\nmodel Note(timestamps, hi‸) {\n  user_id: string\n}\n");
+            List<CompletionItem> items = Complete("import KScript.Data\n\nmodel Note(auto_create, hi‸) {\n  user_id: string\n}\n");
             CompletionItem hidden = Assert.Single(items, i => i.Label == "hidden");
             Assert.Equal("hidden: [$1]", hidden.InsertText);
             Assert.True(hidden.IsSnippet);
@@ -37,14 +37,16 @@ namespace KScript.Language.Tests
             Assert.Contains("left out of JSON", hidden.Documentation);
             Assert.Equal("model option", hidden.Detail);
             // An option the model already has isn't offered again.
-            Assert.DoesNotContain(items, i => i.Label == "timestamps");
+            Assert.DoesNotContain(items, i => i.Label == "auto_create");
+            // Timestamps and soft deletes are mixins now, so they aren't offered as options.
+            Assert.DoesNotContain(items, i => i.Label is "timestamps" or "soft_deletes");
             // A flag is on by being named, and the others take a value.
             items = Complete("import KScript.Data\n\nmodel Note(‸) {\n}\n");
-            Assert.Equal("timestamps", Assert.Single(items, i => i.Label == "timestamps").InsertText);
+            Assert.Equal("auto_create", Assert.Single(items, i => i.Label == "auto_create").InsertText);
             Assert.Equal("key: \"$1\"", Assert.Single(items, i => i.Label == "key").InsertText);
             Assert.Equal("table: \"$1\"", Assert.Single(items, i => i.Label == "table").InsertText);
             // Not where a value goes.
-            Assert.DoesNotContain("timestamps", Labels("import KScript.Data\n\nmodel Note(table: ‸) {\n}\n"));
+            Assert.DoesNotContain("auto_create", Labels("import KScript.Data\n\nmodel Note(table: ‸) {\n}\n"));
         }
 
         [Fact]
@@ -52,7 +54,7 @@ namespace KScript.Language.Tests
         {
             const string import = "import KScript.Data\n\n";
             Assert.Equal(new[] { "title", "body", "id", "created_at", "updated_at", "deleted_at" },
-                Labels(import + "model Note(timestamps, soft_deletes, hidden: [‸]) {\n  title: string\n  body?: string\n}\n"));
+                Labels(import + "model Note(hidden: [‸]) extends [Timestamps, SoftDeletes] {\n  title: string\n  body?: string\n}\n"));
             // Fields already listed aren't offered again, and a word typed is replaced.
             List<CompletionItem> items = Complete(import + "model Note(index: [title, bo‸]) {\n  title: string\n  body: string\n}\n");
             Assert.Equal(new[] { "body", "id" }, items.Select(i => i.Label));
@@ -61,7 +63,7 @@ namespace KScript.Language.Tests
             // A set of fields that is unique together is a list in the list.
             Assert.Equal(new[] { "slug", "id" }, Labels(import + "model Post(unique: [[team, ‸]]) {\n  slug: string\n  team: int\n}\n"));
             // After the list, the next option.
-            Assert.Contains("timestamps", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
+            Assert.Contains("auto_create", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
             Assert.DoesNotContain("title", Labels(import + "model Note(hidden: [title], ‸) {\n  title: string\n}\n"));
         }
 
@@ -173,10 +175,10 @@ namespace KScript.Language.Tests
         [Fact]
         public void SettingValuesSuggestYesNoAndTheModelsFields()
         {
-            Assert.Equal(new[] { "true", "false" }, Labels(Model("  timestamps: ‸\n  title: string")));
-            Assert.Empty(Labels(Model("  timestamps: yes ‸\n  title: string")));
-            Assert.Equal(new[] { "title", "body", "id", "created_at", "updated_at", "deleted_at" },
-                Labels(Model("  timestamps: yes\n  soft_deletes: yes\n  hidden: [‸]\n  title: string\n  body?: string")));
+            Assert.Equal(new[] { "true", "false" }, Labels(Model("  auto_create: ‸\n  title: string")));
+            Assert.Empty(Labels(Model("  auto_create: yes ‸\n  title: string")));
+            Assert.Equal(new[] { "title", "body", "id" },
+                Labels(Model("  auto_create: yes\n  hidden: [‸]\n  title: string\n  body?: string")));
             // Fields already listed aren't offered again, and a word typed is replaced.
             List<CompletionItem> items = Complete(Model("  index: [title, bo‸]\n  title: string\n  body: string"));
             Assert.Equal(new[] { "body", "id" }, items.Select(i => i.Label));
@@ -239,9 +241,9 @@ namespace KScript.Language.Tests
         [Fact]
         public void HoverExplainsSettingsAndRules()
         {
-            HoverResult setting = Hover(Model("  times‸tamps: yes\n  title: string"));
-            Assert.StartsWith("**timestamps** (model setting)", setting.Markdown);
-            Assert.Contains("created_at and updated_at", setting.Markdown);
+            HoverResult setting = Hover(Model("  auto_cre‸ate: yes\n  title: string"));
+            Assert.StartsWith("**auto_create** (model setting)", setting.Markdown);
+            Assert.Contains("table and indexes", setting.Markdown);
             Assert.StartsWith("**min** (rule)", Hover("type Age with [int] {\n  m‸in: 0\n}\n").Markdown);
             Assert.StartsWith("**min** (rule)", Hover(Model("  title: string(m‸in: 1)")).Markdown);
             Assert.Equal("**v** (uuid option)", Hover(Model("  ref: uuid(‸v: 4)")).Markdown);

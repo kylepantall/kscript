@@ -807,7 +807,8 @@ namespace KScript.Syntax.Markup
                             {
                                 // with="User, Auditable" is with [User, Auditable].
                                 string bases = with.Trim().TrimStart('[').TrimEnd(']');
-                                if (e.Name == "model") sb.Append(" extends [").Append(bases.Trim()).Append(']');
+                                // One base needs no brackets: extends Timestamps.
+                                if (e.Name == "model") sb.Append(OneBase(bases) ? " extends " + bases.Trim() : " extends [" + bases.Trim() + "]");
                                 else sb.Append(" with [").Append(string.Join(", ", bases.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0))).Append(']');
                             }
                             if (Attr("extends") is string contract) sb.Append(" extends ").Append(contract.Trim());
@@ -1000,7 +1001,20 @@ namespace KScript.Syntax.Markup
             /// A model's lists of fields as they go in its brackets, names as they are:
             /// <c>unique: [email, [team, slug]]</c>, <c>hidden: [password]</c>. Null for anything else.
             /// </summary>
-            private static string ModelOption(MarkupElement e, MarkupAttribute a)
+            /// <summary>True when a model's bases are one name, with no comma outside brackets: Timestamps, Audit(hidden: [a, b]).</summary>
+        private static bool OneBase(string bases)
+        {
+            int depth = 0;
+            foreach (char c in bases)
+            {
+                if (c is '(' or '[' or '{') depth++;
+                else if (c is ')' or ']' or '}') depth--;
+                else if (c == ',' && depth == 0) return false;
+            }
+            return bases.Trim().Length > 0;
+        }
+
+        private static string ModelOption(MarkupElement e, MarkupAttribute a)
             {
                 string value = a.Value?.Value?.Trim();
                 if (e.Name != "model" || string.IsNullOrEmpty(value))

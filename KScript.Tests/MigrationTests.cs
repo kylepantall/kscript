@@ -85,7 +85,7 @@ public sealed class MigrationTests : DataFixture
 
         enum Role { member, admin }
 
-        model User(timestamps, unique: [email]) {
+        model User(unique: [email]) extends Timestamps {
           name: string(max: 80)
           email: email
           role: Role = 'member'
@@ -145,7 +145,7 @@ public sealed class MigrationTests : DataFixture
             import KScript.Data
 
             type CommentThread extends Component {
-              model Comment(timestamps) {
+              model Comment extends Timestamps {
                 body: string(max: 2000)
               }
 

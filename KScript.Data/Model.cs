@@ -376,6 +376,18 @@ namespace KScript.Data
             if (!ModelComposition.TryReadBases(run.Raw("with"), out var bases, out string problem))
                 throw run.Error(problem, "with", "Syntax");
 
+            // timestamps and soft_deletes are the Timestamps and SoftDeletes mixins now. Only KScript.Data's own
+            // scripts, which declare those mixins, may still write them as options.
+            if (!PackageSource.IsSource(run.Module.Path))
+            {
+                string modelName = run.Raw("name")?.Trim();
+                foreach (string option in ModelMixins.ForOption.Keys)
+                {
+                    if (run.Has(option)) throw run.Error(ModelMixins.Message(option, modelName), option, "Syntax");
+                    if (bases.Any(b => b.Options.ContainsKey(option))) throw run.Error(ModelMixins.Message(option, modelName), "with", "Syntax");
+                }
+            }
+
             var parents = new List<(ModelInfo Model, ModelComposition.Base Entry)>();
             foreach (var entry in bases)
             {

@@ -93,7 +93,7 @@ public sealed class DatabaseServerTests : DataFixture
         FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
         Environment.SetEnvironmentVariable("DATABASE_URL", null);
         string output = Run("""
-            model User(timestamps, unique: [email], index: [[name, age]]) {
+            model User(unique: [email], index: [[name, age]]) extends Timestamps {
               name: string(max: 40)
               email: email
               age?: int
