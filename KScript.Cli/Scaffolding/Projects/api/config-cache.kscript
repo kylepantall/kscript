@@ -1,0 +1,16 @@
+--- make
+when: cache
+unless: db in sqlite, postgres, mysql
+to: config{{ ext }}
+---
+// Settings read from environment variables when the app starts. The map this
+// returns is laid over the "config" section of kscript.json. Tests use the
+// settings in kscript.test.json instead.
+fn configure(environment: string) {
+  if $environment == 'test' {
+    return {}
+  }
+  return {
+    cache: { store: @env('CACHE_STORE', default: 'memory') }
+  }
+}

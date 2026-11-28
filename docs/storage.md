@@ -137,13 +137,13 @@ A folder also has the fields `.app`, `.kind` and `.path` (its own full path), an
 
 ## The person's own settings
 
-`$config` reads the files listed in `kscript.json` under `config.files` (see [Settings](language.md#settings-config)). Turn on `config.user`, and it also reads `config.json`, `config.yaml` or `config.yml` from the app's config folder, after the project's own files:
+`$config` holds the project's settings, from the `config` section of `kscript.json` (see [Settings](language.md#settings-config)). With `"user_config": true` in the `app` section, it also reads `config.json` from the app's config folder, after the project's own settings:
 
 ```jsonc
 // kscript.json
 {
-  "app": { "name": "Notes" },
-  "config": { "user": true }
+  "app": { "name": "Notes", "user_config": true },
+  "config": { "greeting": "Hello" }
 }
 ```
 
@@ -152,12 +152,12 @@ A person can then change a setting for themselves without editing the project, a
 ```kscript
 import KScript.Storage
 
-echo $config->get('greeting', 'Hello')
+echo $config.greeting
 @storage(config)->write_json('config.json', { greeting: 'Hi there' })
-echo $config->reload()->get('greeting')
+echo $config->reload().greeting
 ```
 
-The `config` statement does the same for one script: `config(user: true)`. Environment variables with the config prefix still win over every file.
+The `config` statement does the same for one script: `config(user: true)`.
 
 ## Where storage works
 

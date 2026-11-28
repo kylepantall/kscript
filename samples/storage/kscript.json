@@ -1,5 +1,5 @@
 {
   "name": "notes",
-  "app": { "name": "Notes" },
-  "config": { "user": true }
+  // user_config lays the person's own config.json (in the app's config folder) over $config.
+  "app": { "name": "Notes", "user_config": true }
 }

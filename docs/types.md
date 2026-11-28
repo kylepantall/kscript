@@ -179,13 +179,14 @@ echo $price + $extra                  // GBP 1.60
 echo $price->add($extra, rate: 0.92)  // GBP 1.69
 ```
 
-To share rates across fresh runs, put them in a file listed under `config.files` in `kscript.json`. The outer key names the incoming currency and the inner key names the receiving currency. This example uses YAML.
+To share rates across fresh runs, put them under `money.exchange_rates` in the `config` section of `kscript.json`. The outer key names the incoming currency and the inner key names the receiving currency.
 
-```yaml
-money:
-  exchange_rates:
-    EUR:
-      GBP: 0.80
+```json
+{
+  "config": {
+    "money": { "exchange_rates": { "EUR": { "GBP": 0.80 } } }
+  }
+}
 ```
 
 You can also attach a quote to a particular balance with `price: money(rates: { EUR: 0.85 }) = GBP1.00`. For each addition, KScript uses the first available rate in this order.

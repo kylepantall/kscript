@@ -11,9 +11,36 @@
     // Every route logs its request; routes/api{{ ext }} adds the app's own middleware.
     "middleware": ["log"]
   },
-  // Load project settings from the listed files.
+  // The app's own settings, read as $config (such as $config.app.name).
+  // kscript.test.json changes them for tests. Settings read from environment
+  // variables go in config{{ ext }}.
   "config": {
-    "files": ["config/config{{ ext }}", ".env?"]
+{{#if db is none}}
+{{#if examples}}
+    "notes": { "file": "data/notes.json" },
+{{/if}}
+{{else}}
+    "database": {
+      "connections": {
+{{#if db is sqlite}}
+        "main": { "url": "sqlite:data/app.sqlite" }
+{{else}}
+        "main": {
+          "driver": "{{ db }}",
+          "host": "localhost",
+          "port": {{#if db is postgres}}5432{{else}}3306{{/if}},
+          "database": "{{ snake }}",
+          "username": "{{ snake }}",
+          "password": "secret"
+        }
+{{/if}}
+      }
+    },
+{{/if}}
+{{#if cache}}
+    "cache": { "store": "memory", "ttl": "5m" },
+{{/if}}
+    "app": { "name": "{{ title }}" }
   },
   // kscript make writes new scripts and tests in this syntax: kscript (.kscript files) or xml (.ks.xml).
   "make": {
@@ -25,7 +52,7 @@
   },
   "test": {
     "include": ["tests/**/*.test.kscript", "tests/**/*.test.ks.xml"],
-    // The config script gives tests their own database.
+    // Tests run in the test environment, so kscript.test.json gives them their own data.
     "env": "test"
   }
 }

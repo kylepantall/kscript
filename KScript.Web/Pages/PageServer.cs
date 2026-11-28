@@ -88,12 +88,12 @@ namespace KScript.Pages
             return Directory.Exists(Path.Combine(folder, segment)) || new[] { ".json", ".yaml", ".yml" }.Any(e => File.Exists(Path.Combine(folder, segment + e)));
         }
 
-        /// <summary>config.json, config.staging.json, and any .yaml, .yml or .env file: never served.</summary>
+        /// <summary>kscript.staging.json, config.json, config.staging.json, and any .yaml, .yml or .env file: never served.</summary>
         internal static bool IsConfigFile(string name)
         {
             string ext = Path.GetExtension(name).ToLowerInvariant();
             if (ext == ".yaml" || ext == ".yml" || ext == ".env") return true;
-            return ext == ".json" && name.StartsWith("config.", StringComparison.OrdinalIgnoreCase);
+            return ext == ".json" && (name.StartsWith("config.", StringComparison.OrdinalIgnoreCase) || name.StartsWith("kscript.", StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>
@@ -169,7 +169,7 @@ namespace KScript.Pages
             // The project's settings file is not part of the site.
             if (segments.Count > 0 && string.Equals(segments[^1], Projects.ProjectConfig.FileName, StringComparison.OrdinalIgnoreCase))
                 return true;
-            // Nor are the settings $config reads (config.json, config.staging.yaml), which may hold secrets.
+            // Nor are the settings $config reads (kscript.staging.json, config.json), which may hold secrets.
             if (segments.Count > 0 && IsConfigFile(segments[^1]))
                 return true;
             // Nor are the notes for coding agents (AGENTS.md, CLAUDE.md), with or without .md.

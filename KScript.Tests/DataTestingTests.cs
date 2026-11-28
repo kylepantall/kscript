@@ -112,10 +112,14 @@ public sealed class DataTestingTests : DataFixture
         Passed(file);
     }
 
+    /// <summary>A kscript.json whose tests use the database its config names: a SQLite file, or the CI server's.</summary>
+    private static string ConfiguredDatabase => Server == null
+        ? """{ "name": "testing", "config": { "database": { "connections": { "main": { "url": "sqlite:data/test.sqlite" } } } }, "test": { "database": "config" } }"""
+        : """{ "name": "testing", "test": { "database": "config" } }""";
+
     [Fact]
     public void ConfigUsesTheConfiguredDatabaseAndUndoesEachTest()
     {
-        if (Server == null) FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:data/test.sqlite\n");
         Keep();
         TestFileResult file = RunTests("""
             $db->create_table(Author)
@@ -133,7 +137,7 @@ public sealed class DataTestingTests : DataFixture
             test(name: 'sees nothing') {
               expect(Author->count(), equals: 0)
             }
-            """, "{ \"name\": \"testing\", \"config\": { \"files\": [\"config.yaml?\"] }, \"test\": { \"database\": \"config\" } }");
+            """, ConfiguredDatabase);
         Passed(file);
         if (Server == null) Assert.True(File.Exists(Path.Combine(Project, "data", "test.sqlite")));
     }
@@ -186,11 +190,10 @@ public sealed class DataTestingTests : DataFixture
     [Fact]
     public void ARouteCalledWithApiSharesTheConfiguredDatabaseToo()
     {
-        if (Server == null) FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: sqlite:data/test.sqlite\n");
         Keep();
         FileOf("routes/api.kscript", PostRoutes);
         Passed(RunTests("$db->create_table(Author)\n$db->create_table(Post)\n\n" + PostRouteTests,
-            "{ \"name\": \"testing\", \"config\": { \"files\": [\"config.yaml?\"] }, \"test\": { \"database\": \"config\" } }"));
+            ConfiguredDatabase));
     }
 
     [Fact]

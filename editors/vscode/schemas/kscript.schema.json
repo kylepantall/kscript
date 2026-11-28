@@ -296,7 +296,6 @@
         "policies": { "type": "string", "default": "policies", "description": "Policies, one per model, that @can and @authorize ask (kscript make policy)." },
         "windows": { "type": "string", "default": ".", "description": "Desktop windows (kscript make window)." },
         "documents": { "type": "string", "default": "documents", "description": "Document scripts that write PDF and Word files (kscript make document)." },
-        "config": { "type": "string", "default": "config", "description": "Settings files (kscript make config), unless config.root is set." },
         "locales": { "type": "string", "default": "locales", "description": "Translations (kscript make locale)." },
         "logging": { "type": "string", "default": "lib", "description": "Log providers (kscript make logger)." },
         "data": { "type": "string", "default": "data", "description": "JSON data that stores and caches write." },
@@ -321,7 +320,8 @@
         "name": { "type": "string", "description": "The app's name in the Dock, Start menu or launcher. Defaults to the project's name." },
         "id": { "type": "string", "description": "A reverse-DNS id such as com.example.lifelab (the macOS bundle id)." },
         "version": { "type": "string", "description": "The app's version, such as 1.0.0." },
-        "icon": { "type": "string", "description": "An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux." }
+        "icon": { "type": "string", "description": "An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux." },
+        "user_config": { "type": "boolean", "default": false, "description": "true lays the person's own settings over $config: config.json in the app's config folder, such as ~/.config/<app> on Linux (see KScript.Storage)." }
       }
     },
     "test": {
@@ -350,7 +350,7 @@
         "env": {
           "type": "string",
           "examples": ["test"],
-          "description": "The environment the tests run in (KSCRIPT_ENV), so config/config.test.yaml can give tests their own database. kscript --env and a KSCRIPT_ENV already set win."
+          "description": "The environment the tests run in (KSCRIPT_ENV), so kscript.test.json can give tests their own database. kscript --env and a KSCRIPT_ENV already set win."
         },
         "database": {
           "enum": ["memory", "config"],
@@ -370,36 +370,36 @@
     },
     "config": {
       "type": "object",
-      "additionalProperties": false,
-      "description": "Where $config reads each script's settings from.",
+      "description": "The app's own settings, read as $config: \"config\": { \"app\": { \"name\": \"Shop\" } } gives $config.app.name. kscript.<env>.json's config section is laid over this one for that environment (kscript --env or KSCRIPT_ENV), and then config.kscript's configure(environment), for settings that need @env() or other code.",
       "properties": {
-        "environment": {
-          "type": "string",
-          "description": "The environment used when neither kscript --env nor KSCRIPT_ENV names one. Matching variants such as settings.staging.yaml and .env.staging layer over the listed files."
+        "app": { "type": "object", "description": "Settings about the app, such as its name: $config.app.name." },
+        "database": {
+          "type": "object",
+          "description": "KScript.Data's database connections.",
+          "properties": {
+            "default": { "type": "string", "description": "The connection used when none is named (default: main)." },
+            "connections": {
+              "type": "object",
+              "description": "Connections by name, such as \"main\": { \"url\": \"sqlite:data/app.sqlite\" }.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "url": { "type": "string", "description": "Where the database is: sqlite:data/app.sqlite, postgres://user:password@host/app or mysql://user:password@host/app." },
+                  "driver": { "enum": ["sqlite", "postgres", "mysql", "mariadb"], "description": "The database, when there is no url." },
+                  "host": { "type": "string" },
+                  "port": { "type": "integer" },
+                  "database": { "type": "string" },
+                  "username": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
         },
-        "files": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": [".env"],
-          "description": "The base files, in order. List a .kscript or .ks.xml file with configure(environment), or a YAML, JSON or .env file. A name without an extension means .json, .yaml and .yml. End a name with ? if it may be missing."
-        },
-        "prefix": {
-          "type": "string",
-          "description": "Environment variables with this prefix override the files: with APP_, APP_DATABASE__HOST sets database.host."
-        },
-        "root": {
-          "type": "string",
-          "description": "The folder the files are in, relative to kscript.json. Default: the project folder."
-        },
-        "required": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Settings that must be set, such as database.host. A script stops with a clear message when one is missing."
-        },
-        "user": {
-          "type": "boolean",
-          "description": "true also reads the person's own settings: config.json (or config.yaml) in the app's config folder, such as ~/.config/<app> on Linux. They are layered over the project's files."
-        }
+        "cache": { "type": "object", "description": "KScript.Cache settings, such as \"store\": \"memory\" and \"ttl\": \"5m\"." },
+        "logging": { "type": "object", "description": "Log level and providers, such as \"level\": \"info\"." },
+        "i18n": { "type": "object", "description": "Translations: folder, default and locale, such as \"default\": \"en-GB\"." },
+        "money": { "type": "object", "description": "Money settings, such as exchange_rates: { \"EUR\": { \"GBP\": 0.85 } }." }
       }
     },
     "queue": {

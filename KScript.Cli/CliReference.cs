@@ -45,13 +45,13 @@ namespace KScript
         public static readonly IReadOnlyList<CliCommand> Commands = new[]
         {
             new CliCommand("run", "kscript [run] [--env name] <script> [script arguments]",
-                "Run a script ($args holds the arguments; --env picks staging.yaml, .env.staging...). The word run can be left out.",
+                "Run a script ($args holds the arguments; --env picks kscript.staging.json, .env.staging...). The word run can be left out.",
                 new[]
                 {
-                    O("--env name", "The environment for $config: reads <name>.yaml, .env.<name> and sets KSCRIPT_ENV."),
+                    O("--env name", "The environment for $config: lays kscript.<name>.json over kscript.json, reads .env.<name> and sets KSCRIPT_ENV."),
                     O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1). Works with every command."),
                 },
-                Ex(("kscript hello.kscript Joan", "Runs hello.kscript with Joan as its first argument ($args[0])."), ("kscript run hello.kscript Joan", "The same, with the command written out."), ("kscript --env staging deploy.kscript", "Runs deploy.kscript with the staging settings (config.staging.yaml and .env.staging).")), "language") { Group = "run" },
+                Ex(("kscript hello.kscript Joan", "Runs hello.kscript with Joan as its first argument ($args[0])."), ("kscript run hello.kscript Joan", "The same, with the command written out."), ("kscript --env staging deploy.kscript", "Runs deploy.kscript with the staging settings (kscript.staging.json and .env.staging).")), "language") { Group = "run" },
             new CliCommand("check", "kscript check [file-or-folder]... [--fix] [--all] [--warnings-as-errors] [--output text|json]",
                 "Check scripts and pages without running them (no path: the current project).",
                 new[]
@@ -301,7 +301,7 @@ namespace KScript
         {
             O("-h, --help", "Show help: kscript help <command> (or kscript <command> --help) shows one command."),
             O("--version", "Show the version of kscript."),
-            O("--env name", "The environment for $config: reads <name>.yaml and .env.<name>, and sets KSCRIPT_ENV."),
+            O("--env name", "The environment for $config: lays kscript.<name>.json over kscript.json, reads .env.<name> and sets KSCRIPT_ENV."),
             O("--ansi | --no-ansi", "Force colours on, or turn them off. NO_COLOR and FORCE_COLOR do the same."),
             O("--debug", "Show the .NET exception and stack trace behind an error (also KSCRIPT_DEBUG=1)."),
         };
