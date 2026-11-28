@@ -313,7 +313,8 @@ public sealed class DocsTests
             Assert.Contains($"href=\"/reference/models#{d.Anchor}\"", Site.Value.Find("/reference/" + d.Package.Substring(8).ToLowerInvariant()).Body);
         }
 
-        Assert.Contains("<code>owner</code></td><td><code>string(max: 80)</code>", models.Body);
+        Assert.Contains("<code>user?</code></td><td><code>User(on_delete: cascade)</code>", models.Body);
+        Assert.Contains(declared, d => d.Name == "User" && !d.IsMixin && d.Package == "KScript.Auth");
         Assert.Contains("<code>Note-&gt;mine(as: any = null)</code>", models.Body);
         Assert.Contains(entries, e => e.Name == "soft_deletes" && e.Url == "/reference/models#option-soft-deletes");
         Assert.Contains(Site.Value.Search, s => s.Title == "soft_deletes" && s.Kind == "option of model");

@@ -279,7 +279,7 @@ A computed field, such as `label => $first + ' ' + $last`, isn't stored at all. 
 
 Some packages come with models and mixins you can extend straight away. Import the package, then extend the mixin. You don't declare it yourself.
 
-Today, one ships: KScript.Auth's `Ownable`, for rows that belong to one person. A model that extends it gets an `owner` field, filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
+KScript.Auth ships three: the `User` model its users can be kept in, the `Guest` model for people without an account, and the `Ownable` mixin, for rows that belong to one person. A model that extends `Ownable` gets a `user` and a `guest` [relation](#relations), one of them filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
 
 ```kscript
 import KScript.Data
@@ -290,7 +290,9 @@ model Note extends Ownable {
 }
 ```
 
-Then `Note->mine()->get()` reads only the current person's notes. See [Guests and owners](auth.md#guests-and-owners) for the whole story. The reference lists every built-in mixin with its fields and methods: [Models and mixins](/reference/models). In `kscript mcp`, `lookup Ownable` shows its source.
+Then `Note->mine()->get()` reads only the current person's notes, and `$note.user` is the `User` who wrote one. See [Guests and owners](auth.md#guests-and-owners) for the whole story. The reference lists every built-in model and mixin with its fields and methods: [Models and mixins](/reference/models). In `kscript mcp`, `lookup Ownable` shows its source.
+
+To change a built-in model, copy it into your project with `kscript publish`: `kscript publish User` writes `models/user.kscript`. The copy replaces the package's model wherever the package is imported, so its fields, its key and its options are yours. Relations follow the copy: a uuid key on your `User` makes Ownable's `user_id` a uuid.
 
 KScript.Data itself ships no mixins, because what a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` and `timestamps`. If your project prefers the name, a mixin that sets the option is one line:
 

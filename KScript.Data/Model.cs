@@ -274,6 +274,14 @@ namespace KScript.Data
                             $"The {target.Key} of the {f.Name} (a {target.Name}).", optional: true));
                     }
                 }
+                // unique: [user] and index: [user] name a belongs-to relation: its column is user_id.
+                foreach (List<string> group in Unique.Concat(Index))
+                {
+                    for (int i = 0; i < group.Count; i++)
+                    {
+                        if (relations.TryGetValue(group[i], out Relation r) && r.Kind == RelationKind.BelongsTo) group[i] = r.ForeignKey;
+                    }
+                }
                 ready = true;
             }
         }
