@@ -18,7 +18,7 @@ namespace KScript.Auth
         /// <summary>The record each map this store handed out was made from.</summary>
         private readonly ConditionalWeakTable<Dictionary<string, object>, Record> made = new ConditionalWeakTable<Dictionary<string, object>, Record>();
 
-        public ModelRecordStore(ModelStore store)
+        public ModelRecordStore(ModelStore store, bool passkeySignup = false)
         {
             Store = store;
             string what = "http.auth.users";
@@ -26,6 +26,10 @@ namespace KScript.Auth
                 throw new KScriptException($"{what} is {store.Name}, so {store.Name} needs an email field: email: email.", "Config");
             Password = store.PasswordField
                 ?? throw new KScriptException($"{what} is {store.Name}, so {store.Name} needs a password field: password: password.", "Config");
+            // Someone who signs up with a passkey has no email or password yet.
+            string required = passkeySignup ? new[] { "email", Password }.FirstOrDefault(store.Requires) : null;
+            if (required != null)
+                throw new KScriptException($"http.auth.passkey_signup is on, so people can sign up with only a passkey, and {store.Name}.{required} must be optional: {required}?: {(required == Password ? "password" : "email")}.", "Config");
         }
 
         public ModelStore Store { get; }

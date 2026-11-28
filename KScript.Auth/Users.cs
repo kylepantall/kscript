@@ -55,6 +55,19 @@ namespace KScript.Auth
             return string.IsNullOrEmpty(id) || !IsId(id) ? null : App.Users.Get(id);
         }
 
+        /// <summary>
+        /// True for someone who signs in with a passkey only: a passkey account without a password, which @login()
+        /// and a new password can't reach. Users kept in a model are passkey-only when they have no password and do
+        /// have a passkey.
+        /// </summary>
+        public bool PasskeyOnly(string id)
+        {
+            if (PasskeyStore.IsUserId(id)) return true;
+            if (App.Users is not ModelRecordStore || string.IsNullOrEmpty(id)) return false;
+            Dictionary<string, object> record = Record(id);
+            return record != null && record.GetValueOrDefault(HashField) == null && App.PasskeyStore.HasCredentials(id);
+        }
+
         private static bool IsId(string id) => id.Length <= 128 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
         public Dictionary<string, object> Find(string id) => Show(Record(id));
@@ -189,7 +202,7 @@ namespace KScript.Auth
         {
             lock (Gate)
             {
-                bool passkeyOnly = PasskeyStore.IsUserId(id);
+                bool passkeyOnly = PasskeyOnly(id);
                 if (passkeyOnly && fields.ContainsKey("email"))
                     throw Invalid("email", "This account uses passkeys and has no sign-in email.");
                 Dictionary<string, object> record = Need(id);
@@ -211,7 +224,7 @@ namespace KScript.Auth
                     AddField(record, kv.Key, kv.Value);
                 }
                 record["updated_at"] = AuthApp.Stamp();
-                if (!passkeyOnly) App.Users.Put(id, record);
+                if (!PasskeyStore.IsUserId(id)) App.Users.Put(id, record);
                 else if (!App.PasskeyStore.UpdateUser(id, record)) throw new KScriptException("The account has ended.", "NotFound");
                 return Show(record);
             }
@@ -219,7 +232,7 @@ namespace KScript.Auth
 
         public Dictionary<string, object> SetPassword(CallContext c, string id, object password)
         {
-            if (PasskeyStore.IsUserId(id))
+            if (PasskeyOnly(id))
                 throw Invalid("password", "This account signs in with a passkey.");
             PasswordValue secret = Password(c, password);
             lock (Gate)

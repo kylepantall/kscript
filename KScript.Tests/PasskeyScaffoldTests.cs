@@ -22,6 +22,15 @@ public sealed class PasskeyScaffoldTests : AuthSiteFixture
         Assert.True(auth.PasskeySignup);
         Assert.Contains("// café", Read("kscript.json"));
         Assert.DoesNotContain("password", Read("kscript.json"));
+        // People who sign up with a passkey are rows of the project's own User model, with no email or password yet.
+        Assert.Equal("User", auth.Users);
+        if (syntax == "kscript")
+        {
+            string user = Read("models/user.kscript");
+            Assert.Contains("  email?: email\n", user);
+            Assert.Contains("  password?: password\n", user);
+        }
+        else Assert.True(File.Exists(Path.Combine(Dir, "models/user.ks.xml")));
         string controller = Read("controllers/accounts." + (syntax == "xml" ? "ks.xml" : "kscript"));
         Assert.DoesNotContain("@attempt", controller);
         Assert.DoesNotContain("reset_password", controller);
