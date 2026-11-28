@@ -14,17 +14,18 @@ describe(name: 'Notes') {
 
     @acting_as_guest()
     expect(@api('/api/notes')->json(), equals: [])
-    expect(Note->mine(as: "guest:{ $first }")->count(), equals: 2)
+    expect(Note->where(guest: $first)->count(), equals: 2)
   }
 
   test(name: "a note's owner is whoever made it") {
-    user = @register('cy@example.test', 'correct-horse-battery-9')
+    user = @register('cy@example.test', 'correct-horse-battery-9', name: 'Cy')
     @acting_as($user)
     note = @api('/api/notes', post: { text: 'bread' })->json()
-    expect($note.owner, equals: "user:{ $user.id }")
+    expect($note.user_id, equals: $user.id)
+    expect(Note->find($note.id).user.name, equals: 'Cy')
     expect(Note->find($note.id)->is_mine(), equals: true)
     expect_error(type: Forbidden) {
-      Note->find($note.id)->update(owner: 'user:0')
+      Note->find($note.id)->update(guest: @uuid())
     }
   }
 }

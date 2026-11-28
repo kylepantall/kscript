@@ -6,7 +6,7 @@ using static KScript.Language.Tests.TestHelpers;
 
 namespace KScript.Language.Tests
 {
-    /// <summary>The editor side of KScript.Auth's Ownable mixin (#208), @guest/@owner (#209) and ->dispatch(delay:, at:).</summary>
+    /// <summary>The editor side of KScript.Auth's Ownable mixin (#208), its user and guest relations, @guest (#209) and ->dispatch(delay:, at:).</summary>
     public class OwnableAnalysisTests
     {
         private static readonly string Folder = Path.Combine(Path.GetTempPath(), "kscript-ownable");
@@ -26,10 +26,13 @@ namespace KScript.Language.Tests
 
         [Theory]
         [InlineData("echo Note->mine()->count()")]
-        [InlineData("echo Note->mine(as: 'user:1')->first().owner")]
+        [InlineData("echo Note->mine(as: 1)->first().user.email")]
+        [InlineData("echo Note->first().user_id ?? Note->first().guest_id")]
+        [InlineData("echo Note->where(guest: @guest())->count()")]
         [InlineData("echo Note->where(title: 'a')->mine()->pluck(title)")]
         [InlineData("echo Note->first()->is_mine()")]
-        [InlineData("echo Note->create(title: 'a', owner: @owner(as: 3)).owner")]
+        [InlineData("echo Note->create(title: 'a', user: 3).user.name")]
+        [InlineData("echo Note->first().guest?.id")]
         [InlineData("echo @guest() ?? 'none'")]
         [InlineData("echo @acting_as_guest()")]
         public void OwnableComesWithKScriptAuth(string call)
@@ -42,12 +45,40 @@ namespace KScript.Language.Tests
         [Fact]
         public void OwnableIsTypedFromItsSource()
         {
-            var analysis = Check(Note + "x = Note->first().owner\ny = @owner()\nz = @guest()\necho \"{ $x } { $y } { $z }\"\n");
+            var analysis = Check(Note + "x = Note->first().user\ny = Note->first().guest\nz = @guest()\necho \"{ $x.email } { $y.id } { $z }\"\n");
             AssertClean(analysis);
             var unknown = Check(Note + "echo Note->first().ownr\n");
             Assert.Contains(unknown.Diagnostics, d => d.Message.Contains("ownr", StringComparison.Ordinal));
             var args = Check(Note + "echo Note->mine(1, 2)->count()\n");
             Assert.Contains(args.Diagnostics, d => d.Code == DiagnosticCodes.ArgumentCount);
+        }
+
+        [Fact]
+        public void A_project_copy_of_User_replaces_KScript_Auths()
+        {
+            // kscript publish User, then a uuid key and a handle: Ownable's user follows the copy.
+            string root = Path.Combine(Path.GetTempPath(), "kscript-ownable-copy-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path.Combine(root, "models"));
+            try
+            {
+                File.WriteAllText(Path.Combine(root, "kscript.json"), "{ \"name\": \"copy\" }");
+                File.WriteAllText(Path.Combine(root, "models", "user.kscript"),
+                    "import KScript.Data\n\nmodel User(key: 'uid') {\n  uid: uuid = @uuid()\n  handle: string\n  email: email\n  password: password\n}\n");
+                File.WriteAllText(Path.Combine(root, "models", "ownable.kscript"),
+                    "import KScript.Data\nimport KScript.Auth\n\nmodel Ownable(mixin) {\n  user?: User\n  guest?: Guest\n\n  fn shout() => 'hi'\n}\n");
+                string main = Path.Combine(root, "main.kscript");
+                DocumentAnalysis Run(string call) => Analyzer.Analyze(Note + call + "\n", main, DiskFileSystem.Instance);
+                AssertClean(Run("echo Note->first().user.handle"));
+                AssertClean(Run("echo Note->first().user_uid"));
+                AssertClean(Run("echo Note->first()->shout()"));
+                Assert.Contains(Run("echo Note->first().user.name").Diagnostics, d => d.Message.Contains("'name'", StringComparison.Ordinal));
+                // The copy itself knows User and Guest.
+                AssertClean(WithoutUnused(Analyzer.Analyze(File.ReadAllText(Path.Combine(root, "models", "ownable.kscript")), Path.Combine(root, "models", "ownable.kscript"), DiskFileSystem.Instance)));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
         }
 
         [Fact]

@@ -29,7 +29,8 @@ Then run `kscript serve`, open `/register` to make an account, and open `/accoun
 | `_components/*.kscript` | The [components](components.md) the pages are made of: the sign-in, sign-up and password forms, the account details, the passkey list and the API tokens. |
 | `views/auth/*.html` | The pages: login, register, forgot-password, reset-password and account. Each holds a heading and its components. |
 | `_layout.html` | A plain layout, only when the site has none. |
-| `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet. |
+| `models/user.kscript` | The `User` model the users are kept in: a copy of KScript.Auth's, to change as your app needs (see [Users in a model](#users-in-a-model)). Not with `--passkeys`, whose accounts the passkey store keeps. |
+| `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet, and `"users": "User"` in `http.auth`. |
 
 It respects `make.syntax` and `--syntax xml`, the folders in `paths` (components go in `paths.components`), and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
 
@@ -276,8 +277,8 @@ import "../models/user.kscript"
 
 /// Who may do what to a Post.
 policy for Post {
-  /// An editor may write a new post.
-  fn create(user: User) => $user.role == 'editor'
+  /// Staff, with an address at example.com, may write a new post.
+  fn create(user: User) => $user.email->ends_with('@example.com')
 
   /// Anyone may read a published post. Its author may read a draft.
   fn read(user: User?, post: Post) => $post.published or $user?.id == $post.author_id
@@ -308,7 +309,7 @@ import "../models/post.kscript"
 import "../models/user.kscript"
 
 policy for Post {
-  fn before(user: User) => $user.role == 'admin' ? true : null
+  fn before(user: User) => $user.email == 'admin@example.com' ? true : null
 
   fn update(user: User, post: Post) => $user.id == $post.author_id
 }
@@ -503,24 +504,26 @@ Users from a database of your own work too: `@login({ id: $row.id, email: $row.e
 
 ### Users in a model
 
-To keep the users in the app's database, name a [KScript.Data](data.md) model in `http.auth.users`:
+To keep the users in the app's database, name a [KScript.Data](data.md) model in `http.auth.users`. `kscript make auth` does this for you:
 
 ```json
 { "http": { "auth": { "users": "User" } } }
 ```
 
-The model is the one in the models folder (`models/user.kscript`). It needs an email field and a password field, and any other fields you give `@register` or `->update`:
+KScript.Auth comes with a `User` model: a name, an email and a password, with timestamps, in a `users` table it makes the first time it's used (`auto_create`). `kscript make auth` (or `kscript publish User`) copies it to `models/user.kscript`, where it is yours to change: add fields, relations or a key of your own. Any model in the models folder works too. It needs an email field and a password field, and any other fields you give `@register` or `->update`:
 
 ```kscript
 import KScript.Data
 
 model User(unique: [email], hidden: [password]) extends Timestamps {
+  name: string
   email: email
   password: password
-  name: string
   posts: Post[]
 }
 ```
+
+When you move to [migrations](data.md#migrations), take `auto_create` off and let `kscript db diff` write the table.
 
 Then a user is a row of the `users` table, and `@user()`, `@register` and `@users()` give you the model's record, so its relations and methods work: `@user().posts`. The password field holds the hash KScript.Auth makes; `hidden: [password]` keeps it out of JSON. Ids are the model's keys. Sessions, API tokens and reset tokens are still files in the app's state folder.
 
@@ -545,18 +548,45 @@ Routes {
 }
 ```
 
-`Ownable` comes with KScript.Auth, so there is nothing to declare: importing the package is enough. It adds:
+`Ownable` comes with KScript.Auth, so there is nothing to declare: importing the package is enough. Its owner is a [relation](data.md#relations), so it is typed: `$note.user` is a `User` record, and `->with(user)` and `->where(user: $ada)` work as they do for any relation. It adds:
 
 | Member | What it does |
 | --- | --- |
-| `owner: string` | Who the row belongs to: `user:<id>` or `guest:<uuid>`. It is indexed, set when the row is made, and can't be changed afterwards (`->update(owner:)` is refused). |
-| `->mine(as?:)` | A scope: the rows of whoever is making the request. `as:` names someone else: a user, a user's id, or an owner text such as `'guest:…'`. |
+| `user?: User` | The user the row belongs to, or `null` when a guest made it. It is stored as `user_id`, a foreign key to `users`, so deleting a user deletes their rows. |
+| `guest?: Guest` | The guest the row belongs to, or `null` when a signed-in user made it. It is stored as `guest_id`. |
+| `->mine(as?:)` | A scope: the rows of whoever is making the request. `as:` names a user instead. |
 | `->is_mine()` | Whether this record belongs to whoever is making the request. |
 
-`Note->create()` fills `owner` in itself, so a request can't make a row for someone else: giving a different `owner:` is a `Forbidden` error. Outside a request (a seeder, a job, `kscript run`), nobody is making the request, so name the owner: `Note->create(title: 'Welcome', owner: @owner(as: $user))` and `Note->mine(as: $user)`. Without one, both are `Unauthorized` errors.
+Exactly one of `user` and `guest` is set. `Note->create()` fills it in itself, so a request can't make a row for someone else: giving another `user:` or a `guest:` is a `Forbidden` error. Neither can be changed once the row is made (`->update(user:)` is refused). Outside a request (a seeder, a job, `kscript run`), nobody is making the request, so name the owner: `Note->create(title: 'Welcome', user: $ada)` and `Note->mine(as: $ada)`. Without one, both are `Unauthorized` errors.
 
-- `@guest()` is this browser's guest id, a `uuid`. The first call makes one and sends it in the `ks_guest` cookie (`http.auth.guest_cookie`), which lasts `http.auth.guest_lifetime` (a year). It is `null` when someone is signed in, and outside a request.
-- `@owner(as?:)` is the owner text for whoever is making the request: `user:<id>` when someone is signed in, otherwise `guest:<uuid>`. Outside a request it is `null`. `as:` turns a user, an id or an owner text into one.
+Ownable's user is a record of the model the users are kept in, so an app with Ownable models keeps its users in a model: `"users": "User"` in `http.auth`, which `kscript make auth` sets for you (see [Users in a model](#users-in-a-model)). Without it, making a row as a signed-in user is a `Config` error that says so.
+
+- `@guest()` is this browser's guest id: the key of its `Guest`, a `uuid` unless your copy of `Guest` says otherwise. The first call makes one and sends it in the `ks_guest` cookie (`http.auth.guest_cookie`), which lasts `http.auth.guest_lifetime` (a year). It is `null` when someone is signed in, and outside a request. A guest is stored in the `guests` table the first time it owns a row.
+
+### Changing User, Guest and Ownable
+
+`User`, `Guest` and `Ownable` are KScript models that come with KScript.Auth. To change one, copy it into your project with `kscript publish`, then edit the copy. The copy replaces KScript.Auth's model everywhere: in scripts, routes, tests, migrations and the editor.
+
+```sh
+kscript publish          # list the models the packages ship
+kscript publish User     # copy User to models/user.kscript
+kscript publish Guest Ownable
+```
+
+The relations follow the models. Give your `User` a uuid key and Ownable's `user` is stored as a uuid too:
+
+```kscript
+import KScript.Data
+
+model User(key: 'uid', auto_create, unique: [email], hidden: [password]) extends Timestamps {
+  uid: uuid = @uuid()
+  name: string
+  email: email
+  password: password
+}
+```
+
+Guests work the same way. `Guest`'s key is `id: uuid = @uuid()`, made in the browser's cookie and stored when the guest first owns something. Leave the key out of your copy, and guests are numbered by the database instead: a new guest is stored at once, to get its number. Fields you add to `Guest` are there for each guest, such as a display name.
 
 ### Keeping a guest's rows when they sign up
 
@@ -564,7 +594,7 @@ With `"adopt_guest": true` in `http.auth`, signing in (with `@login`, `@attempt`
 
 ### Testing as a guest
 
-`@acting_as_guest(id?:)` makes the rest of the test run as a guest, in the test and in the routes it calls with `@api(/...)`. It returns the guest's id: a new one each call, or the `uuid` you give it. `@acting_as(...)` switches back to a user.
+`@acting_as_guest(id?:)` makes the rest of the test run as a guest, in the test and in the routes it calls with `@api(/...)`. It returns the guest's id: a new one each call, or the one you give it. `@acting_as(...)` switches back to a user.
 
 ```kscript
 import KScript.Auth
