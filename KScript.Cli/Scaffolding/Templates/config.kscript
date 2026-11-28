@@ -1,19 +1,26 @@
 --- make
-description: Script that returns settings as $config, for the project or one environment
+description: Settings for $config: config.kscript for values that need code, or kscript.<env>.json for one environment
 category: Settings
 usage: <base|environment>
 example: kscript make config base
 example: kscript make config staging
-to: {{ paths.config }}/config{{#unless name in base, default, config}}.{{ kebab }}{{/unless}}{{ ext }}
-hint: List the base config script under config.files in kscript.json. Matching environment variants are loaded automatically.
+to: {{ paths.project }}/{{#if name in base, default, config}}config{{ ext }}{{else}}kscript.{{ kebab }}.json{{/if}}
+hint: {{#if name in base, default, config}}configure(environment) runs when $config is first read, and its map is laid over the "config" section of kscript.json{{else}}kscript --env {{ kebab }} (or KSCRIPT_ENV={{ kebab }}) lays this file's "config" section over kscript.json's{{/if}}
 ---
-fn configure(environment: string) {
 {{#if name in base, default, config}}
+// Settings that need code, such as values from @env(). The map this returns is
+// laid over the "config" section of kscript.json.
+fn configure(environment: string) {
   return {
-    app: { name: 'My app', debug: $environment == 'development' }
-    logging: { level: 'info' }
+    app: { debug: $environment == 'development' }
+    api: { token: @env('API_TOKEN', default: '') }
   }
-{{else}}
-  return { app: { debug: $environment == 'development' or $environment == 'dev' or $environment == 'test' } }
-{{/if}}
 }
+{{else}}
+{
+  // Laid over the "config" section of kscript.json when the environment is {{ kebab }}.
+  "config": {
+    "app": { "debug": false }
+  }
+}
+{{/if}}

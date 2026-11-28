@@ -126,13 +126,13 @@ public sealed class I18nTests : IDisposable
 
         FileOf("lang/en-GB.yaml", "colour: Colour\n");
         FileOf("lang/es.yaml", "colour: Color\n");
-        FileOf("config.yaml", "i18n:\n  folder: lang\n  default: en_gb\n  locale: es\n");
+        FileOf("kscript.json", """{"config": {"i18n": {"folder": "lang", "default": "en_gb", "locale": "es"}}}""");
         Assert.Equal("es Color Colour /es/x\n", Out("<echo>{ @locale() } { @t('colour') } { @t('colour', {}, 'de') } { @locale_path('/x') }</echo>"));
-        File.Delete(Path.Combine(dir, "config.yaml"));
+        File.Delete(Path.Combine(dir, "kscript.json"));
         Assert.Equal("Colour\n", Out("<translations folder=\"lang\" default=\"en-GB\" /><locale set=\"en-GB\" /><echo>{ @t('colour') }</echo>"));
-        FileOf("config.yaml", "i18n: 3\n");
+        FileOf("kscript.json", """{"config": {"i18n": 3}}""");
         Assert.Contains("i18n should be a map", Assert.Throws<KScriptException>(() => Out("<echo>{ @t('x') }</echo>")).Message);
-        File.Delete(Path.Combine(dir, "config.yaml"));
+        File.Delete(Path.Combine(dir, "kscript.json"));
     }
 
     [Fact]

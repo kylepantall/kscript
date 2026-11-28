@@ -183,10 +183,11 @@ public class ProjectConfigTests
         Assert.Equal("connections,default,env,failed,queues,worker", Keys(props.GetProperty("queue").GetProperty("properties")));
         Assert.Equal("api_prefix,auth,cors,groups,middleware,openapi,routes,throttle,views,write_files", Keys(props.GetProperty("http").GetProperty("properties")));
         Assert.Equal("credentials,headers,methods,origins", Keys(props.GetProperty("http").GetProperty("properties").GetProperty("cors").GetProperty("properties")));
-        Assert.Equal("icon,id,main,name,version", Keys(props.GetProperty("app").GetProperty("properties")));
+        Assert.Equal("icon,id,main,name,user_config,version", Keys(props.GetProperty("app").GetProperty("properties")));
         Assert.Equal("syntax", Keys(props.GetProperty("make").GetProperty("properties")));
-        Assert.Equal("environment,files,prefix,required,root,user", Keys(props.GetProperty("config").GetProperty("properties")));
-        Assert.Equal(props.GetProperty("config").GetProperty("properties").GetProperty("files").GetProperty("default").EnumerateArray().Select(e => e.GetString()), KScript.Runtime.ConfigOptions.ProjectDefaultFiles);
+        // The config section holds the app's own settings: the schema only describes the ones packages read.
+        Assert.Equal("app,cache,database,i18n,logging,money", Keys(props.GetProperty("config").GetProperty("properties")));
+        Assert.False(props.GetProperty("config").TryGetProperty("additionalProperties", out _));
         Assert.Equal("docker,docs,docs_port,host,port,root", Keys(props.GetProperty("serve").GetProperty("properties")));
         Assert.Equal("exclude,include,rules,warnings_as_errors", Keys(props.GetProperty("lint").GetProperty("properties")));
         Assert.Equal("database,env,exclude,include,packages,timeout", Keys(props.GetProperty("test").GetProperty("properties")));
@@ -268,7 +269,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "My Site");
 
-        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.kscript", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", "tests/tasks-page.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript", "config/config.kscript" })
+        foreach (var f in new[] { "kscript.json", "index.html", "tasks.html", "about.md", "_layout.html", "_components/site-nav.kscript", "site.css", "scripts/hello.kscript", "lib/greeting.kscript", "lib/tasks.kscript", "desktop.kscript", "tests/greeting.test.kscript", "tests/tasks.test.kscript", "tests/tasks-page.test.kscript", ".vscode/extensions.json", ".gitignore", "routes/api.kscript", "controllers/tasks.kscript" })
         {
             Assert.True(File.Exists(Path.Combine(root, f)), f + " is created");
             Assert.Contains(f, output);
@@ -439,7 +440,7 @@ public class MakeProjectTests : IDisposable
         Assert.True(code == 0, err);
         string root = Path.Combine(parent.Root, "my-tool");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config/config.kscript", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "kscript.json", "main.kscript", "tests/main.test.kscript" }, files);
         Assert.Contains("@greeting(name: string): string", File.ReadAllText(Path.Combine(root, ".kscript", "agents", "index.md")));
         Assert.Equal("@AGENTS.md\n", File.ReadAllText(Path.Combine(root, "CLAUDE.md")));
         Assert.Contains("kscript main.kscript    run the script", output);
@@ -474,7 +475,7 @@ public class MakeProjectTests : IDisposable
         Assert.DoesNotContain("Note:", output);
         string root = Path.Combine(parent.Root, "app");
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(root, f).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal);
-        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".kscript/agents/packages/KScript.Http.md", ".kscript/agents/packages/KScript.Web.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_layout.html", "config/config.kscript", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "routes/api.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
+        Assert.Equal(new[] { ".kscript/agents/index.md", ".kscript/agents/packages/KScript.Core.md", ".kscript/agents/packages/KScript.Http.md", ".kscript/agents/packages/KScript.Web.md", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "_layout.html", "controllers/hello.kscript", "index.html", "kscript.json", "main.kscript", "routes/api.kscript", "site.css", "tests/hello.test.kscript", "tests/main.test.kscript" }, files);
         Assert.Contains("kscript serve           serve the site at http://localhost:8080", output);
         Assert.Contains("kscript routes", output);
 

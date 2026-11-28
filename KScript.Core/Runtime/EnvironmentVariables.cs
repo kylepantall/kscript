@@ -40,7 +40,7 @@ namespace KScript.Runtime
         public static readonly IReadOnlyList<Variable> All = new[]
         {
             new Variable(Environment, "Running scripts", "`config.environment` in kscript.json, else none",
-                "The environment a script or server runs in, such as `staging` or `production`. Its config files (`config.staging.yaml`, `.env.staging`) are layered over the base ones, and the database connection for it is used. `kscript --env` wins over it, and sets it for the scripts it starts.",
+                "The environment a script or server runs in, such as `staging` or `production`. Its settings files (`kscript.staging.json`, `.env.staging`) are layered over the base ones, and the database connection for it is used. `kscript --env` wins over it, and sets it for the scripts it starts.",
                 "KSCRIPT_ENV=production kscript serve", "/guide/language"),
             new Variable(Debug, "Running scripts", "off",
                 "Set to `1` to show the .NET exception and stack trace under an error, as `kscript --debug` does. `0` and `false` leave it off.",

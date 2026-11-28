@@ -12,9 +12,14 @@
     "middleware": ["log"],
     "auth": { "passkey_origin": "http://localhost:8080" }
   },
-  // Select the YAML source explicitly.
+  // The app's own settings, read as $config (such as $config.app.name).
   "config": {
-    "files": ["config/config.yaml", ".env?"]
+    "app": { "name": "Auth App" },
+    "database": {
+      "connections": {
+        "main": { "url": "sqlite:_data/profile.sqlite" }
+      }
+    }
   },
   // kscript make writes new scripts and tests in this format: kscript (.kscript files) or xml (.ks.xml).
   "make": {

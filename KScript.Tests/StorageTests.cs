@@ -168,9 +168,9 @@ public sealed class AppFoldersTests : StorageFixture
     [Fact]
     public void ProjectsNameTheirAppAndCanReadTheUsersConfig()
     {
-        ProjectConfig named = ProjectConfig.Parse("{ \"name\": \"shop\", \"config\": { \"user\": true } }", Path.Combine(Project, "kscript.json"));
+        ProjectConfig named = ProjectConfig.Parse("{ \"name\": \"shop\", \"app\": { \"user_config\": true } }", Path.Combine(Project, "kscript.json"));
         Assert.Empty(named.Warnings);
-        Assert.True(named.Config.User);
+        Assert.True(named.App.UserConfig);
         Assert.Equal("shop", named.AppName);
         Assert.Equal(AppFolder("shop", "config"), named.ConfigOptions().UserFolder);
 
@@ -179,7 +179,7 @@ public sealed class AppFoldersTests : StorageFixture
         Assert.Null(app.ConfigOptions().UserFolder);
         Assert.Equal("project", ProjectConfig.Parse("{}", Path.Combine(Project, "kscript.json")).AppName);
         Assert.Equal("kscript", new ProjectConfig().AppName);
-        Assert.Contains(ProjectConfig.Parse("{ \"config\": { \"user\": 1 } }", Path.Combine(Project, "kscript.json")).Warnings, w => w.Contains("config.user"));
+        Assert.Contains(ProjectConfig.Parse("{ \"app\": { \"user_config\": 1 } }", Path.Combine(Project, "kscript.json")).Warnings, w => w.Contains("app.user_config"));
     }
 }
 
@@ -316,9 +316,9 @@ public sealed class StorageTests : StorageFixture
     [Fact]
     public void ConfigUserReadsThePersonsOwnSettings()
     {
-        FileOf("config.json", "{ \"greeting\": \"Hello\", \"size\": 1 }");
+        FileOf("kscript.json", "{ \"name\": \"notes\", \"config\": { \"greeting\": \"Hello\", \"size\": 1 } }");
         Directory.CreateDirectory(AppFolder("notes", "config"));
-        File.WriteAllText(Path.Combine(AppFolder("notes", "config"), "config.yaml"), "greeting: Hi");
+        File.WriteAllText(Path.Combine(AppFolder("notes", "config"), "config.json"), "{ \"greeting\": \"Hi\" }");
 
         Assert.Equal("Hello 1\n", Run("<echo>{ $config.greeting } { $config.size }</echo>"));
         Assert.Equal("Hi 1 file\n", Run("<config user=\"yes\" /><echo>{ $config.greeting } { $config.size } { $config->sources()->last().kind }</echo>"));
@@ -327,7 +327,7 @@ public sealed class StorageTests : StorageFixture
         Assert.Equal("Hello\n", Run("<echo>{ $config.greeting }</echo>", config: new ConfigOptions { UserFolder = Path.Combine(Root, "nothing-here") }));
 
         // A script can save a setting for the person, and $config->reload() sees it.
-        Assert.Equal("Hi Bye\n", Run("<config user=\"yes\" /><echo>{ $config.greeting } { @storage(config)->write('config.yaml', 'greeting: Bye') ?? $config->reload().greeting }</echo>"));
+        Assert.Equal("Hi Bye\n", Run("<config user=\"yes\" /><echo>{ $config.greeting } { @storage(config)->write_json('config.json', { greeting: 'Bye' }) ?? $config->reload().greeting }</echo>"));
     }
 
     [Fact]

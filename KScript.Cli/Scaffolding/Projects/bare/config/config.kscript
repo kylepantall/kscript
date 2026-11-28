@@ -1,4 +1,0 @@
-// Return the settings that scripts and pages read through $config.
-fn configure(environment: string) {
-  return { app: { name: '{{ title }}', debug: $environment == 'development' } }
-}

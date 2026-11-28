@@ -251,7 +251,7 @@ Colours are used when the output is a terminal; set `NO_COLOR` to turn them off 
 
 `timeout: …` on a test wins over `--timeout`, which wins over `test.timeout`.
 
-`test.env` is the environment the tests run in. The API and fullstack [project templates](projects.md#an-api---template-api) use it in `config/config.kscript` to select an in-memory database. An explicitly listed YAML source can use a matching variant, such as `config.test.yaml`.
+`test.env` is the environment the tests run in, so `kscript.test.json` is laid over `kscript.json`'s settings (see [Settings](language.md#settings-config)). The API and fullstack [project templates](projects.md#an-api---template-api) use it to give tests an in-memory database.
 
 `kscript test --env staging` and a `KSCRIPT_ENV` that is already set win over `test.env`.
 

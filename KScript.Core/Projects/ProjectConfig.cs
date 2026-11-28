@@ -71,6 +71,9 @@ namespace KScript.Projects
 
         /// <summary>An icon file relative to kscript.json: .icns for macOS, .ico for Windows, .png for Linux.</summary>
         public string Icon { get; set; }
+
+        /// <summary>True lays the person's own config.json, in the app's config folder (KScript.Storage), over $config.</summary>
+        public bool UserConfig { get; set; }
     }
 
     /// <summary>The <c>lint</c> section: used by <c>kscript check</c> and by the language server.</summary>
@@ -107,7 +110,7 @@ namespace KScript.Projects
         public List<string> Packages { get; set; } = new List<string>();
 
         /// <summary>
-        /// The environment tests run in (KSCRIPT_ENV), such as test, so config/config.test.yaml can point the database
+        /// The environment tests run in (KSCRIPT_ENV), such as test, so kscript.test.json can point the database
         /// at memory. Null leaves the environment as it is. kscript --env and a KSCRIPT_ENV that is already set win.
         /// </summary>
         public string Env { get; set; }
@@ -127,28 +130,6 @@ namespace KScript.Projects
 
         /// <summary>True for a file named like a test: <c>name.test.kscript</c> or <c>name.test.ks.xml</c>.</summary>
         public static bool IsTestFileName(string path) => KScript.Syntax.Markup.ScriptFiles.IsTest(path);
-    }
-
-    /// <summary>The <c>config</c> section: where <c>$config</c> reads a script's settings from.</summary>
-    public sealed class ConfigSettings
-    {
-        /// <summary>The environment used when neither kscript --env nor KSCRIPT_ENV names one.</summary>
-        public string Environment { get; set; }
-
-        /// <summary>The base files (default: optional .env).</summary>
-        public List<string> Files { get; set; }
-
-        /// <summary>Environment variables with this prefix override the files.</summary>
-        public string Prefix { get; set; }
-
-        /// <summary>The folder the files are in, relative to kscript.json. Null means the project folder.</summary>
-        public string Root { get; set; }
-
-        /// <summary>Settings that must be set.</summary>
-        public List<string> Required { get; set; } = new List<string>();
-
-        /// <summary>True layers the app's own config file (config.json in its config folder) over the project's files.</summary>
-        public bool User { get; set; }
     }
 
     /// <summary>
@@ -497,24 +478,19 @@ namespace KScript.Projects
         public ServeSettings Serve { get; } = new ServeSettings();
         public LintSettings Lint { get; } = new LintSettings();
         public TestSettings Test { get; } = new TestSettings();
-        public ConfigSettings Config { get; } = new ConfigSettings();
 
         /// <summary>Project-relative Markdown files to include in generated AGENTS.md, in order.</summary>
         public IReadOnlyList<string> AgentMarkdown { get; private set; } = Array.Empty<string>();
 
         /// <summary>
-        /// The options $config uses for scripts in this project. <paramref name="environment"/> (from kscript --env)
-        /// wins over KSCRIPT_ENV, which wins over config.environment.
+        /// The options $config uses for scripts in this project: kscript.json's "config" section, kscript.&lt;env&gt;.json
+        /// and config.kscript beside it. <paramref name="environment"/> (from kscript --env) wins over KSCRIPT_ENV.
         /// </summary>
         public KScript.Runtime.ConfigOptions ConfigOptions(string environment = null) => new KScript.Runtime.ConfigOptions
         {
-            Environment = environment ?? System.Environment.GetEnvironmentVariable("KSCRIPT_ENV") ?? Config.Environment,
-            Files = Config.Files,
-            ExplicitProjectFiles = FilePath != null,
-            Prefix = Config.Prefix,
-            Root = Config.Root == null ? (FilePath == null ? null : Directory) : Path.GetFullPath(Path.Combine(Directory, Config.Root)),
-            Required = Config.Required.ToList(),
-            UserFolder = Config.User ? KScript.Runtime.AppFolders.Folder(AppName, "config") : null,
+            Environment = environment ?? System.Environment.GetEnvironmentVariable("KSCRIPT_ENV"),
+            Root = FilePath == null ? null : Directory,
+            UserFolder = App.UserConfig ? KScript.Runtime.AppFolders.Folder(AppName, "config") : null,
         };
 
         /// <summary>The app's name for its folders (KScript.Storage): app.name, else name, else the project folder's name.</summary>
@@ -551,7 +527,6 @@ namespace KScript.Projects
             ["policies"] = "policies",
             ["windows"] = ".",
             ["documents"] = "documents",
-            ["config"] = "config",
             ["locales"] = "locales",
             ["logging"] = "lib",
             ["data"] = "data",
@@ -1193,8 +1168,9 @@ namespace KScript.Projects
                     case "id": config.App.Id = String(p.Value, "app.id", config); break;
                     case "version": config.App.Version = String(p.Value, "app.version", config); break;
                     case "icon": config.App.Icon = String(p.Value, "app.icon", config); break;
+                    case "user_config": config.App.UserConfig = Bool(p.Value, "app.user_config", config) ?? false; break;
                     default:
-                        config.Warnings.Add($"unknown setting 'app.{p.Name}' (expected main, name, id, version or icon).");
+                        config.Warnings.Add($"unknown setting 'app.{p.Name}' (expected main, name, id, version, icon or user_config).");
                         break;
                 }
             }
@@ -1742,37 +1718,8 @@ namespace KScript.Projects
             }
         }
 
-        private static void ReadConfig(JsonElement e, ProjectConfig config)
-        {
-            if (!Object(e, "config", config)) return;
-            foreach (var p in e.EnumerateObject())
-            {
-                switch (p.Name)
-                {
-                    case "environment":
-                        config.Config.Environment = String(p.Value, "config.environment", config);
-                        break;
-                    case "files":
-                        config.Config.Files = Strings(p.Value, "config.files", config);
-                        break;
-                    case "prefix":
-                        config.Config.Prefix = String(p.Value, "config.prefix", config);
-                        break;
-                    case "root":
-                        config.Config.Root = String(p.Value, "config.root", config);
-                        break;
-                    case "required":
-                        config.Config.Required = Strings(p.Value, "config.required", config) ?? config.Config.Required;
-                        break;
-                    case "user":
-                        config.Config.User = Bool(p.Value, "config.user", config) ?? false;
-                        break;
-                    default:
-                        config.Warnings.Add($"unknown setting 'config.{p.Name}' (expected environment, files, prefix, root, required or user).");
-                        break;
-                }
-            }
-        }
+        /// <summary>The "config" section holds the app's own settings ($config), so any names are allowed.</summary>
+        private static void ReadConfig(JsonElement e, ProjectConfig config) => Object(e, "config", config);
 
 
         private static void ReadFormat(JsonElement e, ProjectConfig config)

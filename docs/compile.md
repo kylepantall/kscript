@@ -22,7 +22,7 @@ A program is the release `kscript` for its platform, reduced to what the script 
 
 - **Only the packages it imports.** `kscript compile` loads the script and its imports the same way `kscript` does, and keeps the packages they use and the libraries those packages need. A terminal script that imports `KScript.Math` leaves out the desktop toolkit, the web server, the language server, the command line and every other package. Packages listed in `kscript.json` count as imported. A desktop app keeps `KScript.UI` and its toolkit. A site keeps `KScript.Http`, `KScript.Web` and the packages its pages import.
 - **Your files.** Everything in the script's folder (or the project) goes in, except tests (`*.test.kscript`, `*.test.ks.xml`), `bin`, `obj`, `dist`, `node_modules`, `.git`, editor folders and earlier `.app` builds.
-- **No secrets.** `.env` and `.env.*` files are left out, and `kscript compile` says so. A program you hand to someone shouldn't carry your keys. Set those values as environment variables where the program runs: `APP_` variables and the rest of [`$config`](language.md) work as usual, and `config.json` and `<env>.yaml` files do go in.
+- **No secrets.** `.env` and `.env.*` files are left out, and `kscript compile` says so. A program you hand to someone shouldn't carry your keys. Set those values as environment variables where the program runs, and read them with `@env()` in `config.kscript` (see [`$config`](language.md#settings-config)). `kscript.json`, `kscript.<env>.json` and `config.kscript` do go in.
 
 For a sense of size: on Linux, a terminal script is about 35 MB, Life Lab about 42 MB and a site about 46 MB, where the whole `kscript` is 60 MB. Most of what remains is .NET itself.
 

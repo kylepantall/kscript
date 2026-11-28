@@ -45,7 +45,7 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Levels_categories_and_fields_come_from_config()
     {
-        FileOf("config.yaml", "logging:\n  level: warn\n  levels:\n    db: debug\n    db.noisy: off\n  providers:\n    - type: memory\n");
+        FileOf("kscript.json", """{"config": {"logging": {"level": "warn", "levels": {"db": "debug", "db.noisy": "off"}, "providers": [{"type": "memory"}]}}}""");
         var (output, error, _) = RunWith(
             "<log>skipped</log><log level=\"error\" category=\"pay\" fields=\"{ id: 7 }\">Declined</log>" +
             "<let name=\"db\" value=\"$log->named('db')->with({ host: 'x' })\" /><do>$db->debug('Query'); $db->named('noisy')->error('never'); $db->named('slow')->trace('no')</do>" +
@@ -58,7 +58,7 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void File_provider_writes_text_or_json_lines_and_rolls_daily()
     {
-        FileOf("config.json", "{ \"logging\": { \"level\": \"trace\", \"providers\": [ { \"type\": \"file\", \"path\": \"logs/app.log\" }, { \"type\": \"file\", \"path\": \"logs/app.json\", \"format\": \"json\", \"roll\": \"daily\", \"level\": \"info\" } ] } }");
+        FileOf("kscript.json", "{ \"config\": { \"logging\": { \"level\": \"trace\", \"providers\": [ { \"type\": \"file\", \"path\": \"logs/app.log\" }, { \"type\": \"file\", \"path\": \"logs/app.json\", \"format\": \"json\", \"roll\": \"daily\", \"level\": \"info\" } ] } } }");
         var (_, error, _) = RunWith("<do>$log->trace('t'); $log->info('Saved', { id: 3, tags: ['a'] }); $log->log('fatal', 'Boom', 'not a map')</do>");
         Assert.Equal("", error);
         Assert.Equal(
@@ -83,7 +83,7 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Function_providers_from_config_and_errors_as_fields()
     {
-        FileOf("config.yaml", "logging:\n  providers:\n    - fn: notify\n    - type: console\n      stream: stdout\n      format: json\n      level: error\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"fn": "notify"}, {"type": "console", "stream": "stdout", "format": "json", "level": "error"}]}}}""");
         var (output, _, _) = RunWith(
             "<fn name=\"notify\" params=\"entry\"><echo>notify {$entry.message} {$entry.fields.error} {$entry.fields.error_type} {$entry.fields.error_line}</echo></fn>" +
             "<try><throw message=\"bad thing\" /><catch as=\"err\"><do>$log->error('Failed', $err)</do></catch></try>");
@@ -101,37 +101,37 @@ public sealed class LoggingTests : IDisposable
     [Fact]
     public void Bad_logging_settings_are_reported_clearly()
     {
-        FileOf("config.yaml", "logging: 3\n");
+        FileOf("kscript.json", """{"config": {"logging": 3}}""");
         Assert.Contains("logging should be a map", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  level: loud\n");
+        FileOf("kscript.json", """{"config": {"logging": {"level": "loud"}}}""");
         Assert.Contains("logging.level: 'loud' isn't a log level", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  levels: [1]\n");
+        FileOf("kscript.json", """{"config": {"logging": {"levels": [1]}}}""");
         Assert.Contains("logging.levels should be a map", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers: { type: file }\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": {"type": "file"}}}}""");
         Assert.Contains("logging.providers should be a list", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers: [1]\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [1]}}}""");
         Assert.Contains("logging.providers[0] should be a map", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - level: info\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"level": "info"}]}}}""");
         Assert.Contains("logging.providers[0] needs a type", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: carrier-pigeon\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "carrier-pigeon"}]}}}""");
         Assert.Contains("there is no log provider type 'carrier-pigeon'. Types: console, file, memory, fn.", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: file\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "file"}]}}}""");
         Assert.Contains("logging.providers[0] needs a path", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - fn: missing\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"fn": "missing"}]}}}""");
         Assert.Contains("there is no function called missing", Fails("<log>x</log>").Message);
-        File.Delete(Path.Combine(dir, "config.yaml"));
+        File.Delete(Path.Combine(dir, "kscript.json"));
 
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      format: xml\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "console", "format": "xml"}]}}}""");
         Assert.Contains("logging.providers[0]: format should be text or json", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      stream: tty\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "console", "stream": "tty"}]}}}""");
         Assert.Contains("stream should be stdout or stderr", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: file\n      path: a.log\n      roll: weekly\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "file", "path": "a.log", "roll": "weekly"}]}}}""");
         Assert.Contains("roll should be never or daily", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: memory\n      level: loud\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "memory", "level": "loud"}]}}}""");
         Assert.Contains("logging.providers[0] level: 'loud' isn't a log level", Fails("<log>x</log>").Message);
-        FileOf("config.yaml", "logging:\n  providers:\n    - type: console\n      color: off\n      stream: stdout\n    - type: console\n      color: true\n      stream: stdout\n");
+        FileOf("kscript.json", """{"config": {"logging": {"providers": [{"type": "console", "color": "off", "stream": "stdout"}, {"type": "console", "color": true, "stream": "stdout"}]}}}""");
         Assert.Equal("12:30:15 INFO  x\n\u001b[36m12:30:15 INFO  x\u001b[0m\n", RunWith("<log>x</log>").Output);
-        File.Delete(Path.Combine(dir, "config.yaml"));
+        File.Delete(Path.Combine(dir, "kscript.json"));
         Assert.Contains("there is no function called nope", Fails("<log_provider fn=\"nope\" />").Message);
         Assert.Contains("fn should be a function", Fails("<let name=\"n\" value=\"1\" /><log_provider fn=\"n\" />").Message);
         Assert.Contains("level=\"loud\" isn't one of", Fails("<log level=\"loud\">x</log>").Message);

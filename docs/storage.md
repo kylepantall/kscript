@@ -95,27 +95,27 @@ for name in $drafts->list('*.md') {
 $drafts->delete('letter.md')
 ```
 
-## The person's own settings: config.user
+## The person's own settings: app.user_config
 
-`$config` reads the sources listed in `kscript.json` under `config.files` (see [Settings](language.md#settings-config)). With `"user": true`, it also reads `config.json`, `config.yaml` or `config.yml` from the app's config folder, after the project's own files. A person can change a setting for themselves without editing the project, and a script can save one for them:
+`$config` holds the project's settings, from the `config` section of `kscript.json` (see [Settings](language.md#settings-config)). With `"user_config": true` in the `app` section, it also reads `config.json` from the app's config folder, after the project's own settings. A person can change a setting for themselves without editing the project, and a script can save one for them:
 
 ```jsonc
 // kscript.json
 {
-  "app": { "name": "Notes" },
-  "config": { "user": true }
+  "app": { "name": "Notes", "user_config": true },
+  "config": { "greeting": "Hello" }
 }
 ```
 
 ```kscript
 import KScript.Storage
 
-echo $config->get('greeting', 'Hello')
+echo $config.greeting
 @storage(config)->write_json('config.json', { greeting: 'Hi there' })
-echo $config->reload()->get('greeting')
+echo $config->reload().greeting
 ```
 
-The `config` statement does the same for one script: `config(user: true)`. Environment variables with the config prefix still win over every file.
+The `config` statement does the same for one script: `config(user: true)`.
 
 ## Where it works
 

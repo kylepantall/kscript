@@ -538,7 +538,8 @@ namespace KScript.Scaffolding
             // {{ paths.controllers }} and the rest: the recommended folders, or kscript.json's "paths" (see ProjectConfig.DefaultPaths).
             foreach (string folder in KScript.Projects.ProjectConfig.DefaultPaths.Keys)
                 values["paths." + folder] = Folder(project?.PathFor(folder) ?? KScript.Projects.ProjectConfig.DefaultPaths[folder]);
-            values["paths.config"] = ConfigFolder(project);
+            // Settings files (config.kscript, kscript.<env>.json) sit beside kscript.json.
+            values["paths.project"] = project?.FilePath == null ? "." : Folder(Path.GetRelativePath(project.SiteRoot, project.Directory));
             // Extensions go in the first folder kscript.json's "extensions" lists (not a glob), or extensions/.
             values["paths.extensions"] = Folder(project?.Extensions?.Select(e => e.Trim().Replace('\\', '/').TrimEnd('/'))
                 .FirstOrDefault(e => e.Length > 0 && e.IndexOfAny(new[] { '*', '?' }) < 0 && !KScript.Projects.ProjectConfig.IsExtensionFileName(e))
@@ -555,20 +556,6 @@ namespace KScript.Scaffolding
         {
             string folder = path.Replace('\\', '/').Trim().Trim('/');
             return folder.Length == 0 ? "." : folder;
-        }
-
-        /// <summary>
-        /// Where settings files go: config.root if kscript.json sets it (that's where $config reads them), else
-        /// paths.config if set, else config/ when the folder is there, else the project folder, where $config looks
-        /// by default.
-        /// </summary>
-        private static string ConfigFolder(KScript.Projects.ProjectConfig project)
-        {
-            if (project == null) return ".";
-            if (project.Config.Root != null)
-                return Folder(Path.GetRelativePath(project.SiteRoot, Path.GetFullPath(Path.Combine(project.Directory, project.Config.Root))));
-            if (project.Paths.TryGetValue("config", out var set)) return Folder(set);
-            return System.IO.Directory.Exists(Path.Combine(project.SiteRoot, "config")) ? "config" : ".";
         }
 
         private static void CheckComponentName(string kebab, string given)
