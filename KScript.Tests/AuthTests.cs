@@ -430,7 +430,11 @@ public sealed class AuthMakeTests : AuthSiteFixture
         Write("kscript.json", "{ \"types\": { \"password\": { \"min\": 14 } } }");
         var made = Make(Dir, "auth");
         Assert.DoesNotContain("password rule", made.Out);
-        Assert.Equal("{ \"types\": { \"password\": { \"min\": 14 } } }", Read("kscript.json"));
+        // The project's own rule stays as it is; make auth only adds the users setting.
+        string config = Read("kscript.json");
+        Assert.Contains("\"types\": { \"password\": { \"min\": 14 } }", config);
+        Assert.DoesNotContain("\"min\": 10", config);
+        Assert.Contains("\"users\": \"User\"", config);
     }
 
     [Fact]

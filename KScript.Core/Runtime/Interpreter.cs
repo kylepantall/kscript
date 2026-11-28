@@ -125,7 +125,9 @@ namespace KScript.Runtime
             void Add(KScriptPackage package, string alias) => AddPackage(module, package, alias);
 
             Add(Packages.Core, null);
-            foreach (string name in Options.DefaultPackages)
+            // A package's own scripts import what they use. The project's packages would make them import each
+            // other: KScript.Data's Timestamps loading KScript.Auth's User, which extends Timestamps.
+            foreach (string name in PackageSource.IsSource(module.Path) ? Enumerable.Empty<string>() : Options.DefaultPackages)
             {
                 Add(GetPackage(name, module, null), null);
             }
