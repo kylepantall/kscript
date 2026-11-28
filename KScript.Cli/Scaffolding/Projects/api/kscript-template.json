@@ -36,6 +36,9 @@
       "description": "The port kscript serve uses"
     }
   },
+  // kscript make kits run in the new project once its files are written: with a database, the users are kept
+  // in the project's own User model.
+  "make": ["{{#if auth}}{{#unless db is none}}users{{/unless}}{{/if}}"],
   // Printed after the project is made. Lines that come out empty are left out.
   "notes": [
     "{{#if db in postgres, mysql}}the app keeps its data in {{ db }}, using the connection settings in kscript.json (DATABASE_URL can override them, through config{{ ext }}){{#if docker}}, and docker compose up starts the database too{{/if}}. kscript test uses SQLite in memory, so tests need no database server.{{/if}}"

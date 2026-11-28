@@ -86,6 +86,12 @@ namespace KScript.Runtime
         /// <summary>The root element: &lt;kscript&gt;, or a package element such as &lt;KScript.Window&gt;.</summary>
         public MarkupElement Root { get; internal set; }
 
+        /// <summary>
+        /// The package script this module is, or the project's copy of (kscript publish), such as KScript.Auth's
+        /// ownable.kscript. Null for every other script.
+        /// </summary>
+        public PackageSource PackageOrigin { get; internal set; }
+
         /// <summary>True when the root is a package element (&lt;KScript.Window&gt;) rather than &lt;kscript&gt;.</summary>
         public bool IsPackageRoot { get; internal set; }
 

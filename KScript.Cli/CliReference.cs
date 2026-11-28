@@ -241,6 +241,20 @@ namespace KScript
                     O("--key value", "Values for the template, such as --resource or --fields \"name: string\"."),
                 },
                 Ex(("kscript make project my-site", "Makes a new project in my-site, asking what it needs."), ("kscript make project shop --template api --db postgres --docker", "Makes an API project on Postgres, with Docker files."), ("kscript make route users --api", "Adds an API route for users and its controller."), ("kscript make controller people --resource", "Makes a controller with the index, show, store, update and destroy actions.")), "projects") { Group = "build" },
+            new CliCommand("publish", "kscript publish [model...] [--syntax kscript|xml] [--force] [--dry-run] [--dir <folder>]",
+                "Copy a model a package ships, such as User, Guest or Ownable, into your models folder to change it.",
+                new[]
+                {
+                    O("--syntax kscript|xml", "Write a .kscript (the default) or .ks.xml file."),
+                    O("--force", "Replace the project's copy with the package's again."),
+                    O("--dry-run", "Show where the copy would go, and write nothing."),
+                    O("--dir <folder>", "Use the project in this folder instead of the current one."),
+                },
+                Ex(("kscript publish", "Lists the models and mixins the packages ship, and which ones the project has its own copy of."), ("kscript publish User", "Copies KScript.Auth's User model to models/user.kscript.")), "projects")
+            {
+                Group = "build",
+                Details = "The copy replaces the package's model everywhere the package is imported: in scripts, routes, tests, migrations and the editor. Change its fields, its key or its options there. Ownable's user and guest follow the User and Guest models, so a uuid key on User makes Ownable's user_id a uuid too.",
+            },
             new CliCommand("ide", "kscript ide [install|uninstall|config] [editor] [--version <tag>] [--vsix file]",
                 "Set up VS Code, Cursor, VSCodium or another editor.",
                 new[]
@@ -271,7 +285,7 @@ namespace KScript
             ("web", new[] { "serve", "routes", "openapi", "css" }),
             ("data", new[] { "db" }),
             ("queue", new[] { "worker", "queue" }),
-            ("build", new[] { "make", "repo", "lib", "compile" }),
+            ("build", new[] { "make", "publish", "repo", "lib", "compile" }),
             ("docs", new[] { "docs", "mcp" }),
             ("tools", new[] { "ide", "lsp", "update", "version" }),
         };

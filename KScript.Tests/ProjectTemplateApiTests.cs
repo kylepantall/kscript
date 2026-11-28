@@ -91,7 +91,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         {
             ".gitignore", ".vscode/extensions.json", "AGENTS.md", "CLAUDE.md", "Makefile", "config.kscript",
             "controllers/accounts.kscript", "controllers/notes.kscript", "kscript.json", "kscript.test.json", "lib/cache.kscript", "middleware/request-id.kscript",
-            "models/note.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
+            "models/note.kscript", "models/user.kscript", "requests/note-input.kscript", "requests/sign-in.kscript", "requests/sign-up.kscript", "routes/api.kscript", "tests/accounts.test.kscript", "tests/api.test.kscript", "tests/notes.test.kscript",
         }, Files(root));
         // Each type has its own file, and the controllers import them.
         Assert.Contains("import \"../requests/note-input.kscript\"", File.ReadAllText(Path.Combine(root, "controllers", "notes.kscript")));
@@ -330,7 +330,7 @@ public sealed class ProjectTemplateApiTests : IDisposable
         Assert.True(File.Exists(Path.Combine(t.Root, "made", "one.md")));
         Assert.False(File.Exists(Path.Combine(t.Root, "made", "two.md")));
 
-        Assert.Contains("only auth and docker can be made with a project", Make(t.Root, "other", "--template", Path.Combine(t.Root, "kit"), "--db", "b").Err);
+        Assert.Contains("only auth, users and docker can be made with a project", Make(t.Root, "other", "--template", Path.Combine(t.Root, "kit"), "--db", "b").Err);
         Assert.Contains("db.choices should be a list", Make(t.Root, "bad", "--template", Path.Combine(t.Root, "bad")).Err);
     }
 
