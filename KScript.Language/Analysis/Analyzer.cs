@@ -288,21 +288,34 @@ namespace KScript.Language.Analysis
         private void HoistPackageSources(Scope root)
         {
             string self = result.Path != null && KScript.Runtime.PackageSource.IsSource(result.Path) ? result.Path : null;
+            string mine = result.Path != null ? System.IO.Path.GetFullPath(result.Path) : null;
+            List<string> modelFiles = null;
             foreach (MarkupElement e in result.Markup.RootElements.FirstOrDefault()?.ChildElements.Where(x => x.Name == "import" && x.GetAttribute("package") != null) ?? Enumerable.Empty<MarkupElement>())
             {
                 string package = catalog.FindPackage(e.GetAttributeValue("package")?.Trim() ?? string.Empty);
-                foreach (KScript.Runtime.PackageSource source in package == null ? Enumerable.Empty<KScript.Runtime.PackageSource>() : catalog.SourcesOf(package))
+                var sources = package == null ? new List<KScript.Runtime.PackageSource>() : catalog.SourcesOf(package).ToList();
+                if (sources.Count == 0) continue;
+                // The project's own copy of a package script (kscript publish) replaces it, as it does when the
+                // script runs. A copy sees the package's other scripts (Ownable's copy sees User), not itself.
+                modelFiles ??= ProjectFiles((config, d, f, l, ds) => config.ModelFiles(d, f, l, ds)) ?? new List<string>();
+                foreach (KScript.Runtime.PackageSource source in sources)
                 {
                     if (self != null && self.StartsWith(System.IO.Path.Combine(KScript.Runtime.PackageSource.Root, source.Package), StringComparison.Ordinal)) continue;
-                    HoistImport(e, root, source);
+                    string copy = source.ProjectCopy(modelFiles);
+                    if (copy != null && copy == mine) continue;
+                    packageScripts[copy ?? source.Path] = source.Package;
+                    HoistImport(e, root, source, copy);
                 }
             }
         }
 
-        private void HoistImport(MarkupElement e, Scope root, KScript.Runtime.PackageSource packaged = null)
+        /// <summary>The package scripts this file sees (or the project's copies of them), by path, with their package.</summary>
+        private readonly Dictionary<string, string> packageScripts = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        private void HoistImport(MarkupElement e, Scope root, KScript.Runtime.PackageSource packaged = null, string copy = null)
         {
             string src = packaged?.Package ?? e.GetAttributeValue("path")?.Trim();
-            string full = packaged?.Path ?? ResolvePath(src);
+            string full = copy ?? packaged?.Path ?? ResolvePath(src);
             Dictionary<string, (FunctionParameter[] Params, ExternalLocation Location, string Description)> exported = ReadExports(full);
             Dictionary<string, (ExternalLocation Location, string Description)> constants = ReadConstantExports(full);
 

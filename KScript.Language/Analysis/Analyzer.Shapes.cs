@@ -247,7 +247,26 @@ namespace KScript.Language.Analysis
         /// The relations of a model, as KScript.Data works them out: each field whose type is a model, with that
         /// model's element and whether this model holds the link column (belongs-to).
         /// </summary>
-        private IEnumerable<(string Name, MarkupElement Target, bool List, bool BelongsTo)> ModelRelations(MarkupElement e)
+        private IEnumerable<(string Name, MarkupElement Target, bool List, bool BelongsTo)> ModelRelations(MarkupElement e) => ModelRelations(e, new HashSet<MarkupElement>());
+
+        /// <summary>A model's relations, then those of the mixins it extends (Ownable's user and guest), each once.</summary>
+        private IEnumerable<(string Name, MarkupElement Target, bool List, bool BelongsTo)> ModelRelations(MarkupElement e, HashSet<MarkupElement> seen)
+        {
+            if (!seen.Add(e)) yield break;
+            var own = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var relation in OwnModelRelations(e))
+            {
+                own.Add(relation.Name);
+                yield return relation;
+            }
+            foreach (MarkupElement mixin in WithNames(e).Select(TypeElementNamed).Where(b => b != null && IsModelElement(b) && IsModelMixin(b)))
+            {
+                foreach (var relation in ModelRelations(mixin, seen).Where(r => own.Add(r.Name)))
+                    yield return relation;
+            }
+        }
+
+        private IEnumerable<(string Name, MarkupElement Target, bool List, bool BelongsTo)> OwnModelRelations(MarkupElement e)
         {
             foreach ((string name, string type, bool optional) in ModelFieldTypes(e))
             {
@@ -277,7 +296,7 @@ namespace KScript.Language.Analysis
         private void FillModelFields(MarkupElement e, TypeShape shape)
         {
             var modelOptions = ModelOptions(e);
-            string key = modelOptions.GetValueOrDefault("key")?.Trim();
+            string key = modelOptions.GetValueOrDefault("key")?.Trim().Trim('\'', '"');
             if (string.IsNullOrEmpty(key) && !shape.Fields.ContainsKey("id"))
             {
                 var fields = shape.Fields.ToList();
@@ -312,12 +331,13 @@ namespace KScript.Language.Analysis
                 string targetName = target.GetAttributeValue("name")?.Trim();
                 if (belongsTo)
                 {
-                    string key = ModelOptions(target).GetValueOrDefault("key")?.Trim() ?? "id";
+                    string key = ModelOptions(target).GetValueOrDefault("key")?.Trim().Trim('\'', '"') ?? "id";
                     string column = name + "_" + key;
                     if (!shape.Fields.ContainsKey(column))
                     {
-                        TypeShape keyShape = key == "id" ? new TypeShape(KType.Number) { Declared = true }
-                            : ModelFieldTypes(target).Where(f => f.Name == key).Select(f => TypeNamed(f.Type, 0)).FirstOrDefault() ?? TypeShape.Unknown;
+                        // The key's type: the field the target declares for it (Guest's id: uuid), else a numbered id.
+                        TypeShape keyShape = ModelFieldTypes(target).Where(f => f.Name == key).Select(f => TypeNamed(f.Type, 0)).FirstOrDefault()
+                            ?? (key == "id" ? new TypeShape(KType.Number) { Declared = true } : TypeShape.Unknown);
                         shape.Fields[column] = new FieldInfo(column, keyShape, null, $"The {key} of the {name} (a {targetName}).");
                     }
                 }
