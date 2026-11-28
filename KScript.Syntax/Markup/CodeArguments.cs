@@ -52,14 +52,18 @@ namespace KScript.Syntax.Markup
         /// <summary>Applies the rule to one element's arguments. Safe to call more than once.</summary>
         public static void Normalise(MarkupElement e, ElementInfo info)
         {
-            foreach (MarkupAttribute attr in e.Attributes)
+            // A server's requests share one parse of a script (ScriptCache), so two may normalise the same element at once.
+            lock (e)
             {
-                if (!attr.IsArgument || attr.Normalised || attr.Value == null) continue;
-                attr.Normalised = true;
-                AttributeInfo a = info?.GetAttribute(attr.Name);
-                // An argument the element doesn't list (a page variable, a component's own property) is text.
-                AttributeKind kind = a?.Kind ?? AttributeKind.Template;
-                attr.Value = attr.Quote == '"' ? Quoted(attr, kind) : Bare(attr, kind, a);
+                foreach (MarkupAttribute attr in e.Attributes)
+                {
+                    if (!attr.IsArgument || attr.Normalised || attr.Value == null) continue;
+                    AttributeInfo a = info?.GetAttribute(attr.Name);
+                    // An argument the element doesn't list (a page variable, a component's own property) is text.
+                    AttributeKind kind = a?.Kind ?? AttributeKind.Template;
+                    attr.Value = attr.Quote == '"' ? Quoted(attr, kind) : Bare(attr, kind, a);
+                    attr.Normalised = true;
+                }
             }
         }
 

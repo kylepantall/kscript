@@ -6,6 +6,7 @@ using KScript.Auth;
 using KScript.Pages;
 using KScript.Projects;
 using KScript.Runtime;
+using KScript.Runtime.Dependencies;
 
 using Microsoft.AspNetCore.Http;
 
@@ -32,7 +33,7 @@ namespace KScript.Http
 
         private readonly object gate = new object();
         private RouteTable cached;
-        private DateTime[] stamps;
+        private Dictionary<string, DateTime> stamps;
         private readonly Dictionary<string, (DateTime Start, int Count)> throttle = new Dictionary<string, (DateTime, int)>(StringComparer.Ordinal);
         private DateTime throttlePruned;
         private double longestThrottle;
@@ -196,20 +197,35 @@ namespace KScript.Http
             return table;
         }
 
-        /// <summary>The route table, built again when a route file changes.</summary>
+        /// <summary>
+        /// The route table, built again when a route file changes, or any script or file building it reached (a
+        /// controller, a group of routes made by a function in another script, config).
+        /// </summary>
         public RouteTable Table()
         {
             lock (gate)
             {
-                DateTime[] now = Files.Select(f => File.GetLastWriteTimeUtc(f.Path)).ToArray();
-                if (cached == null || stamps == null || !now.SequenceEqual(stamps))
+                if (cached == null || stamps == null || Files.Any(f => !stamps.ContainsKey(f.Path)) || stamps.Any(s => Stamp(s.Key) != s.Value))
                 {
-                    cached = LoadRoutes();
-                    stamps = now;
+                    DependencySet outer = DependencyTrace.Current;
+                    var reached = new DependencySet();
+                    DependencyTrace.Current = reached;
+                    try
+                    {
+                        cached = LoadRoutes();
+                    }
+                    finally
+                    {
+                        DependencyTrace.Current = outer;
+                        outer?.AddAll(reached);
+                    }
+                    stamps = Files.Select(f => f.Path).Concat(reached.Files.Keys).Distinct(StringComparer.Ordinal).ToDictionary(p => p, Stamp, StringComparer.Ordinal);
                 }
                 return cached;
             }
         }
+
+        private static DateTime Stamp(string path) => File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
 
         private Interpreter NewInterpreter(RequestContext ctx)
         {
@@ -224,7 +240,8 @@ namespace KScript.Http
             host.Items[HttpPackage.ContextKey] = ctx;
             host.Items[AuthRequest.HostKey] = ctx.Auth;
             StartupConfig?.CopyTo(host);
-            return new Interpreter(host, options: new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 200 });
+            // Each request has its own interpreter, but scripts are parsed once for the whole server, and again only when they change.
+            return new Interpreter(host, options: new InterpreterOptions { MaxSteps = MaxSteps, MaxCallDepth = 200, Scripts = KScript.Runtime.Dependencies.ScriptCache.Server });
         }
 
         private static void RunRouteFiles(RequestContext ctx, Interpreter interpreter)

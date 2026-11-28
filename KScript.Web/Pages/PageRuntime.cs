@@ -60,6 +60,8 @@ namespace KScript.Pages
             Interpreter = new Interpreter(host, options: new InterpreterOptions
             {
                 MaxSteps = ctx.MaxSteps, MaxCallDepth = 200, Cancellation = LiveActionStream.Cancellation(ctx.Request),
+                // Scripts are parsed once for the whole server, and again only when they change.
+                Scripts = KScript.Runtime.Dependencies.ScriptCache.Server,
             });
         }
 

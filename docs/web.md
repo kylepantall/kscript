@@ -53,6 +53,8 @@ kscript serve "Example Sites/team" --port 8080     # then open http://localhost:
 
 During development, open the site in a browser and save changes to a page, component, script, stylesheet, or asset. Open HTML pages reload automatically. Use `kscript serve --no-reload` to turn it off. Production and compiled sites serve pages without a browser reload script.
 
+Each request runs your scripts fresh, so a save shows up on the next request without restarting the server. The server doesn't parse every script again for that, though: it parses each script once and keeps the result, and parses a script again only when its text changes. When you save one controller, that controller is the only file parsed again. The pages and route files that import it pick up the new version on the next request. The route table is built again when a route file changes, or any script or file the routes reach does, such as a controller or a config file.
+
 For a containerised development site, add a Compose file and run `kscript serve`. Use `--no-docker` to serve on the host. The bind-mounted source lets the container see edits. Set `serve.docker` in `kscript.json` to make Docker the default. See [Running the development site in Docker](projects.md#running-the-development-site-in-docker).
 
 ## Model forms

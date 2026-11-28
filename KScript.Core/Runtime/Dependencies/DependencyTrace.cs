@@ -30,6 +30,16 @@ namespace KScript.Runtime.Dependencies
             }
         }
 
+        /// <summary>Adds everything another set reached.</summary>
+        public void AddAll(DependencySet other)
+        {
+            if (other == null || ReferenceEquals(other, this)) return;
+            foreach ((string path, IReadOnlyCollection<string> keys) in other.Files)
+            {
+                foreach (string key in keys) Add(path, key);
+            }
+        }
+
         /// <summary>The files reached, with the parts of each.</summary>
         public IReadOnlyDictionary<string, IReadOnlyCollection<string>> Files
         {

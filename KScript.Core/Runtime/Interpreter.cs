@@ -43,15 +43,31 @@ namespace KScript.Runtime
         {
             string full = System.IO.Path.GetFullPath(path);
             if (!File.Exists(full)) throw new KScriptException($"There is no script at {path}.", "FileNotFound") { File = full };
-            return LoadText(File.ReadAllText(full), full);
+            string text = File.ReadAllText(full);
+            if (Options.Scripts?.Get(full, text) is Dependencies.ScriptCache.Entry parsed) return LoadParsed(parsed.Source, parsed.Document, full, parsed);
+            Module module = LoadText(text, full);
+            Options.Scripts?.Add(full, text, module);
+            return module;
         }
 
         /// <summary>Loads and checks a script from text. <paramref name="path"/> names it in errors and anchors relative paths.</summary>
         public Module LoadText(string text, string path = null)
         {
             var source = new SourceText(text);
-            MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script, path);
+            return LoadParsed(source, MarkupParser.Parse(source, DocumentKind.Script, path), path, null);
+        }
+
+        /// <summary>Makes, checks and keeps a module from a parsed script; <paramref name="shared"/> gives the caches of an earlier parse of it.</summary>
+        private Module LoadParsed(SourceText source, MarkupDocument document, string path, Dependencies.ScriptCache.Entry shared)
+        {
             var module = new Module(this, path, source, document);
+            if (shared != null)
+            {
+                module.ParseCache = shared.ParseCache;
+                module.TemplateCache = shared.TemplateCache;
+                module.OldSpellingCache = shared.OldSpellingCache;
+                module.ContentCache = shared.ContentCache;
+            }
             Dependencies.DependencyTrace.Loaded(module);
             if (module.Path != null) loading.Add(module.Path);
             try
