@@ -225,6 +225,9 @@ samples/task-board has a page whose buttons are all handler shorthands, with a t
 kscript test                              # the project's tests a change can affect
 kscript test --all                        # every test in the project
 kscript test --failed                     # only the tests that failed last time
+kscript test --changed                    # the tests your uncommitted changes can affect
+kscript test --changed master             # the tests this branch's changes can affect
+kscript test --watch                      # run the affected tests each time you save
 kscript test tests/cart tests/api.test.kscript   # a folder and a file
 kscript test --filter "cart › adds"       # only tests whose full name contains the text (any case)
 kscript test --timeout 30                 # seconds per test (0: no limit)
@@ -272,6 +275,26 @@ Some runs always run everything they name, and still update the record:
 - CI, where the `CI` variable is set (GitHub Actions and most CI services set it).
 
 `kscript test --failed` runs only the tests that failed in the last run.
+
+### Testing a git diff
+
+`--changed` asks git what changed instead of comparing with the last run. On its own it takes the changes you haven't committed yet; with a base, such as a branch, a tag or a commit, it takes everything since then, committed or not:
+
+```sh
+kscript test --changed                    # tests your uncommitted changes can affect
+kscript test --changed master             # tests this branch can affect, before you open a pull request
+kscript test --changed HEAD~3             # tests the last three commits can affect
+```
+
+kscript compares each changed file as it was at the base with the file now, declaration by declaration, and runs the tests that reached a part that differs, along with new tests and tests the diff changed. It still needs a record of an earlier run to know what each test reaches; without one, it runs every test.
+
+### Watching
+
+`kscript test --watch` runs the tests, then keeps watching the project. Each time you save, it runs only the tests that reach what you changed. Save a file no test reaches, such as a README, and nothing runs. Press Ctrl+C to stop.
+
+```sh
+kscript test --watch                      # run the affected tests each time you save
+```
 
 ## Settings in kscript.json
 

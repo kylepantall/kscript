@@ -82,17 +82,19 @@ namespace KScript
                 "Tidy scripts and pages.",
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },
                 Ex(("kscript fmt", "Formats every script and page in the project."), ("kscript fmt --check", "Changes nothing, and fails when a file isn't formatted (for CI).")), "formatting") { Group = "code", Details = "Tidies .kscript and .ks.xml scripts and kscript serve .html pages. With no path, formats the current project." },
-            new CliCommand("test", "kscript test [file-or-folder]... [--all | --failed] [--filter text] [--timeout s] [--junit file]",
+            new CliCommand("test", "kscript test [file-or-folder]... [--all | --failed | --changed [base]] [--watch] [--filter text] [--timeout s] [--junit file]",
                 "Run *.test.kscript and *.test.ks.xml tests.",
                 new[]
                 {
                     O("--all", "Run every test. Without it, a project run runs only the tests a change since the last run can affect."),
                     O("--failed", "Run only the tests that failed in the last run."),
+                    O("--changed [base]", "Run only the tests git's changes can affect: the changes not committed yet, or everything since base (a branch, tag or commit)."),
+                    O("--watch, -w", "Keep running: each time a file is saved, run the tests the change can affect."),
                     O("--filter text", "Only run tests whose name contains the text."),
                     O("--timeout s", "Stop a test that runs longer than this many seconds (default 10)."),
                     O("--junit file", "Also write a JUnit XML report, for CI."),
                 },
-                Ex(("kscript test", "Runs the project's tests that a change since the last run can affect (all of them the first time)."), ("kscript test --all", "Runs every test in the project."), ("kscript test --failed", "Runs the tests that failed last time."), ("kscript test tests/cart.test.kscript --filter total", "Runs only the tests in one file whose names contain total.")), "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests: only those that reached something that changed since they last passed, unless --all is given or CI is set. Naming files or --filter runs what you name." },
+                Ex(("kscript test", "Runs the project's tests that a change since the last run can affect (all of them the first time)."), ("kscript test --all", "Runs every test in the project."), ("kscript test --failed", "Runs the tests that failed last time."), ("kscript test --changed master", "Runs the tests this branch's changes since master can affect."), ("kscript test --watch", "Runs the affected tests again each time you save."), ("kscript test tests/cart.test.kscript --filter total", "Runs only the tests in one file whose names contain total.")), "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests: only those that reached something that changed since they last passed, unless --all is given or CI is set. Naming files or --filter runs what you name." },
             new CliCommand("serve", "kscript serve [site folder] [--docker | --no-docker] [--port 8080] [--host localhost] [--env name] [--no-reload] [--migrate] [--with-docs [--docs-port 4180]] [--with-worker]",
                 "Serve pages, and routes.kscript / api.kscript routes.",
                 new[]
