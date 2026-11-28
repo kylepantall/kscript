@@ -16,18 +16,24 @@ namespace KScript.Queueing
     /// </summary>
     public sealed class DatabaseQueueDriver : IQueueDriver
     {
-        internal const string JobsTable = "kscript_jobs";
-        internal const string FailedTable = "kscript_failed_jobs";
-        internal const string LocksTable = "kscript_job_locks";
+        internal const string JobsTable = QueueSettings.DefaultJobsTable;
+        internal const string FailedTable = QueueSettings.DefaultFailedTable;
+        internal const string LocksTable = QueueSettings.DefaultLocksTable;
 
-        private static readonly ConcurrentDictionary<Database, bool> Ready = new ConcurrentDictionary<Database, bool>();
+        private static readonly ConcurrentDictionary<(Database, string), bool> Ready = new ConcurrentDictionary<(Database, string), bool>();
 
         private readonly Database db;
+        private readonly string jobs, failed, locks;
+        private readonly bool autoCreate;
 
-        internal DatabaseQueueDriver(string name, Database db)
+        internal DatabaseQueueDriver(string name, Database db, QueueSettings.Connection settings = null)
         {
             Name = name;
             this.db = db;
+            jobs = settings?.JobsTable ?? JobsTable;
+            failed = settings?.FailedTable ?? FailedTable;
+            locks = settings?.LocksTable ?? LocksTable;
+            autoCreate = settings?.AutoCreate ?? true;
         }
 
         /// <summary>The driver for a queue connection: its database connection, or the project's default database.</summary>
@@ -39,7 +45,7 @@ namespace KScript.Queueing
                 WorkingDirectory = folder,
                 Config = context.Project?.ConfigOptions(context.Environment),
             };
-            return new DatabaseQueueDriver(connection.Name, Database.For(host, folder, connection.Database));
+            return new DatabaseQueueDriver(connection.Name, Database.For(host, folder, connection.Database), connection);
         }
 
         public string Kind => "database";
@@ -123,22 +129,32 @@ namespace KScript.Queueing
         /// <summary>Makes the three tables the first time this process uses the database.</summary>
         private void EnsureTables()
         {
-            if (Ready.ContainsKey(db)) return;
+            if (Ready.ContainsKey((db, jobs))) return;
+            if (!autoCreate)
+            {
+                // The project's migrations make the tables (kscript publish queue).
+                List<string> have = db.Tables(null);
+                string missing = new[] { jobs, failed, locks }.FirstOrDefault(t => !have.Contains(t));
+                if (missing != null)
+                    throw new KScriptException($"The {Name} queue keeps its jobs in {missing}, which isn't in the database yet. Run kscript db migrate.", "Config");
+                Ready[(db, jobs)] = true;
+                return;
+            }
             Dialect d = db.Dialect;
             string key = d.KeyText, text = d.LongText, number = d.BigInteger;
-            foreach (string sql in d.CreateTable(JobsTable,
+            foreach (string sql in d.CreateTable(jobs,
                     new[] { $"{Q("id")} {key} PRIMARY KEY", $"{Q("queue")} {key} NOT NULL", $"{Q("available_at")} {number} NOT NULL", $"{Q("reserved_until")} {number}", $"{Q("payload")} {text} NOT NULL" },
-                    new[] { new TableIndex("ix_" + JobsTable + "_next", new[] { "queue", "available_at" }, false) }, ifMissing: true)
-                .Concat(d.CreateTable(FailedTable,
+                    new[] { new TableIndex("ix_" + jobs + "_next", new[] { "queue", "available_at" }, false) }, ifMissing: true)
+                .Concat(d.CreateTable(failed,
                     new[] { $"{Q("id")} {key} PRIMARY KEY", $"{Q("queue")} {key} NOT NULL", $"{Q("failed_at")} {number} NOT NULL", $"{Q("payload")} {text} NOT NULL" },
                     Array.Empty<TableIndex>(), ifMissing: true))
-                .Concat(d.CreateTable(LocksTable,
+                .Concat(d.CreateTable(locks,
                     new[] { $"{Q("key")} {key} PRIMARY KEY", $"{Q("until")} {number} NOT NULL" },
                     Array.Empty<TableIndex>(), ifMissing: true)))
             {
                 db.Execute(null, new SqlStatement(sql, Array.Empty<object>()));
             }
-            Ready[db] = true;
+            Ready[(db, jobs)] = true;
         }
 
         /// <summary>Forgets which databases have their tables, for tests that delete database files.</summary>
@@ -160,7 +176,7 @@ namespace KScript.Queueing
             Rows(sql, parameters).Select(r => Parse(r["payload"])).Where(j => j != null).ToList();
 
         private string PushSql =>
-            db.Dialect.Upsert($"INSERT INTO {Q(JobsTable)} ({Q("id")}, {Q("queue")}, {Q("available_at")}, {Q("reserved_until")}, {Q("payload")}) VALUES (@p1, @p2, @p3, NULL, @p4)",
+            db.Dialect.Upsert($"INSERT INTO {Q(jobs)} ({Q("id")}, {Q("queue")}, {Q("available_at")}, {Q("reserved_until")}, {Q("payload")}) VALUES (@p1, @p2, @p3, NULL, @p4)",
                 "id", new[] { "queue", "available_at", "reserved_until", "payload" });
 
         /// <summary>Saves a job as waiting: a new row, or the row it already has (a released or retried job).</summary>
@@ -177,7 +193,7 @@ namespace KScript.Queueing
                 {
                     while (true)
                     {
-                        Dictionary<string, object> row = tx.Rows($"SELECT {Q("id")}, {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("queue")} = @p1 AND {Q("available_at")} <= @p2"
+                        Dictionary<string, object> row = tx.Rows($"SELECT {Q("id")}, {Q("payload")} FROM {Q(jobs)} WHERE {Q("queue")} = @p1 AND {Q("available_at")} <= @p2"
                             + $" AND ({Q("reserved_until")} IS NULL OR {Q("reserved_until")} <= @p2) ORDER BY {Q("available_at")}, {Q("id")}{db.Dialect.Limit(1, null)}{db.Dialect.Lock("update", true)}",
                             queue, at).FirstOrDefault();
                         if (row == null) return null;
@@ -186,13 +202,13 @@ namespace KScript.Queueing
                         if (next == null)
                         {
                             // Not a job: move it to the failed jobs so it doesn't block the queue.
-                            tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) SELECT {Q("id")}, {Q("queue")}, @p2, {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", "id"), id, at);
-                            tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", id);
+                            tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(failed)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) SELECT {Q("id")}, {Q("queue")}, @p2, {Q("payload")} FROM {Q(jobs)} WHERE {Q("id")} = @p1", "id"), id, at);
+                            tx.Execute($"DELETE FROM {Q(jobs)} WHERE {Q("id")} = @p1", id);
                             continue;
                         }
                         next.Attempts++;
                         next.ReservedUntil = now.AddSeconds(next.Timeout + QueueRuntime.LeaseMargin);
-                        tx.Execute($"UPDATE {Q(JobsTable)} SET {Q("reserved_until")} = @p1, {Q("payload")} = @p2 WHERE {Q("id")} = @p3",
+                        tx.Execute($"UPDATE {Q(jobs)} SET {Q("reserved_until")} = @p1, {Q("payload")} = @p2 WHERE {Q("id")} = @p3",
                             Ms(next.ReservedUntil.Value), next.ToJson(), id);
                         return next;
                     }
@@ -202,7 +218,7 @@ namespace KScript.Queueing
             return null;
         }
 
-        public void Complete(QueuedJob job) => Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", job.Id);
+        public void Complete(QueuedJob job) => Execute($"DELETE FROM {Q(jobs)} WHERE {Q("id")} = @p1", job.Id);
 
         public void Release(QueuedJob job)
         {
@@ -217,26 +233,26 @@ namespace KScript.Queueing
             copy.ReservedUntil = null;
             Transaction(tx =>
             {
-                tx.Execute(db.Dialect.Upsert($"INSERT INTO {Q(FailedTable)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) VALUES (@p1, @p2, @p3, @p4)",
+                tx.Execute(db.Dialect.Upsert($"INSERT INTO {Q(failed)} ({Q("id")}, {Q("queue")}, {Q("failed_at")}, {Q("payload")}) VALUES (@p1, @p2, @p3, @p4)",
                     "id", new[] { "queue", "failed_at", "payload" }),
                     copy.Id, copy.Queue, Ms(copy.FailedAt ?? QueueRuntime.Clock()), copy.ToJson());
-                return tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {Q("id")} = @p1", job.Id);
+                return tx.Execute($"DELETE FROM {Q(jobs)} WHERE {Q("id")} = @p1", job.Id);
             });
         }
 
         public List<QueuedJob> Waiting(string queue) =>
             queue == null
-                ? Jobs($"SELECT {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL ORDER BY {Q("available_at")}, {Q("id")}")
-                : Jobs($"SELECT {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL AND {Q("queue")} = @p1 ORDER BY {Q("available_at")}, {Q("id")}", queue);
+                ? Jobs($"SELECT {Q("payload")} FROM {Q(jobs)} WHERE {Q("reserved_until")} IS NULL ORDER BY {Q("available_at")}, {Q("id")}")
+                : Jobs($"SELECT {Q("payload")} FROM {Q(jobs)} WHERE {Q("reserved_until")} IS NULL AND {Q("queue")} = @p1 ORDER BY {Q("available_at")}, {Q("id")}", queue);
 
         public List<QueuedJob> Running() =>
-            Jobs($"SELECT {Q("payload")} FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NOT NULL ORDER BY {Q("id")}");
+            Jobs($"SELECT {Q("payload")} FROM {Q(jobs)} WHERE {Q("reserved_until")} IS NOT NULL ORDER BY {Q("id")}");
 
         public List<QueuedJob> Failed() =>
-            Jobs($"SELECT {Q("payload")} FROM {Q(FailedTable)} ORDER BY {Q("failed_at")}, {Q("id")}");
+            Jobs($"SELECT {Q("payload")} FROM {Q(failed)} ORDER BY {Q("failed_at")}, {Q("id")}");
 
         public List<string> QueueNames() =>
-            Rows($"SELECT DISTINCT {Q("queue")} FROM {Q(JobsTable)} WHERE {Q("reserved_until")} IS NULL ORDER BY {Q("queue")}").Select(r => Values.ToStr(r["queue"])).ToList();
+            Rows($"SELECT DISTINCT {Q("queue")} FROM {Q(jobs)} WHERE {Q("reserved_until")} IS NULL ORDER BY {Q("queue")}").Select(r => Values.ToStr(r["queue"])).ToList();
 
         public int Clear(string queue) =>
             Transaction(tx =>
@@ -244,45 +260,45 @@ namespace KScript.Queueing
                 // A cleared unique job no longer holds its key, so it can be dispatched again.
                 string where = $"{Q("reserved_until")} IS NULL" + (queue == null ? string.Empty : $" AND {Q("queue")} = @p1");
                 object[] parameters = queue == null ? Array.Empty<object>() : new object[] { queue };
-                foreach (Dictionary<string, object> row in tx.Rows($"SELECT {Q("payload")} FROM {Q(JobsTable)} WHERE {where}", parameters))
+                foreach (Dictionary<string, object> row in tx.Rows($"SELECT {Q("payload")} FROM {Q(jobs)} WHERE {where}", parameters))
                 {
-                    if (Parse(row["payload"])?.UniqueKey is string key) tx.Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1", key);
+                    if (Parse(row["payload"])?.UniqueKey is string key) tx.Execute($"DELETE FROM {Q(locks)} WHERE {Q("key")} = @p1", key);
                 }
-                return tx.Execute($"DELETE FROM {Q(JobsTable)} WHERE {where}", parameters);
+                return tx.Execute($"DELETE FROM {Q(jobs)} WHERE {where}", parameters);
             });
 
         public bool Retry(string id) =>
             Transaction(tx =>
             {
-                Dictionary<string, object> row = tx.Rows($"SELECT {Q("payload")} FROM {Q(FailedTable)} WHERE {Q("id")} = @p1", id).FirstOrDefault();
+                Dictionary<string, object> row = tx.Rows($"SELECT {Q("payload")} FROM {Q(failed)} WHERE {Q("id")} = @p1", id).FirstOrDefault();
                 QueuedJob job = row == null ? null : Parse(row["payload"]);
                 if (job == null) return false;
                 QueueRuntime.ResetForRetry(job);
                 tx.Execute(PushSql, job.Id, job.Queue, Ms(job.AvailableAt), job.ToJson());
-                tx.Execute($"DELETE FROM {Q(FailedTable)} WHERE {Q("id")} = @p1", id);
+                tx.Execute($"DELETE FROM {Q(failed)} WHERE {Q("id")} = @p1", id);
                 return true;
             });
 
-        public bool Forget(string id) => Execute($"DELETE FROM {Q(FailedTable)} WHERE {Q("id")} = @p1", id) > 0;
+        public bool Forget(string id) => Execute($"DELETE FROM {Q(failed)} WHERE {Q("id")} = @p1", id) > 0;
 
         public bool Lock(string key, DateTime until, DateTime now)
         {
             // A new key, or one whose lock has run out, is taken; a key held until later changes nothing.
             if (db.Dialect.ConditionalUpsert)
             {
-                return Execute(db.Dialect.Upsert($"INSERT INTO {Q(LocksTable)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key", new[] { "until" })
-                    + $" WHERE {Q(LocksTable)}.{Q("until")} <= @p3", key, Ms(until), Ms(now)) > 0;
+                return Execute(db.Dialect.Upsert($"INSERT INTO {Q(locks)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key", new[] { "until" })
+                    + $" WHERE {Q(locks)}.{Q("until")} <= @p3", key, Ms(until), Ms(now)) > 0;
             }
             // MySQL's upsert can't have a WHERE: a lock that has run out is deleted, then the key is taken if it is free.
             return Transaction(tx =>
             {
-                tx.Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1 AND {Q("until")} <= @p2", key, Ms(now));
-                return tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(LocksTable)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key"), key, Ms(until)) > 0;
+                tx.Execute($"DELETE FROM {Q(locks)} WHERE {Q("key")} = @p1 AND {Q("until")} <= @p2", key, Ms(now));
+                return tx.Execute(db.Dialect.InsertOrIgnore($"INSERT INTO {Q(locks)} ({Q("key")}, {Q("until")}) VALUES (@p1, @p2)", "key"), key, Ms(until)) > 0;
             });
         }
 
-        public void Unlock(string key) => Execute($"DELETE FROM {Q(LocksTable)} WHERE {Q("key")} = @p1", key);
+        public void Unlock(string key) => Execute($"DELETE FROM {Q(locks)} WHERE {Q("key")} = @p1", key);
 
-        public int Prune(DateTime before) => Execute($"DELETE FROM {Q(FailedTable)} WHERE {Q("failed_at")} < @p1", Ms(before));
+        public int Prune(DateTime before) => Execute($"DELETE FROM {Q(failed)} WHERE {Q("failed_at")} < @p1", Ms(before));
     }
 }

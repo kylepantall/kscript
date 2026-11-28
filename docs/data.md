@@ -287,7 +287,9 @@ Some packages ship mixins you may extend straight away. Import the package, then
 | --- | --- | --- |
 | `Timestamps` | KScript.Data | `created_at` and `updated_at`, set when records are saved. See [Timestamps](#timestamps). |
 | `SoftDeletes` | KScript.Data | `deleted_at`: `->delete()` marks a record deleted, and queries leave it out. See [Soft deletes](#soft-deletes). |
-| `Ownable` | KScript.Auth | An `owner` field, set from whoever is signed in (or the browser's guest) and never changed after, the `->mine()` scope and `->is_mine()`. See [Guests and owners](auth.md#guests-and-owners). |
+| `Ownable` | KScript.Auth | A `user` and a `guest` [relation](#relations), one of them set from whoever is signed in (or the browser's guest) and never changed after, the `->mine()` scope and `->is_mine()`. See [Guests and owners](auth.md#guests-and-owners). |
+
+KScript.Auth also ships two models: `User`, which its users can be kept in, and `Guest`, for people without an account.
 
 For example, notes that belong to one person and know when they were written:
 
@@ -300,7 +302,9 @@ model Note extends [Ownable, Timestamps] {
 }
 ```
 
-Then `Note->mine()->get()` reads only the current person's notes. In `kscript mcp`, `lookup Ownable` shows a mixin's source.
+Then `Note->mine()->get()` reads only the current person's notes, and `$note.user` is the `User` who wrote one. In `kscript mcp`, `lookup Ownable` shows a mixin's source.
+
+To change a built-in model or mixin, copy it into your project with `kscript publish`: `kscript publish User` writes `models/user.kscript`. The copy replaces the package's version wherever the package is imported, so its fields, its key and its options are yours. Relations follow the copy: a uuid key on your `User` makes Ownable's `user_id` a uuid.
 
 The [Models and mixins](/reference/models) reference lists every mixin with its fields and methods, every option with an example, and the tables KScript keeps in your database for itself (`kscript_migrations` and the database queue's `kscript_jobs`, `kscript_failed_jobs` and `kscript_job_locks`).
 

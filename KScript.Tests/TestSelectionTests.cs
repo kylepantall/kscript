@@ -29,6 +29,9 @@ public sealed class TestSelectionTests : IDisposable
     public void Dispose()
     {
         Environment.SetEnvironmentVariable("CI", ci);
+        // Git marks its object files read-only, which Windows won't delete.
+        foreach (var file in Directory.EnumerateFiles(site.Root, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
         site.Dispose();
     }
 

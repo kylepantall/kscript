@@ -108,6 +108,7 @@ namespace KScript.Data
                 ("record->update", Tasks + "<let name=\"task\" value=\"Task->find(1)\" />\n<do>$task->update(points: 8)</do>\n<echo>{ Task->find(1).points }</echo>"),
                 ("record->delete", Tasks + "<do>Task->find(2)->delete()</do>\n<echo>{ Task->count() } left, { Task->with_trashed()->count() } in the table</echo>"),
                 ("record->force_delete", Tasks + "<do>Task->find(2)->force_delete()</do>\n<echo>{ Task->with_trashed()->count() } in the table</echo>"),
+                ("record->is", Tasks + "<let name=\"task\" value=\"Task->find(1)\" />\n<echo>{ $task->is(Task->first()) } { $task->is(2) }</echo>"),
                 ("record->restore", Tasks + "<let name=\"task\" value=\"Task->find(2)\" />\n<do>$task->delete()</do>\n<do>$task->restore()</do>\n<echo>{ Task->count() } tasks</echo>"),
                 ("record->fresh", Tasks + "<let name=\"task\" value=\"Task->find(1)\" />\n<do>Task->where(title: 'Write docs')->update(points: 9)</do>\n<echo>{ $task.points }, then { $task->fresh().points }</echo>"),
                 ("record->is_dirty", Tasks + "<let name=\"task\" value=\"Task->find(1)\" />\n<do>task.points = 4</do>\n<echo>{ $task->is_dirty() } { $task->is_dirty('title') }</echo>"),

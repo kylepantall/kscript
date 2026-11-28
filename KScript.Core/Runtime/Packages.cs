@@ -114,11 +114,13 @@ namespace KScript.Runtime
         /// <summary>The folder package scripts appear to be in. Nothing is ever written there.</summary>
         public static readonly string Root = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "kscript-package-sources"));
 
-        public PackageSource(string package, string fileName, string text)
+        public PackageSource(string package, string fileName, string text, bool replaceable = false)
         {
             Package = package;
+            Replaceable = replaceable;
             FileName = fileName;
-            Text = text;
+            // A checkout on Windows may give the embedded script \r\n line ends; a package's script reads the same everywhere.
+            Text = text?.Replace("\r\n", "\n");
             Path = System.IO.Path.Combine(Root, package, fileName);
         }
 
@@ -126,12 +128,33 @@ namespace KScript.Runtime
         public string FileName { get; }
         public string Text { get; }
 
+        /// <summary>
+        /// True when a project may replace the script with its own copy (kscript publish), as with KScript.Auth's
+        /// User. KScript.Data's Timestamps and SoftDeletes can't be replaced: they only name a behaviour built in.
+        /// </summary>
+        public bool Replaceable { get; }
+
         /// <summary>Where the script appears to be: under <see cref="Root"/>, in a folder named for its package.</summary>
         public string Path { get; }
 
         /// <summary>True for the path of a package's script.</summary>
         public static bool IsSource(string path) =>
             path != null && path.StartsWith(Root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+        /// <summary>The script's name without its ending: <c>user</c> for user.kscript. kscript publish takes it.</summary>
+        public string Name => KScript.Projects.ProjectConfig.ScriptName(FileName);
+
+        /// <summary>
+        /// The project's own copy of this script, which replaces it: a file of the same name in the project's models
+        /// folder (paths.models), such as the models/user.kscript that kscript publish User writes. Null when the
+        /// project has none, or <paramref name="directory"/> isn't in a project.
+        /// </summary>
+        public string ProjectCopy(string directory) =>
+            directory == null || KScript.Projects.ProjectConfig.FindAndLoad(directory) is not KScript.Projects.ProjectConfig config ? null : ProjectCopy(config.ModelFiles());
+
+        /// <summary>The copy of this script among a project's model files, or null.</summary>
+        public string ProjectCopy(IEnumerable<string> modelFiles) =>
+            Replaceable && KScript.Projects.ProjectConfig.ModelFileFor(modelFiles, Name) is string file ? System.IO.Path.GetFullPath(file) : null;
 
         /// <summary>The package script at a path, among the packages given, or null.</summary>
         public static PackageSource At(string path, IEnumerable<KScriptPackage> packages) =>
@@ -453,9 +476,10 @@ namespace KScript.Runtime
             /// <summary>
             /// A script written in KScript that the package ships (<paramref name="fileName"/> names it in errors and the
             /// editor). Its top-level declarations reach every script that imports the package; a script's own
-            /// declaration of the same name wins.
+            /// declaration of the same name wins. A <paramref name="replaceable"/> script is one kscript publish copies
+            /// into a project, and a file of the same name in the project's models folder replaces it.
             /// </summary>
-            public void Source(string fileName, string text) => package.sources.Add(new PackageSource(package.Name, fileName, text));
+            public void Source(string fileName, string text, bool replaceable = false) => package.sources.Add(new PackageSource(package.Name, fileName, text, replaceable));
         }
     }
 
