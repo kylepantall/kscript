@@ -1,94 +1,201 @@
 # Queues and jobs: KScript.Queue
 
-A job is a piece of work you hand off to run later, away from the script or request that asked for it: sending an email, resizing a picture, calling a slow API. `->dispatch()` puts a job on a queue and returns at once. `kscript worker` takes jobs off the queue and runs them, tries again when one fails, and keeps the ones that keep failing so you can see why.
+## Introduction
+
+Some work shouldn't make a person wait: sending an email, resizing a picture, calling a slow API. KScript.Queue lets you hand that work off as a **job** to run later. `->dispatch()` puts a job on a queue and returns at once. `kscript worker` takes jobs off the queue and runs them. It tries a failed job again, and keeps jobs that keep failing so you can see why.
+
+A job is declared with `job`, its fields and a `handle` function that does the work:
 
 ```kscript
 import KScript.Queue
 
 /// Sends the welcome email to a new user.
-job SendWelcome(queue: "mail", tries: 5, backoff: [10s, 1m, 5m]) {
+job SendWelcome(queue: "mail", tries: 5) {
   user_id: int
   email: email
 
   fn handle() {
     echo "Sending the welcome email to {$email}"
   }
+}
+```
 
-  fn failed(err) {
-    echo "Gave up on user {$user_id}: {$err.message}"
+Save it as `jobs/send-welcome.kscript`, and dispatch it from anywhere in the project:
+
+```kscript
+import KScript.Queue
+import "jobs/send-welcome.kscript"
+
+SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
+```
+
+Then start a worker in another terminal:
+
+```sh
+kscript worker   # runs jobs as they arrive, until Ctrl+C
+```
+
+Every file that declares or dispatches a job starts with `import KScript.Queue`. Without it, `kscript check` says `job is part of KScript.Queue. Add import KScript.Queue`, and the editor offers to add it.
+
+## Creating jobs
+
+### Writing a job
+
+`kscript make job SendWelcome` writes a job file for you. A job's name starts with a capital letter. Its fields are written as in a [type](types.md): `name: type`, `name?: type` for one that may be left out, and `name: type = default`.
+
+Inside `handle`, each field is a variable and `$this` is the job. In the editor, a job without `fn handle()` has a quick fix that writes it.
+
+A queued job is saved as JSON until a worker runs it, so keep its fields small and plain. Pass the user's id, not the user. A `password` field is an error for the same reason.
+
+### Knowing which attempt this is
+
+`$job` says which attempt is running, which helps when a job behaves differently on a retry:
+
+```kscript
+import KScript.Queue
+
+job SyncContacts(tries: 3) {
+  account_id: int
+
+  fn handle() {
+    echo "Attempt {$job.attempt} of {$job.tries} for account {$account_id}"
   }
 }
 ```
 
-Save it as `jobs/send-welcome.kscript` (`kscript make job SendWelcome` writes one for you). In the editor, a job without `fn handle()` has a quick fix that writes it, and the lightbulb on a job adds `fn failed(err)`. Then, anywhere in the project:
+`$job` has the queued job's `id` (`null` when it runs with `->run()`), its `name`, the `attempt` (`1` the first time), how many `tries` it gets, the `queue` and `connection` it came from, and when it was dispatched (`dispatched_at`).
+
+### Handling a job that fails
+
+Add `fn failed(err)` to do something when a job has failed for good. It runs once, after the last try, with a `JobFailed` error whose `cause` is the error the last try threw. The lightbulb on a job adds it for you:
+
+```kscript
+import KScript.Queue
+
+job SendInvoice(tries: 3) {
+  invoice_id: int
+
+  fn handle() {
+    echo "Sending invoice {$invoice_id}"
+  }
+
+  fn failed(err) {
+    echo "Gave up on invoice {$invoice_id}: {$err.message}"
+  }
+}
+```
+
+A job has only these two functions. Put helpers outside the job.
+
+## Job options
+
+Options go in the brackets after the job's name. Times are durations, written with no quotes: `500ms`, `30s`, `10m`, `2h`, `1d`. A plain number is seconds.
+
+### Queues and connections
+
+`queue` is the queue the job goes on (`default` unless you say), and `connection` is the connection in `kscript.json` it goes to (`queue.default` unless you say). See [Connections and drivers](#connections-and-drivers).
+
+### Retries and backoff
+
+A job gets 3 tries unless you give `tries`. `backoff` is how long to wait before each retry: one time (`30s`), a list where the last one repeats (`[10s, 1m, 5m]`), or `'exponential'`, the default, which waits 2s, 4s, 8s and so on up to 10m. `retry_until` stops retrying a while after the job was dispatched, even with tries left:
+
+```kscript
+import KScript.Queue
+
+job FetchRates(tries: 10, backoff: [10s, 1m, 5m], retry_until: 1h) {
+  currency: string
+
+  fn handle() {
+    echo "Fetching {$currency} rates"
+  }
+}
+```
+
+### Timeouts
+
+`timeout` is the longest one attempt may run, 60 seconds unless you say. Past it, the attempt stops with a `JobTimeout` error and counts as a try:
+
+```kscript
+import KScript.Queue
+
+job BuildReport(timeout: 5m) {
+  month: string
+
+  fn handle() {
+    echo "Building the report for {$month}"
+  }
+}
+```
+
+### Which errors are retried
+
+By default, every error is retried. `retry_on` retries only the error types you list, and fails the job at once on any other. `fail_on` never retries the types you list. Error types match their children too, so `retry_on: [Network]` also retries an error declared as `error ApiDown extends Network`:
+
+```kscript
+import KScript.Queue
+
+job PostWebhook(retry_on: [Network, Timeout], fail_on: [Validation]) {
+  url: url
+
+  fn handle() {
+    echo "Posting to {$url}"
+  }
+}
+```
+
+### Unique jobs
+
+`unique_for` queues a job only once while one with the same fields is waiting or running, for up to that long. `unique_by` compares only the fields you list:
+
+```kscript
+import KScript.Queue
+
+job RebuildSearchIndex(unique_for: 10m, unique_by: [user_id]) {
+  user_id: int
+
+  fn handle() {
+    echo "Rebuilding the index for user {$user_id}"
+  }
+}
+```
+
+## Dispatching jobs
+
+`->dispatch()` queues a job with its own options, and returns what was queued: its `id`, `job`, `queue`, `connection` and when it's due (`available_at`). It returns `null` for a unique job that is already queued:
 
 ```kscript
 import KScript.Queue
 import "jobs/send-welcome.kscript"
 
-SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
+queued = SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
+echo "Queued {$queued?.id}"
 ```
 
-And in another terminal:
+A job's fields are given by name, and both the editor and the worker check them against the job's declaration.
 
-```sh
-kscript worker
-```
+### Delaying a job
 
-`job`, `->dispatch()` and the commands below (`@chain`, `@queue`, `@fake_queue`, `@release_job`, `@fail_job`) are part of KScript.Queue, so the file that declares a job and the file that dispatches it both start with `import KScript.Queue`. Nothing is imported silently: without the import, `kscript check` says `job is part of KScript.Queue. Add import KScript.Queue` and the editor offers to add it.
-
-## Declaring a job
-
-A job has a name that starts with a capital letter, its fields, and a `handle` function that does the work. Fields are written as in a [type](types.md): `name: type`, `name?: type` for one that may be left out, and `name: type = default`. Inside `handle` each field is a variable, `$this` is the job, and `$job` says which attempt this is:
-
-| `$job.` | What it is |
-| --- | --- |
-| `id` | The queued job's id (`null` when it runs with `->run()`). |
-| `name` | The job's name, such as `SendWelcome`. |
-| `attempt` | This attempt: `1` the first time. |
-| `tries` | How many attempts it gets. |
-| `queue`, `connection` | Where it came from. |
-| `dispatched_at` | When it was dispatched. |
-
-`failed(err)` is optional. It runs once, after the last try has failed, with a `JobFailed` error whose `cause` is the error the last try threw. A job has only these two functions: put helpers outside the job.
-
-A queued job is saved to disk as JSON until a worker runs it, so keep fields small and plain. Pass the user's id, not the user. A `password` field is an error for the same reason.
-
-### Options
-
-| Option | What it does | Default |
-| --- | --- | --- |
-| `queue` | The queue it goes on. | `default` |
-| `connection` | The connection in `kscript.json` it goes to. | `queue.default` |
-| `tries` | How many attempts it gets before it fails for good. | `3` |
-| `backoff` | How long to wait before each retry: one time (`30s`), a list (`[10s, 1m, 5m]`, the last one repeats) or `'exponential'` (2s, 4s, 8s… up to 10m). | `exponential` |
-| `timeout` | The longest one attempt may run. Past it the attempt stops with a `JobTimeout` error. | `60s` |
-| `retry_until` | Stop retrying this long after the job was dispatched, even with tries left, such as `1h`. | none |
-| `retry_on` | Only retry these error types: `[Network, Timeout]`. Other errors fail the job at once. | every error |
-| `fail_on` | Never retry these error types: `[Validation, NotFound]`. | none |
-| `unique_for`, `unique_by` | Queue the job only once while one with the same fields is waiting or running, for up to this long: `unique_for: 10m, unique_by: [user_id]`. | none |
-
-Times are durations, written as a number and a unit with no quotes: `500ms`, `30s`, `10m`, `2h`, `1d`. A plain number is seconds. Error types match their children too, so `retry_on: [Network]` also retries an error declared as `error ApiDown extends Network`.
-
-## Dispatching
+Give `->dispatch()` a `delay` (a duration) or an `at` (a date) to run the job later, and a `queue` or `connection` to send it somewhere other than its own. Give `delay` or `at`, not both:
 
 ```kscript
 import KScript.Queue
 import "jobs/send-welcome.kscript"
 
-SendWelcome(user_id: 7, email: 'joan@example.com')->dispatch()
+SendWelcome(user_id: 8, email: 'ann@example.com')->dispatch(delay: 10m, queue: 'low')
+```
 
-queued = SendWelcome(user_id: 8, email: 'ann@example.com')->dispatch(delay: 10m, queue: 'low')
-echo "Queued {$queued.id} on {$queued.queue}"
+### Running a job now
+
+`->run()` runs `handle` here and now, with no queue and no retries, and its errors reach the caller:
+
+```kscript
+import KScript.Queue
+import "jobs/send-welcome.kscript"
 
 SendWelcome(user_id: 9, email: 'bo@example.com')->run()
 ```
 
-- `Job(...)->dispatch()` queues the job with its own options.
-- `->dispatch(delay:, at:, queue:, connection:)` queues it with others. Both return what was queued: `id`, `job`, `queue`, `connection` and `available_at`. `delay` is a duration (`10m`); `at` is a date. Give one or the other: both is an error, from `kscript check` and when the code runs. It returns `null` for a unique job that is already queued, and on the `sync` connection, where the job has already run and nothing is queued. `kscript test` uses `sync`, so code that reads `$queued.id` should allow for `null` there, or use `@fake_queue()`.
-- `->run()` runs `handle` here and now, with no queue and no retries. Errors reach the caller.
-
-A job's fields are given by name and checked against its declaration, both by the editor and when it runs.
+On the `sync` connection, `->dispatch()` also runs the job straight away and returns `null`, because nothing was queued. `kscript test` uses `sync`, so code that reads `$queued.id` should allow for `null`, or use [`@fake_queue()`](#testing-jobs).
 
 ### Chains
 
@@ -101,9 +208,9 @@ import "jobs/orders.kscript"
 @chain([ChargeCard(order_id: 42), ShipOrder(order_id: 42), SendReceipt(order_id: 42)])->dispatch()
 ```
 
-### Inside a handle: @release_job and @fail_job
+## Controlling a running job
 
-`@release_job(after: 30s)` puts the job back on its queue to run again later without using up a try, for work that isn't ready yet. `@fail_job(err)` fails the job now, with no more tries, for work that will never succeed. Give it an error (`@fail_job(Validation(message: 'Bad data'))`) or a message. Both only work inside a job's `handle`; anywhere else they raise a `Context` error. An `exit` in a handle ends that job only: `exit` or `exit 0` finishes it, and any other code fails the attempt like an error, so the worker carries on with the next job.
+Inside `handle`, `@release_job(after: 30s)` puts the job back on its queue to run again later, without using up a try. Use it for work that isn't ready yet:
 
 ```kscript
 import KScript.Queue
@@ -121,23 +228,38 @@ job WaitForPayment(tries: 1) {
 }
 ```
 
+`@fail_job()` fails the job now, with no more tries, for work that will never succeed. Give it an error or a message:
+
+```kscript
+import KScript.Queue
+
+job ImportFile(tries: 5) {
+  path: string
+
+  fn handle() {
+    if not $path->ends_with('.csv') {
+      @fail_job(Validation(message: 'Only CSV files can be imported'))
+    }
+    echo "Importing {$path}"
+  }
+}
+```
+
+Both work only inside a job's `handle`. Anywhere else they raise a `Context` error. An `exit` in a handle ends that job only: `exit` or `exit 0` finishes it, and any other code fails the attempt like an error, so the worker carries on with the next job.
+
 ## Connections and drivers
 
-A connection is where jobs wait. `kscript.json` names them under `queue`:
+A connection is where jobs wait, and its driver decides how. You name connections in `kscript.json` under `queue`:
 
 ```jsonc
 {
   "queue": {
     "default": "file",                 // the connection jobs go to
     "connections": {
-      "file": { "driver": "file" },    // these four are always there
-      "database": { "driver": "database" },
-      "memory": { "driver": "memory" },
-      "sync": { "driver": "sync" },
       "uploads": { "driver": "file", "path": "storage/queue" },
       "reports": { "driver": "database", "connection": "reports" }
     },
-    "queues": ["high", "default"],     // only these, first to last (default: default, then every other queue)
+    "queues": ["high", "default"],     // only these, first to last
     "failed": { "keep": "7d" },        // how long failed jobs are kept
     "worker": { "concurrency": 2, "sleep": "1s" },
     "env": {
@@ -147,16 +269,17 @@ A connection is where jobs wait. `kscript.json` names them under `queue`:
 }
 ```
 
-| Driver | Where jobs wait | Use it for |
-| --- | --- | --- |
-| `file` | One JSON file per job in the app's data folder (see [App folders](storage.md)), or in `path`. Workers claim a job by moving its file, so several workers, even in different processes, never run the same job twice. | Most apps. It is the default. |
-| `database` | Rows in the project's database (see [Data](data.md#connections)), or in the database `connection` names. | Apps that already have a database, and workers on several machines that share it. |
-| `memory` | In memory, in this process only. | `kscript serve --with-worker`, which runs a worker inside the server. |
-| `sync` | Nowhere: `->dispatch()` runs the job straight away and its errors reach the caller. | Tests and scripts where waiting isn't worth it. |
+Four connections are always there, named after their drivers: `file`, `database`, `memory` and `sync`. Without `queues`, workers take the `default` queue first, then every other queue.
+
+### The file driver
+
+The `file` driver is the default, and suits most apps. It keeps one JSON file per job in the app's data folder (see [App folders](storage.md)), or in the folder `path` names. A worker claims a job by moving its file, so several workers, even in different processes, never run the same job twice.
 
 ### The database driver
 
-The `database` driver keeps waiting and running jobs in a `kscript_jobs` table, failed jobs in `kscript_failed_jobs`, and the keys of unique jobs in `kscript_job_locks`. It makes the tables the first time it needs them, so there is nothing to set up. With no `connection`, it uses the default database: `data/app.sqlite` in the project folder, or `DATABASE_URL`. To keep jobs apart from the app's data, name another database connection from your config:
+The `database` driver keeps jobs in the project's database (see [Databases](data.md#connections)). It suits apps that already have a database, and workers on several machines that share it. Waiting and running jobs go in a `kscript_jobs` table, failed jobs in `kscript_failed_jobs`, and the keys of unique jobs in `kscript_job_locks`. It makes the tables the first time it needs them, so there is nothing to set up.
+
+With no `connection`, it uses the default database: `data/app.sqlite` in the project folder, or `DATABASE_URL`. To keep jobs apart from the app's data, name another database connection from your config:
 
 ```jsonc
 // kscript.json
@@ -193,25 +316,33 @@ kscript db migrate
 
 A worker takes a job in one write transaction that reads the next due row and marks it as running, so two workers never get the same job. If the database is busy or can't be reached, the worker says so and tries again after a pause, rather than stopping.
 
-If a worker stops in the middle of a job (the machine restarts, say), the job is held for its timeout plus 30 seconds, then goes back on the queue for the next worker, and counts as a try.
+### The memory and sync drivers
 
-## Running workers: kscript worker
+The `memory` driver keeps jobs in memory, in one process only. `kscript serve --with-worker` uses it to run a worker inside the server.
+
+The `sync` driver doesn't queue anything: `->dispatch()` runs the job straight away, and its errors reach the caller. It suits tests, and scripts where waiting isn't worth it.
+
+## Running workers
+
+`kscript worker` runs jobs from the default connection and queues until you press Ctrl+C:
 
 ```sh
-kscript worker                                   # the default connection and queues, until Ctrl+C
+kscript worker                                        # the default connection and queues, until Ctrl+C
 kscript worker --queue high,default --concurrency 4   # high before default, four jobs at a time
-kscript worker --stop-when-empty                 # run what is there, then stop
-kscript worker --once                            # one job, for cron
-kscript serve --with-worker                      # a worker inside the server
+kscript worker --stop-when-empty                      # run what is there, then stop
+kscript worker --once                                 # one job, for cron
+kscript serve --with-worker                           # a worker inside the server
 ```
 
-The worker prints a line for each job: when it started, whether it finished, how long it took, and when a failed one will be tried again. Ctrl+C lets the running jobs finish first. `--max-jobs` and `--max-time` stop it after a while, so a process manager can start a fresh one. `--connection` picks a connection other than the default. Every option is in [the CLI reference](/cli).
+The worker prints a line for each job: when it started, whether it finished, how long it took, and when a failed one will be tried again. Ctrl+C lets the running jobs finish first. `--max-jobs` and `--max-time` stop the worker after a while, so a process manager can start a fresh one, and `--connection` picks a connection other than the default. Every option is in [the CLI reference](/cli).
 
-Each attempt runs in a fresh interpreter that loads the job's file again, so a worker picks up a changed job the next time it runs it. A worker that has been running for a while should still be restarted after a deploy, for the settings it read when it started.
+Each attempt runs in a fresh interpreter that loads the job's file again, so a worker picks up a changed job the next time it runs it. Still restart a long-running worker after a deploy, for the settings it read when it started.
 
-## Looking after the queues: kscript queue
+If a worker stops in the middle of a job, such as when the machine restarts, the job is held for its timeout plus 30 seconds. It then goes back on the queue for the next worker, and counts as a try.
 
-Use a job ID from `kscript queue failed` in place of `42` below.
+## Managing queues
+
+`kscript queue` shows what is waiting and what has failed, and lets you retry or remove jobs. Use a job ID from `kscript queue failed` in place of `42`:
 
 ```sh
 kscript queue status              # waiting, delayed, running and failed jobs per queue
@@ -222,7 +353,16 @@ kscript queue delete 42           # delete a failed job (or --all)
 kscript queue clear mail          # remove every waiting job on a queue
 ```
 
-Add `--output json` to read the output from another program. From a script, `@queue('mail')` does the same: `->size()`, `->waiting()`, `->failed()`, `->retry(id)` and `->clear()`.
+Add `--output json` to read the output from another program. A script may do the same with `@queue()`:
+
+```kscript
+import KScript.Queue
+
+mail = @queue('mail')
+echo "{ $mail->size() } emails waiting, { $mail->failed()->count() } failed"
+```
+
+`@queue()` also has `->waiting()`, `->retry(id)` and `->clear()`.
 
 ## Testing jobs
 
@@ -239,13 +379,8 @@ echo "{$queue->count_of(SendWelcome)} welcome email queued for user {$queue->pus
 $queue->run_all()
 ```
 
-`->pushed(Job)` lists the dispatched jobs, `->dispatches()` what each dispatch asked for (queue, connection, delay), `->count()` counts them (`->count_of(Job)` those of one job), `->run_all()` runs them here, and `->clear()` forgets them.
+The fake queue's `->pushed(Job)` lists the dispatched jobs, and `->dispatches()` lists what each dispatch asked for (queue, connection, delay). `->count()` counts them, and `->count_of(Job)` counts those of one job. `->run_all()` runs them here, and `->clear()` forgets them.
 
 ## Errors
 
-| Error | When |
-| --- | --- |
-| `JobTimeout` (a kind of `Timeout`) | An attempt ran longer than the job's `timeout`. |
-| `JobFailed` | What `failed(err)` receives, with the last error as `err.cause`. Also what `@fail_job('message')` throws. |
-
-Both can be caught, matched in `retry_on` and `fail_on`, and extended like any other [error type](language.md).
+A job that runs past its `timeout` throws `JobTimeout`, a kind of `Timeout`. `failed(err)` receives a `JobFailed`, with the last error as `err.cause`, and `@fail_job('message')` throws one too. Both may be caught, listed in `retry_on` and `fail_on`, and extended like any other [error type](/reference/errors).
