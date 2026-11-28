@@ -16,7 +16,7 @@ namespace KScript.Testing
     /// </summary>
     public static class TestCommand
     {
-        public const string Usage = "kscript test [file-or-folder]... [--all | --failed] [--filter <text>] [--timeout <seconds>] [--junit <file>]";
+        public const string Usage = "kscript test [file-or-folder]... [--all | --failed | --changed [base]] [--watch] [--filter <text>] [--timeout <seconds>] [--junit <file>]";
 
         public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null, string workingDirectory = null)
         {
@@ -62,7 +62,8 @@ namespace KScript.Testing
             var paths = new List<string>();
             var settings = new TestRunSettings { Cancellation = cancellation, BaseDirectory = cwd };
             string junit = null;
-            bool runAll = false, failedOnly = false;
+            bool runAll = false, failedOnly = false, changed = false, watch = false;
+            string changedBase = null;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -96,11 +97,23 @@ namespace KScript.Testing
                     case "--failed":
                         failedOnly = true;
                         break;
+                    case "--changed":
+                        changed = true;
+                        // A base (master, HEAD~3) is optional: the next word is one unless it is a path or another option.
+                        if (i + 1 < args.Length && !args[i + 1].StartsWith("-", StringComparison.Ordinal)
+                            && !File.Exists(Path.Combine(cwd, args[i + 1])) && !Directory.Exists(Path.Combine(cwd, args[i + 1])))
+                            changedBase = args[++i];
+                        break;
+                    case "--watch":
+                    case "-w":
+                        watch = true;
+                        break;
                     case "--help":
                     case "-h":
                         output.WriteLine("Usage: " + Usage);
                         output.WriteLine("Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests.");
-                        output.WriteLine("In a project, runs only the tests a change since the last run can affect. --all runs every test; --failed runs the tests that failed last time.");
+                        output.WriteLine("In a project, runs only the tests a change since the last run can affect. --all runs every test; --failed runs the tests that failed last time;");
+                        output.WriteLine("--changed runs the tests git's uncommitted changes (or the changes since a base, such as --changed master) can affect; --watch runs again as you save, only the tests a change can affect.");
                         return 0;
                     default:
                         if (arg.StartsWith("--", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{arg}'. Usage: {Usage}");
@@ -109,7 +122,7 @@ namespace KScript.Testing
                 }
             }
 
-            if (runAll && failedOnly) return Fail(error, "Use --all or --failed, not both.");
+            if ((runAll ? 1 : 0) + (failedOnly ? 1 : 0) + (changed ? 1 : 0) > 1) return Fail(error, "Use one of --all, --failed and --changed.");
             bool namedFiles = paths.Any(p => File.Exists(Path.Combine(cwd, p)));
 
             if (paths.Count == 0)
@@ -139,6 +152,12 @@ namespace KScript.Testing
                 }
             }
 
+            int code = RunOnce(first: true);
+            if (!watch || code == ExitCodes.Usage || code == 130) return code;
+            return Watch(paths, cwd, output, cancellation, () => RunOnce(first: false));
+
+            int RunOnce(bool first)
+            {
             var missing = new List<string>();
             List<string> files = TestRunner.Discover(paths, missing);
             foreach (string m in missing) new CliOutput(error).Error($"There is no file or folder at '{m}'.");
@@ -151,7 +170,17 @@ namespace KScript.Testing
 
             var cli = new CliOutput(output, color);
             var style = cli.Style;
-            settings.Selection = Selection(files, cwd, paths, runAll, failedOnly, namedFiles || !string.IsNullOrEmpty(settings.Filter));
+            try
+            {
+                // After the first run, watching runs what a change can affect.
+                settings.Selection = first
+                    ? Selection(files, cwd, paths, runAll, failedOnly, changed ? changedBase ?? string.Empty : null, namedFiles || !string.IsNullOrEmpty(settings.Filter))
+                    : Selection(files, cwd, paths, false, false, null, false);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Fail(error, $"--changed needs git: {ex.Message}");
+            }
             if (settings.Selection?.Mode != TestSelectionMode.All && settings.Selection?.FullRunReason is string reason && settings.Selection.Graph != null)
             {
                 output.WriteLine(style.Dim($"  Running every test: {reason}."));
@@ -212,7 +241,12 @@ namespace KScript.Testing
             if (failed > 0) parts.Add(style.Apply($"{failed} failed", "1;31"));
             if (passed > 0) parts.Add(style.Apply($"{passed} passed", "1;32"));
             if (skipped > 0) parts.Add(style.Apply($"{skipped} skipped", "1;33"));
-            if (unchanged > 0) parts.Add(style.Dim(settings.Selection?.Mode == TestSelectionMode.Failed ? $"{unchanged} not run (passed last time)" : $"{unchanged} unchanged since the last run"));
+            if (unchanged > 0) parts.Add(style.Dim(settings.Selection?.Mode switch
+            {
+                TestSelectionMode.Failed => $"{unchanged} not run (passed last time)",
+                TestSelectionMode.Changed => $"{unchanged} not affected by the changes",
+                _ => $"{unchanged} unchanged since the last run",
+            }));
             parts.Add($"{all.Count + unchanged} total");
             output.WriteLine($"  {style.Gray("Tests:")}    {string.Join(", ", parts)}");
             int failedFiles = results.Count(r => r.Failed);
@@ -237,9 +271,13 @@ namespace KScript.Testing
             if (all.Count == 0 && brokenFiles == 0 && settings.Selection?.Selective == true)
             {
                 output.WriteLine();
-                cli.Info(settings.Selection.Mode == TestSelectionMode.Failed
-                    ? "No test failed in the last run. Use --all to run every test."
-                    : "Nothing the tests reach changed since the last run. Use --all to run every test.");
+                cli.Info(settings.Selection.Mode switch
+                {
+                    TestSelectionMode.Failed => "No test failed in the last run. Use --all to run every test.",
+                    TestSelectionMode.Changed when settings.Selection.ChangedFiles.Count == 0 => "git shows no changes. Use --all to run every test.",
+                    TestSelectionMode.Changed => $"No test reaches what changed ({string.Join(", ", settings.Selection.ChangedFiles.Take(3))}{(settings.Selection.ChangedFiles.Count > 3 ? ", ..." : string.Empty)}).",
+                    _ => "Nothing the tests reach changed since the last run. Use --all to run every test.",
+                });
                 return 0;
             }
             if (all.Count == 0 && brokenFiles == 0)
@@ -248,14 +286,78 @@ namespace KScript.Testing
                 return 1;
             }
             return failed == 0 && brokenFiles == 0 ? 0 : 1;
+            }
         }
+
+        /// <summary>How long the files must stay unchanged before a watching run starts, so one save (or a branch switch) is one run.</summary>
+        internal static int WatchQuietMilliseconds = 300;
+
+        /// <summary>
+        /// kscript test --watch: after the first run, runs again each time a file in the project (or the folders given)
+        /// changes, and then only the tests the change can affect, until Ctrl+C.
+        /// </summary>
+        private static int Watch(List<string> paths, string cwd, TextWriter output, CancellationToken cancellation, Func<int> run)
+        {
+            string root;
+            try
+            {
+                string start = Path.GetFullPath(Path.Combine(cwd, paths[0]));
+                root = ProjectConfig.FindAndLoad(Directory.Exists(start) ? start : Path.GetDirectoryName(start))?.Directory ?? cwd;
+            }
+            catch (ProjectConfigException)
+            {
+                root = cwd;
+            }
+
+            var pending = new System.Collections.Concurrent.BlockingCollection<string>();
+            using var watcher = new FileSystemWatcher(root) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.DirectoryName };
+            void Changed(string path)
+            {
+                string rel = Path.GetRelativePath(root, path).Replace('\\', '/');
+                if (IgnoredByWatch(rel)) return;
+                pending.Add(rel);
+            }
+            watcher.Changed += (_, e) => Changed(e.FullPath);
+            watcher.Created += (_, e) => Changed(e.FullPath);
+            watcher.Deleted += (_, e) => Changed(e.FullPath);
+            watcher.Renamed += (_, e) => Changed(e.FullPath);
+            watcher.EnableRaisingEvents = true;
+
+            int code = 0;
+            var style = new CliOutput(output).Style;
+            while (true)
+            {
+                output.WriteLine(style.Dim("  Watching for changes. Press Ctrl+C to stop."));
+                output.Flush();
+                var changed = new SortedSet<string>(StringComparer.Ordinal);
+                try
+                {
+                    changed.Add(pending.Take(cancellation));
+                    while (pending.TryTake(out string more, WatchQuietMilliseconds, cancellation)) changed.Add(more);
+                }
+                catch (OperationCanceledException)
+                {
+                    return code;
+                }
+                output.WriteLine();
+                output.WriteLine(style.Dim($"  Changed: {string.Join(", ", changed.Take(5))}{(changed.Count > 5 ? $" and {changed.Count - 5} more" : string.Empty)}"));
+                output.WriteLine();
+                code = run();
+                if (code == 130) return code;
+                output.WriteLine();
+            }
+        }
+
+        /// <summary>Files a watching run never reacts to: kscript's own cache and generated files, git, builds and packages.</summary>
+        private static bool IgnoredByWatch(string rel) =>
+            rel.Split('/').Any(part => part is ".git" or "bin" or "obj" or "node_modules" or ProjectConfig.GeneratedFolder || part.EndsWith(".tmp", StringComparison.Ordinal));
 
         /// <summary>
         /// How the run picks its tests: in a project, only the affected ones (or --failed ones), unless --all is given,
         /// files or --filter were named, or this is a CI run; those run everything but still record what each test
         /// reached. Null (no recording) outside a project, or when the files aren't all in it.
         /// </summary>
-        private static TestSelection Selection(List<string> files, string cwd, List<string> paths, bool runAll, bool failedOnly, bool named)
+        private static TestSelection Selection(List<string> files, string cwd, List<string> paths, bool runAll, bool failedOnly, string changedBase, bool named)
         {
             ProjectConfig project;
             try
@@ -270,6 +372,8 @@ namespace KScript.Testing
             if (project?.FilePath == null) return null;
             string root = Path.GetFullPath(project.Directory);
             if (files.Any(f => Path.GetRelativePath(root, f).StartsWith("..", StringComparison.Ordinal))) return null;
+            // --changed: what git says changed (since the base, or not committed yet), whatever the last run was.
+            if (changedBase != null) return TestSelection.ForChanges(root, GitChanges.Since(root, changedBase.Length == 0 ? null : changedBase));
             TestSelectionMode mode = failedOnly ? TestSelectionMode.Failed
                 : runAll || named || TestSelection.InCi() ? TestSelectionMode.All
                 : TestSelectionMode.Affected;

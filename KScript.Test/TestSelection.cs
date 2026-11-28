@@ -22,6 +22,9 @@ namespace KScript.Testing
         All,
         Affected,
         Failed,
+
+        /// <summary>The tests a set of changes (such as a git diff) can affect, whatever ran last time.</summary>
+        Changed,
     }
 
     /// <summary>
@@ -38,7 +41,13 @@ namespace KScript.Testing
         private readonly Dictionary<string, string> settings;
         private readonly List<string> scripts;
 
-        private TestSelection(string projectRoot, TestGraph graph, TestSelectionMode mode)
+        /// <summary>For <see cref="TestSelectionMode.Changed"/>: each changed file's parts that changed, or null when all of it did.</summary>
+        private readonly Dictionary<string, HashSet<string>> changedParts = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        /// <summary>For <see cref="TestSelectionMode.Changed"/>: the test-block fingerprints of each changed file before the change.</summary>
+        private readonly Dictionary<string, HashSet<string>> testsBefore = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        private TestSelection(string projectRoot, TestGraph graph, TestSelectionMode mode, IReadOnlyDictionary<string, string> before = null)
         {
             ProjectRoot = Path.GetFullPath(projectRoot);
             Graph = graph;
@@ -46,9 +55,11 @@ namespace KScript.Testing
             settings = SettingsFingerprints(ProjectRoot);
             scripts = ProjectScripts(ProjectRoot);
             if (mode == TestSelectionMode.All) return;
+            if (mode == TestSelectionMode.Changed) CompareWith(before ?? new Dictionary<string, string>());
             FullRunReason = graph == null ? "there is no record of an earlier run"
                 : graph.Build != TestGraph.CurrentBuild ? "kscript changed since the last run"
                 : mode == TestSelectionMode.Failed ? null
+                : mode == TestSelectionMode.Changed ? ChangedFiles.FirstOrDefault(IsSetting) is string s ? $"{s} changed" : null
                 : ChangedSetting(graph) is string setting ? $"{setting} changed"
                 : scripts.Except(graph.Scripts, StringComparer.Ordinal).FirstOrDefault() is string added ? $"{added} is new"
                 : null;
@@ -74,6 +85,51 @@ namespace KScript.Testing
 
         internal static TestSelection For(string projectRoot, TestGraph graph, TestSelectionMode mode) => new TestSelection(projectRoot, graph, mode);
 
+        /// <summary>
+        /// Picks the tests that changes can affect, such as the files a git diff names. <paramref name="before"/> has
+        /// each changed file (relative to the project) with its text before the change, or null when it is new.
+        /// </summary>
+        public static TestSelection ForChanges(string projectRoot, IReadOnlyDictionary<string, string> before) =>
+            new TestSelection(projectRoot, TestGraph.Load(projectRoot), TestSelectionMode.Changed, before);
+
+        /// <summary>The changed files (for <see cref="TestSelectionMode.Changed"/>), relative to the project.</summary>
+        public IReadOnlyCollection<string> ChangedFiles => changedParts.Keys;
+
+        private static bool IsSetting(string rel) => rel == ProjectConfig.FileName || rel == ".env" || rel.StartsWith(".env.", StringComparison.Ordinal);
+
+        /// <summary>Works out which parts of each changed file changed, from its text before and its text now.</summary>
+        private void CompareWith(IReadOnlyDictionary<string, string> before)
+        {
+            foreach ((string path, string old) in before)
+            {
+                string rel = Relative(Path.Combine(ProjectRoot, path));
+                SourceFingerprint now = Current(rel);
+                SourceFingerprint then = old == null ? null : SourceFingerprint.Of(rel, old);
+                if (then != null) testsBefore[rel] = new HashSet<string>(then.Tests, StringComparer.Ordinal);
+                if (then == null || now == null)
+                {
+                    changedParts[rel] = null;
+                    continue;
+                }
+                var parts = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string key in then.Declarations.Keys.Union(now.Declarations.Keys).Append(SourceFingerprint.Rest))
+                {
+                    if (then.Of(key) != now.Of(key)) parts.Add(key);
+                }
+                if (parts.Count > 0 || !then.Tests.SequenceEqual(now.Tests)) changedParts[rel] = parts;
+            }
+        }
+
+        /// <summary>True when the changes touch a part of a file in <paramref name="reached"/>.</summary>
+        private bool InChanges(Dictionary<string, List<string>> reached)
+        {
+            foreach ((string file, List<string> keys) in reached)
+            {
+                if (changedParts.TryGetValue(file, out HashSet<string> parts) && (parts == null || keys.Any(parts.Contains))) return true;
+            }
+            return false;
+        }
+
         /// <summary>True when the CI variable says this is a CI run, where every test runs.</summary>
         public static bool InCi(Func<string, string> env = null)
         {
@@ -90,6 +146,20 @@ namespace KScript.Testing
             string rel = Relative(file);
             if (!Graph.Files.TryGetValue(rel, out TestFileRecord record)) return Mode == TestSelectionMode.Failed ? new TestFilePlan { Skip = true } : TestFilePlan.All;
             if (record.Error) return TestFilePlan.All;
+
+            if (Mode == TestSelectionMode.Changed)
+            {
+                if (InChanges(record.Reached)) return TestFilePlan.All;
+                testsBefore.TryGetValue(rel, out HashSet<string> earlier);
+                bool fileChanged = changedParts.ContainsKey(rel);
+                if (!fileChanged && !record.Tests.Values.Any(t => InChanges(t.Reached))) return new TestFilePlan { Skip = true };
+                return new TestFilePlan
+                {
+                    ShouldRun = test => (fileChanged && earlier?.Contains(SourceFingerprint.TestHash(test.Element, test.Module.Source)) != true)
+                        || !record.Tests.TryGetValue(test.FullName, out TestRecord t)
+                        || InChanges(t.Reached),
+                };
+            }
 
             if (Mode == TestSelectionMode.Failed)
             {
