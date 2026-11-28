@@ -389,6 +389,69 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_environment_variable_kscript_reads_has_a_reference_entry()
+    {
+        // Every KSCRIPT_ name in kscript's own code, install scripts and Docker files, and every variable the code
+        // reads by name, must be in EnvironmentVariables.All, which the page is made from. Test-only names and the
+        // operating system's own variables are left out.
+        string root = Conventions.CliConventionTests.RepoRoot();
+        string[] extensions = { ".cs", ".sh", ".ps1", ".yaml", ".yml", ".kscript" };
+        var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(f => extensions.Contains(Path.GetExtension(f)) || Path.GetFileName(f) == "Dockerfile")
+            .Where(f => !Regex.IsMatch(Path.GetRelativePath(root, f).Replace('\\', '/'), @"(^|/)(bin|obj|node_modules|\.git|\.github|editors|samples)/|Tests/|\.Tests/|EnvironmentVariables\.cs$"));
+        string[] system = { "HOME", "PATH", "PWD", "LOCALAPPDATA", "ProgramFiles", "XDG_CONFIG_HOME" };
+        var read = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (string file in files)
+        {
+            string text = File.ReadAllText(file);
+            foreach (Match m in Regex.Matches(text, @"\bKSCRIPT_[A-Z_]*[A-Z]\b")) read.Add(m.Value);
+            foreach (Match m in Regex.Matches(text, @"GetEnvironmentVariable\(""([A-Za-z_]+)""\)")) read.Add(m.Groups[1].Value);
+        }
+        read.ExceptWith(system);
+        read.Remove("KSCRIPT_DOCS_EXAMPLE"); // the name @env's example looks up, so it shows the fallback
+        var listed = KScript.Runtime.EnvironmentVariables.All.Select(v => v.Name).ToHashSet(StringComparer.Ordinal);
+        var missing = read.Where(n => !listed.Contains(n)).ToList();
+        Assert.True(missing.Count == 0, "Add these to KScript.Runtime.EnvironmentVariables.All: " + string.Join(", ", missing));
+        Assert.Contains("KSCRIPT_REPO", read);
+
+        DocPage page = Site.Value.Find("/reference/environment");
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (var v in KScript.Runtime.EnvironmentVariables.All)
+        {
+            Assert.Contains(v.Area, KScript.Runtime.EnvironmentVariables.Areas);
+            Assert.Contains($"id=\"{DocsSite.EnvironmentAnchor(v)}\"", page.Body);
+            Assert.Contains(entries, e => e.Name == v.Name && e.Url == "/reference/environment#" + DocsSite.EnvironmentAnchor(v));
+        }
+        Assert.Contains("href=\"/reference/environment\"", Site.Value.Find("/reference").Body);
+    }
+
+    [Fact]
+    public void Every_diagnostic_code_has_its_own_section_in_the_errors_guide()
+    {
+        string guide = File.ReadAllText(Path.Combine(Conventions.CliConventionTests.RepoRoot(), "docs", "errors.md"));
+        var codes = typeof(KScript.Syntax.DiagnosticCodes).GetFields().Where(f => f.IsLiteral && f.FieldType == typeof(string))
+            .Select(f => (string)f.GetRawConstantValue()!).Where(c => Regex.IsMatch(c, @"^KS\d{4}$")).Distinct().ToList();
+        Assert.NotEmpty(codes);
+        var missing = codes.Where(c => !Regex.IsMatch(guide, @"^## " + c + @"\b", RegexOptions.Multiline)).ToList();
+        Assert.True(missing.Count == 0, "Give these a ## section in docs/errors.md: " + string.Join(", ", missing));
+    }
+
+    [Fact]
+    public void Every_format_rule_and_MCP_tool_is_documented()
+    {
+        // Format rules are settings in kscript.json's schema, which the settings page is made from; the MCP tools are
+        // listed in the MCP guide.
+        string schema = File.ReadAllText(Path.Combine(Conventions.CliConventionTests.RepoRoot(), "editors", "vscode", "schemas", "kscript.schema.json"));
+        foreach (string rule in KScript.Projects.FormatSettings.RuleNames)
+            Assert.Contains($"\"{rule}\":", schema);
+        string mcp = File.ReadAllText(Path.Combine(Conventions.CliConventionTests.RepoRoot(), "docs", "mcp.md"));
+        var tools = new KScript.Docs.Mcp.DocsTools(new KScript.Docs.Mcp.DocsMarkdown(Site.Value), "kscript", Path.GetTempPath()).All;
+        Assert.NotEmpty(tools);
+        foreach (var tool in tools)
+            Assert.Contains($"`{tool.Name}`", mcp);
+    }
+
+    [Fact]
     public void A_bar_escaped_in_a_table_shows_without_its_backslash()
     {
         // `add\|remove: file` in a Markdown table: the backslash only keeps the bar from ending the cell.
