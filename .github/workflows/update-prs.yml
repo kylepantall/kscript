@@ -1,0 +1,106 @@
+name: Update pull requests
+
+# A small merge queue. CI doesn't run on master (see ci.yml), and the "main" ruleset only lets a pull request merge
+# once it is up to date with master. So this keeps one pull request at a time moving: the oldest open pull request
+# with auto-merge on is brought up to date with master and its CI is started; it merges itself once green, that push
+# to master runs this again, and the next one goes. Pull requests without auto-merge on are left alone, so each merge
+# costs one CI run, not one per open pull request.
+#
+# It runs when master changes, when auto-merge is turned on, and when a CI run fails (so a red pull request doesn't
+# hold up the ones behind it). Pull requests stacked on the one that merged move onto master first.
+#
+# GitHub doesn't start workflows for commits made with GITHUB_TOKEN, so the update alone wouldn't run CI. Running a
+# workflow by hand (workflow_dispatch) is the exception, so this starts CI on the updated branch that way. Its checks
+# report on the branch's new head commit, which is what the pull request and the ruleset look at.
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    types: [ auto_merge_enabled ]
+  workflow_run:
+    workflows: [ CI ]
+    types: [ completed ]
+  workflow_dispatch:
+
+# One at a time, in order: each run looks at where the queue stands when it starts.
+concurrency:
+  group: update-prs
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update:
+    name: Update the next pull request
+    # A fork's pull request gets a read-only token; and a CI run that passed changes nothing here (auto-merge acts).
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # A stacked pull request targets the branch of the pull request below it. Once that one has merged, point the
+      # stacked one at master. (GitHub does this itself only when it deletes the merged branch.)
+      - name: Retarget pull requests stacked on the one that merged
+        if: github.event_name == 'push'
+        run: |
+          set -u
+          gh api "repos/$GH_REPO/commits/${{ github.sha }}/pulls" --jq '.[] | select(.merged_at != null) | .head.ref' |
+          while read -r merged; do
+            gh api --paginate "repos/$GH_REPO/pulls?state=open&base=$merged&per_page=100" --jq '.[].number' |
+            while read -r number; do
+              gh api -X PATCH "repos/$GH_REPO/pulls/$number" -f base=master --silent &&
+                echo "#$number was stacked on $merged; it now targets master"
+            done
+          done
+
+      - name: Bring the next pull request up to date and run its CI
+        run: |
+          set -u
+          # Open, ready pull requests into master from this repository with auto-merge on, oldest first.
+          queue=$(gh api --paginate "repos/$GH_REPO/pulls?state=open&base=master&sort=created&direction=asc&per_page=100" \
+            --jq '.[] | select(.draft | not) | select(.auto_merge != null)
+                      | select(.head.repo.full_name == "'"$GH_REPO"'") | "\(.number) \(.head.ref) \(.head.sha)"')
+          [ -z "$queue" ] && { echo "No pull requests with auto-merge on"; exit 0; }
+
+          echo "$queue" | while read -r number branch sha; do
+            behind=$(gh api "repos/$GH_REPO/compare/master...$sha" --jq '.behind_by')
+            if [ "$behind" = "0" ]; then
+              # Up to date already: it's at the front unless its CI failed, in which case the next one goes.
+              ci=$(gh run list --workflow ci.yml --commit "$sha" --limit 1 --json status,conclusion \
+                --jq '.[0] | if . == null then "none" elif .status != "completed" then "running" else .conclusion end')
+              case "$ci" in
+                failure|cancelled|timed_out) echo "#$number is up to date but its CI is $ci; skipping it"; continue ;;
+                none) gh workflow run ci.yml --ref "$branch"; echo "#$number is up to date; CI started" ;;
+                *) echo "#$number is up to date and its CI is $ci" ;;
+              esac
+              exit 0
+            fi
+
+            if ! gh api -X PUT "repos/$GH_REPO/pulls/$number/update-branch" -f expected_head_sha="$sha" --silent; then
+              echo "::warning::#$number couldn't be updated (a merge conflict, or a new push); it needs updating by hand"
+              continue
+            fi
+
+            # The update happens in the background: wait for the branch's new head before starting CI on it.
+            head="$sha"
+            for _ in $(seq 1 30); do
+              sleep 2
+              head=$(gh api "repos/$GH_REPO/pulls/$number" --jq '.head.sha')
+              [ "$head" != "$sha" ] && break
+            done
+            if [ "$head" = "$sha" ]; then
+              echo "::warning::#$number didn't update within a minute; CI wasn't started"
+              exit 0
+            fi
+
+            gh workflow run ci.yml --ref "$branch"
+            echo "#$number updated to $head, CI started"
+            exit 0
+          done

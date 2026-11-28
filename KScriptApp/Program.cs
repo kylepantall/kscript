@@ -912,7 +912,7 @@ namespace KScript
         /// Runs a script. Packages listed in the nearest kscript.json are imported for it.
         /// </summary>
         /// <summary>Set to "full" by an editor that runs a script, so an error names its file with the whole path.</summary>
-        public const string ErrorPathsVariable = "KSCRIPT_ERROR_PATHS";
+        public const string ErrorPathsVariable = KScript.Runtime.EnvironmentVariables.ErrorPaths;
 
         int RunScript(string path, string[] scriptArgs)
         {
