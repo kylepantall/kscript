@@ -134,6 +134,29 @@ namespace KScript.Auth
             return true;
         }
 
+        // A passkey account whose user is a record of the app's User model: the handle and the first credential go
+        // in together, and the user record is the model's.
+        public bool CreateAccount(string rp, string user, byte[] handle, string id, byte[] key, uint counter, bool eligible)
+        {
+            using var db = Open();
+            using var transaction = db.BeginTransaction();
+            using var account = Command(db, "INSERT INTO accounts(rp, user, handle) VALUES ($rp, $user, $handle)", ("rp", rp), ("user", user), ("handle", handle));
+            account.Transaction = transaction;
+            account.ExecuteNonQuery();
+            if (!Add(db, transaction, rp, id, user, handle, key, counter, eligible)) return false;
+            transaction.Commit();
+            return true;
+        }
+
+        /// <summary>True when the user has a passkey.</summary>
+        public bool HasCredentials(string user)
+        {
+            if (!File.Exists(path)) return false;
+            using var db = Open();
+            using var cmd = Command(db, "SELECT 1 FROM credentials WHERE user = $user LIMIT 1", ("user", user));
+            return cmd.ExecuteScalar() != null;
+        }
+
         // Other stores may use UUIDs, integers or app-defined keys. Only the identifier pattern generated
         // by signup warrants a lookup here, and existing sites need no passkey database to read their users.
         public Dictionary<string, object> User(string id)
@@ -177,16 +200,16 @@ namespace KScript.Auth
             return cmd.ExecuteNonQuery() == 1;
         }
 
-        public bool Revoke(string rp, string user, string id)
+        public bool Revoke(string rp, string user, string id, bool keepLast)
         {
             using var db = Open();
             // An account created without a password must retain a usable credential. Check and delete
             // in the same statement so concurrent revocations cannot remove its final two keys.
             using var cmd = Command(db, """
                 DELETE FROM credentials WHERE rp = $rp AND user = $user AND id = $id
-                AND (NOT EXISTS (SELECT 1 FROM passkey_users WHERE id = $user)
+                AND (($keep = 0 AND NOT EXISTS (SELECT 1 FROM passkey_users WHERE id = $user))
                   OR EXISTS (SELECT 1 FROM credentials WHERE rp = $rp AND user = $user AND id <> $id))
-                """, ("rp", rp), ("user", user), ("id", id));
+                """, ("rp", rp), ("user", user), ("id", id), ("keep", keepLast ? 1 : 0));
             return cmd.ExecuteNonQuery() == 1;
         }
 

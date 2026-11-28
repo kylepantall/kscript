@@ -207,6 +207,60 @@ public sealed class PasskeyTests : IDisposable
         Assert.Throws<KScriptException>(() => Request(server: restarted).Login(new Dictionary<string, object> { ["id"] = account }, false));
     }
 
+    private static TempSite ModelSite(string email, string password) => new(
+        ("kscript.json", "{ \"name\": \"pk\", \"packages\": [\"KScript.Data\"] }"),
+        ("models/user.kscript", "import KScript.Data\n\nmodel User(auto_create, unique: [email], hidden: [password]) extends Timestamps {\n  name: string\n  " + email + "\n  " + password + "\n}\n"));
+
+    [Fact]
+    public void SignupKeepsPasskeyUsersInTheUserModel()
+    {
+        using var project = ModelSite("email?: email", "password?: password");
+        var server = AuthApp.For(project.Root, new AuthSettings { Folder = "storage", PasskeyOrigin = Origin, PasskeyRpId = Rp, PasskeySignup = true, Users = "User" });
+        var guest = Request(server: server);
+        var options = Begin(guest, "signup");
+        string guestCookie = Cookie(guest);
+
+        var signup = Request(guestCookie, server: server);
+        Assert.True((bool)JsonNode.Parse(Passkeys.Handle(signup, "signup", "verify", Attest(options).ToJsonString()))["ok"]);
+        // A row of the project's users table, keyed as User is (auto-numbered here), not a passkey store profile.
+        Assert.IsType<KScript.Runtime.Record>(signup.User);
+        string account = AuthApp.Text(signup.User["id"]);
+        Assert.Equal("1", account);
+        Assert.Empty(server.PasskeyStore.Users());
+        Assert.Equal(1, server.Users.Count());
+
+        var users = signup.Users;
+        Assert.True(users.PasskeyOnly(account));
+        Assert.False(Passkeys.Revoke(signup, B64(id)));
+        Assert.Throws<KScriptException>(() => users.SetPassword(null, account, "a new sign-in secret"));
+        Assert.Throws<KScriptException>(() => Request(server: server).Login(new Dictionary<string, object> { ["id"] = account }, false));
+        string signedIn = Cookie(signup);
+
+        var returning = Request(signedIn, server: server);
+        Assert.Equal(account, AuthApp.Text(returning.User["id"]));
+        var anonymous = Request(server: server);
+        var login = Begin(anonymous, "login");
+        var verified = Request(Cookie(anonymous), server: server);
+        Passkeys.Handle(verified, "login", "verify", AssertCredential(login, (string)options["user"]["id"]));
+        Assert.Equal(account, AuthApp.Text(verified.User["id"]));
+
+        Assert.True(verified.Users.Delete(account));
+        Assert.Equal(0, server.Users.Count());
+        Assert.Null(server.PasskeyStore.Find(Rp, B64(id)));
+    }
+
+    [Fact]
+    public void PasskeySignupNeedsAnOptionalEmailAndPassword()
+    {
+        using var project = ModelSite("email: email", "password?: password");
+        var error = Assert.Throws<KScriptException>(() => AuthApp.For(project.Root, new AuthSettings { Folder = "storage", PasskeyOrigin = Origin, PasskeyRpId = Rp, PasskeySignup = true, Users = "User" }));
+        Assert.Equal("Config", error.Type);
+        Assert.Contains("User.email must be optional: email?: email", error.Message);
+        using var other = ModelSite("email?: email", "password: password");
+        Assert.Contains("User.password must be optional: password?: password",
+            Assert.Throws<KScriptException>(() => AuthApp.For(other.Root, new AuthSettings { Folder = "storage", PasskeyOrigin = Origin, PasskeyRpId = Rp, PasskeySignup = true, Users = "User" })).Message);
+    }
+
     [Fact]
     public void ExpiredSignupAndDuplicateCredentialLeaveNoNewAccount()
     {
