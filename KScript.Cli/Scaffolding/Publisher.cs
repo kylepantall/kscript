@@ -26,7 +26,7 @@ namespace KScript.Scaffolding
             var list = new List<Publishable>();
             foreach (KScriptPackage package in PackageRegistry.Default.LoadAll())
             {
-                foreach (PackageSource source in package.Sources)
+                foreach (PackageSource source in package.Sources.Where(s => s.Replaceable))
                 {
                     MarkupElement model = CodeParser.Parse(source.Text).RootElements.FirstOrDefault()?.ChildElements
                         .FirstOrDefault(e => e.Name == "model" && e.GetAttributeValue("name") != null);

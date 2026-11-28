@@ -34,7 +34,7 @@ namespace KScript.Data
             options.DefaultPackages.AddRange(config.Packages);
             var interpreter = new Interpreter(host, options: options);
             // A model a package ships (KScript.Auth's User) is used as it is until the project has its own copy.
-            PackageSource shipped = file == null ? interpreter.Packages.LoadAll().SelectMany(p => p.Sources).FirstOrDefault(s => ProjectConfig.ModelFileFor(new[] { s.FileName }, name) != null) : null;
+            PackageSource shipped = file == null ? interpreter.Packages.LoadAll().SelectMany(p => p.Sources).FirstOrDefault(s => s.Replaceable && ProjectConfig.ModelFileFor(new[] { s.FileName }, name) != null) : null;
             if (file == null && shipped == null)
                 throw new KScriptException($"{what} is {name}, but there is no {name} model in {config.PathFor("models")}. Make one with kscript make model {name}, or publish one a package ships with kscript publish.", "Config");
             // A shipped model is declared for a script of the project that imports its package, so its records are

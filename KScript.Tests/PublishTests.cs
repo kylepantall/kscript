@@ -23,6 +23,9 @@ public sealed class PublishTests
         Assert.Contains("Ownable", list.Out);
         Assert.Contains("(mixin, KScript.Auth)", list.Out);
         Assert.DoesNotContain("Yours:", list.Out);
+        // Timestamps and SoftDeletes only name a behaviour KScript.Data has built in, so there is nothing to change.
+        Assert.DoesNotContain("Timestamps", list.Out);
+        Assert.Contains("No package ships a model called 'SoftDeletes'", Publish(site.Root, "SoftDeletes").Err);
 
         var dry = Publish(site.Root, "user", "--dry-run");
         Assert.Equal(0, dry.Code);
@@ -62,5 +65,13 @@ public sealed class PublishTests
 
         using var outside = new TempSite();
         Assert.Contains("there is no kscript.json here", Publish(outside.Root, "User").Err);
+    }
+
+    [Fact]
+    public void Only_replaceable_sources_have_project_copies()
+    {
+        string file = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "models", "timestamps.kscript"));
+        Assert.Null(new KScript.Runtime.PackageSource("KScript.Data", "timestamps.kscript", "").ProjectCopy(new[] { file }));
+        Assert.Equal(file, new KScript.Runtime.PackageSource("KScript.Auth", "timestamps.kscript", "", replaceable: true).ProjectCopy(new[] { file }));
     }
 }

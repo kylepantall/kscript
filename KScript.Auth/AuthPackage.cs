@@ -151,9 +151,9 @@ namespace KScript.Auth
                 }, "<do>@authorize(update, $post)</do>").Info.KeepsBareWords = true;
             // User and Guest go first: Ownable's relations name them. A project's own copy of each (kscript publish)
             // replaces it.
-            p.Source("user.kscript", Embedded("user.kscript"));
-            p.Source("guest.kscript", Embedded("guest.kscript"));
-            p.Source("ownable.kscript", Embedded("ownable.kscript"));
+            p.Source("user.kscript", Embedded("user.kscript"), replaceable: true);
+            p.Source("guest.kscript", Embedded("guest.kscript"), replaceable: true);
+            p.Source("ownable.kscript", Embedded("ownable.kscript"), replaceable: true);
             KScript.Data.ModelInfo.OwnerMixin(Name, "Ownable");
             KScript.Data.ModelInfo.CurrentOwner = Owners.Of;
             KScript.Data.ModelInfo.OwnedScope = Owners.Adopt;
