@@ -7,6 +7,9 @@ namespace KScript.Runtime
     /// <summary>Limits and defaults for a run.</summary>
     public sealed class InterpreterOptions
     {
+        /// <summary>Parsed scripts shared with other interpreters (a server's), so unchanged scripts aren't parsed again. Null: none.</summary>
+        public Dependencies.ScriptCache Scripts { get; set; }
+
         /// <summary>Stop with an error after this many evaluation steps (null: no limit). Servers set one so a bad loop can't hang them.</summary>
         public long? MaxSteps { get; set; }
 
@@ -162,12 +165,13 @@ namespace KScript.Runtime
         /// <summary>Scripts imported with &lt;import path&gt;, by their import element.</summary>
         internal readonly Dictionary<MarkupElement, Module> ScriptImports = new Dictionary<MarkupElement, Module>(ReferenceEqualityComparer.Instance);
 
-        internal readonly Dictionary<object, ParseResult> ParseCache = new Dictionary<object, ParseResult>(ReferenceEqualityComparer.Instance);
-        internal readonly Dictionary<object, Template> TemplateCache = new Dictionary<object, Template>(ReferenceEqualityComparer.Instance);
+        // Shared with the other modules made from the same parse when the interpreter has a ScriptCache.
+        internal Dictionary<object, ParseResult> ParseCache = new Dictionary<object, ParseResult>(ReferenceEqualityComparer.Instance);
+        internal Dictionary<object, Template> TemplateCache = new Dictionary<object, Template>(ReferenceEqualityComparer.Instance);
 
         /// <summary>The old spelling found in a piece of code of a .kscript file (see <see cref="KScript.Syntax.Markup.OldSpellings"/>), by the text it is in.</summary>
-        internal readonly Dictionary<object, KScript.Syntax.Markup.OldSpelling> OldSpellingCache = new Dictionary<object, KScript.Syntax.Markup.OldSpelling>(ReferenceEqualityComparer.Instance);
-        internal readonly Dictionary<MarkupElement, DecodedText> ContentCache = new Dictionary<MarkupElement, DecodedText>(ReferenceEqualityComparer.Instance);
+        internal Dictionary<object, KScript.Syntax.Markup.OldSpelling> OldSpellingCache = new Dictionary<object, KScript.Syntax.Markup.OldSpelling>(ReferenceEqualityComparer.Instance);
+        internal Dictionary<MarkupElement, DecodedText> ContentCache = new Dictionary<MarkupElement, DecodedText>(ReferenceEqualityComparer.Instance);
 
         internal bool HasRun;
         internal bool Running;
