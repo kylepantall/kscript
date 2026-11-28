@@ -19,6 +19,7 @@ namespace KScript.Scaffolding
             var names = new List<string>();
             var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             bool force = false, dryRun = false;
+            string dir = null;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
@@ -26,17 +27,21 @@ namespace KScript.Scaffolding
                 {
                     case "--force": force = true; continue;
                     case "--dry-run": dryRun = true; continue;
+                    case "--dir":
+                        if (i + 1 >= args.Length) return Fail(error, "--dir needs a folder.");
+                        dir = args[++i];
+                        continue;
                     case "--syntax":
                         if (i + 1 >= args.Length) return Fail(error, "--syntax needs kscript or xml.");
                         options[ScriptFormat.Option] = args[++i];
                         continue;
                 }
                 if (a.StartsWith("--syntax=", StringComparison.Ordinal)) { options[ScriptFormat.Option] = a.Substring(9); continue; }
-                if (a.StartsWith("-", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{a}'. kscript publish takes model names, --syntax, --force and --dry-run.");
+                if (a.StartsWith("-", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{a}'. kscript publish takes model names, --syntax, --force, --dry-run and --dir.");
                 names.Add(a);
             }
 
-            string start = KScript.Runtime.WorkingFolder.Current;
+            string start = Path.GetFullPath(dir ?? KScript.Runtime.WorkingFolder.Current);
             string file = ProjectConfig.Find(start);
             string root = file != null ? Path.GetDirectoryName(file) : start;
             ProjectConfig project = file != null ? ProjectConfig.Load(file) : null;

@@ -2,7 +2,7 @@ using KScript.Testing;
 
 namespace KScript.Tests;
 
-/// <summary>KScript.Auth's Ownable mixin (#208) and guest identity: @guest(), @owner(), adoption on sign-in (#209).</summary>
+/// <summary>KScript.Auth's Ownable mixin (#208) and guest identity: its user and guest relations, @guest() and adoption on sign-in (#209).</summary>
 public sealed class OwnableTests : StorageFixture
 {
     private static void AllPass(TempSite site, string file)

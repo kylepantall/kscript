@@ -6,7 +6,7 @@ using static KScript.Language.Tests.TestHelpers;
 
 namespace KScript.Language.Tests
 {
-    /// <summary>The editor side of KScript.Auth's Ownable mixin (#208), @guest/@owner (#209) and ->dispatch(delay:, at:).</summary>
+    /// <summary>The editor side of KScript.Auth's Ownable mixin (#208), its user and guest relations, @guest (#209) and ->dispatch(delay:, at:).</summary>
     public class OwnableAnalysisTests
     {
         private static readonly string Folder = Path.Combine(Path.GetTempPath(), "kscript-ownable");
