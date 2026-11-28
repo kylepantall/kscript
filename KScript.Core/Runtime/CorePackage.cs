@@ -92,7 +92,7 @@ namespace KScript.Runtime
                 if (bad != null) throw run.Error($"'{bad}' can't be an enum value: use letters, digits and _, starting with a letter.", "values", "Syntax");
                 string twice = names.GroupBy(v => v, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1)?.Key;
                 if (twice != null) throw run.Error($"<enum name=\"{name}\"> lists '{twice}' twice.", "values", "Syntax");
-                run.Scope.Declare(name, new EnumType(name, names), isConst: true);
+                run.Scope.Declare(name, new EnumType(name, names) { Module = run.Module, DeclarationOffset = run.Element.NameSpan.Start }, isConst: true);
                 return null;
             });
 
@@ -815,7 +815,7 @@ namespace KScript.Runtime
             if (reserved != null) throw run.Error($"'{reserved}' is part of every error, so <error name=\"{name}\"> can't have a field with that name.", "fields", "Syntax");
             string parent = run.Raw("extends")?.Trim();
             if (parent != null && parent.Length == 0) parent = null;
-            var type = new ErrorType(name, parent ?? ErrorTypes.Root, status, run.Raw("description"), run.Element.GetAttribute("message")?.Value, fields, run.Scope, run.Module);
+            var type = new ErrorType(name, parent ?? ErrorTypes.Root, status, run.Raw("description"), run.Element.GetAttribute("message")?.Value, fields, run.Scope, run.Module) { DeclarationOffset = run.Element.NameSpan.Start };
             // Check what it extends now when that is already declared; one declared further down is found on first use.
             if (parent != null && ErrorTypes.Find(parent, run.Scope) != null) _ = type.Parent;
             return type;

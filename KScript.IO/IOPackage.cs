@@ -55,8 +55,8 @@ namespace KScript.IO
             call.Host.CheckPath(Path);
             result = name switch
             {
-                "read_text" => File.ReadAllText(Path),
-                "read_lines" => File.ReadAllLines(Path).Cast<object>().ToList(),
+                "read_text" => KScript.Runtime.Dependencies.DependencyTrace.ReadText(Path),
+                "read_lines" => KScript.Runtime.Dependencies.DependencyTrace.ReadLines(Path).Cast<object>().ToList(),
                 "join" => Checked(call, new FileValue(IOPackage.JoinPath(call.Args.Prepend(Path)))),
                 "relative_to" => System.IO.Path.GetRelativePath(IOPackage.PathOf(call.Arg(0), call), Path),
                 "to_string" => Path,
@@ -143,20 +143,20 @@ namespace KScript.IO
 
             p.Command("file", "path", "A file value for a path, with fields like .name, .extension and .size, and methods like ->read_text().", KType.File, c => new FileValue(PathOf(c.Need(0), c)),
                 "<let name=\"report\" value=\"@file('out/report.pdf')\" />");
-            p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => File.ReadAllText(PathOf(c.Need(0), c)),
+            p.Command("read_text", "path", "The text of a file. Relative paths are from the script's folder.", KType.String, c => KScript.Runtime.Dependencies.DependencyTrace.ReadText(PathOf(c.Need(0), c)),
                 "<do>@write_text('config.json', '{ \"port\": 8080 }')</do>\n<let name=\"settings\" value=\"@read_text('config.json')->json()\" />\n<echo>$settings.port</echo>");
-            p.Command("read_lines", "path", "The lines of a file.", KType.List, c => File.ReadAllLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
-            p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(File.ReadAllText(PathOf(c.Need(0), c))), 1));
+            p.Command("read_lines", "path", "The lines of a file.", KType.List, c => KScript.Runtime.Dependencies.DependencyTrace.ReadLines(PathOf(c.Need(0), c)).Cast<object>().ToList());
+            p.Command("read_json", "path, as?: type", "A JSON file read into maps and lists. With as: a <type>, the data is checked and turned into records.", KType.Any, c => Shapes.MapJson(c, Values.ParseJson(KScript.Runtime.Dependencies.DependencyTrace.ReadText(PathOf(c.Need(0), c))), 1));
             p.Command("read_yaml", "path", "A YAML file read into maps and lists.", KType.Any, c =>
             {
                 string path = PathOf(c.Need(0), c);
-                return Yaml.Parse(File.ReadAllText(path), System.IO.Path.GetFileName(path));
+                return Yaml.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path), System.IO.Path.GetFileName(path));
             });
             p.Command("read_env", "path", "A .env file (NAME=value lines) read into a map. ${NAME} uses earlier lines or the environment.", KType.Map, c =>
             {
                 string path = PathOf(c.Need(0), c);
                 var map = new Dictionary<string, object>();
-                foreach (var pair in DotEnv.Parse(File.ReadAllText(path), c.Host.EnvironmentVariable, System.IO.Path.GetFileName(path))) map[pair.Key] = pair.Value;
+                foreach (var pair in DotEnv.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path), c.Host.EnvironmentVariable, System.IO.Path.GetFileName(path))) map[pair.Key] = pair.Value;
                 return map;
             });
             p.Command("write_text", "path, text", "Writes text to a file, replacing it. Folders are created as needed.", KType.Null, c => Write(c, c.Str(1), append: false));

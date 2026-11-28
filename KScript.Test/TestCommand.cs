@@ -8,13 +8,15 @@ using KScript.Projects;
 namespace KScript.Testing
 {
     /// <summary>
-    /// <c>kscript test [file-or-folder]... [--filter text] [--timeout seconds] [--junit file]</c>: runs test files and
-    /// prints each result. With no paths it runs the tests of the current project (the folder of the nearest
-    /// kscript.json), or of the current folder. The exit code is 0 when every test passed and 1 otherwise.
+    /// <c>kscript test [file-or-folder]... [--all | --failed] [--filter text] [--timeout seconds] [--junit file]</c>: runs
+    /// test files and prints each result. With no paths it runs the tests of the current project (the folder of the
+    /// nearest kscript.json), or of the current folder. In a project it runs only the tests that a change since the last
+    /// run can affect (see <see cref="TestSelection"/>), unless --all is given, files or --filter are named, or CI is
+    /// set. The exit code is 0 when every test that ran passed and 1 otherwise.
     /// </summary>
     public static class TestCommand
     {
-        public const string Usage = "kscript test [file-or-folder]... [--filter <text>] [--timeout <seconds>] [--junit <file>]";
+        public const string Usage = "kscript test [file-or-folder]... [--all | --failed] [--filter <text>] [--timeout <seconds>] [--junit <file>]";
 
         public static int Run(string[] args, TextWriter output, TextWriter error, CancellationToken cancellation = default, bool? color = null, string workingDirectory = null)
         {
@@ -36,7 +38,7 @@ namespace KScript.Testing
         /// <summary>test.env of the project around the first path given (or the current folder).</summary>
         private static string TestEnvironment(string[] args, string cwd)
         {
-            // The first path, not the text after --filter, --timeout or --junit.
+            // The first path, not the text after --filter, --timeout or --junit (--all and --failed take nothing).
             string first = null;
             for (int i = 0; i < args.Length && first == null; i++)
             {
@@ -60,6 +62,7 @@ namespace KScript.Testing
             var paths = new List<string>();
             var settings = new TestRunSettings { Cancellation = cancellation, BaseDirectory = cwd };
             string junit = null;
+            bool runAll = false, failedOnly = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -87,10 +90,17 @@ namespace KScript.Testing
                         junit = Value();
                         if (junit == null) return Fail(error, "--junit needs a file to write, e.g. --junit test-results.xml");
                         break;
+                    case "--all":
+                        runAll = true;
+                        break;
+                    case "--failed":
+                        failedOnly = true;
+                        break;
                     case "--help":
                     case "-h":
                         output.WriteLine("Usage: " + Usage);
                         output.WriteLine("Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests.");
+                        output.WriteLine("In a project, runs only the tests a change since the last run can affect. --all runs every test; --failed runs the tests that failed last time.");
                         return 0;
                     default:
                         if (arg.StartsWith("--", StringComparison.Ordinal)) return Fail(error, $"Unknown option '{arg}'. Usage: {Usage}");
@@ -98,6 +108,9 @@ namespace KScript.Testing
                         break;
                 }
             }
+
+            if (runAll && failedOnly) return Fail(error, "Use --all or --failed, not both.");
+            bool namedFiles = paths.Any(p => File.Exists(Path.Combine(cwd, p)));
 
             if (paths.Count == 0)
             {
@@ -138,6 +151,12 @@ namespace KScript.Testing
 
             var cli = new CliOutput(output, color);
             var style = cli.Style;
+            settings.Selection = Selection(files, cwd, paths, runAll, failedOnly, namedFiles || !string.IsNullOrEmpty(settings.Filter));
+            if (settings.Selection?.Mode != TestSelectionMode.All && settings.Selection?.FullRunReason is string reason && settings.Selection.Graph != null)
+            {
+                output.WriteLine(style.Dim($"  Running every test: {reason}."));
+                output.WriteLine();
+            }
             var clock = Stopwatch.StartNew();
             var results = new List<TestFileResult>();
             foreach (string file in files)
@@ -159,6 +178,7 @@ namespace KScript.Testing
                     return 130;
                 }
                 results.Add(result);
+                if (result.NotRun) continue;
 
                 if (result.Error != null)
                 {
@@ -167,8 +187,8 @@ namespace KScript.Testing
                 }
                 else if (result.Tests.Count == 0)
                 {
-                    // With --filter, files without a match are left out of the output.
-                    if (!string.IsNullOrEmpty(settings.Filter)) continue;
+                    // With --filter, files without a match are left out of the output, as are files whose tests all stayed the same.
+                    if (!string.IsNullOrEmpty(settings.Filter) || result.Unchanged > 0) continue;
                     lines.WriteLine(style.Dim("  (no tests in this file)"));
                 }
 
@@ -179,6 +199,8 @@ namespace KScript.Testing
                 output.WriteLine();
             }
             clock.Stop();
+            if (settings.Selection != null) settings.Selection.Update(results).Save(settings.Selection.ProjectRoot);
+            int unchanged = results.Sum(r => r.Unchanged);
 
             List<TestResult> all = results.SelectMany(r => r.Tests).ToList();
             int passed = all.Count(t => t.Outcome == TestOutcome.Passed);
@@ -190,10 +212,12 @@ namespace KScript.Testing
             if (failed > 0) parts.Add(style.Apply($"{failed} failed", "1;31"));
             if (passed > 0) parts.Add(style.Apply($"{passed} passed", "1;32"));
             if (skipped > 0) parts.Add(style.Apply($"{skipped} skipped", "1;33"));
-            parts.Add($"{all.Count} total");
+            if (unchanged > 0) parts.Add(style.Dim(settings.Selection?.Mode == TestSelectionMode.Failed ? $"{unchanged} not run (passed last time)" : $"{unchanged} unchanged since the last run"));
+            parts.Add($"{all.Count + unchanged} total");
             output.WriteLine($"  {style.Gray("Tests:")}    {string.Join(", ", parts)}");
             int failedFiles = results.Count(r => r.Failed);
-            output.WriteLine($"  {style.Gray("Files:")}    {(failedFiles > 0 ? style.Apply($"{failedFiles} failed", "1;31") + ", " : string.Empty)}{results.Count} total{(brokenFiles > 0 ? $" ({brokenFiles} could not run)" : string.Empty)}");
+            int notRun = results.Count(r => r.NotRun);
+            output.WriteLine($"  {style.Gray("Files:")}    {(failedFiles > 0 ? style.Apply($"{failedFiles} failed", "1;31") + ", " : string.Empty)}{(notRun > 0 ? style.Dim($"{notRun} unchanged") + ", " : string.Empty)}{results.Count} total{(brokenFiles > 0 ? $" ({brokenFiles} could not run)" : string.Empty)}");
             output.WriteLine($"  {style.Gray("Duration:")} {clock.Elapsed.TotalSeconds.ToString("0.00", CultureInfo.InvariantCulture)}s");
 
             if (junit != null)
@@ -210,12 +234,46 @@ namespace KScript.Testing
                 }
             }
 
+            if (all.Count == 0 && brokenFiles == 0 && settings.Selection?.Selective == true)
+            {
+                output.WriteLine();
+                cli.Info(settings.Selection.Mode == TestSelectionMode.Failed
+                    ? "No test failed in the last run. Use --all to run every test."
+                    : "Nothing the tests reach changed since the last run. Use --all to run every test.");
+                return 0;
+            }
             if (all.Count == 0 && brokenFiles == 0)
             {
                 new CliOutput(error).Warn(string.IsNullOrEmpty(settings.Filter) ? "No tests found." : $"No tests match '{settings.Filter}'.");
                 return 1;
             }
             return failed == 0 && brokenFiles == 0 ? 0 : 1;
+        }
+
+        /// <summary>
+        /// How the run picks its tests: in a project, only the affected ones (or --failed ones), unless --all is given,
+        /// files or --filter were named, or this is a CI run; those run everything but still record what each test
+        /// reached. Null (no recording) outside a project, or when the files aren't all in it.
+        /// </summary>
+        private static TestSelection Selection(List<string> files, string cwd, List<string> paths, bool runAll, bool failedOnly, bool named)
+        {
+            ProjectConfig project;
+            try
+            {
+                string start = Path.GetFullPath(Path.Combine(cwd, paths[0]));
+                project = ProjectConfig.FindAndLoad(Directory.Exists(start) ? start : Path.GetDirectoryName(start));
+            }
+            catch (ProjectConfigException)
+            {
+                return null;
+            }
+            if (project?.FilePath == null) return null;
+            string root = Path.GetFullPath(project.Directory);
+            if (files.Any(f => Path.GetRelativePath(root, f).StartsWith("..", StringComparison.Ordinal))) return null;
+            TestSelectionMode mode = failedOnly ? TestSelectionMode.Failed
+                : runAll || named || TestSelection.InCi() ? TestSelectionMode.All
+                : TestSelectionMode.Affected;
+            return TestSelection.For(root, mode);
         }
 
         private static void PrintResult(TextWriter output, CliStyle style, TestResult r)

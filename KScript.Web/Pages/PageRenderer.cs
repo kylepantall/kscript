@@ -106,7 +106,7 @@ namespace KScript.Pages
         {
             string full = ResolveSitePath(path, where);
             if (!File.Exists(full)) throw new PageException($"File not found: {path} ({where}).");
-            return File.ReadAllText(full);
+            return KScript.Runtime.Dependencies.DependencyTrace.ReadText(full);
         }
 
         /// <summary>For paths the renderer builds itself (such as _components/name.html), which stay in the site.</summary>

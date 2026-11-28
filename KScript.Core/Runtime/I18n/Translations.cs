@@ -210,7 +210,7 @@ namespace KScript.Runtime
         private Dictionary<string, object> Read(string file)
         {
             host.CheckPath(file);
-            string text = File.ReadAllText(file);
+            string text = KScript.Runtime.Dependencies.DependencyTrace.ReadText(file);
             object value = file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? Values.ParseJson(text) : Yaml.Parse(text, Path.GetFileName(file));
             if (value == null) return ConfigLoader.NewMap();
             if (value is not Dictionary<string, object> map)

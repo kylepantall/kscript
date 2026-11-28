@@ -234,7 +234,7 @@ namespace KScript.Documents
             {
                 string path = Located(run, () => run.Host.ResolvePath(run.Template("path"), run.Module.Directory), "path");
                 if (!File.Exists(path)) throw run.Error($"There is no Markdown file at {path}.", "path", "IO");
-                blocks = Located(run, () => MarkdownBlocks.Parse(File.ReadAllText(path), dollarMaths: true), "path");
+                blocks = Located(run, () => MarkdownBlocks.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path), dollarMaths: true), "path");
             }
             else
             {
@@ -430,7 +430,7 @@ namespace KScript.Documents
             {
                 string path = Located(run, () => run.Host.ResolvePath(run.Template("path"), run.Module.Directory), "path");
                 if (!File.Exists(path)) throw run.Error($"There is no BibTeX file at {path}.", "path", "IO");
-                foreach (Source s in Located(run, () => BibTex.Parse(File.ReadAllText(path)), "path")) b.Doc.Sources[s.Key] = s;
+                foreach (Source s in Located(run, () => BibTex.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path)), "path")) b.Doc.Sources[s.Key] = s;
             }
             b.Target.Add(bib);
             b.Bibliography = bib;

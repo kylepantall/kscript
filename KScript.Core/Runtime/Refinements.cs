@@ -360,7 +360,7 @@ namespace KScript.Runtime
     /// A type made from one other type plus rules: <c>type Age with [int] { min: 0; max: 150 }</c>. Its values are
     /// values of the base type (an Age is a number), so it works anywhere the base type does.
     /// </summary>
-    public sealed class RefinedType : IKObject, IDeclaredType
+    public sealed class RefinedType : IKObject, IDeclaredType, Dependencies.IDeclaredSource
     {
         private readonly IReadOnlyDictionary<string, MarkupElement> methods;
 
@@ -391,6 +391,12 @@ namespace KScript.Runtime
         public string Description { get; }
 
         internal Scope Closure { get; }
+        internal int? DeclarationOffset { get; init; }
+
+        /// <summary>Where it was declared, so reaching it can be recorded (see <see cref="Dependencies.DependencyTrace"/>).</summary>
+        Module Dependencies.IDeclaredSource.DeclaredIn => DeclarationOffset == null ? null : Module;
+        int Dependencies.IDeclaredSource.DeclaredAt => DeclarationOffset ?? 0;
+
         internal Module Module { get; }
         internal RefinedType BaseRefinement { get; }
         internal bool HasMethods { get; }
