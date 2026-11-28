@@ -514,7 +514,7 @@ The model is the one in the models folder (`models/user.kscript`). It needs an e
 ```kscript
 import KScript.Data
 
-model User(timestamps, unique: [email], hidden: [password]) {
+model User(unique: [email], hidden: [password]) extends Timestamps {
   email: email
   password: password
   name: string
@@ -534,7 +534,7 @@ import KScript.Auth
 import KScript.Http
 
 /// A note on someone's board.
-model Note(timestamps) extends Ownable {
+model Note extends [Ownable, Timestamps] {
   title: string
 }
 

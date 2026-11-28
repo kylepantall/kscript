@@ -18,7 +18,7 @@ public sealed class OwnableTests : StorageFixture
         import KScript.Auth
 
         /// A note on someone's board.
-        model Note(timestamps, soft_deletes) extends Ownable {
+        model Note extends [Ownable, Timestamps, SoftDeletes] {
           title: string = ''
         }
         """;

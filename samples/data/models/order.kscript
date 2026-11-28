@@ -2,7 +2,7 @@ import KScript.Data
 import "../types/order-status.kscript"
 
 /// An order for one product.
-model Order(timestamps, soft_deletes, index: [[status, created_at]]) {
+model Order(index: [[status, created_at]]) extends [Timestamps, SoftDeletes] {
   product: Product
   customer: email
   quantity: int(min: 1)

@@ -15,7 +15,7 @@ namespace KScript.Language.Tests
             import KScript.Data
             import KScript.Auth
 
-            model Note(timestamps) extends Ownable {
+            model Note extends [Ownable, Timestamps] {
               title: string = ''
             }
 

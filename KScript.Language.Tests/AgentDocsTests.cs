@@ -204,15 +204,15 @@ namespace KScript.Language.Tests
             Write("models/note.kscript", """
                 import KScript.Data
                 model UID(mixin, key: "uid") { uid: uuid }
-                model Audit(mixin, timestamps)
-                model Note(table: "notes", auto_create, index: [title]) extends [UID, Audit(timestamps: false)] {
+                model Audit(mixin, hidden: [uid]) extends Timestamps
+                model Note(table: "notes", auto_create, index: [title]) extends [UID, Audit(hidden: [])] {
                   title: string
                 }
                 """);
 
             string index = AgentDocs.Index(AgentDocs.Read(dir));
             Assert.Contains("model UID(mixin, key: \"uid\")", index);
-            Assert.Contains("model Note(table: \"notes\", auto_create, index: [title]) extends [UID, Audit(timestamps: false)]", index);
+            Assert.Contains("model Note(table: \"notes\", auto_create, index: [title]) extends [UID, Audit(hidden: [])]", index);
         }
 
         [Fact]

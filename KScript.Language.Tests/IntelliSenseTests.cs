@@ -426,7 +426,7 @@ namespace KScript.Language.Tests
             const string prefix = """
                 import KScript.Data
                 model UID(mixin, key: 'uid') { uid: uuid }
-                model Audit(mixin, timestamps)
+                model Audit(mixin) extends Timestamps
                 type Caption with [string] { min: 1 }
 
                 """;

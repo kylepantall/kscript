@@ -153,7 +153,7 @@ namespace KScript.Language.Tests
               fn owned_by(query, owner: string) => $query->where(owner: $owner)
             }
 
-            model Item(soft_deletes) extends Owned {
+            model Item extends [Owned, SoftDeletes] {
               title: string = ''
             }
 

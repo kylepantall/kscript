@@ -21,7 +21,7 @@ public sealed class DataRelationTests : DataFixture
           bio: string
         }
 
-        model Post(soft_deletes) {
+        model Post extends SoftDeletes {
           title: string
           published: bool = false
           views: int = 0

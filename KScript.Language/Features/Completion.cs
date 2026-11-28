@@ -536,7 +536,8 @@ namespace KScript.Language.Features
             bool code = analysis.MarkupAt(offset).Syntax == SourceSyntax.Code;
             foreach (AttributeInfo a in code ? CodeStatementHelp.Options(info) : info.Attributes)
             {
-                if (e.Attributes.Any(x => x.Name == a.Name && !(x.NameSpan.Start == start)))
+                if (e.Attributes.Any(x => x.Name == a.Name && !(x.NameSpan.Start == start))
+                    || (info.Name == "model" && ModelMixins.IsRetiredOption(a.Name)))
                 {
                     continue;
                 }

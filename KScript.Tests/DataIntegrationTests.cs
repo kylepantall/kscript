@@ -14,7 +14,7 @@ public sealed class DataIntegrationTests : DataFixture
     private const string PostModel = """
         import KScript.Data
 
-        model Post(timestamps, soft_deletes, hidden: [secret]) {
+        model Post(hidden: [secret]) extends [Timestamps, SoftDeletes] {
           title: string(max: 200)
           views: int = 0
           secret: string = 'x'
@@ -140,7 +140,7 @@ public sealed class DataIntegrationTests : DataFixture
     private const string Member = """
         import KScript.Data
 
-        model User(timestamps, hidden: [password]) {
+        model User(hidden: [password]) extends Timestamps {
           email: email
           password: password
           name: string = 'Someone'

@@ -196,7 +196,7 @@ namespace KScript.Docs
 
         #region A to Z
 
-        /// <summary>The declarations whose options are listed in the index on their own, such as model's soft_deletes.</summary>
+        /// <summary>The declarations whose options are listed in the index on their own, such as model's unique.</summary>
         private static readonly string[] DeclarationElements = { "model", "type", "enum", "error", "job", "fn", "const", "extend", "component", "policy" };
 
         /// <summary>One entry of the A to Z index.</summary>
@@ -217,7 +217,7 @@ namespace KScript.Docs
                     : new IndexEntry(CodeName(e), kind, url, e.Description);
                 if (DeclarationElements.Contains(e.Name))
                 {
-                    foreach (var a in e.Attributes.Where(a => a.Name is not ("name" or "description")))
+                    foreach (var a in e.Attributes.Where(a => a.Name is not ("name" or "description") && !(e.Name == "model" && KScript.Syntax.Markup.ModelMixins.IsRetiredOption(a.Name))))
                         yield return new IndexEntry(a.Name, $"option of {CodeName(e)}", e.Name == "model" ? ModelsPath + "#option-" + Html.Slug(a.Name) : url, a.Description);
                 }
             }

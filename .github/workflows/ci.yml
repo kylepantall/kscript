@@ -278,7 +278,15 @@ jobs:
           ANTHROPIC_BASE_URL: http://127.0.0.1:8765
         run: |
           python3 .github/scripts/fake-claude.py 8765 &
-          sleep 2
+          # Wait for the fake server to listen: a fixed sleep was too short on Windows runners.
+          python3 -c "import socket, time
+          for _ in range(60):
+              try:
+                  socket.create_connection(('127.0.0.1', 8765), 1).close(); break
+              except OSError:
+                  time.sleep(0.5)
+          else:
+              raise SystemExit('fake Claude server did not start')"
           printf '%s\n' 'import KScript.AI' "echo \"{ @llm('Say hi.') }\"" \
             "llm(into: t, schema: { category: 'bug|feature', urgency: 'int 1-5' }) \"Triage: it crashes\"" 'echo "{$t.category} {$t.urgency}"' \
             '/// The status of an order.' "fn order_status(id: int) => \$id == 42 ? 'shipped' : 'unknown'" \

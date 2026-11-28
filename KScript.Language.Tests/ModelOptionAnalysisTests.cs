@@ -19,7 +19,7 @@ namespace KScript.Language.Tests
                 import KScript.Data
 
                 model UID(mixin, key: 'uid') { uid: uuid = @uuid() }
-                model Audit(mixin, timestamps)
+                model Audit(mixin) extends Timestamps
                 model Base extends UID { title: string }
                 model Note(auto_create) extends [Base, Audit] { done: bool = false }
                 echo Note->first().uid
@@ -74,7 +74,7 @@ namespace KScript.Language.Tests
         {
             const string source = """
                 import KScript.Data
-                model Note(timestamps, soft_deletes, hidden: [id, created_at, updated_at, deleted_at]) {
+                model Note(hidden: [id, created_at, updated_at, deleted_at]) extends [Timestamps, SoftDeletes] {
                   title: string
                 }
                 model Ticket(key: 'code', index: [id]) {
@@ -83,7 +83,7 @@ namespace KScript.Language.Tests
                 model Entry(key: 'id', hidden: [deleted_at]) {
                   title: string
                 }
-                model Event(key: 'created_at', timestamps) {
+                model Event(key: 'created_at') extends Timestamps {
                   title: string
                 }
                 """;

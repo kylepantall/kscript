@@ -21,7 +21,7 @@ namespace KScript.Language.Tests
             enum Role { member, admin }
 
             /// Someone who can sign in.
-            model User(timestamps, soft_deletes, unique: [email], hidden: [password]) {
+            model User(unique: [email], hidden: [password]) extends [Timestamps, SoftDeletes] {
               name: string
               email: email
               role: Role = 'member'
@@ -200,7 +200,7 @@ namespace KScript.Language.Tests
             const string code = """
                 import KScript.Data
 
-                model Post(table: 'posts', timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {
+                model Post(table: 'posts', auto_create, unique: [slug, [team, slug]], index: [team], guarded: [team]) {
                   slug: string
                   team: int
                 }
@@ -209,18 +209,18 @@ namespace KScript.Language.Tests
             Assert.DoesNotContain(doc.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
             MarkupElement model = doc.RootElements.Single().ChildElements.Single(e => e.Name == "model");
             Assert.Equal("'posts'", model.GetAttributeValue("table"));
-            Assert.Equal("yes", model.GetAttributeValue("timestamps"));
+            Assert.Equal("yes", model.GetAttributeValue("auto_create"));
             Assert.Equal("[slug, [team, slug]]", model.GetAttributeValue("unique"));
 
             string xml = ScriptConverter.Convert(code, "post.kscript").Text;
-            Assert.Contains("<model name=\"Post\" table=\"posts\" timestamps=\"yes\" unique=\"[slug, [team, slug]]\" index=\"[team]\" guarded=\"[team]\">", xml);
+            Assert.Contains("<model name=\"Post\" table=\"posts\" auto_create=\"yes\" unique=\"[slug, [team, slug]]\" index=\"[team]\" guarded=\"[team]\">", xml);
             string back = ScriptConverter.Convert(xml, "post.ks.xml").Text;
             // Options go in the brackets, whichever way the file was written.
-            Assert.Contains("model Post(table: \"posts\", timestamps, unique: [slug, [team, slug]], index: [team], guarded: [team]) {\n  slug: string", back);
+            Assert.Contains("model Post(table: \"posts\", auto_create, unique: [slug, [team, slug]], index: [team], guarded: [team]) {\n  slug: string", back);
             Assert.Contains("model User(hidden: [password]) {\n  name: string", ScriptConverter.Convert("<kscript><import package=\"KScript.Data\" /><model name=\"User\" hidden=\"password\" fields=\"name: string, password: password\" /></kscript>", "u.ks.xml").Text);
 
-            MarkupDocument twice = CodeParser.Parse("model A {\n  timestamps: yes\n  timestamps: no\n  name: string\n}\n");
-            Assert.Contains(twice.Diagnostics, d => d.Message == "This model already sets timestamps.");
+            MarkupDocument twice = CodeParser.Parse("model A {\n  auto_create: yes\n  auto_create: no\n  name: string\n}\n");
+            Assert.Contains(twice.Diagnostics, d => d.Message == "This model already sets auto_create.");
         }
 
         private const string Blog = """
@@ -420,7 +420,7 @@ namespace KScript.Language.Tests
               posts: Post[]
             }
 
-            model Post(soft_deletes) {
+            model Post extends SoftDeletes {
               title: string
               views: int = 0
               author: Author

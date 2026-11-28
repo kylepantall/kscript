@@ -1,0 +1,5 @@
+import KScript.Data
+
+/// Adds created_at and updated_at to a model. Both are set when a record is
+/// first saved, and updated_at changes every time it is saved again.
+model Timestamps(mixin, timestamps)
