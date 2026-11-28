@@ -322,6 +322,69 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_page_directive_shorthand_modifier_and_event_field_has_a_reference_entry()
+    {
+        // Made from the lists the checker uses, so a new directive or shorthand shows up by itself.
+        DocPage page = Site.Value.Find("/reference/directives");
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (AttributeInfo a in KScript.Pages.LiveAttributes.All)
+        {
+            string anchor = DocsSite.DirectiveAnchor(a);
+            Assert.Contains($"<tr id=\"{anchor}\"><td><code>{DocsSite.DirectiveName(a)}</code></td>", page.Body);
+            Assert.Contains(entries, e => e.Name == DocsSite.DirectiveName(a) && e.Url == "/reference/directives#" + anchor);
+            Assert.Contains(Site.Value.Search, s => s.Url == "/reference/directives#" + anchor);
+        }
+        foreach (var a in KScript.Syntax.Markup.HandlerShorthands.Actions)
+            Assert.Contains($"id=\"shorthand-{Html.Slug(a.Name)}\"", page.Body);
+        foreach (var m in KScript.Syntax.Markup.HandlerShorthands.Modifiers)
+            Assert.Contains($"id=\"modifier-{Html.Slug(m.Name)}\"", page.Body);
+        foreach (var o in KScript.Syntax.Markup.BindDirective.Options)
+            Assert.Contains($"id=\"bind-{Html.Slug(o.Name)}\"", page.Body);
+        foreach (var f in KScript.Pages.EventFields.Common)
+            Assert.Contains($"<code>$event.{f.Name}</code>", page.Body);
+        Assert.Contains("<code>$event.drag_value</code>", page.Body);
+        foreach (string retired in KScript.Pages.LiveAttributes.Retired.Keys)
+            Assert.Contains($"id=\"retired-{Html.Slug(retired)}\"", page.Body);
+        Assert.DoesNotContain("id=\"directive-live-confirm\"", page.Body);
+        Assert.Contains("<code>@live-cloak</code>", page.Body);
+        Assert.Contains("href=\"/reference/directives\"", Site.Value.Find("/reference").Body);
+        Assert.Contains("## Handler shorthands", new KScript.Docs.Mcp.DocsMarkdown(Site.Value).Page("/reference/directives", "kscript"));
+    }
+
+    [Fact]
+    public void Every_editor_command_and_setting_has_a_reference_entry()
+    {
+        // Read from the extension's package.json, so a new setting shows up by itself; a new command needs its words.
+        DocPage page = Site.Value.Find("/reference/editor");
+        var manifest = DocsSite.ExtensionManifest;
+        foreach (var c in DocsSite.PaletteCommands(manifest))
+        {
+            string id = (string)c["command"];
+            Assert.True(DocsSite.CommandDescriptions.ContainsKey(id), $"Say what {id} does in DocsSite.CommandDescriptions.");
+            Assert.Contains($"<strong>KScript: {Html.H((string)c["title"])}</strong>", page.Body);
+        }
+        Assert.DoesNotContain("Enter (ends an empty", page.Body);
+        Assert.Contains("<kbd>Ctrl+F5</kbd>", page.Body);
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (var (name, _) in (System.Text.Json.Nodes.JsonObject)manifest["contributes"]!["configuration"]!["properties"]!)
+        {
+            Assert.Contains($"<td><code>{name}</code></td>", page.Body);
+            Assert.Contains(entries, e => e.Name == name && e.Url.StartsWith("/reference/editor#", StringComparison.Ordinal));
+        }
+        Assert.Contains("<code>auto</code></td>", page.Body);
+        Assert.Contains("href=\"/reference/editor\"", Site.Value.Find("/reference").Body);
+    }
+
+    [Fact]
+    public void A_bar_escaped_in_a_table_shows_without_its_backslash()
+    {
+        // `add\|remove: file` in a Markdown table: the backslash only keeps the bar from ending the cell.
+        string language = Site.Value.Find("/guide/language").Body;
+        Assert.Contains("<code>add|remove: file</code>", language);
+        Assert.DoesNotContain("\\|", Regex.Replace(language, "<pre.*?</pre>", string.Empty, RegexOptions.Singleline));
+    }
+
+    [Fact]
     public void The_a_to_z_lists_everything_built_in()
     {
         string index = Site.Value.Find("/reference/index").Body;

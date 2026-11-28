@@ -1,17 +1,24 @@
 # Sign-in: KScript.Auth
 
+## Introduction
+
 KScript.Auth gives a `kscript serve` app accounts that people sign in to. It keeps the users, hashes their passwords with argon2id, and keeps their sessions in a cookie with safe defaults. It also checks a CSRF token on every form, limits failed sign-ins, and handles password resets and API tokens. The `email` and `password` types check what people type, so the rules live in one place: your kscript.json.
 
-The quickest start is `kscript make auth`, which writes the pages and routes for you:
+### Quick start
 
-```
-kscript make auth            # sign up, sign in, sign out, forgot password, account page
-kscript make auth --api      # and POST /api/tokens + GET /api/me for API tokens
+The quickest start is `kscript make auth`, which writes the pages, routes and controller for you:
+
+```sh
+kscript make auth              # sign up, sign in, sign out, forgot password and an account page
+kscript make auth --api        # the same, plus POST /api/tokens and GET /api/me for API tokens
+kscript make auth --passkeys   # accounts that sign in with a passkey instead of a password
 ```
 
-Then `kscript serve`, open `/register` to make an account, and `/account` to see it. The rest of this guide explains what those files do, so you can change them or write your own.
+Then run `kscript serve`, open `/register` to make an account, and open `/account` to see it. The rest of this guide explains what those files do, so you may change them or write your own.
 
 ## What kscript make auth writes
+
+`kscript make auth` writes or adds to these files:
 
 | File | What it is |
 | --- | --- |
@@ -179,15 +186,21 @@ fn sign_in(form: map) {
 
 ## Passkeys
 
-To create accounts using passkeys from the first visit, run this in your project.
+A passkey signs someone in with their device's lock (a fingerprint, a face or a PIN) instead of a password. KScript supplies the browser code and the HTTP endpoints, so you only add buttons.
+
+### Accounts without passwords
+
+To create accounts using passkeys from the first visit, run this in your project:
 
 ```sh
-kscript make auth --passkeys
+kscript make auth --passkeys   # passkey sign-up, sign-in and an account page
 ```
 
 Open `/register` and choose **Create account with a passkey**. KScript creates the account and starts its session after the device verifies the ceremony. Store `@user().id` as a string on records the account owns, such as licenses. Every passkey added on `/account` signs in to that same ID. Add a second passkey before removing the first. An account with a single passkey must keep it.
 
 The generator sets `http.auth.passkey_signup` and uses the configured serve port for localhost. For a deployed app, generate with `--origin https://accounts.example.com`. Add `--rp-id example.com` if you want that parent domain to scope the credentials. Add `--api` for the authenticated identity endpoint. A signed-in user can issue tokens from the account page. This kit has no password registration, sign-in or reset routes.
+
+### Adding passkeys to password accounts
 
 In a project made with `kscript make auth`, set the public origin in `kscript.json` and restart `kscript serve`. For the default local server, use the following setting.
 
@@ -196,6 +209,8 @@ In a project made with `kscript make auth`, set the public origin in `kscript.js
 ```
 
 Sign in to an existing account, open `/account` and choose **Add a passkey**. Sign out, then choose **Sign in with a passkey** on `/login`. The browser asks you to unlock your passkey. Each successful sign-in starts a fresh KScript session, so existing `auth:session` routes and [model forms](web.md#model-forms) work with it. You can enroll multiple passkeys and remove a lost one from the account page.
+
+### Passkey buttons on your own pages
 
 The `<sign-in-form>`, `<sign-up-form>` and `<passkey-list>` components hold these buttons. For your own pages, put them on the sign-in and signed-in account pages respectively. KScript supplies the browser code and the HTTP endpoints.
 
@@ -207,13 +222,17 @@ The `<sign-in-form>`, `<sign-up-form>` and `<passkey-list>` components hold thes
 
 Use `@has_passkeys()` from KScript.Auth to show the controls when the site has enabled them. After sign-in the browser returns to the protected URL that prompted it, or to `http.auth.home`. The optional `passkey-redirect` overrides that destination with a page on the same origin. From a signed-in account page, `@passkeys()` lists that user's credential IDs and creation dates. Call `@revoke_passkey($id)` from a live action, as `<passkey-list>` does, or from a CSRF-protected POST to remove one.
 
+### Your own browser code
+
 For a custom browser UI, POST `{}` as `application/json` to `/_ks/passkeys/signup/options` for a new account, `/_ks/passkeys/register/options` to add a credential, or `/_ks/passkeys/login/options` to sign in. Use the returned public-key options with the browser's credentials API. POST the resulting credential JSON to `verify` in the same path, from the same origin and session. Verification returns `{"ok":true}` on success and includes the destination in `redirect` for sign-in. Each challenge expires after five minutes and can be verified once, on the process that issued it. Restarting a server discards pending ceremonies. When using several workers, route both steps to the same worker. Accounts and completed credentials persist in the auth store.
 
-For deployment set `passkey_origin` to the exact public HTTPS origin, including a non-default port. The relying party ID defaults to its hostname. To keep credentials scoped to a parent domain you control, set `passkey_rp_id` before enrolling users. Changing the relying party ID requires enrolling new credentials. Back up the `_passkeys` folder alongside your auth user data. Use `@users()->delete(id)` to remove a stored account and its passkeys. If a separate system manages your users, give each account an immutable ID that is never reused.
+### Deploying passkeys
+
+For deployment, set `passkey_origin` to the exact public HTTPS origin, including a non-default port. The relying party ID defaults to its hostname. To keep credentials scoped to a parent domain you control, set `passkey_rp_id` before enrolling users. Changing the relying party ID requires enrolling new credentials. Back up the `_passkeys` folder alongside your auth user data. Use `@users()->delete(id)` to remove a stored account and its passkeys. If a separate system manages your users, give each account an immutable ID that is never reused.
 
 ## Protecting routes
 
-The `auth` middleware lets signed-in users through and sets `$request.user`. A browser is sent to `http.auth.login` (`/login`) and comes back afterwards. A request that wants JSON (an API route, an `Authorization` header, or `Accept: application/json`) gets a 401 instead. The `guest` middleware is the other way round: it sends people who are signed in to `http.auth.home`.
+To let only signed-in people reach a route, put it behind the `auth` middleware. The `auth` middleware lets signed-in users through and sets `$request.user`. A browser is sent to `http.auth.login` (`/login`) and comes back afterwards. A request that wants JSON (an API route, an `Authorization` header, or `Accept: application/json`) gets a 401 instead. The `guest` middleware is the other way round: it sends people who are signed in to `http.auth.home`.
 
 ```kscript
 import KScript.Http
@@ -245,8 +264,8 @@ Routes {
 
 A policy says who may do what to a model's records. It is one block per model, and each function in it is an ability: it takes the user, then the record, and returns `true` or `false`.
 
-```bash
-kscript make policy Post    # policies/post.kscript
+```sh
+kscript make policy Post    # write policies/post.kscript
 ```
 
 ```kscript

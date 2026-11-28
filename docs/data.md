@@ -1,36 +1,90 @@
 # Databases: KScript.Data
 
-KScript.Data keeps records in a database. A `model` is a type whose records live in a table: it checks every value by its field's type and rules, like any [type](types.md), and gives you a query builder whose conditions are ordinary lambdas, turned into SQL.
+## Introduction
+
+KScript.Data lets you keep records in a database and read them back without writing SQL. You describe each table as a **model**: a [type](types.md) whose records are stored as rows. KScript.Data checks every value against its field's type before it reaches the database, and turns your queries into SQL for you.
+
+Your first model needs nothing set up. SQLite ships with KScript, and the database is the file `data/app.sqlite` in your project folder (the folder with `kscript.json`, or the script's own folder). When you're ready for Postgres, MySQL or MariaDB, you only change a URL: see [Connections](#connections).
+
+To get started, import the package and declare a model:
 
 ```kscript
 import KScript.Data
 
-enum Role { member, editor, admin }
-
-model User(timestamps, unique: [email], hidden: [password], guarded: [role]) {
-  name: string(max: 120)
-  email: email
-  age?: int
-  role: Role = 'member'
-  password: password
+model Note {
+  text: string
 }
 
-$db->create_table(User)
+$db->create_table(Note)
 
-joan = User->create(name: 'Joan', email: 'joan@example.com', age: 34, password: 'correct horse battery')
-adults = User->where(fn(u) => $u.age >= 18 and $u.email->ends_with('@example.com'))->order_by(name)->get()
-echo $adults->map(.name)
-echo $joan.id
+Note->create(text: 'Buy milk')
+echo Note->count()
 ```
 
-The database is SQLite, in `data/app.sqlite` in your project folder (the folder with `kscript.json`, or the script's folder). Nothing needs installing: KScript ships SQLite. Postgres, MySQL and MariaDB are a url away: see [Connections](#connections).
+`$db->create_table()` makes the table, which is all a script needs. A project whose tables already hold data changes them with [migrations](#migrations) instead.
 
-Split longer model option lists across lines. A trailing comma is accepted and the formatter keeps it, so adding another option only changes one line.
+## Models
+
+### Defining a model
+
+A model is declared like a [type](types.md), with `model` in place of `type`. Each field becomes a column of the table:
 
 ```kscript
 import KScript.Data
 
-model Attachments(
+model Post {
+  title: string(max: 200)
+  body: string
+  published: bool = false
+  tags: string[] = []
+}
+```
+
+A field with a default, such as `published`, may be left out when a record is made. A field marked with `?` may be empty (null):
+
+```kscript
+import KScript.Data
+
+model User {
+  name: string
+  age?: int
+}
+```
+
+A model may also have methods. Inside a method, `$this` and the fields belong to the record it was called on:
+
+```kscript
+import KScript.Data
+
+model Post {
+  title: string
+  body: string
+
+  fn excerpt() => $body->truncate(80)
+}
+```
+
+Like every declaration, a model may have a `///` doc comment above it, which the editor shows when you hover over its name.
+
+### Model options
+
+Options go in brackets after the model's name. An option that is simply on is written as a bare word, and the rest take a value:
+
+```kscript
+import KScript.Data
+
+model Post(timestamps, soft_deletes, unique: [slug]) {
+  title: string
+  slug: string
+}
+```
+
+When the list grows long, you may put each option on its own line. A trailing comma is allowed, and the formatter keeps it, so adding another option changes only one line:
+
+```kscript
+import KScript.Data
+
+model Attachment(
   timestamps,
   soft_deletes,
 ) {
@@ -38,46 +92,136 @@ model Attachments(
 }
 ```
 
-## Models
+The block itself holds only fields, `validate` rules and `fn` methods. An option written as a line of the block is reported as KS6014, and `kscript check --fix` moves it into the brackets.
 
-A model is declared like a [type](types.md), with `model` instead of `type`. Its fields are the table's columns.
+#### Timestamps
+
+The `timestamps` option adds `created_at` and `updated_at` fields. Both are filled in when a record is first saved, and `updated_at` changes every time it is saved again:
 
 ```kscript
 import KScript.Data
 
-/// A post on the blog.
-model Post(timestamps, soft_deletes, index: [published]) {
-  title: string(max: 200)
-  body: string
-  published: bool = false
-  tags: string[] = []
-
-  fn excerpt() => $body->truncate(80)
+model Comment(timestamps) {
+  text: string
 }
-
-$db->create_table(Post)
-post = Post->create(title: 'Hello', body: 'The first post.')
-echo $post->excerpt()
 ```
 
-A model's options go in the brackets after its name, like the options of every other declaration: `model Post(table: "posts", timestamps, unique: [slug])`. The block holds only fields, `validate` rules and `fn`. An option written as a line of the block is an error (KS6014), and `kscript check --fix` moves it into the brackets.
+#### Soft deletes
 
-| Option | What it does |
-| --- | --- |
-| `table: "posts"` | The table. Default: the plural of the name in snake case (`User` is `users`, `BlogPost` is `blog_posts`). |
-| `key: "slug"` | The field that is the key. Default: `id`, an `int` the database numbers, added for you. |
-| `timestamps` | Adds `created_at` and `updated_at`, set when records are saved. |
-| `soft_deletes` | Adds `deleted_at`. `->delete()` sets it instead of removing the row, and queries leave those records out. |
-| `unique: [email, [team_id, slug]]` | Fields no two records may share. A list in the list is a set of fields that is unique together. A save that clashes fails with `UniqueViolation`. |
-| `index: [team_id]` | Fields to index, so queries on them stay fast. |
-| `hidden: [password]` | Fields left out of JSON, so they never reach a route's response. |
-| `guarded: [role]` | Fields `->create($form)` and `->update($form)` leave alone, so a form can't set them. Set them on the record: `user.role = 'admin'`. |
-| `connection: "reports"` | The [connection](#connections) the table is in. |
-| `auto_create` | Creates the table and indexes if they are needed on first database use. Referenced models on the same connection are created first when they also opt in. Use migrations for changes to existing tables and circular foreign keys. |
+With `soft_deletes`, deleting a record doesn't remove its row. Instead, its `deleted_at` field is set, and queries leave it out from then on. You may still read deleted records with `->with_trashed()`, and bring one back with `->restore()`:
+
+```kscript
+import KScript.Data
+
+model Task(soft_deletes) {
+  title: string
+}
+
+$db->create_table(Task)
+task = Task->create(title: 'Write the report')
+$task->delete()
+
+echo Task->count()
+echo Task->with_trashed()->count()
+```
+
+#### Table names and keys
+
+By default, a model's table is the plural of its name in snake case: `User` is stored in `users`, and `BlogPost` in `blog_posts`. You may name the table yourself with `table:`:
+
+```kscript
+import KScript.Data
+
+model Person(table: 'people') {
+  name: string
+}
+```
+
+Every model has a key. Unless you say otherwise, it is an `int` field called `id`, numbered by the database and added for you. To use one of your own fields instead, name it with `key:`:
+
+```kscript
+import KScript.Data
+
+model Country(key: 'code') {
+  code: string(max: 2)
+  name: string
+}
+```
+
+#### Unique fields and indexes
+
+`unique:` lists fields that no two records may share. A list inside the list is a set of fields that must be unique together. A save that would break the rule fails with a `UniqueViolation` error:
+
+```kscript
+import KScript.Data
+
+model Member(unique: [email, [team_id, handle]]) {
+  email: email
+  team_id: int
+  handle: string
+}
+```
+
+`index:` lists fields you often search or sort by, so those queries stay fast as the table grows:
+
+```kscript
+import KScript.Data
+
+model Order(index: [customer, [status, created_at]], timestamps) {
+  customer: string
+  status: string
+}
+```
+
+#### Protecting fields
+
+Two options keep fields safe when records come from, or go to, the outside world. `hidden:` leaves fields out of JSON, so they never appear in a route's response. `guarded:` lists fields that `->create($form)` and `->update($form)` won't set, so a form can't change them:
+
+```kscript
+import KScript.Data
+
+model Account(hidden: [password], guarded: [role]) {
+  email: email
+  password: password
+  role: string = 'member'
+}
+```
+
+A guarded field may still be set directly on the record, as in `account.role = 'admin'`.
+
+#### Extra keys
+
+When `->create()` is given a key the model doesn't have, it drops that key. The `extra:` option changes this: it may keep the keys or make them an error instead.
+
+#### Connections and creating tables
+
+`connection:` puts the model's table in another [connection](#connections), such as `connection: reports`. `auto_create` creates the table and its indexes the first time the model is used, if the table isn't there yet. It suits small apps. For tables that change over time, use [migrations](#migrations).
+
+Every option is also listed in the reference: [Models and mixins](/reference/models).
 
 ### Extending models
 
-Use `extends` to share fields, `validate` rules, methods, scopes and options. Add `mixin` to a reusable declaration that has no table of its own.
+Models that share fields, methods or options can take them from a common base with `extends`. A base that is only there to be extended, with no table of its own, is a **mixin**, marked with the `mixin` option:
+
+```kscript
+import KScript.Data
+
+/// Things that can be published.
+model Publishable(mixin, timestamps, index: [published_at]) {
+  published_at?: date
+
+  fn published(query) => $query->where(fn(p) => $p.published_at != null)
+}
+
+model Page(auto_create) extends Publishable {
+  title: string(min: 1, max: 200)
+}
+
+Page->create(title: 'About', published_at: @now())
+echo Page->published()->count()
+```
+
+A model may extend several bases at once. List them in brackets, and later bases take precedence over earlier ones:
 
 ```kscript
 import KScript.Data
@@ -88,68 +232,67 @@ model UID(mixin, key: 'uid') {
 }
 
 /// Things that can be published.
-model Publishable(mixin, timestamps, index: [published_at]) {
+model Publishable(mixin, timestamps) {
   published_at?: date
-
-  fn published(query) => $query->where(fn(p) => $p.published_at != null)
 }
 
-model Page(auto_create) extends [UID, Publishable] {
-  title: string(min: 1, max: 200)
+model Invoice extends [UID, Publishable] {
+  total: number
 }
-
-page = Page->create(title: 'About', published_at: @now())
-echo Page->published()->count()
-echo $page.uid
 ```
 
-What a model takes from its bases, and what stays its own:
+A model takes its bases' fields, `validate` rules, methods, [scopes](#scopes) and options such as `key`, `timestamps`, `soft_deletes`, `unique`, `index`, `hidden`, `guarded` and `extra`. A field or method of the model itself replaces one of the same name, and the model's own options win over all of its bases'.
 
-| From its bases | Its own |
-| --- | --- |
-| Fields, `validate` rules, `fn` methods and [scopes](#scopes). A field or method of the model itself replaces one of the same name. | `table`, `connection` and `auto_create`: each concrete model has its own table. |
-| Options such as `key`, `timestamps`, `soft_deletes`, `unique`, `index`, `hidden`, `guarded` and `extra`. Later bases take precedence over earlier ones, and the model's own options over all of them. | `mixin`: a model that extends a mixin is not a mixin unless it says so. |
+Some things are never inherited. Each model has its own `table`, `connection` and `auto_create`, because each concrete model has its own table. A model that extends a mixin isn't a mixin itself unless it says so.
 
-Put a literal option on a base to change it for this use: `extends [UID, Publishable(timestamps: false)]`. XML writes the base list in the model's `with` attribute.
+You may change a base's option for one use by giving it in brackets after the base's name:
 
-KScript.Data ships no mixins of its own: `timestamps` and `soft_deletes` are options, so `model Post(soft_deletes)` is all a model needs. KScript.Auth ships one, `Ownable`. See [Built-in models and mixins](#built-in-models-and-mixins).
+```kscript
+import KScript.Data
 
-### What a model gets
+model Publishable(mixin, timestamps) {
+  published_at?: date
+}
 
-| What | Declared as | Called as |
-| --- | --- | --- |
-| Its own methods | `fn excerpt() => ...` | On a record: `$post->excerpt()`. `$this` and the fields are the record's. |
-| [Scopes](#scopes) | `fn live(query) => $query->where(...)` | On the model, a query or a relation: `Post->live()`, `$query->live()`, `$ada->posts()->live()`. |
-| `validate` rules | `validate` in the block | When a record is made or saved. |
-| [Query methods](#queries) | built in | On the model or a query: `Post->where(...)`, `->order_by()`, `->with_trashed()`, `->count()`. |
-| [Record methods](#adding-and-saving) | built in | On a record: `->save()`, `->update()`, `->delete()`, `->restore()`, `->fresh()`. |
-| [Relations](#relations) | a field of another model | On a record: `$post.author`, `$ada->posts()`. |
+model Draft extends Publishable(timestamps: false) {
+  text: string
+}
+```
 
-How each type is stored:
+In XML, the list of bases goes in the model's `with` attribute.
 
-| Field type | Column |
-| --- | --- |
-| `string`, `email`, `handle`, `uuid` | Text. Emails compare without minding case, so `JOAN@example.com` finds `joan@example.com`. |
-| `int`, `number`, `float` | Integer or real. |
-| `bool` | 0 or 1. |
-| `date` | Text in ISO order, so dates sort and compare. |
-| an enum | Text, checked by the database to be one of the enum's words. |
-| `password` | The password's hash (Argon2id). It is never stored as typed. |
-| another model (`author: User`) | A [relation](#relations): the column `author_id`, a foreign key to `users`. |
-| a list of another model (`posts: Post[]`) | A [relation](#relations), with no column of its own here. |
-| lists, maps and other types | JSON. |
+### How fields are stored
 
-An optional field (`age?: int`) is a column that can be null. A computed field (`label => $first + ' ' + $last`) isn't stored: it is worked out each time a record is read.
+Each field type is stored in the column type that suits it, so you rarely need to think about it. A few are worth knowing:
+
+- `string`, `email`, `handle` and `uuid` are text. Emails compare without minding case, so `JOAN@example.com` finds `joan@example.com`.
+- `int`, `number` and `float` are integers or real numbers, and `bool` is 0 or 1.
+- `date` is text in ISO order, so dates sort and compare correctly.
+- An enum is text, and the database checks that it is one of the enum's words.
+- A `password` is stored as its hash (Argon2id), never as typed.
+- A field whose type is another model, such as `author: User`, is a [relation](#relations). It is stored as an `author_id` column with a foreign key to `users`.
+- Lists, maps and any other type are stored as JSON.
+
+A computed field, such as `label => $first + ' ' + $last`, isn't stored at all. It is worked out each time a record is read.
 
 ## Built-in models and mixins
 
-These come with a package: import the package and `extends` them. You don't declare them yourself. `lookup Ownable` (in `kscript mcp`) shows the source. The reference lists every one with its fields and methods, and every option a model takes: [Models and mixins](/reference/models).
+Some packages come with models and mixins you can extend straight away. Import the package, then extend the mixin. You don't declare it yourself.
 
-| Name and package | What it adds | Options | Usage | Same as a model option |
-| --- | --- | --- | --- | --- |
-| `Ownable` (KScript.Auth) | `owner: string`, indexed and guarded, set from whoever makes the record and fixed after that. The `->mine(as?:)` scope and `->is_mine()`. | None. | `model Note extends Ownable { ... }`, with `import KScript.Auth`. See [Guests and owners](auth.md#guests-and-owners). | None. |
+Today, one ships: KScript.Auth's `Ownable`, for rows that belong to one person. A model that extends it gets an `owner` field, filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
 
-KScript.Data itself ships no models or mixins. What a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` adds `deleted_at` with `->with_trashed()`, `->only_trashed()` and `->restore()`, and `timestamps` adds `created_at` and `updated_at`. A mixin that sets one is a line, if a project wants the name:
+```kscript
+import KScript.Data
+import KScript.Auth
+
+model Note extends Ownable {
+  text: string
+}
+```
+
+Then `Note->mine()->get()` reads only the current person's notes. See [Guests and owners](auth.md#guests-and-owners) for the whole story. The reference lists every built-in mixin with its fields and methods: [Models and mixins](/reference/models). In `kscript mcp`, `lookup Ownable` shows its source.
+
+KScript.Data itself ships no mixins, because what a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` and `timestamps`. If your project prefers the name, a mixin that sets the option is one line:
 
 ```kscript
 import KScript.Data
@@ -161,9 +304,13 @@ model Post extends SoftDeletable {
 }
 ```
 
-KScript.Auth can also keep its users in a model of the project's own. See [Users in a model](auth.md#users-in-a-model).
+KScript.Auth can also keep its users in a model of your own. See [Users in a model](auth.md#users-in-a-model).
 
-## Adding and saving
+## Creating and updating records
+
+### Creating records
+
+To add a record, call `->create()` on the model with its fields. The values are checked, the record is saved, and you get it back with its key filled in:
 
 ```kscript
 import KScript.Data
@@ -176,30 +323,66 @@ model Note(timestamps) {
 $db->create_table(Note)
 
 note = Note->create(text: 'Buy milk')
-note.pinned = true
-$note->save()
-
-$note->update(text: 'Buy oat milk')
-echo $note->is_dirty()
-echo Note->count()
+echo $note.id
 ```
 
-| Method | What it does |
-| --- | --- |
-| `Model->create(values)` | Checks the values, saves a new record and returns it. Takes a map (`->create($form)`) or names and values. |
-| `Model(values)` | Calling the model makes a record without saving it, the way calling any type makes a value: `note = Note(text: 'Buy milk')`. `$note->save()` adds it. |
-| `Model->first_or_create(match, values)` | The first record matching `match`, or a new one made from both maps. |
-| `$record->save()` | Saves a record: adds it if it's new, otherwise writes only the fields that changed (and `updated_at`). |
-| `$record->update(values)` | Sets fields and saves. |
-| `$record->delete()` | Deletes it (with `soft_deletes`, marks it deleted). `->force_delete()` always removes it, and `->restore()` brings a soft-deleted one back. |
-| `$record->fresh()` | The record as the database has it now. |
-| `$record->is_dirty(field?)`, `->dirty()` | Whether it has changes that aren't saved, and which fields. |
+`->create()` also takes a map, which is handy for a form: `Note->create($form)`.
 
-Values are checked as they are set: `note.pinned = 'maybe'` fails with a Type error before anything reaches the database.
+If you would like to make a record without saving it yet, call the model like a function. The record is saved when you call `->save()`:
+
+```kscript
+note = Note(text: 'Buy bread')
+$note->save()
+```
+
+Sometimes you want a record only if it isn't there already. `->first_or_create()` finds the first record that matches its first map, or makes one from both maps:
+
+```kscript
+tag = Tag->first_or_create({ name: 'urgent' }, { colour: 'red' })
+```
+
+To add many rows at once, pass a list to `->insert()`. Each row is checked the same way `->create()` checks one:
+
+```kscript
+Note->insert([
+  { text: 'Call the bank' },
+  { text: 'Water the plants', pinned: true },
+])
+```
+
+### Updating records
+
+Change a record's fields, then call `->save()`. Only the fields that changed are written, along with `updated_at`:
+
+```kscript
+note = Note->find(1)
+note.pinned = true
+$note->save()
+```
+
+`->update()` sets fields and saves in one step:
+
+```kscript
+$note->update(text: 'Buy oat milk')
+```
+
+Values are checked as soon as you set them. `note.pinned = 'maybe'` fails with a `Type` error before anything reaches the database.
+
+You may ask a record whether it has unsaved changes with `->is_dirty()`, optionally for one field, and `->dirty()` names the fields that changed. `->fresh()` reads the record again, as the database has it now.
+
+### Deleting records
+
+`->delete()` removes a record. On a model with `soft_deletes`, it marks the record deleted instead. Use `->force_delete()` to remove it for good, and `->restore()` to bring a soft-deleted record back:
+
+```kscript
+$note->delete()
+```
 
 ## Queries
 
-Every query starts from the model, and each step returns a new query, so a query can be built up and reused.
+### Retrieving records
+
+Every query starts from the model. `->all()` gives every record, and `->get()` runs a query you've built:
 
 ```kscript
 import KScript.Data
@@ -217,49 +400,114 @@ Order->insert([
   { customer: 'Ada', total: 60, status: 'paid' },
 ])
 
-big = 50
+for order in Order->where(status: 'paid')->get() {
+  echo "{$order.customer}: {$order.total}"
+}
+```
+
+Each step returns a new query, so you may build a query up and reuse it:
+
+```kscript
 paid = Order->where(status: 'paid')
 echo $paid->count()
-echo $paid->sum(total)
-echo Order->where(fn(o) => $o.total > $big)->order_by(total: desc)->pluck(customer)
-echo Order->where(.customer->starts_with('A'))->latest()->first().total
+echo $paid->where(customer: 'Ada')->count()
+```
+
+To read one record, use `->find()` with a key or `->first()` with a query. Both give `null` when nothing matches:
+
+```kscript
+order = Order->find(1)
+latest = Order->where(customer: 'Ada')->latest()->first()
+```
+
+When a missing record is a mistake, use `->find_or_fail()` or `->first_or_fail()` instead. They throw a `ModelNotFound` error, which a route answers with a 404 for you.
+
+If you only need one column, `->pluck()` gives it for every row and `->value()` gives it for the first:
+
+```kscript
+names = Order->pluck(customer)
 ```
 
 ### Conditions
 
-`->where()` takes a lambda whose parameter is the row: `$o.total` is a column. The rest of the lambda (variables, function calls, literals) is worked out first and sent to the database as a parameter, so a value can never change the SQL.
+The simplest condition names fields and the values they must equal:
 
-These parts can be turned into SQL: comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `and`, `or`, `not`, `in` with a list, `??`, arithmetic, `? :`, and these string methods on a column: `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. `$o.x == null` is `IS NULL`, also when the `null` comes from a variable. An empty column compares as it does in a script: `$o.status != 'paid'`, `not ($o.status == 'paid')` and `->where_not(status: 'paid')` keep the rows whose status is empty. `/` divides as it does in a script, so two whole-number columns can give 3.5. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something else.
+```kscript
+open_for_ada = Order->where(status: 'open', customer: 'Ada')->get()
+```
 
-Names and values are a shorter way to write equality: `->where(status: 'paid', customer: 'Ada')`. A list means any of them (`status: [open, paid]`), and `null` means the column is empty. Enum words don't need quotes: `->where(role: admin)`.
+A list means any of its values, and `null` means the field is empty. Enum words don't need quotes:
 
-| Method | What it does |
-| --- | --- |
-| `->where(...)`, `->or_where(...)`, `->where_not(...)` | Keep the rows that match, or that match these instead, or that don't. |
-| `->when(test, fn(q) => ...)` | Changes the query only when the test is true, for optional filters. |
-| `->order_by(name)`, `->order_by(total: desc)` | Sorts. `->latest()` and `->oldest()` default to `created_at`, or the primary key on models with timestamps disabled. Both accept a column name. |
-| `->limit(n)`, `->offset(n)` | Reads at most `n` rows, after skipping `n`. |
-| `->select(id, name)`, `->distinct()` | Reads only these columns, and leaves out rows that repeat. |
-| `->with_trashed()`, `->only_trashed()` | With `soft_deletes`: keep the deleted records too, or read only them. |
-| `->lock_for_update()`, `->skip_locked()` | In a transaction, lock the rows read (and skip ones another transaction has locked). SQLite locks the whole database for writes, so these change nothing there. |
+```kscript
+active = User->where(role: [editor, admin])->get()
+no_age = User->where(age: null)->get()
+```
 
-### Reading
+For anything else, pass a lambda. Its parameter stands for the row, so `$o.total` is a column:
 
-| Method | What it gives |
-| --- | --- |
-| `->get()`, `Model->all()` | A list of records. |
-| `->first()`, `->find(id)` | One record, or null. |
-| `->first_or_fail()`, `->find_or_fail(id)` | One record, or a `ModelNotFound` error, which a route answers with 404. |
-| `->count()`, `->exists()` | How many rows match, and whether any do. |
-| `->sum(col)`, `->average(col)`, `->min(col)`, `->max(col)` | Totals over the rows that match. |
-| `->pluck(col)`, `->value(col)` | One column of every row, or of the first. |
-| `->paginate(per_page, page)` | One page: `{ items, page, per_page, total, last_page, from, to, has_more }`. `page` may be text, such as `$query.page`. |
-| `->chunk(size, fn(rows, n) => ...)` | Goes through the rows a batch at a time, for more rows than fit in memory. Return `false` to stop. |
-| `->sql()` | The SQL and parameters the query would run, without running it. |
+```kscript
+big = 50
+large_orders = Order->where(fn(o) => $o.total > $big and $o.status != 'paid')->get()
+```
+
+The lambda is turned into SQL. Everything in it that isn't a column, such as `$big`, is worked out first and sent to the database as a parameter, so a value can never change the SQL. When there is only one condition on the row, you may leave out the lambda and start with a dot:
+
+```kscript
+a_customers = Order->where(.customer->starts_with('A'))->get()
+```
+
+A condition may use comparisons, `and`, `or`, `not`, `in` with a list, `??`, arithmetic and `? :`. On a column, it may also call `->contains()`, `->starts_with()`, `->ends_with()`, `->lower()`, `->upper()`, `->trim()`, `->count()` and `->matches(regex)`. Anything else is a `Query` error that says which part can't run in the database, rather than a query that quietly does something different.
+
+A few rules keep conditions working the way they do in a script. `$o.x == null` is SQL's `IS NULL`, even when the `null` comes from a variable. `$o.status != 'paid'` keeps rows whose status is empty. And `/` divides as it does in a script, so two whole-number columns can give 3.5.
+
+`->or_where()` adds another way to match, and `->where_not()` keeps the rows that don't match:
+
+```kscript
+urgent = Order->where(status: 'open')->or_where(fn(o) => $o.total > 100)->get()
+unpaid = Order->where_not(status: 'paid')->get()
+```
+
+`->when()` changes a query only when its test is true, which is useful for optional filters, such as a search box that may be empty:
+
+```kscript
+results = Order->when($search != '', fn(q) => $q->where(.customer->contains($search)))->get()
+```
+
+### Ordering, limiting and paging
+
+`->order_by()` sorts by a field, ascending unless you say `desc`:
+
+```kscript
+biggest_first = Order->order_by(total: desc)->get()
+```
+
+`->latest()` and `->oldest()` sort by `created_at`, or by the key when the model has no timestamps. Both also take a field name.
+
+`->limit()` reads at most that many rows, and `->offset()` skips rows first. `->select()` reads only some columns, and `->distinct()` leaves out rows that repeat.
+
+To show results a page at a time, use `->paginate()`. It gives one page of records along with what a page of links needs: `items`, `page`, `per_page`, `total`, `last_page`, `from`, `to` and `has_more`. The page number may be text, straight from the query string:
+
+```kscript
+page = Order->latest()->paginate(20, $query.page)
+```
+
+### Counting and totals
+
+`->count()` and `->exists()` ask the database how many rows match, or whether any do, without reading the rows:
+
+```kscript
+echo Order->where(status: 'open')->count()
+```
+
+`->sum()`, `->average()`, `->min()` and `->max()` total a column over the rows that match:
+
+```kscript
+echo Order->where(status: 'paid')->sum(total)
+```
 
 ### Scopes
 
-A scope is a model method whose first parameter is `query`: a named query step of the model's own. It is called on the model, on a query, and on a relation, and gets the query to add to. It returns the query, so more steps can follow:
+A query you write often deserves a name. A **scope** is a model method whose first parameter is `query`. It adds to the query it's given and returns it, so more steps can follow:
 
 ```kscript
 import KScript.Data
@@ -277,15 +525,40 @@ $db->create_table(Article)
 echo Article->live()->popular(over: 10)->count()
 ```
 
-Other parameters work as they do in any function: `->popular(over: 10)`. A scope from a [mixin](#extending-models) is the model's own, and `kscript check` knows a scope wherever it is called from, including other files.
+You may call a scope on the model, on a query, or on a [relation](#scopes-on-relations). Its other parameters work as they do in any function. A scope from a [mixin](#extending-models) becomes the model's own, and `kscript check` knows a scope wherever it's called from, including other files.
 
 ### Changing many rows
 
-`->update(values)`, `->increment(col, by)`, `->decrement(col, by)`, `->delete()`, `->force_delete()` and `->restore()` change every row that matches, in one statement, and return how many rows changed. They can't follow `->limit()` or `->offset()`, which is an `Argument` error rather than a change to every row: read the keys first, then change those rows with `->where(id: $query->pluck(id))`. `Model->insert(rows)` adds a list of rows, each checked like `->create()`.
+Some methods change every row a query matches in a single statement, and give back how many rows changed. They are `->update()`, `->increment()`, `->decrement()`, `->delete()`, `->force_delete()` and `->restore()`:
+
+```kscript
+Order->where(status: 'open')->update(status: 'cancelled')
+Article->where(published: true)->increment(views, by: 1)
+```
+
+These can't follow `->limit()` or `->offset()`. That is an `Argument` error rather than a change to every row. To change only some rows, read their keys first: `->where(id: $query->pluck(id))`.
+
+### Chunking results
+
+When a query matches more rows than fit comfortably in memory, `->chunk()` goes through them a batch at a time. Return `false` from the function to stop early:
+
+```kscript
+fn send(batch: list, n: int) {
+  echo "Batch {$n}: {$batch->count()} orders"
+}
+
+Order->chunk(100, @send)
+```
+
+### Seeing the SQL
+
+`->sql()` gives the SQL a query would run, and its parameters, without running it. It's a quick way to check what a condition turns into.
 
 ## Relations
 
-A field whose type is another model links the two. There is nothing else to declare: KScript.Data works out the kind of link from the fields on both sides.
+### Defining relations
+
+Relations need no extra declarations. A field whose type is another model links the two, and KScript.Data works out the kind of link from the fields on both sides:
 
 ```kscript
 import KScript.Data
@@ -312,48 +585,39 @@ model Tag {
   name: string
   posts: Post[]
 }
-
-$db->create_table(User)
-$db->create_table(Profile)
-$db->create_table(Post)
-$db->create_table(Tag)
-
-ada = User->create(name: 'Ada')
-Profile->create(user: $ada, bio: 'Mathematician')
-post = $ada->posts()->create(title: 'Notes on the engine')
-maths = Tag->create(name: 'maths')
-$post->tags()->attach($maths)
-
-echo $post.author.name
-echo $ada.profile.bio
-echo $ada.posts->map(.title)
-echo $maths.posts->count()
 ```
 
-| The field | The kind | Where the link is kept |
-| --- | --- | --- |
-| `author: User` | belongs to | `author_id` on this table, a foreign key to `users`. The model gets an `author_id` field too. |
-| `profile?: Profile`, where Profile has `user: User` | has one | `user_id` on `profiles`. The side that has one is the optional one. |
-| `posts: Post[]`, where Post has one field that is a User | has many | That field's column on `posts`: `author_id`. |
-| `tags: Tag[]`, where Tag has no field that is one Post | many to many | A pivot table, `post_tag`, with `post_id` and `tag_id`. |
-| `comments: Comment[](through: posts)` | has many through | Nothing of its own: the comments of this user's posts. |
-| `drafts: Post[](by: author, scope: drafts)` | has many, filtered | As has many, keeping the posts the model's `drafts` scope keeps. |
+Here is what each kind of field means.
 
-A relation's options go in brackets after its type:
+**Belongs to.** `author: User` on Post stores an `author_id` column, a foreign key to `users`. The model gets an `author_id` field too.
 
-| Option | What it does |
-| --- | --- |
-| `by: author` | Names the field on the other model that links back, when it has more than one that could (Post with `author: User` and `editor: User`). |
-| `through: posts` | Goes through another relation of this model. |
-| `scope: drafts` | Keeps only the records a [scope](#scopes) of the other model keeps. |
-| `pivot: memberships` | Names the pivot table of a many to many relation. |
-| `on_delete: cascade` | For a belongs-to field: what deleting the other record does to this one. `cascade` deletes it too (the default for a field that isn't optional), `set_null` empties the field (the default for one that is), and `restrict` refuses the delete with a `ForeignKeyViolation`. |
+**Has one.** `profile?: Profile` on User, where Profile has `user: User`, is kept as `user_id` on `profiles`. The side that has one is the optional side.
 
-Two models that link to each other can each live in their own file without importing the other: a model a field names is found in the project's models folder (`paths.models` in `kscript.json`) when it isn't imported. This is the one place a model is found without an import, because the two files would otherwise import each other, and circular imports aren't allowed. Scripts and controllers that use a model still import its file. See [one type per file](projects.md#where-files-go-the-recommended-layout).
+**Has many.** `posts: Post[]` on User, where Post has a field that is a User, uses that field's column on `posts`. When Post has more than one such field (say `author` and `editor`), name the one you mean with `by:`, as in `posts: Post[](by: author)`.
+
+**Many to many.** `tags: Tag[]` on Post, where Tag has a list of Posts rather than one, is kept in a pivot table named `post_tag`, with `post_id` and `tag_id`. Name the table yourself with `pivot:`.
+
+**Has many through.** `comments: Comment[](through: posts)` reads the comments of this user's posts, through another relation. It stores nothing of its own.
+
+A relation may also keep only the records one of the other model's [scopes](#scopes) keeps: `drafts: Post[](by: author, scope: drafts)`.
+
+On a belongs-to field, `on_delete:` says what happens when the record it points to is deleted. `cascade` deletes this record too, and is the default for a required field. `set_null` empties the field, and is the default for an optional one. `restrict` refuses the delete with a `ForeignKeyViolation` error.
+
+Two models that refer to each other may each live in their own file without importing the other. When a field names a model that isn't imported, it's found in the project's models folder (`paths.models` in `kscript.json`). This is the one place a model is found without an import, because otherwise the two files would import each other, and circular imports aren't allowed. Scripts and controllers that use a model still import its file. See [one type per file](projects.md#where-files-go-the-recommended-layout).
 
 ### Reading relations
 
-Reading a relation on a record loads it: one record (or null) for belongs to and has one, a list for the others. A record read in a list loads the relation for the whole list at once, so a loop like this makes one query for the authors, not one for each post:
+To read a relation, read it like a field. You get one record (or `null`) for belongs to and has one, and a list for the others:
+
+```kscript
+ada = User->create(name: 'Ada')
+post = $ada->posts()->create(title: 'Notes on the engine')
+
+echo $post.author.name
+echo $ada.posts->map(.title)
+```
+
+When you read a relation on records that came from the same list, it's loaded for the whole list at once. A loop like this one makes one query for all the authors, not one for each post:
 
 ```kscript
 for post in Post->latest()->get() {
@@ -361,23 +625,37 @@ for post in Post->latest()->get() {
 }
 ```
 
-`->with()` loads relations with the records, and `->load()` loads them onto a record you have. A dotted name loads a relation's relations, and a function changes a relation's query:
+### Loading relations up front
+
+`->with()` loads relations together with the records. A dotted name loads a relation's own relations:
 
 ```kscript
-import KScript.Data
-
 users = User->with(profile, posts.tags)->get()
+```
+
+If you only want some of the related records, give a function that changes the relation's query:
+
+```kscript
 users = User->with(posts: fn(q) => $q->where(published: true))->get()
+```
+
+`->load()` does the same for a record you already have:
+
+```kscript
 $post->load(author, tags)
 ```
 
-A relation that hasn't been loaded is left out of JSON, so a route's response only has the ones you loaded.
+A relation that hasn't been loaded is left out of JSON, so a route's response includes only the relations you loaded.
 
-`->with_count(posts)` gives each record a `posts_count` field, counted by the database. `->with_count(posts: fn(q) => $q->where(published: true))` counts some of them.
+To count related records without reading them, use `->with_count()`. Each record gets a `posts_count` field, counted by the database:
 
-### Relations as queries
+```kscript
+authors = User->with_count(posts)->get()
+```
 
-`$user->posts()` is a query of the user's posts, to filter, count and add to:
+### Querying relations
+
+Calling a relation as a method, such as `$ada->posts()`, gives a query of the related records. You may filter it, count it, or add to it, and everything stays within that user's posts:
 
 ```kscript
 import KScript.Data
@@ -386,39 +664,44 @@ echo $ada->posts()->where(published: false)->count()
 $ada->posts()->create(title: 'A second post')
 ```
 
-Everything added to it stays within that user's posts, `->or_where(...)` included.
+`->create()` on a relation sets the link for you: the new post's author is Ada.
 
-| Method | What it does |
-| --- | --- |
-| `->create(values)` | Adds a record to the relation: `$ada->posts()->create(...)` sets the post's author. On a many to many relation it saves the record and links it. |
-| `->attach(records)` | Links records through the pivot table: records, keys, or a list of either. Links already there are kept. |
-| `->detach(records?)` | Unlinks the records given, or every one. |
-| `->sync(records)` | Links exactly these, unlinking the rest. Gives `{ attached, detached }`. |
-| `->toggle(records)` | Links the ones that aren't linked and unlinks the ones that are. |
+A many-to-many relation is linked through its pivot table. `->attach()` links records (or keys, or a list of either), keeping links that are already there. `->detach()` unlinks the records you give, or all of them. `->sync()` links exactly the records you give and unlinks the rest, and `->toggle()` flips each one:
 
-A belongs-to relation is set on the record: `post.author = $ben` sets `author_id`, and `$post->save()` writes it.
+```kscript
+import KScript.Data
+
+maths = Tag->create(name: 'maths')
+$post->tags()->attach($maths)
+$post->tags()->sync([$maths])
+```
+
+A belongs-to relation is set on the record itself. `post.author = $ben` sets `author_id`, and `$post->save()` writes it.
 
 ### Relations in conditions
 
-A condition can read through relations, and the database does the work:
+A condition may read through relations, and the database does the work:
 
 ```kscript
 busy = User->where(fn(u) => $u.posts->count() > 10)->get()
 tagged = Post->where(fn(p) => $p.tags->any(fn(t) => $t.name == 'maths'))->get()
 by_ada = Post->where(fn(p) => $p.author.name == 'Ada')->get()
 no_profile = User->where(fn(u) => $u.profile == null)->get()
+```
+
+On a list relation, `->count()`, `->any()`, `->is_empty()`, `->all()`, `->sum()`, `->average()`, `->min()` and `->max()` become SQL, each with an optional lambda on the related record. On a single related record, you may read its fields, compare it with a record, or compare it with `null`. Comparing with a record also works with the short form:
+
+```kscript
 mine = Post->where(author: $ada)->get()
 ```
 
-On a list relation, `->count()`, `->any()`, `->is_empty()`, `->all()`, `->sum()`, `->average()`, `->min()` and `->max()` become SQL, each with an optional lambda on the related record. On one record, its fields can be read (`$p.author.name`), it can be compared with a record (`$p.author == $ada`), and with null.
-
 ### Scopes on relations
 
-A [scope](#scopes) works on a relation too, and keeps to the relation's records: `$ada->posts()->live()->count()`.
+A [scope](#scopes) works on a relation too, and keeps to the relation's records: `$ada->posts()->live()->count()` counts only Ada's live posts.
 
 ## Transactions
 
-A transaction keeps a group of changes together: when the block ends they are all saved, and if anything in it fails none of them are. The error then carries on.
+A transaction keeps a group of changes together. When the block ends, they're all saved. If anything inside fails, none of them are, and the error carries on:
 
 ```kscript
 import KScript.Data
@@ -452,13 +735,13 @@ for amount in [30, 500] {
 echo Account->pluck(balance)
 ```
 
-`$db->transaction(fn() => ...)` does the same for a function and returns what it returns. A transaction inside another is a savepoint, so only its own changes are undone. `retries: 3` tries again when the database is busy.
+If you'd rather wrap a function, `$db->transaction(fn() => ...)` does the same and returns what the function returns. A transaction inside another becomes a savepoint, so only its own changes are undone. Pass `retries: 3` to try again when the database is busy.
+
+Inside a transaction, `->lock_for_update()` locks the rows a query reads, and `->skip_locked()` skips rows another transaction has locked. Both lock rows on Postgres, MySQL and MariaDB. SQLite locks the whole database for a transaction's writes instead, so they change nothing there.
 
 ## Raw SQL
 
-`@sql` runs SQL you write. Each `{ }` in it is worked out and sent as a parameter, never pasted into the SQL, so it is safe with any value. A list becomes `(?, ?, ?)` for `in`. Write `{{` and `}}` for braces.
-
-Write the SQL inside the call, as below. Text in `"double quotes"` given to a variable first is filled in there and then, so its values would be pasted into the SQL; the editor warns about that. To keep SQL in a variable, use `'single quotes'` or a ```` ```sql ```` block.
+When you need SQL that a query can't express, `@sql` runs SQL you write. Each `{ }` inside it is worked out and sent as a parameter, never pasted into the SQL, so it's safe with any value:
 
 ```kscript
 import KScript.Data
@@ -469,11 +752,19 @@ $db->sql("insert into visits (page, at) values ({$page}, {@now()->to_string()})"
 echo @sql("select count(*) as n from visits where page = {$page}")[0].n
 ```
 
-A query gives its rows as maps (or as a type: `@sql(text, as: User)`), and anything else gives how many rows it changed. `@db('visits')` is a query on a table with no model, whose rows are maps.
+A list becomes `(?, ?, ?)`, for use with `in`. Write `{{` and `}}` for literal braces.
+
+A query gives its rows as maps. If you'd like records of a type instead, pass it: `@sql(text, as: User)`. Any other statement gives how many rows it changed.
+
+Write the SQL inside the call, as above. Text in double quotes that is given to a variable first is filled in at that moment, so its values would be pasted into the SQL. The editor warns you when that happens. To keep SQL in a variable, use single quotes or a ```` ```sql ```` text block.
+
+For a table with no model, `@db('visits')` is a query whose rows are maps.
 
 ## Connections
 
-With no settings, the database is `data/app.sqlite` in the project folder, or the `DATABASE_URL` environment variable when it is set. Set connections in your config:
+### Configuring connections
+
+With no settings, the database is `data/app.sqlite` in the project folder, or the `DATABASE_URL` environment variable when it's set. To use other databases, list connections in your config:
 
 ```yaml
 database:
@@ -485,16 +776,18 @@ database:
       url: sqlite:data/reports.sqlite
 ```
 
-A model uses another connection with `connection: reports`, and `@db(connection: reports)` is that database.
+A model uses another connection with the `connection: reports` option, and `@db(connection: reports)` gives you that database.
 
-| Database | url | Notes |
-| --- | --- | --- |
-| SQLite | `sqlite:data/app.sqlite`, or `sqlite::memory:` | A file, relative to the project folder. `:memory:` lasts while kscript runs. |
-| Postgres | `postgres://user:password@host:5432/app` | Also `postgresql://`. Version 12 or later. |
-| MySQL | `mysql://user:password@host:3306/app` | Version 8.0.16 or later. |
-| MariaDB | `mariadb://user:password@host:3306/app` | Version 10.6 or later. |
+Each database has its own URL:
 
-Use a URL or a map of connection fields. Generated server-database projects use fields by default and use `DATABASE_URL` when it is set. In `config/config.kscript`, you can write:
+- SQLite: `sqlite:data/app.sqlite`, a file relative to the project folder, or `sqlite::memory:`, which lasts while kscript runs.
+- Postgres 12 or later: `postgres://user:password@host:5432/app` (or `postgresql://`).
+- MySQL 8.0.16 or later: `mysql://user:password@host:3306/app`.
+- MariaDB 10.6 or later: `mariadb://user:password@host:3306/app`.
+
+In a URL, put driver options after `?`, as in `?sslmode=require`, and percent-encode characters such as `@` and `:` in passwords.
+
+You may also give a connection as a map of fields, which is what generated server-database projects do. In `config/config.kscript`:
 
 ```kscript
 fn configure(environment: string) {
@@ -517,48 +810,56 @@ fn configure(environment: string) {
 }
 ```
 
-Use `options: { sslmode: 'require' }` in a Postgres connection map. In a URL, put driver options after `?`, as in `?sslmode=require`, and percent-encode characters such as `@` and `:` in passwords. Separate password fields accept those characters directly.
+A password given as a field may contain `@` and `:` as they are. Driver options go in `options:`, such as `options: { sslmode: 'require' }`.
 
-Models, queries, transactions and the database queue work the same on each database:
+### Differences between databases
 
-- Text compares exactly, and emails don't mind case, so `JOAN@example.com` finds `joan@example.com` and a unique email can't be taken twice in different case. On Postgres, `->create_table()` makes a case-insensitive collation for emails, `kscript_nocase`; on MySQL and MariaDB, tables use `utf8mb4_bin` and emails `utf8mb4_unicode_ci`.
-- `->contains()`, `->starts_with()` and `->ends_with()` don't mind case on any database, and `->matches()` reads its flags (`i`, `m`, `s`, `x`) the same everywhere.
+Models, queries, transactions and the database queue work the same on every database. KScript.Data smooths over the differences that would otherwise surprise you:
+
+- Text compares exactly, but emails don't mind case, so `JOAN@example.com` finds `joan@example.com` and a unique email can't be taken twice in different case. On Postgres, `->create_table()` makes a case-insensitive collation for emails, `kscript_nocase`. On MySQL and MariaDB, tables use `utf8mb4_bin` and emails use `utf8mb4_unicode_ci`.
+- `->contains()`, `->starts_with()` and `->ends_with()` don't mind case on any database, and `->matches()` reads its flags (`i`, `m`, `s`, `x`) the same way everywhere.
 - Nulls sort first going up and last going down.
-- `->lock_for_update()` and `->skip_locked()` lock rows on Postgres, MySQL and MariaDB. SQLite locks the whole database for a transaction's writes instead.
 - Dates are kept to the microsecond.
-- A date is stored as a clock time, and the clock is the project's: `"timezone"` in `kscript.json`, which is `Europe/London` unless you set another (`America/New_York`, `UTC`, any IANA name). A date is converted to that zone when it is written and back when it is read, so a row is the same moment on a laptop in one zone and a server in another. Change the setting before the project has data, not after: rows already stored keep the clock time they were written with. A database written before this setting existed holds the clock times of the computer that wrote it, so set `"timezone"` to that computer's zone (`"UTC"` for most servers and containers).
 
-Raw SQL in `@sql` is given to the database as it is, so it is written in that database's own SQL.
+Raw SQL in `@sql` is passed to the database as it is, so write it in that database's own dialect.
+
+### Time zones
+
+A date is stored as a clock time in the project's time zone: `"timezone"` in `kscript.json`, which is `Europe/London` unless you set another, such as `America/New_York`, `UTC` or any IANA name. A date is converted to that zone when it's written and back when it's read, so a row means the same moment on a laptop in one zone and a server in another.
+
+You should choose the time zone before the project has data. Rows already stored keep the clock time they were written with. A database written before this setting existed holds the clock times of the computer that wrote it, so set `"timezone"` to that computer's zone (`"UTC"` for most servers and containers).
 
 ## Errors
 
-| Error | When | In a route |
-| --- | --- | --- |
-| `ModelNotFound` (extends `NotFound`) | `->find_or_fail()` and `->first_or_fail()` find nothing. `$e.model` and `$e.id` say what. | 404 |
-| `UniqueViolation` (extends `Conflict`) | A save would give two records the same unique value. `$e.fields` names the fields. | 409 |
-| `ForeignKeyViolation` (extends `Conflict`) | A change would leave a row pointing at one that isn't there. | 409 |
-| `Query` | The database refused a query, or a condition can't be turned into SQL. | 500 |
-| `Connection` | The database can't be opened. | 503 |
+KScript.Data throws errors you can catch by type. In a route, each one becomes a sensible HTTP status for you:
 
-## Making a model
+- `ModelNotFound`, a kind of `NotFound`, comes from `->find_or_fail()` and `->first_or_fail()`. `$e.model` and `$e.id` say what wasn't found. A route answers 404.
+- `UniqueViolation`, a kind of `Conflict`, means a save would give two records the same unique value. `$e.fields` names the fields. A route answers 409.
+- `ForeignKeyViolation`, also a `Conflict`, means a change would leave a row pointing at one that isn't there. A route answers 409.
+- `Query` means the database refused a query, or a condition can't be turned into SQL. A route answers 500.
+- `Connection` means the database can't be opened. A route answers 503.
 
+```kscript
+try {
+  User->create(email: 'ada@example.com')
+} catch UniqueViolation as e {
+  echo "That email is already taken."
+}
 ```
-kscript make model User --fields "name: string, email: email, password: password" --timestamps
-```
-
-writes `models/user.kscript` (the folder is `paths.models` in `kscript.json`).
 
 ## Migrations
 
-`$db->create_table()` is enough for a script, but a project whose tables already hold rows changes them with migrations: files in `database/migrations` (`paths.migrations` in `kscript.json`) that say, step by step, how the tables change. `kscript db migrate` runs the ones that haven't run, and `kscript db rollback` undoes them.
+### Introduction to migrations
 
-You don't usually write them yourself. Change the models, then let `kscript db diff` write the migration that takes the tables from what the migrations make to what the models want:
+`$db->create_table()` is enough for a script. A project whose tables already hold rows changes them with **migrations** instead. Each migration is a file in `database/migrations` (`paths.migrations` in `kscript.json`) that says, step by step, how the tables change.
 
-```
-kscript db diff              # writes database/migrations/2026_11_22_101500_update_users.kscript
-kscript db diff add_bio      # the same, named add_bio
-kscript db diff --pretend    # prints it instead
-kscript db migrate
+You don't usually write migrations yourself. Change your models, then let `kscript db diff` write the migration that takes the tables from where the migrations leave them to what the models want:
+
+```sh
+kscript db diff              # Write a migration from the changes to your models
+kscript db diff add_bio      # The same, named add_bio
+kscript db diff --pretend    # Print the migration instead of writing it
+kscript db migrate           # Run the migrations that haven't run
 ```
 
 A migration it writes looks like this:
@@ -579,52 +880,49 @@ Migration {
 }
 ```
 
-When a table or a column has gone and another has come, `diff` asks whether it was renamed, so a rename keeps its rows instead of dropping them. Where it can't ask (in CI, or with its input piped in) it takes the answer as no, drops and adds, and warns about each one it couldn't ask about. Read the migration it writes before you run it.
+When a table or column has gone and another has appeared, `diff` asks whether it was renamed, so a rename keeps its rows instead of dropping them. Where it can't ask, such as in CI or with its input piped in, it assumes no, drops and adds, and warns about each one. You should always read a migration before you run it.
 
-### The steps
+To write a migration by hand, `kscript make migration add_bio_to_users` gives you an empty one to fill in.
 
-Steps call a table's columns fields, as models do: `AddField` adds a column to the table.
+### Migration steps
 
-| Step | What it does |
-| --- | --- |
-| `CreateTable(name:) { ... }` | Makes a table: a `Field` for each column, an `Index` for each index, and a `Key(columns: [a, b])` for a key of two columns (a pivot table's). |
-| `DropTable(name:)` | Drops a table and its rows. |
-| `RenameTable(from:, to:)` | Renames a table. Foreign keys that point to it follow. |
-| `AddField(table:, name:, type:, ...)` | Adds a field. A required field needs a `default:` when the table has rows. |
-| `DropField(table:, name:)` | Drops a field, and its indexes. |
-| `RenameField(table:, from:, to:)` | Renames a field, keeping its values. |
-| `ChangeField(table:, name:, type:, ...)` | Makes a field the one described: its type, whether it is optional, its default or what it references. The rows are kept. |
-| `AddIndex(table:, columns:)` (with `unique`), `DropIndex(...)` | Adds or drops the index on those columns. |
-| `Sql(up:, down:)` | SQL to run as it is, for anything the other steps can't do. |
-| `Down { ... }` | The steps that undo this migration, when you want to say them yourself. |
+Migration steps call a table's columns fields, as models do.
 
-A field (`Field`, `AddField`, `ChangeField`) has a `type:` of `string`, `int`, `number`, `bool`, `date`, `email`, `handle`, `uuid`, `password`, `json` or `enum` (with `values:`), each stored the way a model's field of that type is. `max:` gives a string a length, `optional` lets it be empty, `default:` is what the database fills in (text, a number, `true` or `false`), the `key` and `auto` flags make a numbered key, and `references:` (with `references_column:` and `on_delete:`) makes a foreign key, like a model's relation field.
+`CreateTable(name:) { ... }` makes a table, with a `Field` for each column and an `Index` for each index. A key made of two columns, such as a pivot table's, is `Key(columns: [a, b])`. `DropTable(name:)` drops a table and its rows, and `RenameTable(from:, to:)` renames one. Foreign keys that point to a renamed table follow it.
 
-Each step is checked against the tables the migrations before it make, before anything runs: dropping a table that isn't there, adding a column twice or pointing at a column that isn't a key says which migration and what's wrong, with the closest name when it's a typo.
+`AddField(table:, name:, type:, ...)` adds a field. A required field needs a `default:` when the table has rows. `DropField(table:, name:)` drops a field and its indexes, and `RenameField(table:, from:, to:)` renames one, keeping its values. `ChangeField(table:, name:, type:, ...)` changes a field to match what you describe: its type, whether it's optional, its default or what it references. The rows are kept.
 
-### Running and undoing
+`AddIndex(table:, columns:)` adds an index, with `unique` for a unique one, and `DropIndex(...)` drops it.
 
-```
-kscript db migrate            # runs what hasn't run, as one batch
-kscript db migrate --pretend  # prints the SQL instead
-kscript db rollback           # undoes the last batch
-kscript db rollback --steps 2 # undoes the last two migrations
-kscript db status             # what has run, and what the models want that no migration makes (--output json too)
-kscript db fresh              # drops every table and runs every migration again
-kscript db fresh --pretend    # names the tables it would drop and prints the SQL, and changes nothing
+A field's `type:` is one of `string`, `int`, `number`, `bool`, `date`, `email`, `handle`, `uuid`, `password`, `json` or `enum` (with `values:`), each stored the way a model's field of that type is. `max:` gives a string a length, `optional` lets it be empty, and `default:` is what the database fills in. The `key` and `auto` flags make a numbered key, and `references:` (with `references_column:` and `on_delete:`) makes a foreign key, like a model's relation field.
+
+For anything the other steps can't do, `Sql(up:, down:)` runs SQL as it is.
+
+Every step is checked against the tables the earlier migrations make before anything runs. Dropping a table that isn't there, adding a column twice, or pointing at a column that isn't a key tells you which migration and what's wrong, with the closest name when it looks like a typo.
+
+### Running and rolling back
+
+```sh
+kscript db migrate            # Run what hasn't run, as one batch
+kscript db migrate --pretend  # Print the SQL instead of running it
+kscript db rollback           # Undo the last batch
+kscript db rollback --steps 2 # Undo the last two migrations
+kscript db status             # Show what has run, and what the models want that no migration makes
+kscript db fresh              # Drop every table and run every migration again
+kscript db fresh --pretend    # Name the tables it would drop and print the SQL, changing nothing
 ```
 
-Each migration runs in a transaction on SQLite and Postgres, so one that fails changes nothing. MySQL and MariaDB commit each change to a table as it is made, so a migration that fails there stops where it failed: the error says how many of its steps ran and stay, and the migration isn't marked as run.
+On SQLite and Postgres, each migration runs in a transaction, so one that fails changes nothing. MySQL and MariaDB commit each change to a table as it's made, so a migration that fails there stops where it failed. The error says how many of its steps ran, and the migration isn't marked as run.
 
-Rollback undoes each step the other way round: a created table is dropped, an added column is dropped, and a dropped table or column comes back as it was (empty). A `Sql` step needs its `down:` for that, and a migration with a `Down { }` block runs that block instead. The migrations that have run are kept in the `kscript_migrations` table, with the batch each ran in.
+Rolling back undoes each step the other way round. A created table is dropped, an added column is dropped, and a dropped table or column comes back as it was, empty. A `Sql` step needs its `down:` for that. When you'd rather say the steps yourself, add a `Down { ... }` block, and rollback runs that block instead. The migrations that have run are recorded in the `kscript_migrations` table, with the batch each ran in.
 
-In the production environment (`config.environment` in `kscript.json`), `migrate`, `rollback` and `seed` ask first, and `fresh` won't run without `--force`.
+In the production environment (`config.environment` in `kscript.json`), `migrate`, `rollback` and `seed` ask before they start, and `fresh` won't run without `--force`.
 
-`diff` and `status` see the models that use the default connection, in the models folder and [inside components](components.md#types-that-belong-to-a-component). Models on another connection, and what a `Sql` step changes, are left out, so after a `Sql` step that changes a table `diff` may suggest changing it back.
+`diff` and `status` see the models on the default connection, in the models folder and [inside components](components.md#types-that-belong-to-a-component). Models on another connection, and changes made by a `Sql` step, are left out, so after a `Sql` step that changes a table, `diff` may suggest changing it back.
 
 ### Seeders
 
-A seeder is a script in `database/seeders` (`paths.seeders`) that fills the database with records, for development and tests:
+A seeder is a script in `database/seeders` (`paths.seeders`) that fills the database with records for development and tests:
 
 ```kscript
 import KScript.Data
@@ -633,13 +931,11 @@ import "../../models/user.kscript"
 User->create(name: 'Ada', email: 'ada@example.com')
 ```
 
-`kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating.
-
-`kscript make migration add_bio_to_users` writes an empty migration to fill in by hand, and `kscript make seeder users` writes a seeder.
+`kscript db seed` runs every seeder in name order, and `kscript db seed users` runs one. `kscript db migrate --seed` and `kscript db fresh --seed` run them after migrating. `kscript make seeder users` writes a new one.
 
 ## Testing with a database
 
-Under `kscript test`, each test file that uses KScript.Data gets a database of its own in memory, made from the migrations (or from the models when there are none yet), and each test's changes are undone when it ends. Tests don't need `$db->create_table()`, don't touch the project's database, and see none of each other's records:
+Under `kscript test`, each test file that uses KScript.Data gets its own database in memory, made from your migrations (or from the models, when there are none yet). Each test's changes are undone when it ends. Your tests don't need `$db->create_table()`, never touch the project's real database, and never see each other's records:
 
 ```kscript
 // tests/post.test.kscript
@@ -657,20 +953,22 @@ test(name: "each test starts empty") {
 }
 ```
 
-`test.database` in `kscript.json` chooses: `memory` (the default) or `config`, which uses the configured database (see `test.env` in [Testing](testing.md#settings-in-kscriptjson)) and still undoes each test.
+If you'd rather test against the configured database, set `test.database` in `kscript.json` to `config`. Each test is still undone when it ends. See `test.env` in [Testing](testing.md#settings-in-kscriptjson).
 
 ### Fakes
 
-`Model->fake(fields...)` saves a record with made-up values for the fields you don't give, and `->fake_many(count, fields...)` saves several. The values fit each field's type and limits (a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, an enum is its first value), and a required relation gets a fake record of its own:
+`Model->fake()` saves a record with made-up values for every field you don't give. `->fake_many()` saves several:
 
 ```kscript
 joan = Author->fake(name: 'Joan')
 posts = Post->fake_many(3, author: $joan)
 ```
 
+The made-up values fit each field's type and rules: a `string(min: 3, max: 12)` is 3 to 12 characters, an `email` ends in `@example.com`, and an enum is its first value. A required relation gets a fake record of its own.
+
 ### Counting queries
 
-`@queries()` is the SQL sent so far in this test (in a script, so far in the run), each as `{ sql, bindings, database }`. `count_at_most` checks a page doesn't send a query per row:
+A page that sends one query per row gets slow as the data grows. `@queries()` is the SQL sent so far in the test, each as `{ sql, bindings, database }`, so you may check how many queries a page needs:
 
 ```kscript
 test(name: "the post list loads authors at once") {
@@ -680,19 +978,29 @@ test(name: "the post list loads authors at once") {
 }
 ```
 
+## Making a model
+
+`kscript make model` writes a model file for you, in the models folder (`paths.models` in `kscript.json`):
+
+```sh
+kscript make model User --fields "name: string, email: email, password: password" --timestamps  # Write models/user.kscript
+```
+
 ## With the rest of KScript
 
-- **Routes**: a controller parameter typed as a model, `fn show(post: Post)`, is the record with the key in the path, or a `404` (see [Controllers](http.md)).
-- **Components and types**: an input with the default `@inject()`, `construct({ post: Post = @inject() })`, takes the record the route holds, so a page writes `<post-card />` (see [components](components.md#take-the-routes-record-with-inject)).
-- **Policies**: `policy for Post { fn update(user: User, post: Post) => ... }` says who may create, read, update and delete a model's records. Ask it with `@can(update, $post)`, `@authorize(update, $post)`, `can: update` on a route, or `@inject(can: read)` (see [policies](auth.md#policies)).
-- **OpenAPI**: a model in a route's input or answer is a schema: the key and timestamps are read-only, a relation is only there when it was loaded with `->with()`, and `->paginate()` answers with a page of records.
-- **Sign-in**: `http.auth.users` keeps [KScript.Auth](auth.md#users-in-a-model)'s users in a model, so `@user()` is a record.
+Models work with the rest of KScript without any glue:
+
+- **Routes.** A controller parameter typed as a model, such as `fn show(post: Post)`, is the record whose key is in the path, or a 404. See [Controllers](http.md).
+- **Components.** An input with the default `@inject()`, such as `construct({ post: Post = @inject() })`, takes the record the route holds, so a page may write `<post-card />`. See [components](components.md#take-the-routes-record-with-inject).
+- **Policies.** `policy for Post { fn update(user: User, post: Post) => ... }` says who may create, read, update and delete a model's records. Ask it with `@can(update, $post)`, `@authorize(update, $post)`, `can: update` on a route, or `@inject(can: read)`. See [policies](auth.md#policies).
+- **OpenAPI.** A model in a route's input or answer becomes a schema. The key and timestamps are read-only, a relation appears only when it was loaded with `->with()`, and `->paginate()` answers with a page of records.
+- **Sign-in.** `http.auth.users` keeps [KScript.Auth](auth.md#users-in-a-model)'s users in a model, so `@user()` is a record.
 
 ## In the editor
 
-The language server knows each model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`; a field the model doesn't have is `KS5013` (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn(p) => $p.` completes its fields too.
+The language server knows every model's fields. It completes them in `->where(`, `->order_by(`, `->create(` and the rest, and relations in `->with(`. A field the model doesn't have is reported as KS5013 (see [errors](errors.md)). A `where` lambda's parameter is the model's record, so `fn(p) => $p.` completes its fields too.
 
-Hover over a query method to see the SQL the chain sends, roughly, with `?` for the values:
+Hover over a query method to see roughly the SQL the chain sends, with `?` for the values:
 
 ```sql
 SELECT * FROM posts
@@ -701,4 +1009,4 @@ ORDER BY created_at DESC
 LIMIT ?
 ```
 
-When the project has migrations, a model the migrations don't make as it is now is `KS5014`, with the first change `kscript db diff` would write (`add field users.bio`).
+When the project has migrations, a model that the migrations don't make as it is now is reported as KS5014, with the first change `kscript db diff` would write, such as `add field users.bio`.

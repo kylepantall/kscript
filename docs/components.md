@@ -128,6 +128,8 @@ KScript restores fields the instance changed on later actions. Fields the compon
 
 Put KScript behavior in directives on the opening HTML tag. For example, `@bind($title, on: blur)` takes a field and options, `@live-disable()` is a flag, and `@on-click(count += 1)` takes KScript statements. The IDE completes directive names after `@`, checks binding names, and checks each option's value. The HTML spellings `bind="$title"` and `on-click="count += 1"` work too. A binding names its field with `$`: `@bind('title')` and `bind="title"` are errors with a quick fix to `@bind($title)`.
 
+Every directive, shorthand, modifier and `$event` field is listed in [Page directives](/reference/directives).
+
 Each directive has one spelling. These older attributes are errors with a quick fix that moves them where they now go:
 
 | Was | Now |
@@ -169,7 +171,7 @@ Use `<state name="…" value="…" />` at the top level of a component template 
 
 Number defaults let normal numeric input update the state as a number. For query-backed state, use a text, number, Boolean or null value. A change updates the current history entry, and null clears the parameter. Session-backed instances that should remain independent need separate keys.
 
-For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#reading), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
+For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#retrieving-records), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
 
 ### Inputs and state with construct
 

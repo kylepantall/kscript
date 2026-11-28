@@ -46,6 +46,8 @@ You can also install this extension from the command line with `kscript ide inst
 | `kscript.pages.enabled` | `auto` | Check `.html` and `.md` pages: `auto` in folders that look like a `kscript serve` site (`_components/`, `_layout.html`, `_layouts/` or `kscript.json`), `always`, or `never`. |
 | `kscript.codeLens.enabled` | `true` | Show **Run** above a script, **Run test** above each test and how many times each function is used. |
 | `kscript.trace.server` | `off` | Log the messages between VS Code and the language server (`messages` or `verbose`). |
+| `kscript.autoCloseTags` | `true` | Add the end tag when you finish typing a start tag in a `.ks.xml` script: `<echo>` becomes `<echo></echo>`. |
+| `kscript.blocks.dividers` | `true` | Draw a thin line between the top-level blocks of a script (functions, loops and comment-headed sections), like cells in a notebook. |
 
 In component HTML fences, completion, hover, and diagnostics use the fields declared on the component class. Use `$record.title` or `$.record.title`, and type `$.` to list the values in scope.
 
