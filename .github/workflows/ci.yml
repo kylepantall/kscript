@@ -1,18 +1,19 @@
 name: CI
 
 on:
-  push:
-    branches: [ master, main ]
+  # Pull requests only: the "main" ruleset makes a pull request be up to date with master before it merges, so its
+  # run already tested what lands on master, and nothing runs again after the merge. Run it on master by hand from
+  # the Actions tab when needed.
   pull_request:
     # closed is here only to stop work: see the concurrency note below.
     types: [ opened, synchronize, reopened, closed ]
+  workflow_dispatch:
 
-# One run at a time per pull request, and one for master; a newer run cancels the older one, whether it is running
-# or still queued. That covers three cases:
+# One run at a time per pull request; a newer run cancels the older one, whether it is running or still queued.
+# That covers two cases:
 # - a new push to a pull request cancels the run for the push before it;
 # - merging or closing a pull request starts a run in the same group, which cancels whatever is left of that pull
-#   request's run, and its jobs are all skipped (the `if:` on each job), so nothing more runs for a closed PR;
-# - a new commit on master cancels master's older run, since the newest run tests everything the older one did.
+#   request's run, and its jobs are all skipped (the `if:` on each job), so nothing more runs for a closed PR.
 concurrency:
   group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: true
