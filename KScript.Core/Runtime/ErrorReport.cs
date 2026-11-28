@@ -36,7 +36,7 @@ namespace KScript.Runtime
         public const string InternalType = "Internal";
 
         /// <summary>The environment variable that turns on <see cref="Debug"/>.</summary>
-        public const string DebugVariable = "KSCRIPT_DEBUG";
+        public const string DebugVariable = EnvironmentVariables.Debug;
 
         /// <summary>True when errors also show the .NET exception and stack trace: --debug, or KSCRIPT_DEBUG set (and not 0 or false).</summary>
         public static bool Debug { get; set; } = IsOn(Environment.GetEnvironmentVariable(DebugVariable));

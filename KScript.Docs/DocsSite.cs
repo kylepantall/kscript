@@ -157,6 +157,7 @@ namespace KScript.Docs
             site.AddModelsPage();
             site.AddDirectivesPage();
             site.AddEditorPage();
+            site.AddEnvironmentPage();
             site.AddBuiltinPages();
             site.AddCli();
             site.AddMakeCommands();

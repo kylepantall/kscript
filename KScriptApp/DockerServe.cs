@@ -14,9 +14,9 @@ namespace KScript;
 
 internal static class DockerServe
 {
-    internal const string ContainerMarker = "KSCRIPT_SERVE_IN_DOCKER";
-    internal const string MigrateSetting = "KSCRIPT_SERVE_MIGRATE";
-    internal const string ReloadSetting = "KSCRIPT_LIVE_RELOAD";
+    internal const string ContainerMarker = KScript.Runtime.EnvironmentVariables.ServeInDocker;
+    internal const string MigrateSetting = KScript.Runtime.EnvironmentVariables.ServeMigrate;
+    internal const string ReloadSetting = KScript.Runtime.EnvironmentVariables.LiveReload;
     private static readonly string[] ComposeFiles = { "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml" };
 
     internal static bool IsContainer(string marker) => marker == "1";
@@ -38,8 +38,8 @@ internal static class DockerServe
             "See \"Docker files from before 0.27\" in docs/projects.md.";
     }
 
-    internal const string AppFoldersRoot = "KSCRIPT_STORAGE_ROOT";
-    internal const string ProjectDataRoot = "KSCRIPT_PROJECT_DATA_ROOT";
+    internal const string AppFoldersRoot = KScript.Runtime.EnvironmentVariables.StorageRoot;
+    internal const string ProjectDataRoot = KScript.Runtime.EnvironmentVariables.ProjectDataRoot;
 
     internal static bool ShouldLaunch(string root, DockerServeSettings settings, bool? requested, string environment, bool auto)
     {
