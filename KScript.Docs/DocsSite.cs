@@ -191,6 +191,8 @@ namespace KScript.Docs
         #region Guides
 
         internal static readonly Regex Fence = new Regex(@"^(`{3,})(?!`)([^`\n]*)\n(.*?)^\1`*[ \t]*$", RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.Compiled);
+        private static readonly Regex TableCodeSpan = new Regex(@"<t[dh][^>]*>.*?</t[dh]>", RegexOptions.Singleline | RegexOptions.Compiled);
+
         private static readonly Regex Heading = new Regex(@"<h([1-3]) id=""([^""]+)"">(.*?)</h\1>", RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex Href = new Regex(@"href=""([^""#:]*)(#[^""]*)?""", RegexOptions.Compiled);
         private static readonly Regex LocalLink = new Regex(@"href=""#([^""]+)""", RegexOptions.Compiled);
@@ -229,6 +231,8 @@ namespace KScript.Docs
             html = Regex.Replace(html, @"<div data-block=""(\d+)""></div>", m => blocks[int.Parse(m.Groups[1].Value)]);
             html = Href.Replace(html, m => $"href=\"{Html.H(LinkTarget(m.Groups[1].Value, m.Groups[2].Value, includeInstallGuide))}\"");
             html = Regex.Replace(html, "<table>", "<div class=\"table\"><table>").Replace("</table>", "</table></div>");
+            // In a table, `a\|b` keeps the bar from ending the cell. Markdig leaves the backslash in a code span; GitHub doesn't.
+            html = TableCodeSpan.Replace(html, m => m.Value.Replace("\\|", "|", StringComparison.Ordinal));
 
             string title = guide.NavTitle;
             Match h1 = Heading.Match(html);

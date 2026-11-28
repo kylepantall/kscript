@@ -322,6 +322,15 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void A_bar_escaped_in_a_table_shows_without_its_backslash()
+    {
+        // `add\|remove: file` in a Markdown table: the backslash only keeps the bar from ending the cell.
+        string language = Site.Value.Find("/guide/language").Body;
+        Assert.Contains("<code>add|remove: file</code>", language);
+        Assert.DoesNotContain("\\|", Regex.Replace(language, "<pre.*?</pre>", string.Empty, RegexOptions.Singleline));
+    }
+
+    [Fact]
     public void The_a_to_z_lists_everything_built_in()
     {
         string index = Site.Value.Find("/reference/index").Body;

@@ -169,7 +169,7 @@ Use `<state name="…" value="…" />` at the top level of a component template 
 
 Number defaults let normal numeric input update the state as a number. For query-backed state, use a text, number, Boolean or null value. A change updates the current history entry, and null clears the parameter. Session-backed instances that should remain independent need separate keys.
 
-For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#reading), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
+For database pagination, keep the current page in query-backed state, call `->paginate(page: $page)` on a [model query](data.md#retrieving-records), and change the page from the next and previous buttons. The view can use `has_more` and the current page to disable those buttons at the ends.
 
 ### Inputs and state with construct
 
