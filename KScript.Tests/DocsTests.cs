@@ -352,6 +352,30 @@ public sealed class DocsTests
     }
 
     [Fact]
+    public void Every_editor_command_and_setting_has_a_reference_entry()
+    {
+        // Read from the extension's package.json, so a new setting shows up by itself; a new command needs its words.
+        DocPage page = Site.Value.Find("/reference/editor");
+        var manifest = DocsSite.ExtensionManifest;
+        foreach (var c in DocsSite.PaletteCommands(manifest))
+        {
+            string id = (string)c["command"];
+            Assert.True(DocsSite.CommandDescriptions.ContainsKey(id), $"Say what {id} does in DocsSite.CommandDescriptions.");
+            Assert.Contains($"<strong>KScript: {Html.H((string)c["title"])}</strong>", page.Body);
+        }
+        Assert.DoesNotContain("Enter (ends an empty", page.Body);
+        Assert.Contains("<kbd>Ctrl+F5</kbd>", page.Body);
+        var entries = Site.Value.IndexEntries().ToList();
+        foreach (var (name, _) in (System.Text.Json.Nodes.JsonObject)manifest["contributes"]!["configuration"]!["properties"]!)
+        {
+            Assert.Contains($"<td><code>{name}</code></td>", page.Body);
+            Assert.Contains(entries, e => e.Name == name && e.Url.StartsWith("/reference/editor#", StringComparison.Ordinal));
+        }
+        Assert.Contains("<code>auto</code></td>", page.Body);
+        Assert.Contains("href=\"/reference/editor\"", Site.Value.Find("/reference").Body);
+    }
+
+    [Fact]
     public void A_bar_escaped_in_a_table_shows_without_its_backslash()
     {
         // `add\|remove: file` in a Markdown table: the backslash only keeps the bar from ending the cell.

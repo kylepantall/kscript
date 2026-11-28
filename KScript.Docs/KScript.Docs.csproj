@@ -22,6 +22,7 @@
     <EmbeddedResource Include="Assets\*" WithCulture="false" LogicalName="KScript.Docs.Assets.%(Filename)%(Extension)" />
     <!-- The kscript.json schema the editor checks with: the settings reference is made from it. -->
     <EmbeddedResource Include="..\editors\vscode\schemas\kscript.schema.json" WithCulture="false" LogicalName="KScript.Docs.Schemas.kscript.schema.json" />
+    <EmbeddedResource Include="..\editors\vscode\package.json" WithCulture="false" LogicalName="KScript.Docs.Schemas.package.json" />
   </ItemGroup>
 
   <ItemGroup>
