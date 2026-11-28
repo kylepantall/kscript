@@ -1,0 +1,45 @@
+// Written by kscript db diff from the models. Read it, change it if you need
+// to, then run kscript db migrate.
+import KScript.Data
+
+Migration {
+  CreateTable(name: 'guests') {
+    Field(name: 'id', type: uuid, key)
+    Field(name: 'created_at', type: date, optional)
+    Field(name: 'updated_at', type: date, optional)
+  }
+  CreateTable(name: 'users') {
+    Field(name: 'id', type: int, key, auto)
+    Field(name: 'name', type: string)
+    Field(name: 'email', type: email)
+    Field(name: 'password', type: password)
+    Field(name: 'created_at', type: date, optional)
+    Field(name: 'updated_at', type: date, optional)
+    Index(columns: [email], unique)
+  }
+  ChangeField(
+    table: 'profiles',
+    name: 'user_id',
+    type: int,
+    references: 'users'
+  )
+  AddField(
+    table: 'notes',
+    name: 'user_id',
+    type: int,
+    optional,
+    references: 'users',
+    on_delete: cascade
+  )
+  AddField(
+    table: 'notes',
+    name: 'guest_id',
+    type: uuid,
+    optional,
+    references: 'guests',
+    on_delete: cascade
+  )
+  DropField(table: 'notes', name: 'owner')
+  AddIndex(table: 'notes', columns: [user_id])
+  AddIndex(table: 'notes', columns: [guest_id])
+}

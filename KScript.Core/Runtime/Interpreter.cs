@@ -125,7 +125,9 @@ namespace KScript.Runtime
             void Add(KScriptPackage package, string alias) => AddPackage(module, package, alias);
 
             Add(Packages.Core, null);
-            foreach (string name in Options.DefaultPackages)
+            // A package's own scripts import what they use. The project's packages would make them import each
+            // other: KScript.Data's Timestamps loading KScript.Auth's User, which extends Timestamps.
+            foreach (string name in PackageSource.IsSource(module.Path) ? Enumerable.Empty<string>() : Options.DefaultPackages)
             {
                 Add(GetPackage(name, module, null), null);
             }
@@ -764,13 +766,20 @@ namespace KScript.Runtime
         /// </summary>
         private void DeclarePackageSources(Module module, KScriptPackage package, Scope scope)
         {
+            if (package.Sources.Count == 0) return;
+            if (PackageSource.IsSource(module.Path) && module.Path.StartsWith(System.IO.Path.Combine(PackageSource.Root, package.Name), StringComparison.Ordinal)) return;
+            List<string> modelFiles = ProjectModelFiles(module.Directory);
+            // The project's own copy of a package script (kscript publish) is one of the package's scripts too.
+            string self = module.Path != null ? System.IO.Path.GetFullPath(module.Path) : null;
+            if (self != null && package.Sources.Any(s => s.ProjectCopy(modelFiles) == self)) return;
             foreach (PackageSource source in package.Sources)
             {
-                if (PackageSource.IsSource(module.Path) && module.Path.StartsWith(System.IO.Path.Combine(PackageSource.Root, package.Name), StringComparison.Ordinal)) continue;
-                if (!modulesByPath.TryGetValue(source.Path, out Module imported))
+                string copy = source.ProjectCopy(modelFiles);
+                if (!modulesByPath.TryGetValue(copy ?? source.Path, out Module imported))
                 {
-                    imported = LoadText(source.Text, source.Path);
+                    imported = copy != null ? Load(copy) : LoadText(source.Text, source.Path);
                 }
+                imported.PackageOrigin = source;
                 RunModule(imported);
                 foreach (KeyValuePair<string, object> export in imported.Exports)
                 {
@@ -779,6 +788,30 @@ namespace KScript.Runtime
                 }
             }
         }
+
+        /// <summary>The model files of the project a folder is in, read once per folder. Empty outside a project.</summary>
+        private List<string> ProjectModelFiles(string directory)
+        {
+            if (directory == null) return new List<string>();
+            lock (projectModelFiles)
+            {
+                if (projectModelFiles.TryGetValue(directory, out List<string> known)) return known;
+            }
+            List<string> files;
+            try
+            {
+                files = KScript.Projects.ProjectConfig.FindAndLoad(directory)?.ModelFiles() ?? new List<string>();
+            }
+            catch (KScript.Projects.ProjectConfigException)
+            {
+                // A broken kscript.json is reported where the setting is read; it has no copies to find.
+                files = new List<string>();
+            }
+            lock (projectModelFiles) projectModelFiles[directory] = files;
+            return files;
+        }
+
+        private readonly Dictionary<string, List<string>> projectModelFiles = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
         /// <summary>
         /// The kinds of thing a script declares by name at its top level, which scripts that import it see:

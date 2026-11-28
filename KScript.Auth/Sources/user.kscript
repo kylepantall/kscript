@@ -1,0 +1,14 @@
+import KScript.Data
+
+/// Someone with an account. KScript.Auth keeps the users in this model when kscript.json says
+/// "http": { "auth": { "users": "User" } }: @register makes one, and @user() is the one signed in. It comes
+/// with KScript.Auth; kscript publish User copies it into the project's models folder, where its fields and
+/// its key can be changed.
+model User(auto_create, unique: [email], hidden: [password]) extends Timestamps {
+  /// What they're called.
+  name: string
+  /// The address they sign in with.
+  email: email
+  /// Their password, kept as a hash.
+  password: password
+}

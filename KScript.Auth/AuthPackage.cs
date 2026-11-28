@@ -149,17 +149,19 @@ namespace KScript.Auth
                     Policies.Authorize(c, Policies.AbilityName(c, c.Arg(0, "ability")), c.Arg(1, "target"));
                     return c.Arg(1, "target");
                 }, "<do>@authorize(update, $post)</do>").Info.KeepsBareWords = true;
-            p.Source("ownable.kscript", Embedded("ownable.kscript"));
+            // User and Guest go first: Ownable's relations name them. A project's own copy of each (kscript publish)
+            // replaces it.
+            p.Source("user.kscript", Embedded("user.kscript"), replaceable: true);
+            p.Source("guest.kscript", Embedded("guest.kscript"), replaceable: true);
+            p.Source("ownable.kscript", Embedded("ownable.kscript"), replaceable: true);
             KScript.Data.ModelInfo.OwnerMixin(Name, "Ownable");
-            KScript.Data.ModelInfo.CurrentOwner = c => Owners.Of(c, null);
-            p.Command("guest", "", "The browser's guest id: a uuid kept in a long-lived cookie (http.auth.guest_lifetime, a year by default), made the first time it is read. Null once someone is signed in, and outside a request. @owner() is the guest when no one is signed in.",
-                SemanticTypes.Uuid, c => Owners.Guest(c.Host, create: true) is string id ? Owners.Uuid(id) : null,
+            KScript.Data.ModelInfo.CurrentOwner = Owners.Of;
+            KScript.Data.ModelInfo.OwnedScope = Owners.Adopt;
+            p.Command("guest", "", "The browser's guest id: the key of its Guest (a uuid, unless your copy of Guest says otherwise), kept in a long-lived cookie (http.auth.guest_lifetime, a year by default) and made the first time it is read. Null once someone is signed in, and outside a request. Ownable records a guest makes belong to it.",
+                KType.Any, c => Owners.Guest(c, create: true),
                 "<echo>{ @guest() }</echo>");
-            p.Command("owner", "as?: any", "Who owns what this request makes: user:<id> for the signed-in user, else guest:<uuid> for the browser (see @guest()). Null outside a request. as: names one instead: a user, or an owner value. Ownable models keep it in their owner column.",
-                KType.String, c => Owners.Of(c, c.Arg(0, "as")),
-                "<echo>{ @owner() }</echo>");
-            p.Command("acting_as_guest", "id?: uuid", "In a test, acts as a guest until the test ends, in the test and in routes it calls with @api(/...) or @visit(): no one is signed in, and @guest() is this id (a new one when it is left out). Returns the guest id.",
-                SemanticTypes.Uuid, c => Owners.Uuid(Policies.ActAsGuest(c.Host, c.Arg(0, "id") is object id ? Values.ToStr(Values.Unwrap(id)) : null)),
+            p.Command("acting_as_guest", "id?: any", "In a test, acts as a guest until the test ends, in the test and in routes it calls with @api(/...) or @visit(): no one is signed in, and @guest() is this id (a new one when it is left out). Returns the guest id.",
+                KType.Any, c => Policies.ActAsGuest(c, c.Arg(0, "id")),
                 "<do>@acting_as_guest()</do>");
             p.Command("acting_as", "user", "In a test, sets who @can, @authorize and @user() ask about until the test ends, in the test and in routes it calls with @api(/...): @acting_as($editor). Pass null to act as a guest.",
                 KType.Any, c => Policies.ActAs(c.Host, Values.Unwrap(c.Arg(0, "user"))), "<do>@acting_as({ id: 1, role: 'editor' })</do>");

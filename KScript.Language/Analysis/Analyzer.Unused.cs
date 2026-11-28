@@ -492,7 +492,7 @@ namespace KScript.Language.Analysis
         /// <summary>True if the script uses something one of the package's own scripts declares: <c>extends Ownable</c>, or a call.</summary>
         private bool PackageSourceUsed(string package)
         {
-            var declared = result.Symbols.Where(s => catalog.SourceAt(s.SourcePath)?.Package == package).ToList();
+            var declared = result.Symbols.Where(s => s.SourcePath != null && packageScripts.GetValueOrDefault(s.SourcePath) == package).ToList();
             if (declared.Count == 0) return false;
             var names = new HashSet<string>(declared.Select(s => s.Name), StringComparer.Ordinal);
             return declared.Any(s => uses[s].Any())

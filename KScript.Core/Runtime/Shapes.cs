@@ -574,6 +574,12 @@ namespace KScript.Runtime
     /// </summary>
     internal interface IRecordKind
     {
+        /// <summary>
+        /// Finishes the type before a value is mapped onto it: a model works out its relations, which makes them
+        /// optional (a relation that hasn't been loaded isn't missing).
+        /// </summary>
+        void Ready();
+
         /// <summary>A member the record doesn't hold, such as a relation that hasn't been loaded yet. False to read the field as usual.</summary>
         bool TryGetMember(Interpreter interpreter, Record record, string name, out object value);
 
@@ -1756,6 +1762,7 @@ namespace KScript.Runtime
             Func<FieldDefinition, object> missingField = null)
         {
             if (value is Record existing && existing.Type.IsA(type)) return existing;
+            (type.Tag as IRecordKind)?.Ready();
             if (type.ReadsText && (value is string || value is ISemanticText))
             {
                 value = ReadText(Values.ToStr(value), type, path);

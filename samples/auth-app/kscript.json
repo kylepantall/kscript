@@ -10,7 +10,7 @@
   },
   "http": {
     "middleware": ["log"],
-    "auth": { "passkey_origin": "http://localhost:8080" }
+    "auth": { "users": "User", "passkey_origin": "http://localhost:8080" }
   },
   // Select the YAML source explicitly.
   "config": {
