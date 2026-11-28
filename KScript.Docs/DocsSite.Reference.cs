@@ -112,6 +112,7 @@ namespace KScript.Docs
             index.Append("<a class=\"card\" href=\"/reference/models\"><strong>Models and mixins</strong><span>Every built-in mixin, such as Timestamps, SoftDeletes and Ownable, and every option a model takes.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/directives\"><strong>Page directives</strong><span>Every @ directive for live pages and components, such as @on-click and @bind, with handler shorthands, modifiers and the fields of $event.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/editor\"><strong>VS Code</strong><span>Every command and setting of the KScript extension for VS Code, with their keys and defaults.</span></a>");
+            index.Append("<a class=\"card\" href=\"/reference/environment\"><strong>Environment variables</strong><span>Every environment variable kscript reads, such as KSCRIPT_ENV and KSCRIPT_SECRET, with defaults and examples.</span></a>");
             index.Append("<a class=\"card\" href=\"/reference/index\"><strong>A to Z</strong><span>Everything built in, in one list: statements and their options, commands, methods, types and settings.</span></a>");
             index.Append("</div>");
             var indexPage = new DocPage { Path = "/reference", Title = "Reference", NavTitle = "Overview", Section = "Reference", Description = "Every package, element, command, method and variable.", Body = index.ToString() };

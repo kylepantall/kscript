@@ -14,7 +14,7 @@ namespace KScript.Runtime
         public static readonly string[] Kinds = { "config", "data", "cache", "state", "logs" };
 
         /// <summary>When set, every app's folders are under this folder instead (<c>&lt;root&gt;/&lt;app&gt;/&lt;kind&gt;</c>): handy for tests and portable installs.</summary>
-        public const string RootVariable = "KSCRIPT_STORAGE_ROOT";
+        public const string RootVariable = EnvironmentVariables.StorageRoot;
 
         private static readonly AsyncLocal<TestStorage> Testing = new AsyncLocal<TestStorage>();
 
@@ -50,7 +50,7 @@ namespace KScript.Runtime
         public static string ProjectDataPath(string project, string path)
         {
             if (Path.IsPathFullyQualified(path)) return Path.GetFullPath(path);
-            string folder = Environment.GetEnvironmentVariable("KSCRIPT_PROJECT_DATA_ROOT");
+            string folder = Environment.GetEnvironmentVariable(EnvironmentVariables.ProjectDataRoot);
             if (string.IsNullOrEmpty(folder)) return Path.GetFullPath(Path.Combine(project, path));
             if (!Path.IsPathFullyQualified(folder))
                 throw new KScriptException("KSCRIPT_PROJECT_DATA_ROOT needs an absolute folder path.", "Config");
