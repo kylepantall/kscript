@@ -123,7 +123,7 @@ namespace KScript.Language.Features
         {
             ElementInfo info = Catalog.GetElement("model");
             List<CompletionItem> items = new List<CompletionItem>();
-            foreach (string name in CodeParser.ModelSettings.Where(n => !have.Contains(n)))
+            foreach (string name in CodeParser.ModelSettings.Where(n => !have.Contains(n) && !ModelMixins.IsRetiredOption(n)))
             {
                 AttributeInfo a = info?.GetAttribute(name);
                 items.Add(new CompletionItem

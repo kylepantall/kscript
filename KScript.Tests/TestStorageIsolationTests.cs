@@ -130,7 +130,7 @@ public sealed class TestStorageIsolationTests : StorageFixture
         Directory.CreateDirectory(Path.Combine(Project, "models"));
         File.WriteAllText(Path.Combine(Project, "models", "user.kscript"), """
             import KScript.Data
-            model User(timestamps, unique: [email], hidden: [password]) {
+            model User(unique: [email], hidden: [password]) extends Timestamps {
               email: email
               password: password
             }

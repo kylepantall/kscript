@@ -30,6 +30,15 @@ namespace KScript.Data
         /// <summary>A query method: its name, parameters, what it does, what it returns, and the work it does on a query.</summary>
         private sealed record QueryMethod(string Name, string Params, string Description, string Returns, Func<Query, CallContext, object> Run, bool Bare = false);
 
+        /// <summary>A script KScript.Data ships, such as the Timestamps mixin.</summary>
+        private static string Embedded(string name)
+        {
+            using Stream stream = typeof(DataPackage).Assembly.GetManifestResourceStream("KScript.Data.Sources." + name)
+                ?? throw new InvalidOperationException($"KScript.Data is missing its script {name}.");
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+
         protected override void Register(PackageBuilder p)
         {
             RegisterModel(p);
@@ -38,6 +47,8 @@ namespace KScript.Data
             RegisterDatabase(p);
             Migrations.MigrationElements.Register(p);
             RegisterExamples(p);
+            foreach (string mixin in new[] { "timestamps.kscript", "soft-deletes.kscript" })
+                p.Source(mixin, Embedded(mixin));
         }
 
         #region Models
@@ -54,8 +65,8 @@ namespace KScript.Data
                 new A("table", K.Text, "The table its records are kept in. Default: the plural of the name in snake case (User is users, BlogPost blog_posts)."),
                 new A("connection", K.Text, "The database connection, from database.connections in your config. Default: the default connection (main)."),
                 new A("key", K.Text, "The field that is the key. Default: id, an int the database numbers, added when the model doesn't declare it.") { ModelFields = ModelFieldKind.Single },
-                new A("timestamps", K.Bool, "true adds created_at and updated_at, set when records are saved."),
-                new A("soft_deletes", K.Bool, "true adds deleted_at: ->delete() sets it instead of removing the row, and queries leave those records out (->with_trashed() keeps them)."),
+                new A("timestamps", K.Bool, "Retired: extend the Timestamps mixin instead. Only KScript.Data's own script, which declares the mixin, sets it."),
+                new A("soft_deletes", K.Bool, "Retired: extend the SoftDeletes mixin instead. Only KScript.Data's own script, which declares the mixin, sets it."),
                 new A("unique", K.Text, "Fields no two records may share: `[email]`, or `[email, [team_id, slug]]` for a pair that is unique together. Saving a clash fails with UniqueViolation.") { ModelFields = ModelFieldKind.Groups },
                 new A("index", K.Text, "Fields to index, so queries on them are fast: `[team_id, [team_id, created_at]]`.") { ModelFields = ModelFieldKind.Groups },
                 new A("hidden", K.Text, "Fields left out of JSON (and so out of route responses): `[password]`.") { ModelFields = ModelFieldKind.List },
@@ -66,7 +77,7 @@ namespace KScript.Data
             p.Element(new ElementInfo("model", "Declares a model: a <type> whose records are kept in a database table. `User->where(role: admin)->get()` reads them, `User->create({...})` adds one, and `$user->save()` writes changes. Its fields are checked by their types and rules on every save.",
                 ContentKind.Statements, attributes.ToArray())
             {
-                Example = "<model name=\"User\" timestamps=\"true\" unique=\"email\">\n  <field name=\"name\" type=\"string(max: 120)\" />\n  <field name=\"email\" type=\"email\" />\n</model>",
+                Example = "<model name=\"User\" with=\"Timestamps\" unique=\"email\">\n  <field name=\"name\" type=\"string(max: 120)\" />\n  <field name=\"email\" type=\"email\" />\n</model>",
             }, run =>
             {
                 RecordType type = ModelInfo.Declare(run);
@@ -192,14 +203,14 @@ namespace KScript.Data
                     if (c.Args.Count == 0 && c.Named.Count == 0) throw new KScriptException("->order_by() needs a column: ->order_by(name), or ->order_by(created_at: desc).", "Argument");
                     return q;
                 }, Bare: true),
-            new("latest", "column?", "Sorts newest first by the supplied column. Defaults to created_at, or the primary key for a model with timestamps disabled.", KType.Query,
+            new("latest", "column?", "Sorts newest first by the supplied column. Defaults to created_at, or the primary key for a model that doesn't extend Timestamps.", KType.Query,
                 (q, c) => q.OrderBy(q.ColumnNamed(c.Has(0) ? Word(c.Arg(0), "->latest()") : DefaultTimeColumn(q), " for ->latest()"), true), Bare: true),
-            new("oldest", "column?", "Sorts oldest first by the supplied column. Defaults to created_at, or the primary key for a model with timestamps disabled.", KType.Query,
+            new("oldest", "column?", "Sorts oldest first by the supplied column. Defaults to created_at, or the primary key for a model that doesn't extend Timestamps.", KType.Query,
                 (q, c) => q.OrderBy(q.ColumnNamed(c.Has(0) ? Word(c.Arg(0), "->oldest()") : DefaultTimeColumn(q), " for ->oldest()"), false), Bare: true),
             new("limit", "count: number", "Reads at most this many rows.", KType.Query, (q, c) => q.Taking(Count(c.Arg(0), "->limit()"))),
             new("offset", "count: number", "Skips this many rows first.", KType.Query, (q, c) => q.Skipping(Count(c.Arg(0), "->offset()"))),
-            new("with_trashed", "", "For models with soft_deletes: keeps the deleted records, which queries leave out by default.", KType.Query, (q, c) => q.WithTrashed("with")),
-            new("only_trashed", "", "For models with soft_deletes: reads only the deleted records.", KType.Query, (q, c) => q.WithTrashed("only")),
+            new("with_trashed", "", "For models that extend SoftDeletes: keeps the deleted records, which queries leave out by default.", KType.Query, (q, c) => q.WithTrashed("with")),
+            new("only_trashed", "", "For models that extend SoftDeletes: reads only the deleted records.", KType.Query, (q, c) => q.WithTrashed("only")),
             new("lock_for_update", "", "Locks the rows read until the transaction ends, so nobody else changes them first. Use it inside a transaction. On SQLite, which locks the whole database for a transaction's writes instead, it changes nothing.", KType.Query, (q, c) => q.Locking("update", false)),
             new("skip_locked", "", "With ->lock_for_update(): skips rows another transaction has locked, instead of waiting. Good for taking jobs from a queue. On SQLite, which has no row locks, it changes nothing.", KType.Query, (q, c) => q.Locking(null, true)),
 
@@ -241,9 +252,9 @@ namespace KScript.Data
                 (q, c) => q.Increment(c, Word(c.Arg(0), "->increment()"), c.Num(1, 1)), Bare: true),
             new("decrement", "column, by?: number", "Takes away from a number column on every row that matches (1 by default). Returns how many rows changed.", KType.Number,
                 (q, c) => q.Increment(c, Word(c.Arg(0), "->decrement()"), -c.Num(1, 1), "decrement"), Bare: true),
-            new("delete", "", "Deletes every row that matches: models with soft_deletes only mark them deleted. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: false)),
-            new("force_delete", "", "Deletes every row that matches, even for models with soft_deletes. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: true)),
-            new("restore", "", "For models with soft_deletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
+            new("delete", "", "Deletes every row that matches: models that extend SoftDeletes only mark them deleted. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: false)),
+            new("force_delete", "", "Deletes every row that matches, even for models that extend SoftDeletes. Returns how many.", KType.Number, (q, c) => q.Delete(c, force: true)),
+            new("restore", "", "For models that extend SoftDeletes: brings back the deleted records that match. Returns how many.", KType.Number, (q, c) => q.Restore(c)),
             new("insert", "rows", "Adds rows: a map, or a list of maps. On a model each one is checked like ->create(). Returns how many were added.", KType.Number, (q, c) => q.Insert(c, c.Arg(0))),
             new("upsert", "row: map, key?: string", "Atomically inserts a row or updates supplied fields on unique conflict. The key must name a unique column. The returned count is the provider’s affected-row count.", KType.Number,
                 (q, c) => q.Upsert(c, c.Map(0), c.Str(1, null))),
@@ -382,9 +393,9 @@ namespace KScript.Data
                 (t, c) => Records.Save(c, RecordOf(t, c)));
             p.Method(KType.Record, "update", "values...", "Sets fields and saves: `$user->update(name: 'Joan')` or `->update($form)`. Each value is checked by its field's type; guarded fields are left out. Returns the record.", KType.Record,
                 (t, c) => Records.Update(c, RecordOf(t, c), ValuesOf(c, "update"))).Info.KeepsBareWords = true;
-            p.Method(KType.Record, "delete", "", "Deletes the record. With soft_deletes it is only marked deleted (->restore() brings it back). True when it was deleted.", KType.Bool,
+            p.Method(KType.Record, "delete", "", "Deletes the record. For a model that extends SoftDeletes it is only marked deleted (->restore() brings it back). True when it was deleted.", KType.Bool,
                 (t, c) => Records.Delete(c, RecordOf(t, c), force: false));
-            p.Method(KType.Record, "force_delete", "", "Deletes the record from the table, even with soft_deletes.", KType.Bool,
+            p.Method(KType.Record, "force_delete", "", "Deletes the record from the table, even for a model that extends SoftDeletes.", KType.Bool,
                 (t, c) => Records.Delete(c, RecordOf(t, c), force: true));
             p.Method(KType.Record, "restore", "", "Brings back a soft-deleted record. Returns the record.", KType.Record,
                 (t, c) => Records.Restore(c, RecordOf(t, c)));

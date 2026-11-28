@@ -49,8 +49,8 @@ public sealed class MakeWizardTests : IDisposable
         var (code, _, error) = Make(site.Root, "model");
         Assert.True(code == 0, error);
         string model = File.ReadAllText(Directory.GetFiles(site.Root, "post.*", SearchOption.AllDirectories).Single());
-        Assert.Contains("model Post(timestamps) {", model);
-        Assert.DoesNotContain("soft_deletes", model);
+        Assert.Contains("model Post extends Timestamps {", model);
+        Assert.DoesNotContain("SoftDeletes", model);
         Assert.True(MakeWizard.IsFlag(Scaffolder.FindTemplate(site.Root, "model"), "timestamps"));
         Assert.False(MakeWizard.IsFlag(Scaffolder.FindTemplate(site.Root, "model"), "fields"));
     }

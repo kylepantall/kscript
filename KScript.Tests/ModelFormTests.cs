@@ -18,7 +18,7 @@ public sealed class ModelFormTests : DataFixture
         FileOf("kscript.json", """{ "name": "binding-test", "http": { "auth": { "folder": "storage", "csrf": false } } }""");
         FileOf("models/note.kscript", """
             import KScript.Data
-            model Note(timestamps, soft_deletes, guarded: [admin], hidden: [secret]) {
+            model Note(guarded: [admin], hidden: [secret]) extends [Timestamps, SoftDeletes] {
               user_id: string
               title: string(max: 15)
               score: int

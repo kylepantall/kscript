@@ -285,7 +285,7 @@ import KScript.Web
 import KScript.Data
 
 type CommentThread extends Component {
-  model Comment(timestamps) {
+  model Comment extends Timestamps {
     post_id: int
     body: string(min: 1, max: 2000)
   }

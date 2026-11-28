@@ -32,7 +32,7 @@ public sealed class PublishTests
         var made = Publish(site.Root, "User", "Ownable");
         Assert.True(made.Code == 0, made.Err);
         string user = File.ReadAllText(Path.Combine(site.Root, "app", "models", "user.kscript"));
-        Assert.Contains("model User(timestamps, auto_create, unique: [email], hidden: [password]) {", user);
+        Assert.Contains("model User(auto_create, unique: [email], hidden: [password]) extends Timestamps {", user);
         Assert.Contains("Yours: app/models/user.kscript.", Publish(site.Root).Out);
 
         File.WriteAllText(Path.Combine(site.Root, "app", "models", "user.kscript"), "// mine\n");

@@ -66,6 +66,41 @@ model Post {
 
 Like every declaration, a model may have a `///` doc comment above it, which the editor shows when you hover over its name.
 
+### Timestamps and soft deletes
+
+Two things many tables want come as mixins that KScript.Data ships. A model extends them, as it would any other [base](#extending-models).
+
+#### Timestamps
+
+KScript.Data ships a `Timestamps` mixin. A model that extends it gets `created_at` and `updated_at` fields. Both are filled in when a record is first saved, and `updated_at` changes every time it is saved again:
+
+```kscript
+import KScript.Data
+
+model Comment extends Timestamps {
+  text: string
+}
+```
+
+#### Soft deletes
+
+A model that extends the `SoftDeletes` mixin doesn't lose a row when a record is deleted. Instead, its `deleted_at` field is set, and queries leave it out from then on. You may still read deleted records with `->with_trashed()`, and bring one back with `->restore()`:
+
+```kscript
+import KScript.Data
+
+model Task extends SoftDeletes {
+  title: string
+}
+
+$db->create_table(Task)
+task = Task->create(title: 'Write the report')
+$task->delete()
+
+echo Task->count()
+echo Task->with_trashed()->count()
+```
+
 ### Model options
 
 Options go in brackets after the model's name. An option that is simply on is written as a bare word, and the rest take a value:
@@ -73,7 +108,7 @@ Options go in brackets after the model's name. An option that is simply on is wr
 ```kscript
 import KScript.Data
 
-model Post(timestamps, soft_deletes, unique: [slug]) {
+model Post(auto_create, unique: [slug]) {
   title: string
   slug: string
 }
@@ -85,45 +120,14 @@ When the list grows long, you may put each option on its own line. A trailing co
 import KScript.Data
 
 model Attachment(
-  timestamps,
-  soft_deletes,
+  auto_create,
+  unique: [name],
 ) {
   name: string
 }
 ```
 
 The block itself holds only fields, `validate` rules and `fn` methods. An option written as a line of the block is reported as KS6014, and `kscript check --fix` moves it into the brackets.
-
-#### Timestamps
-
-The `timestamps` option adds `created_at` and `updated_at` fields. Both are filled in when a record is first saved, and `updated_at` changes every time it is saved again:
-
-```kscript
-import KScript.Data
-
-model Comment(timestamps) {
-  text: string
-}
-```
-
-#### Soft deletes
-
-With `soft_deletes`, deleting a record doesn't remove its row. Instead, its `deleted_at` field is set, and queries leave it out from then on. You may still read deleted records with `->with_trashed()`, and bring one back with `->restore()`:
-
-```kscript
-import KScript.Data
-
-model Task(soft_deletes) {
-  title: string
-}
-
-$db->create_table(Task)
-task = Task->create(title: 'Write the report')
-$task->delete()
-
-echo Task->count()
-echo Task->with_trashed()->count()
-```
 
 #### Table names and keys
 
@@ -167,7 +171,7 @@ model Member(unique: [email, [team_id, handle]]) {
 ```kscript
 import KScript.Data
 
-model Order(index: [customer, [status, created_at]], timestamps) {
+model Order(index: [customer, [status, created_at]]) extends Timestamps {
   customer: string
   status: string
 }
@@ -207,7 +211,7 @@ Models that share fields, methods or options can take them from a common base wi
 import KScript.Data
 
 /// Things that can be published.
-model Publishable(mixin, timestamps, index: [published_at]) {
+model Publishable(mixin, index: [published_at]) extends Timestamps {
   published_at?: date
 
   fn published(query) => $query->where(fn(p) => $p.published_at != null)
@@ -232,7 +236,7 @@ model UID(mixin, key: 'uid') {
 }
 
 /// Things that can be published.
-model Publishable(mixin, timestamps) {
+model Publishable(mixin) extends Timestamps {
   published_at?: date
 }
 
@@ -241,7 +245,7 @@ model Invoice extends [UID, Publishable] {
 }
 ```
 
-A model takes its bases' fields, `validate` rules, methods, [scopes](#scopes) and options such as `key`, `timestamps`, `soft_deletes`, `unique`, `index`, `hidden`, `guarded` and `extra`. A field or method of the model itself replaces one of the same name, and the model's own options win over all of its bases'.
+A model takes its bases' fields, `validate` rules, methods, [scopes](#scopes) and options such as `key`, `unique`, `index`, `hidden`, `guarded` and `extra`. A base may itself extend the built-in mixins, so a model that extends `Publishable` above has timestamps too. A field or method of the model itself replaces one of the same name, and the model's own options win over all of its bases'.
 
 Some things are never inherited. Each model has its own `table`, `connection` and `auto_create`, because each concrete model has its own table. A model that extends a mixin isn't a mixin itself unless it says so.
 
@@ -250,11 +254,11 @@ You may change a base's option for one use by giving it in brackets after the ba
 ```kscript
 import KScript.Data
 
-model Publishable(mixin, timestamps) {
+model Publishable(mixin, hidden: [published_at]) {
   published_at?: date
 }
 
-model Draft extends Publishable(timestamps: false) {
+model Draft extends Publishable(hidden: []) {
   text: string
 }
 ```
@@ -277,34 +281,32 @@ A computed field, such as `label => $first + ' ' + $last`, isn't stored at all. 
 
 ## Built-in models and mixins
 
-Some packages come with models and mixins you can extend straight away. Import the package, then extend the mixin. You don't declare it yourself.
+Some packages ship mixins you may extend straight away. Import the package, then extend the mixin. You don't declare it yourself. A model may extend several at once: `model Post extends [Timestamps, SoftDeletes] { ... }`.
 
-KScript.Auth ships three: the `User` model its users can be kept in, the `Guest` model for people without an account, and the `Ownable` mixin, for rows that belong to one person. A model that extends `Ownable` gets a `user` and a `guest` [relation](#relations), one of them filled in from whoever is signed in (or the browser's guest) when a record is made, and never changed after. It also gets a `->mine()` scope and an `->is_mine()` method:
+| Mixin | Package | What a model that extends it gets |
+| --- | --- | --- |
+| `Timestamps` | KScript.Data | `created_at` and `updated_at`, set when records are saved. See [Timestamps](#timestamps). |
+| `SoftDeletes` | KScript.Data | `deleted_at`: `->delete()` marks a record deleted, and queries leave it out. See [Soft deletes](#soft-deletes). |
+| `Ownable` | KScript.Auth | A `user` and a `guest` [relation](#relations), one of them set from whoever is signed in (or the browser's guest) and never changed after, the `->mine()` scope and `->is_mine()`. See [Guests and owners](auth.md#guests-and-owners). |
+
+KScript.Auth also ships two models: `User`, which its users can be kept in, and `Guest`, for people without an account.
+
+For example, notes that belong to one person and know when they were written:
 
 ```kscript
 import KScript.Data
 import KScript.Auth
 
-model Note extends Ownable {
+model Note extends [Ownable, Timestamps] {
   text: string
 }
 ```
 
-Then `Note->mine()->get()` reads only the current person's notes, and `$note.user` is the `User` who wrote one. See [Guests and owners](auth.md#guests-and-owners) for the whole story. The reference lists every built-in model and mixin with its fields and methods: [Models and mixins](/reference/models). In `kscript mcp`, `lookup Ownable` shows its source.
+Then `Note->mine()->get()` reads only the current person's notes, and `$note.user` is the `User` who wrote one. In `kscript mcp`, `lookup Ownable` shows a mixin's source.
 
-To change a built-in model, copy it into your project with `kscript publish`: `kscript publish User` writes `models/user.kscript`. The copy replaces the package's model wherever the package is imported, so its fields, its key and its options are yours. Relations follow the copy: a uuid key on your `User` makes Ownable's `user_id` a uuid.
+To change a built-in model or mixin, copy it into your project with `kscript publish`: `kscript publish User` writes `models/user.kscript`. The copy replaces the package's version wherever the package is imported, so its fields, its key and its options are yours. Relations follow the copy: a uuid key on your `User` makes Ownable's `user_id` a uuid.
 
-KScript.Data itself ships no mixins, because what a `SoftDeletable` or `Auditable` mixin would do is already an option: `soft_deletes` and `timestamps`. If your project prefers the name, a mixin that sets the option is one line:
-
-```kscript
-import KScript.Data
-
-model SoftDeletable(mixin, soft_deletes)
-
-model Post extends SoftDeletable {
-  title: string
-}
-```
+The [Models and mixins](/reference/models) reference lists every mixin with its fields and methods, every option with an example, and the tables KScript keeps in your database for itself (`kscript_migrations` and the database queue's `kscript_jobs`, `kscript_failed_jobs` and `kscript_job_locks`).
 
 KScript.Auth can also keep its users in a model of your own. See [Users in a model](auth.md#users-in-a-model).
 
@@ -317,7 +319,7 @@ To add a record, call `->create()` on the model with its fields. The values are 
 ```kscript
 import KScript.Data
 
-model Note(timestamps) {
+model Note extends Timestamps {
   text: string
   pinned: bool = false
 }
@@ -374,7 +376,7 @@ You may ask a record whether it has unsaved changes with `->is_dirty()`, optiona
 
 ### Deleting records
 
-`->delete()` removes a record. On a model with `soft_deletes`, it marks the record deleted instead. Use `->force_delete()` to remove it for good, and `->restore()` to bring a soft-deleted record back:
+`->delete()` removes a record. On a model that extends `SoftDeletes`, it marks the record deleted instead. Use `->force_delete()` to remove it for good, and `->restore()` to bring a soft-deleted record back:
 
 ```kscript
 $note->delete()
@@ -389,7 +391,7 @@ Every query starts from the model. `->all()` gives every record, and `->get()` r
 ```kscript
 import KScript.Data
 
-model Order(timestamps) {
+model Order extends Timestamps {
   customer: string
   total: number
   status: string = 'open'
@@ -483,7 +485,7 @@ results = Order->when($search != '', fn(q) => $q->where(.customer->contains($sea
 biggest_first = Order->order_by(total: desc)->get()
 ```
 
-`->latest()` and `->oldest()` sort by `created_at`, or by the key when the model has no timestamps. Both also take a field name.
+`->latest()` and `->oldest()` sort by `created_at`, or by the key when the model doesn't extend `Timestamps`. Both also take a field name.
 
 `->limit()` reads at most that many rows, and `->offset()` skips rows first. `->select()` reads only some columns, and `->distinct()` leaves out rows that repeat.
 

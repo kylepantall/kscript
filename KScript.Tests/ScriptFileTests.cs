@@ -23,7 +23,7 @@ public class ScriptFileTests
         const string code = """
             import KScript.Data
 
-            model Note (timestamps, index: [title]) {
+            model Note (index: [title]) extends Timestamps {
               title: string (min: 1)
             }
 

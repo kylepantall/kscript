@@ -2,7 +2,7 @@ import KScript.Data
 import "stocked.kscript"
 
 /// Something the shop sells.
-model Product(timestamps, unique: [sku]) extends Stocked {
+model Product(unique: [sku]) extends [Stocked, Timestamps] {
   sku: string(max: 20)
   name: string(max: 120)
   price: number(min: 0)

@@ -484,6 +484,7 @@ namespace KScript.Language.Analysis
             // parse="..." sees the text being read, so it is analyzed below with $value and $match.
             AnalyzeAttributes(e, info, scope, skip: "parse");
             CheckOptionsAreInBrackets(e);
+            CheckRetiredModelOptions(e);
             var seen = new HashSet<string>(StringComparer.Ordinal);
             MarkupAttribute fields = e.GetAttribute("fields");
             if (fields?.Value != null)

@@ -22,7 +22,7 @@ namespace KScript.Language.Tests
                 import KScript.Data
                 import "../types/link.kscript"
 
-                model Note(timestamps, soft_deletes) {
+                model Note extends [Timestamps, SoftDeletes] {
                   title: string = ''
                   links: Link[] = []
                 }

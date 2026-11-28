@@ -8,7 +8,7 @@ namespace KScript.Tests;
 public sealed class DataTimeZoneTests : DataFixture
 {
     private const string Notes = """
-        model Note(timestamps) {
+        model Note extends Timestamps {
           text: string
         }
         $db->create_table(Note)
@@ -86,7 +86,7 @@ public sealed class DataTimeZoneTests : DataFixture
         Database.CloseAll();
         FileOf("read.kscript", """
             import KScript.Data
-            model Note(timestamps) {
+            model Note extends Timestamps {
               text: string
             }
             echo Note->find(1).created_at->format('yyyy-MM-dd HH:mm')

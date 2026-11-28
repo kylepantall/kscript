@@ -38,7 +38,9 @@ public class OldSpellingTests
         { "type Repo {\n  name: string\n}\nr = $Repo(name: 'x')\necho $r.name\n", "Write Repo", "type Repo {\n  name: string\n}\nr = Repo(name: 'x')\necho $r.name\n", "x\n" },
         { "type Repo {\n  name: string\n  age: int?\n}\necho Repo(name: 'x').name\n", "age?: int", "type Repo {\n  name: string\n  age?: int\n}\necho Repo(name: 'x').name\n", "x\n" },
         // A model's options go in its brackets
-        { "import KScript.Data\nmodel User {\n  timestamps: true\n  name: string\n}\necho \"ok\"\n", "Write a model's options in its brackets", "import KScript.Data\nmodel User(timestamps) {\n  name: string\n}\necho \"ok\"\n", "ok\n" },
+        { "import KScript.Data\nmodel User {\n  auto_create: true\n  name: string\n}\necho \"ok\"\n", "Write a model's options in its brackets", "import KScript.Data\nmodel User(auto_create) {\n  name: string\n}\necho \"ok\"\n", "ok\n" },
+        // Timestamps and soft deletes are mixins
+        { "import KScript.Data\nmodel User(timestamps, soft_deletes) {\n  name: string\n}\necho \"ok\"\n", "is now the Timestamps mixin", "import KScript.Data\nmodel User extends [Timestamps, SoftDeletes] {\n  name: string\n}\necho \"ok\"\n", "ok\n" },
         // Text is quoted, and a function is @name
         { "import KScript.Terminal\ndetail(name: People) \"2\"\n", "name: \"People\"", "import KScript.Terminal\ndetail(name: \"People\") \"2\"\n", null },
         { "fn job() {\n  echo \"x\"\n}\nspawn(fn: job)\n", "Write @job", "fn job() {\n  echo \"x\"\n}\nspawn(fn: @job)\n", null },

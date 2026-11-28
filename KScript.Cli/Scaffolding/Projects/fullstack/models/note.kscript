@@ -10,7 +10,7 @@ import KScript.Auth
 {{/if}}
 
 /// A note{{#if auth}} that belongs to the user who wrote it{{/if}}.
-model Note(timestamps, auto_create){{#if auth}} extends Ownable{{/if}} {
+model Note(auto_create) extends {{#if auth}}[Ownable, Timestamps]{{else}}Timestamps{{/if}} {
   title: string(min: 1, max: 200)
   body: string = ''
   done: bool = false

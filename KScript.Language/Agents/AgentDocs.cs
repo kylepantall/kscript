@@ -560,7 +560,7 @@ namespace KScript.Language.Agents
             - Operators: `== !=` (loose) `=== !==` (strict) `< <= > >=` `and or not` `??` `?.` `a ? b : c` `in`. Ranges `0..10` exclude the end.
             - Arguments: the first (the subject) positional, the rest named: `@round($x, digits: 2)`. Flags are bare words: `recursive`, `not recursive`. Enums are `enum Size { small, large }`, and their values are bare: `@known_folder(downloads)`.
             - Lists of names are arrays: `use: [log, cors]`, never `"log, cors"`.
-            - Types, models, enums, errors and jobs are named bare (`as: Task`, `User->create(name: 'Joan')`), and calling the name makes a value: `Task($data)`, `Task(title: 'x')`. An optional field is `due?: date`. Options go in brackets: `model User(timestamps, unique: [email]) { }`.
+            - Types, models, enums, errors and jobs are named bare (`as: Task`, `User->create(name: 'Joan')`), and calling the name makes a value: `Task($data)`, `Task(title: 'x')`. An optional field is `due?: date`. Options go in brackets: `model User(unique: [email]) extends Timestamps { }`.
             - A package is named in its import: `import KScript.UI`, then `Window { }`. Core and the packages configured in `kscript.json` are available throughout the project. Import additional packages where used.
             - Lengths of time are durations, a number and a unit with no quotes: `timeout: 30s`, `ttl: 10m`, `wait(duration: 500ms)`. A plain number is seconds.
 

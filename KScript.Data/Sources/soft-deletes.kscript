@@ -1,0 +1,6 @@
+import KScript.Data
+
+/// Adds deleted_at to a model: ->delete() sets it instead of removing the row,
+/// and queries leave those records out. ->with_trashed() keeps them,
+/// ->restore() brings one back and ->force_delete() removes it for good.
+model SoftDeletes(mixin, soft_deletes)

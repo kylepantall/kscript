@@ -515,7 +515,7 @@ KScript.Auth comes with a `User` model: a name, an email and a password, with ti
 ```kscript
 import KScript.Data
 
-model User(timestamps, auto_create, unique: [email], hidden: [password]) {
+model User(unique: [email], hidden: [password]) extends Timestamps {
   name: string
   email: email
   password: password
@@ -537,7 +537,7 @@ import KScript.Auth
 import KScript.Http
 
 /// A note on someone's board.
-model Note(timestamps) extends Ownable {
+model Note extends [Ownable, Timestamps] {
   title: string
 }
 
@@ -578,7 +578,7 @@ The relations follow the models. Give your `User` a uuid key and Ownable's `user
 ```kscript
 import KScript.Data
 
-model User(key: 'uid', timestamps, auto_create, unique: [email], hidden: [password]) {
+model User(key: 'uid', auto_create, unique: [email], hidden: [password]) extends Timestamps {
   uid: uuid = @uuid()
   name: string
   email: email

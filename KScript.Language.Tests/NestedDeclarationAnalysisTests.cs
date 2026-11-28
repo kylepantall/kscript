@@ -31,7 +31,7 @@ namespace KScript.Language.Tests
             import KScript.Data
 
             type CommentThread extends Component {
-              model Comment(timestamps) {
+              model Comment extends Timestamps {
                 post_id: int
                 body: string(min: 1, max: 2000)
               }
@@ -106,11 +106,11 @@ namespace KScript.Language.Tests
         {
             string source = Component.ReplaceLineEndings("\n");
             string xml = ScriptConverter.Convert(source, "comment-thread.kscript").Text;
-            Assert.Contains("    <model name=\"Comment\" timestamps=\"yes\">", xml);
+            Assert.Contains("    <model name=\"Comment\" with=\"Timestamps\">", xml);
             Assert.Contains("    <enum name=\"Order\" values=\"newest, oldest\" />", xml);
             Assert.Contains("    <error name=\"TooLong\" message=\"That comment is too long\" />", xml);
             string code = ScriptConverter.Convert(xml, "comment-thread.ks.xml").Text;
-            Assert.Contains("type CommentThread extends Component {\n  model Comment(timestamps) {\n    post_id: int\n", code);
+            Assert.Contains("type CommentThread extends Component {\n  model Comment extends Timestamps {\n    post_id: int\n", code);
             Assert.Contains("  /// What is being typed.\n  type Draft {\n    body: string = ''\n  }\n", code);
             Assert.Contains("  enum Order { newest, oldest }\n", code);
             Assert.Contains("  error TooLong(message: \"That comment is too long\")\n", code);
