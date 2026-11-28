@@ -119,7 +119,8 @@ namespace KScript.Runtime
             Package = package;
             Replaceable = replaceable;
             FileName = fileName;
-            Text = text;
+            // A checkout on Windows may give the embedded script \r\n line ends; a package's script reads the same everywhere.
+            Text = text?.Replace("\r\n", "\n");
             Path = System.IO.Path.Combine(Root, package, fileName);
         }
 
