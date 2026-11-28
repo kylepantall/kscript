@@ -82,15 +82,17 @@ namespace KScript
                 "Tidy scripts and pages.",
                 new[] { O("--check", "Only report files that would change, and fail if any would (for CI).") },
                 Ex(("kscript fmt", "Formats every script and page in the project."), ("kscript fmt --check", "Changes nothing, and fails when a file isn't formatted (for CI).")), "formatting") { Group = "code", Details = "Tidies .kscript and .ks.xml scripts and kscript serve .html pages. With no path, formats the current project." },
-            new CliCommand("test", "kscript test [file-or-folder]... [--filter text] [--timeout s] [--junit file]",
+            new CliCommand("test", "kscript test [file-or-folder]... [--all | --failed] [--filter text] [--timeout s] [--junit file]",
                 "Run *.test.kscript and *.test.ks.xml tests.",
                 new[]
                 {
+                    O("--all", "Run every test. Without it, a project run runs only the tests a change since the last run can affect."),
+                    O("--failed", "Run only the tests that failed in the last run."),
                     O("--filter text", "Only run tests whose name contains the text."),
                     O("--timeout s", "Stop a test that runs longer than this many seconds (default 10)."),
                     O("--junit file", "Also write a JUnit XML report, for CI."),
                 },
-                Ex(("kscript test", "Runs every test file in the project."), ("kscript test tests/cart.test.kscript --filter total", "Runs only the tests in one file whose names contain total.")), "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests." },
+                Ex(("kscript test", "Runs the project's tests that a change since the last run can affect (all of them the first time)."), ("kscript test --all", "Runs every test in the project."), ("kscript test --failed", "Runs the tests that failed last time."), ("kscript test tests/cart.test.kscript --filter total", "Runs only the tests in one file whose names contain total.")), "testing") { Group = "run", Details = "Runs *.test.kscript and *.test.ks.xml files (or the files test.include names in kscript.json). With no paths, runs the current project's tests: only those that reached something that changed since they last passed, unless --all is given or CI is set. Naming files or --filter runs what you name." },
             new CliCommand("serve", "kscript serve [site folder] [--docker | --no-docker] [--port 8080] [--host localhost] [--env name] [--no-reload] [--migrate] [--with-docs [--docs-port 4180]] [--with-worker]",
                 "Serve pages, and routes.kscript / api.kscript routes.",
                 new[]
@@ -241,16 +243,17 @@ namespace KScript
                     O("--key value", "Values for the template, such as --resource or --fields \"name: string\"."),
                 },
                 Ex(("kscript make project my-site", "Makes a new project in my-site, asking what it needs."), ("kscript make project shop --template api --db postgres --docker", "Makes an API project on Postgres, with Docker files."), ("kscript make route users --api", "Adds an API route for users and its controller."), ("kscript make controller people --resource", "Makes a controller with the index, show, store, update and destroy actions.")), "projects") { Group = "build" },
-            new CliCommand("publish", "kscript publish [model...] [--syntax kscript|xml] [--force] [--dry-run] [--dir <folder>]",
-                "Copy a model a package ships, such as User, Guest or Ownable, into your models folder to change it.",
+            new CliCommand("publish", "kscript publish [model...|queue] [--syntax kscript|xml] [--force] [--dry-run] [--dir <folder>] [--connection <name>]",
+                "Copy a model a package ships, such as User, Guest or Ownable, into your models folder to change it, or write the migration for the database queue's tables.",
                 new[]
                 {
                     O("--syntax kscript|xml", "Write a .kscript (the default) or .ks.xml file."),
                     O("--force", "Replace the project's copy with the package's again."),
                     O("--dry-run", "Show where the copy would go, and write nothing."),
                     O("--dir <folder>", "Use the project in this folder instead of the current one."),
+                    O("--connection <name>", "With queue: the database queue connection whose tables to write (default: database)."),
                 },
-                Ex(("kscript publish", "Lists the models and mixins the packages ship, and which ones the project has its own copy of."), ("kscript publish User", "Copies KScript.Auth's User model to models/user.kscript.")), "projects")
+                Ex(("kscript publish", "Lists the models and mixins the packages ship, and which ones the project has its own copy of."), ("kscript publish User", "Copies KScript.Auth's User model to models/user.kscript."), ("kscript publish queue", "Writes the migration that makes the database queue's tables, so kscript db migrate makes them.")), "projects")
             {
                 Group = "build",
                 Details = "The copy replaces the package's model everywhere the package is imported: in scripts, routes, tests, migrations and the editor. Change its fields, its key or its options there. Ownable's user and guest follow the User and Guest models, so a uuid key on User makes Ownable's user_id a uuid too.",

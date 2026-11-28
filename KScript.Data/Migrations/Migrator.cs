@@ -93,7 +93,7 @@ namespace KScript.Data.Migrations
 
         private static bool HoldsModel(string path)
         {
-            var document = MarkupParser.Parse(new SourceText(File.ReadAllText(path)), MarkupParser.KindFromPath(path), path);
+            var document = MarkupParser.Parse(new SourceText(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path)), MarkupParser.KindFromPath(path), path);
             return document.DescendantElements().Any(e => e.Name == "model" && ComponentScript.IsNestedDeclaration(e));
         }
 

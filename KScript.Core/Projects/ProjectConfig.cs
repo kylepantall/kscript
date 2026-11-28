@@ -224,7 +224,24 @@ namespace KScript.Projects
 
             /// <summary>For the redis driver: the environment variable holding the URL.</summary>
             public string UrlEnv { get; set; }
+
+            /// <summary>For the database driver: the table jobs wait in ("tables": { "jobs": ... }).</summary>
+            public string JobsTable { get; set; } = DefaultJobsTable;
+
+            /// <summary>For the database driver: the table failed jobs are kept in.</summary>
+            public string FailedTable { get; set; } = DefaultFailedTable;
+
+            /// <summary>For the database driver: the table unique jobs' locks are kept in.</summary>
+            public string LocksTable { get; set; } = DefaultLocksTable;
+
+            /// <summary>
+            /// For the database driver: false when the project's migrations make the tables (kscript publish queue),
+            /// so the driver doesn't make them the first time it is used.
+            /// </summary>
+            public bool AutoCreate { get; set; } = true;
         }
+
+        public const string DefaultJobsTable = "kscript_jobs", DefaultFailedTable = "kscript_failed_jobs", DefaultLocksTable = "kscript_job_locks";
 
         public static readonly string[] Drivers = { "sync", "memory", "file", "database" };
 
@@ -1213,7 +1230,28 @@ namespace KScript.Projects
                                     case "path": connection.Path = String(o.Value, where + ".path", config); break;
                                     case "connection": connection.Database = String(o.Value, where + ".connection", config); break;
                                     case "url_env": connection.UrlEnv = String(o.Value, where + ".url_env", config); break;
-                                    default: config.Warnings.Add($"unknown setting '{where}.{o.Name}' (expected driver, path, connection or url_env)."); break;
+                                    case "auto_create": connection.AutoCreate = Bool(o.Value, where + ".auto_create", config) ?? connection.AutoCreate; break;
+                                    case "tables":
+                                        if (!Object(o.Value, where + ".tables", config)) break;
+                                        foreach (var t in o.Value.EnumerateObject())
+                                        {
+                                            string table = String(t.Value, $"{where}.tables.{t.Name}", config)?.Trim();
+                                            if (table == null) continue;
+                                            if (!System.Text.RegularExpressions.Regex.IsMatch(table, "^[A-Za-z_][A-Za-z0-9_]{0,62}$"))
+                                            {
+                                                config.Warnings.Add($"{where}.tables.{t.Name} should be a table name: letters, digits and _, such as \"jobs\".");
+                                                continue;
+                                            }
+                                            switch (t.Name)
+                                            {
+                                                case "jobs": connection.JobsTable = table; break;
+                                                case "failed": connection.FailedTable = table; break;
+                                                case "locks": connection.LocksTable = table; break;
+                                                default: config.Warnings.Add($"unknown setting '{where}.tables.{t.Name}' (expected jobs, failed or locks)."); break;
+                                            }
+                                        }
+                                        break;
+                                    default: config.Warnings.Add($"unknown setting '{where}.{o.Name}' (expected driver, path, connection, url_env, tables or auto_create)."); break;
                                 }
                             }
                             if (connection.Driver == null)

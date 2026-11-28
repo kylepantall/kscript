@@ -484,9 +484,17 @@ namespace KScript.Runtime
                 case IdentifierNode id:
                     if (ctx.Module != null && ctx.Module.Aliases.TryGetValue(id.Name, out ImportNamespace ns)) return ns;
                     // A declared type (type, model, enum, error, job) is named bare: as: Repo, User->find(1), Size.small.
-                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType) return declaredType;
+                    if (scope.TryGet(id.Name, out object declaredType) && declaredType is IDeclaredType)
+                    {
+                        Dependencies.DependencyTrace.Reached(declaredType);
+                        return declaredType;
+                    }
                     // So is an error type: catch NotFound, $err->is(NotFound).
-                    if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType) return errorType;
+                    if (ErrorTypes.FindExact(id.Name, scope) is ErrorType errorType)
+                    {
+                        Dependencies.DependencyTrace.Reached(errorType);
+                        return errorType;
+                    }
                     if (InferredLiteral(id.Name, scope, ctx.Module) is PatternLiteral literal) return literal.Convert(this);
                     throw Fail(node, ctx, $"Unknown name '{id.Name}'. Variables start with $ (${id.Name}) and commands with @ (@{id.Name}(...)).", "Name");
 

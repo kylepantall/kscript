@@ -86,6 +86,32 @@ namespace KScript.Runtime
         /// <summary>The root element: &lt;kscript&gt;, or a package element such as &lt;KScript.Window&gt;.</summary>
         public MarkupElement Root { get; internal set; }
 
+        private List<(int Start, int End, string Key)> declarationSpans;
+
+        /// <summary>The key of the top-level declaration holding <paramref name="offset"/> (<c>fn:greet</c>, <c>model:User</c>), or null.</summary>
+        internal string DeclarationAt(int offset)
+        {
+            List<(int Start, int End, string Key)> spans = declarationSpans;
+            if (spans == null)
+            {
+                spans = new List<(int, int, string)>();
+                foreach (var d in Dependencies.SourceFingerprint.DeclarationsOf(Root)) spans.Add((d.Element.Span.Start, d.Element.Span.End, d.Key));
+                declarationSpans = spans;
+            }
+            // The innermost: a method rather than the type around it.
+            string found = null;
+            int width = int.MaxValue;
+            foreach ((int start, int end, string key) in spans)
+            {
+                if (offset >= start && offset < end && end - start < width)
+                {
+                    found = key;
+                    width = end - start;
+                }
+            }
+            return found;
+        }
+
         /// <summary>
         /// The package script this module is, or the project's copy of (kscript publish), such as KScript.Auth's
         /// ownable.kscript. Null for every other script.

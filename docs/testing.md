@@ -222,7 +222,9 @@ samples/task-board has a page whose buttons are all handler shorthands, with a t
 ## Command line
 
 ```sh
-kscript test                              # every test in the project
+kscript test                              # the project's tests a change can affect
+kscript test --all                        # every test in the project
+kscript test --failed                     # only the tests that failed last time
 kscript test tests/cart tests/api.test.kscript   # a folder and a file
 kscript test --filter "cart › adds"       # only tests whose full name contains the text (any case)
 kscript test --timeout 30                 # seconds per test (0: no limit)
@@ -232,6 +234,44 @@ kscript test --junit test-results.xml     # also write a JUnit XML report
 Colours are used when the output is a terminal; set `NO_COLOR` to turn them off or `FORCE_COLOR` to keep them. Ctrl+C stops the run after the current test.
 
 `--junit` writes the results in the JUnit XML format that GitHub Actions reporters, GitLab, Jenkins and Azure Pipelines can show. A failed check is a `<failure>`, another error is an `<error>`, and a file that couldn't run is reported as an `<error>` on a test named `(load)`.
+
+## Running only what changed
+
+A big project has a lot of tests, and most changes affect only a few of them. So in a project, `kscript test` runs just the tests that a change since the last run can affect. Change a model's method, and only the tests that called that method run again; change a service, and only the tests that went through it run.
+
+```sh
+kscript test        # first run: every test, and kscript notes what each one reached
+# edit lib/billing.kscript's total()
+kscript test        # runs the 3 tests that called total(), directly or through other code
+```
+
+```text
+   PASS  tests/checkout.test.kscript
+  ✓ charges the total (12 ms)
+  ✓ adds tax (4 ms)
+  ✓ applies a discount (5 ms)
+
+  Tests:    3 passed, 241 unchanged since the last run, 244 total
+```
+
+While each test runs, kscript notes what it reaches: every function and method it calls, every type, model, enum, error and job it uses, every script it loads and every file read for it (pages, config, test data). Each of those has a fingerprint of its own text, kept in `.kscript/cache/tests.json` (the folder ignores itself, so git never sees it). A test runs again when:
+
+- it is new, or its own block changed;
+- it failed last time (it keeps running until it passes);
+- a function, method, type or other declaration it reached changed;
+- a script it loaded changed outside its declarations (its imports, constants or top-level code), or a file read for it changed.
+
+Because it's what each test actually ran that counts, a test file can import half the project and a test still only depends on the code it went through.
+
+Every test runs when there's no record of a run yet, when kscript itself changed, when `kscript.json` or a `.env` file changed, and when a new script appears (it may be picked up by convention, such as an extension or a route file). The first line of the output says why.
+
+Some runs always run everything they name, and still update the record:
+
+- `kscript test --all`;
+- naming files (`kscript test tests/cart.test.kscript`) or using `--filter`;
+- CI, where the `CI` variable is set (GitHub Actions and most CI services set it).
+
+`kscript test --failed` runs only the tests that failed in the last run.
 
 ## Settings in kscript.json
 

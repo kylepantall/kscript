@@ -125,7 +125,7 @@ namespace KScript.Runtime
             string Lookup(string name) => host.EnvironmentVariable(name) ?? (dotenv.TryGetValue(name, out string v) ? v : null);
             foreach (var layer in layers.Where(l => l.Kind == ConfigLayerKind.EnvFile))
             {
-                foreach (var pair in DotEnv.Parse(File.ReadAllText(layer.Path), Lookup, Path.GetFileName(layer.Path))) dotenv[pair.Key] = pair.Value;
+                foreach (var pair in DotEnv.Parse(KScript.Runtime.Dependencies.DependencyTrace.ReadText(layer.Path), Lookup, Path.GetFileName(layer.Path))) dotenv[pair.Key] = pair.Value;
             }
             if (options.ExportEnv && host.FileRoot == null)
             {
@@ -155,10 +155,10 @@ namespace KScript.Runtime
                 else if (layer.Kind == ConfigLayerKind.Manifest && IsProjectManifest(fileName))
                 {
                     // A broken kscript.json reports itself wherever the project is read; $config just gets nothing from it.
-                    try { parsed = Values.ParseJson(File.ReadAllText(layer.Path)); }
+                    try { parsed = Values.ParseJson(KScript.Runtime.Dependencies.DependencyTrace.ReadText(layer.Path)); }
                     catch (KScriptException) { continue; }
                 }
-                else parsed = ParseJson(File.ReadAllText(layer.Path), fileName);
+                else parsed = ParseJson(KScript.Runtime.Dependencies.DependencyTrace.ReadText(layer.Path), fileName);
                 if (layer.Kind == ConfigLayerKind.Manifest) parsed = ManifestSection(parsed, fileName);
                 if (parsed == null) { sources.Add(new ConfigSource { Name = fileName, Path = layer.Path, Kind = "file" }); continue; }
                 if (parsed is not Dictionary<string, object> map)

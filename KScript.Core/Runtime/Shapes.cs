@@ -330,7 +330,7 @@ namespace KScript.Runtime
     /// data and makes a <see cref="Record"/> of it; <c>Repo->check($data)</c> lists the problems instead; and
     /// <c>Repo->schema()</c> describes it as JSON Schema.
     /// </summary>
-    public sealed class RecordType : IKObject, IDeclaredType
+    public sealed class RecordType : IKObject, IDeclaredType, Dependencies.IDeclaredSource
     {
         internal RecordType(string name, string description, ExtraKeys extra, Scope closure, Module module)
         {
@@ -346,6 +346,10 @@ namespace KScript.Runtime
         public ExtraKeys Extra { get; }
         public IReadOnlyList<FieldDefinition> Fields => fields;
         internal int? DeclarationOffset { get; init; }
+
+        /// <summary>Where it was declared, so reaching it can be recorded (see <see cref="Dependencies.DependencyTrace"/>).</summary>
+        Module Dependencies.IDeclaredSource.DeclaredIn => DeclarationOffset == null ? null : Module;
+        int Dependencies.IDeclaredSource.DeclaredAt => DeclarationOffset ?? 0;
         internal IReadOnlyList<TypeCatch> Catches { get; set; } = Array.Empty<TypeCatch>();
 
         internal Scope Closure { get; }
@@ -624,7 +628,11 @@ namespace KScript.Runtime
     /// </summary>
     public sealed class Record : Dictionary<string, object>
     {
-        internal Record(RecordType type) : base(StringComparer.Ordinal) => Type = type;
+        internal Record(RecordType type) : base(StringComparer.Ordinal)
+        {
+            Type = type;
+            Dependencies.DependencyTrace.Reached(type);
+        }
 
         /// <summary>What a package keeps with one record, such as the values a model record was loaded with.</summary>
         internal object Tag { get; set; }
@@ -883,7 +891,11 @@ namespace KScript.Runtime
         internal static object Resolve(TypeRef type, Scope scope, Module module)
         {
             if (type.Inline != null) return type.Inline;
-            if (scope.TryGet(type.Name, out object found) && (found is RecordType || found is EnumType || found is RefinedType)) return found;
+            if (scope.TryGet(type.Name, out object found) && (found is RecordType || found is EnumType || found is RefinedType))
+            {
+                Dependencies.DependencyTrace.Reached(found);
+                return found;
+            }
             IEnumerable<string> known = Values.DeclarableTypes.Concat(KnownTypes(scope));
             string close = Values.Closest(type.Name, known);
             throw new KScriptException(Wording.Of($"Unknown type '{type.Name}'.") + (close != null ? $" Did you mean {close}?" : string.Empty)
@@ -1006,7 +1018,7 @@ namespace KScript.Runtime
                 object data;
                 try
                 {
-                    data = Values.ParseJson(File.ReadAllText(path));
+                    data = Values.ParseJson(KScript.Runtime.Dependencies.DependencyTrace.ReadText(path));
                 }
                 catch (KScriptException ex)
                 {
@@ -1165,7 +1177,7 @@ namespace KScript.Runtime
                 if (!rules.TryAddChild(e, run, allowNormalize: true))
                     throw run.Error($"<type name=\"{name}\"> is made from {baseName}, so it can only hold <validate> and <normalize> rules or <fn> methods, not <{e.Name}>.", null, "Syntax");
             }
-            var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module, methods);
+            var type = new RefinedType(name, baseType, rules, run.Raw("description"), run.Scope, run.Module, methods) { DeclarationOffset = run.Element.NameSpan.Start };
             type.Catches = TypeCatch.Collect(run, type.BaseRefinement?.Catches ?? Array.Empty<TypeCatch>(), recordFields: false);
             if (rules.ProblemFor(type.Root(), $"<type name=\"{name}\">") is string problem) throw run.Error(problem, null, "Syntax");
             return type;

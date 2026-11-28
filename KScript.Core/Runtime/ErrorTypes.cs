@@ -10,7 +10,7 @@ namespace KScript.Runtime
     /// <c>catch NotFound</c> catches it and every error type that extends it, <c>NotFound(id: 42)</c> makes one, and a
     /// <c>status</c> (its own or a parent's) is the HTTP status KScript.Http answers with when a route doesn't catch it.
     /// </summary>
-    public sealed class ErrorType : IKObject, IDeclaredType
+    public sealed class ErrorType : IKObject, IDeclaredType, Dependencies.IDeclaredSource
     {
         private readonly string parentName;
         private ErrorType parent;
@@ -58,6 +58,12 @@ namespace KScript.Runtime
         internal RecordType OwnFields { get; }
 
         internal Scope Closure { get; }
+
+        internal int? DeclarationOffset { get; init; }
+
+        /// <summary>Where it was declared, so reaching it can be recorded (see <see cref="Dependencies.DependencyTrace"/>).</summary>
+        Module Dependencies.IDeclaredSource.DeclaredIn => DeclarationOffset == null ? null : Module;
+        int Dependencies.IDeclaredSource.DeclaredAt => DeclarationOffset ?? 0;
 
         internal Module Module { get; }
 

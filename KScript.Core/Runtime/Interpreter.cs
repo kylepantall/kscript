@@ -52,6 +52,7 @@ namespace KScript.Runtime
             var source = new SourceText(text);
             MarkupDocument document = MarkupParser.Parse(source, DocumentKind.Script, path);
             var module = new Module(this, path, source, document);
+            Dependencies.DependencyTrace.Loaded(module);
             if (module.Path != null) loading.Add(module.Path);
             try
             {

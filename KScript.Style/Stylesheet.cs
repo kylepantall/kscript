@@ -35,7 +35,7 @@ namespace KScript.Style
         public static string Compile(string path, Dictionary<string, object> vars = null, Action<KScriptHost> setup = null)
         {
             string full = Path.GetFullPath(path);
-            return CompileText(File.ReadAllText(full), full, vars, setup);
+            return CompileText(KScript.Runtime.Dependencies.DependencyTrace.ReadText(full), full, vars, setup);
         }
 
         /// <summary>Compiles stylesheet text. <paramref name="path"/> names it in errors and is where relative paths start.</summary>

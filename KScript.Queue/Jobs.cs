@@ -53,7 +53,7 @@ namespace KScript.Queueing
     /// A job type: <c>job SendWelcome(queue: mail, tries: 5) { user_id: int; fn handle() { } }</c>. Calling it with
     /// its fields (<c>SendWelcome(user_id: 7)</c>) makes a job, which <c>dispatch</c> queues.
     /// </summary>
-    public sealed class JobType : IKObject, ICallable, IDeclaredType
+    public sealed class JobType : IKObject, ICallable, IDeclaredType, KScript.Runtime.Dependencies.IDeclaredSource
     {
         internal JobType(string name, string description, RecordType fields, JobOptions options, MarkupElement handle, MarkupElement failed, Scope closure, Module module)
         {
@@ -75,6 +75,10 @@ namespace KScript.Queueing
         internal MarkupElement Failed { get; }
         internal Scope Closure { get; }
         internal Module Module { get; }
+
+        /// <summary>Where it was declared, so reaching it can be recorded: the job's handle (or failed) method, inside its declaration.</summary>
+        Module KScript.Runtime.Dependencies.IDeclaredSource.DeclaredIn => (Handle ?? Failed) == null ? null : Module;
+        int KScript.Runtime.Dependencies.IDeclaredSource.DeclaredAt => (Handle ?? Failed)?.Span.Start ?? 0;
 
         /// <summary>The file the job is declared in, which a worker loads to run it.</summary>
         public string File => Module?.Path;
@@ -151,6 +155,7 @@ namespace KScript.Queueing
 
         private object RunMethod(Interpreter interpreter, MarkupElement method, string name, JobValue job, Dictionary<string, object> context, object[] args)
         {
+            KScript.Runtime.Dependencies.DependencyTrace.Reached(Module, method.Span.Start);
             Scope scope = Closure.Child();
             foreach (KeyValuePair<string, object> field in job.Fields) scope.Declare(field.Key, field.Value);
             scope.Declare("this", job);

@@ -29,7 +29,7 @@ Then run `kscript serve`, open `/register` to make an account, and open `/accoun
 | `_components/*.kscript` | The [components](components.md) the pages are made of: the sign-in, sign-up and password forms, the account details, the passkey list and the API tokens. |
 | `views/auth/*.html` | The pages: login, register, forgot-password, reset-password and account. Each holds a heading and its components. |
 | `_layout.html` | A plain layout, only when the site has none. |
-| `models/user.kscript` | The `User` model the users are kept in: a copy of KScript.Auth's, to change as your app needs (see [Users in a model](#users-in-a-model)). Not with `--passkeys`, whose accounts the passkey store keeps. |
+| `models/user.kscript` | The `User` model the users are kept in: a copy of KScript.Auth's, to change as your app needs (see [Users in a model](#users-in-a-model)). With `--passkeys` its `email` and `password` are optional, because someone who signs up with a passkey has neither. |
 | `kscript.json` (added to) | `"types": { "password": { "min": 10 } }`, the rule new passwords must meet, and `"users": "User"` in `http.auth`. |
 
 It respects `make.syntax` and `--syntax xml`, the folders in `paths` (components go in `paths.components`), and the route files `http.routes` lists. It won't replace files or routes you already have unless you add `--force`, and `--dry-run` shows what it would do.
@@ -197,7 +197,7 @@ To create accounts using passkeys from the first visit, run this in your project
 kscript make auth --passkeys   # passkey sign-up, sign-in and an account page
 ```
 
-Open `/register` and choose **Create account with a passkey**. KScript creates the account and starts its session after the device verifies the ceremony. Store `@user().id` as a string on records the account owns, such as licenses. Every passkey added on `/account` signs in to that same ID. Add a second passkey before removing the first. An account with a single passkey must keep it.
+Open `/register` and choose **Create account with a passkey**. KScript creates the account, a `User` record with no email or password, and starts its session after the device verifies the ceremony. Records the account owns can extend [Ownable](#guests-and-owners) or hold a `user: User` relation. Every passkey added on `/account` signs in to that same user. Add a second passkey before removing the first. An account with a single passkey must keep it.
 
 The generator sets `http.auth.passkey_signup` and uses the configured serve port for localhost. For a deployed app, generate with `--origin https://accounts.example.com`. Add `--rp-id example.com` if you want that parent domain to scope the credentials. Add `--api` for the authenticated identity endpoint. A signed-in user can issue tokens from the account page. This kit has no password registration, sign-in or reset routes.
 
@@ -526,6 +526,8 @@ model User(unique: [email], hidden: [password]) extends Timestamps {
 When you move to [migrations](data.md#migrations), take `auto_create` off and let `kscript db diff` write the table.
 
 Then a user is a row of the `users` table, and `@user()`, `@register` and `@users()` give you the model's record, so its relations and methods work: `@user().posts`. The password field holds the hash KScript.Auth makes; `hidden: [password]` keeps it out of JSON. Ids are the model's keys. Sessions, API tokens and reset tokens are still files in the app's state folder.
+
+With `passkey_signup` on, someone who signs up with a passkey becomes a record with no email or password, so the model's `email` and `password` must be optional (`email?: email`, `password?: password`). `kscript make auth --passkeys` writes them that way. Their passkeys are kept with the auth data, in the `_passkeys` folder.
 
 ## Guests and owners
 
