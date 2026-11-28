@@ -277,8 +277,8 @@ import "../models/user.kscript"
 
 /// Who may do what to a Post.
 policy for Post {
-  /// An editor may write a new post.
-  fn create(user: User) => $user.role == 'editor'
+  /// Staff, with an address at example.com, may write a new post.
+  fn create(user: User) => $user.email->ends_with('@example.com')
 
   /// Anyone may read a published post. Its author may read a draft.
   fn read(user: User?, post: Post) => $post.published or $user?.id == $post.author_id
@@ -309,7 +309,7 @@ import "../models/post.kscript"
 import "../models/user.kscript"
 
 policy for Post {
-  fn before(user: User) => $user.role == 'admin' ? true : null
+  fn before(user: User) => $user.email == 'admin@example.com' ? true : null
 
   fn update(user: User, post: Post) => $user.id == $post.author_id
 }
