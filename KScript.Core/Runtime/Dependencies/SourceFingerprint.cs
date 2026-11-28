@@ -33,8 +33,7 @@ namespace KScript.Runtime.Dependencies
         public string Of(string key) => key == Rest ? RestHash : Declarations.TryGetValue(key, out string hash) ? hash : null;
 
         /// <summary>True for a .kscript or .ks.xml file.</summary>
-        public static bool IsScript(string path) =>
-            path != null && (path.EndsWith(".kscript", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".ks.xml", StringComparison.OrdinalIgnoreCase));
+        public static bool IsScript(string path) => ScriptFiles.IsScript(path);
 
         /// <summary>The fingerprints of a file on disk, or null when it doesn't exist or can't be read.</summary>
         public static SourceFingerprint ForFile(string path)
@@ -55,7 +54,7 @@ namespace KScript.Runtime.Dependencies
         /// <summary>The fingerprints of a file's text.</summary>
         public static SourceFingerprint Of(string path, string text)
         {
-            if (!IsScript(path) && !(path != null && TestFileName(path))) return new SourceFingerprint { RestHash = Hash(text) };
+            if (!IsScript(path)) return new SourceFingerprint { RestHash = Hash(text) };
 
             MarkupDocument document;
             try
@@ -150,8 +149,6 @@ namespace KScript.Runtime.Dependencies
             byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes((text ?? string.Empty).Replace("\r\n", "\n")));
             return Convert.ToHexString(digest, 0, 12).ToLowerInvariant();
         }
-
-        private static bool TestFileName(string path) => path.EndsWith(".test.xml", StringComparison.OrdinalIgnoreCase);
 
         private static string Slice(string text, TextSpan span)
         {
