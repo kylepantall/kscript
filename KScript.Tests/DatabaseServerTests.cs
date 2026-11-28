@@ -90,7 +90,7 @@ public sealed class DatabaseServerTests : DataFixture
     /// <summary>The SQL a query writes on a database, without connecting to it.</summary>
     private string[] SqlOn(string url, string code)
     {
-        FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
+        FileOf("kscript.json", """{"config": {"database": {"connections": {"main": {"url": """ + System.Text.Json.JsonSerializer.Serialize(url) + "}}}}}");
         Environment.SetEnvironmentVariable("DATABASE_URL", null);
         string output = Run("""
             model User(unique: [email], index: [[name, age]]) extends Timestamps {
@@ -104,7 +104,7 @@ public sealed class DatabaseServerTests : DataFixture
             }
 
             """ + code);
-        File.Delete(Path.Combine(Project, "config.yaml"));
+        File.Delete(Path.Combine(Project, "kscript.json"));
         return output.TrimEnd('\n').Split('\n');
     }
 
@@ -296,13 +296,13 @@ public sealed class DatabaseServerTests : DataFixture
     {
         foreach (string url in new[] { "postgres://nobody@127.0.0.1:1/none?Timeout=2", "mysql://nobody@127.0.0.1:1/none?ConnectionTimeout=2" })
         {
-            FileOf("config.yaml", $"database:\n  connections:\n    main:\n      url: \"{url}\"\n");
+            FileOf("kscript.json", """{"config": {"database": {"connections": {"main": {"url": """ + System.Text.Json.JsonSerializer.Serialize(url) + "}}}}}");
             KScriptException e = Fails("echo $db->tables()");
             Assert.Equal("Connection", e.Type);
             Assert.StartsWith("Can't open the ", e.Message);
             Assert.Contains("database 'main' (nobody@127.0.0.1:1/none)", e.Message);
         }
-        FileOf("config.yaml", "database:\n  connections:\n    main:\n      url: \"postgres://localhost/x?NoSuchOption=1\"\n");
+        FileOf("kscript.json", """{"config": {"database": {"connections": {"main": {"url": "postgres://localhost/x?NoSuchOption=1"}}}}}""");
         Assert.Equal("Connection", Fails("echo $db->tables()").Type);
     }
 

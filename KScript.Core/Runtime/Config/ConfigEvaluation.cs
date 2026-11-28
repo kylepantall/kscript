@@ -46,43 +46,4 @@ internal static class ConfigEvaluation
             throw new KScriptException("configure(environment) must return a map of settings.", "Config") { File = path };
         }
     }
-
-    internal static object ReadYaml(KScriptHost host, string path, string text, string environment,
-        IReadOnlyDictionary<string, string> dotenv, Func<string, string> lookup)
-    {
-        Interpreter interpreter = null;
-        Module module = null;
-        return Yaml.ParseConfig(text, Path.GetFileName(path), (value, tagged, line, column) =>
-        {
-            if (!tagged && !value.Contains('{')) return DotEnv.Expand(value, lookup);
-            Template template = TemplateParser.Parse(DotEnv.EscapeTemplateReferences(value), allowBareReferences: false);
-            try
-            {
-                if (template.Errors.FirstOrDefault() is SyntaxError error)
-                    throw new KScriptException(error.Message, "Config");
-                if (tagged && !template.IsSingleInterpolation)
-                    throw new KScriptException("!kscript needs one expression in braces, such as !kscript { 30s }.", "Config");
-                if (!template.Expressions.Any())
-                    return string.Concat(template.Segments.Select(segment => DotEnv.Expand(segment.Text, lookup)));
-
-                if (interpreter == null)
-                {
-                    interpreter = CreateInterpreter(host, dotenv, script: false);
-                    module = interpreter.CreateModule(path);
-                    module.Globals.Declare("environment", environment ?? "development");
-                }
-                var context = new EvalContext(module, null);
-                if (template.IsSingleInterpolation)
-                    return interpreter.Evaluate(template.Expressions.First().Node, module.Globals, context);
-
-                return string.Concat(template.Segments.Select(segment => segment.Kind == TemplateSegmentKind.Text
-                    ? DotEnv.Expand(segment.Text, lookup)
-                    : Values.ToStr(interpreter.Evaluate(segment.Node, module.Globals, context))));
-            }
-            catch (KScriptException error)
-            {
-                throw new KScriptException(error.Message, "Config", error) { File = path, Line = line, Column = column };
-            }
-        });
-    }
 }

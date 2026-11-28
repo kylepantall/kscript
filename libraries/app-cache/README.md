@@ -16,4 +16,4 @@ echo $answer
 @cache.forget_cached('answer')
 ```
 
-The library uses the `app` store in `KScript.Cache`. It keeps values in memory for five minutes by default. Set `cache.store` to `file` in your application's `config.yaml` to keep values between runs, and set `cache.ttl` to change their lifetime. The API and fullstack templates keep this file at `config/config.yaml`. Call `@cache.app_cache()` to access the configured store directly.
+The library uses the `app` store in `KScript.Cache`. It keeps values in memory for five minutes by default. Set `cache.store` to `file` in the `config` section of your application's `kscript.json` to keep values between runs, and set `cache.ttl` to change their lifetime. Call `@cache.app_cache()` to access the configured store directly.

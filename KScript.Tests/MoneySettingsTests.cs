@@ -9,24 +9,32 @@ public sealed class MoneySettingsTests : IDisposable
     public MoneySettingsTests()
     {
         Directory.CreateDirectory(Path.Combine(project, "scripts"));
-        Directory.CreateDirectory(Path.Combine(project, "settings"));
-        File.WriteAllText(Path.Combine(project, "kscript.json"), """{"config":{"root":"settings","files":["config?"],"environment":"stage"}}""");
+        File.WriteAllText(Path.Combine(project, "kscript.json"), "{}");
     }
 
     public void Dispose() => Directory.Delete(project, recursive: true);
 
-    private void Settings(string file, string text) => File.WriteAllText(Path.Combine(project, "settings", file), text);
+    private void Settings(string file, string text) => File.WriteAllText(Path.Combine(project, file), text);
 
     private string Run(string script) => ScriptRunner.Run(script, path: Path.Combine(project, "scripts", "main.kscript"));
 
     [Fact]
     public void NestedScriptUsesLayeredProjectRatesAndPerRunOverrides()
     {
-        Settings("config.yaml", "money:\n  exchange_rates:\n    EUR:\n      GBP: 0.8\n    USD:\n      GBP: 0.5\n");
-        Settings("config.stage.json", """{"money":{"exchange_rates":{"eur":{"gbp":0.9}}}}""");
+        Settings("kscript.json", """{"config":{"money":{"exchange_rates":{"EUR":{"GBP":0.8},"USD":{"GBP":0.5}}}}}""");
+        Settings("kscript.stage.json", """{"config":{"money":{"exchange_rates":{"eur":{"gbp":0.9}}}}}""");
         string add = "echo GBP1 + EUR1 + USD1";
-        Assert.Equal("GBP 2.40\nGBP 1.75\n", Run(add + "\n@set_exchange_rate(to: 'GBP', rate: 0.25, from: 'EUR')\n" + add));
-        Assert.Equal("GBP 2.40\n", Run(add));
+        string before = Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+        try
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_ENV", "stage");
+            Assert.Equal("GBP 2.40\nGBP 1.75\n", Run(add + "\n@set_exchange_rate(to: 'GBP', rate: 0.25, from: 'EUR')\n" + add));
+            Assert.Equal("GBP 2.40\n", Run(add));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_ENV", before);
+        }
     }
 
     [Theory]
@@ -39,7 +47,7 @@ public sealed class MoneySettingsTests : IDisposable
     [InlineData("""{"EUR":{"EUR":2}}""", "money.exchange_rates.EUR.EUR")]
     public void InvalidProjectRatesIdentifyTheSetting(string table, string path)
     {
-        Settings("config.json", """{"money":{"exchange_rates":""" + table + "}}");
+        Settings("kscript.json", """{"config":{"money":{"exchange_rates":""" + table + "}}}");
         var error = Assert.Throws<KScriptException>(() => Run("echo $config.money.exchange_rates"));
         Assert.Equal("Config", error.Type);
         Assert.Contains(path, error.Message);

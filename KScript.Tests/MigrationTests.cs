@@ -449,19 +449,28 @@ public sealed class MigrationTests : DataFixture
     {
         Models();
         Ok("diff");
-        FileOf("kscript.json", "{ \"name\": \"blog\", \"config\": { \"environment\": \"production\" } }");
-        var (code, output, error) = Db("migrate");
-        Assert.Equal(1, code);
-        Assert.Contains("the environment is production", error);
-        Assert.Contains("db fresh drops every table", Failed("fresh"));
-        Assert.Contains("db rollback --force", Failed("rollback"));
-        Assert.Contains("db seed --force", Failed("seed"));
-        Ok("migrate", "--force");
-        var no = DbWith("n\n", "rollback");
-        Assert.True(no.Code == 1, no.Out + no.Error);
-        Assert.Equal(0, DbWith("y\n", "rollback").Code);
-        var ended = DbWith(string.Empty, "rollback");
-        Assert.Contains("The input ended before the question was answered", ended.Error);
+        // KSCRIPT_ENV (or kscript db --env) names the environment.
+        string before = Environment.GetEnvironmentVariable("KSCRIPT_ENV");
+        Environment.SetEnvironmentVariable("KSCRIPT_ENV", "production");
+        try
+        {
+            var (code, output, error) = Db("migrate");
+            Assert.Equal(1, code);
+            Assert.Contains("the environment is production", error);
+            Assert.Contains("db fresh drops every table", Failed("fresh"));
+            Assert.Contains("db rollback --force", Failed("rollback"));
+            Assert.Contains("db seed --force", Failed("seed"));
+            Ok("migrate", "--force");
+            var no = DbWith("n\n", "rollback");
+            Assert.True(no.Code == 1, no.Out + no.Error);
+            Assert.Equal(0, DbWith("y\n", "rollback").Code);
+            var ended = DbWith(string.Empty, "rollback");
+            Assert.Contains("The input ended before the question was answered", ended.Error);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KSCRIPT_ENV", before);
+        }
         FileOf("kscript.json", "{ nope");
         Assert.Equal(2, Db("status").Code);
     }

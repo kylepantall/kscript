@@ -15,9 +15,7 @@ namespace KScript.Runtime
         /// Parses YAML. Plain scalars become numbers, true/false or null where they look like one; quoted scalars stay
         /// text. An empty document is null. Several documents (separated by ---) give a list.
         /// </summary>
-        public static object Parse(string text, string source = null) => ParseConfig(text, source, null);
-
-        internal static object ParseConfig(string text, string source, Func<string, bool, int, int, object> evaluate)
+        public static object Parse(string text, string source = null)
         {
             var stream = new YamlStream();
             try
@@ -30,30 +28,15 @@ namespace KScript.Runtime
                 throw new KScriptException($"Not valid YAML ({where}line {ex.Start.Line}): {FirstLine(ex.InnerException?.Message ?? ex.Message)}", "Yaml");
             }
             if (stream.Documents.Count == 0) return null;
-            if (stream.Documents.Count == 1) return FromNode(stream.Documents[0].RootNode, 0, text, evaluate);
-            return stream.Documents.Select(d => FromNode(d.RootNode, 0, text, evaluate)).ToList();
+            if (stream.Documents.Count == 1) return FromNode(stream.Documents[0].RootNode, 0);
+            return stream.Documents.Select(d => FromNode(d.RootNode, 0)).ToList();
         }
 
         private static string FirstLine(string message) => message.Split('\n')[0].Trim();
 
-        private static object FromNode(YamlNode node, int depth, string text, Func<string, bool, int, int, object> evaluate)
+        private static object FromNode(YamlNode node, int depth)
         {
             if (depth > 200) throw new KScriptException("The YAML is nested too deeply (or refers to itself).", "Yaml");
-            if (evaluate != null && node.Tag == new TagName("!kscript"))
-            {
-                string expression = (node as YamlScalarNode)?.Value;
-                if (node is YamlMappingNode { Style: YamlDotNet.Core.Events.MappingStyle.Flow })
-                {
-                    // A flow mapping's End mark is the end of its opening token.
-                    int brace = text.IndexOf('{', (int)node.Start.Index);
-                    if (brace >= 0)
-                    {
-                        ExpressionParser.ParseEmbedded(text, brace + 1, out int close);
-                        expression = close < 0 ? text.Substring(brace) : text.Substring(brace, close - brace + 1);
-                    }
-                }
-                return evaluate(expression ?? string.Empty, true, (int)node.Start.Line, (int)node.Start.Column);
-            }
             switch (node)
             {
                 case YamlMappingNode map:
@@ -66,22 +49,20 @@ namespace KScript.Runtime
                             // Merge keys: <<: *defaults copies the fields that this map doesn't set itself.
                             foreach (YamlNode merged in pair.Value is YamlSequenceNode many ? many.Children : new List<YamlNode> { pair.Value })
                             {
-                                if (FromNode(merged, depth + 1, text, evaluate) is Dictionary<string, object> m)
+                                if (FromNode(merged, depth + 1) is Dictionary<string, object> m)
                                     foreach (var kv in m) result.TryAdd(kv.Key, kv.Value);
                             }
                             continue;
                         }
-                        result[key] = FromNode(pair.Value, depth + 1, text, evaluate);
+                        result[key] = FromNode(pair.Value, depth + 1);
                     }
                     return result;
                 case YamlSequenceNode list:
-                    return list.Children.Select(c => FromNode(c, depth + 1, text, evaluate)).ToList();
+                    return list.Children.Select(c => FromNode(c, depth + 1)).ToList();
                 default:
                     // Aliases are resolved when the stream loads, so every other node is a scalar.
                     var scalar = (YamlScalarNode)node;
-                    object value = scalar.Style == ScalarStyle.Plain ? PlainScalar(scalar.Value) : scalar.Value;
-                    return evaluate != null && value is string template
-                        ? evaluate(template, false, (int)scalar.Start.Line, (int)scalar.Start.Column) : value;
+                    return scalar.Style == ScalarStyle.Plain ? PlainScalar(scalar.Value) : scalar.Value;
             }
         }
 
@@ -296,9 +277,5 @@ namespace KScript.Runtime
                 string value = lookup?.Invoke(m.Groups[1].Value);
                 return string.IsNullOrEmpty(value) && m.Groups[2].Success ? m.Groups[2].Value : value ?? string.Empty;
             });
-
-        // Keep ${NAME} in template text, where it can expand without parsing environment values as code.
-        internal static string EscapeTemplateReferences(string text) =>
-            Reference.Replace(text, match => match.Value.Replace("{", "{{").Replace("}", "}}"));
     }
 }

@@ -671,15 +671,21 @@ public sealed class MakeGeneratorTests : IDisposable
     [Fact]
     public void SettingsFilesAreNamedForTheirEnvironment()
     {
-        // A scaffolded project lists its config script under config.files.
+        // config.kscript and kscript.<env>.json sit beside kscript.json.
         string app = Project();
+        Assert.Equal(0, Make(app, "config", "base").Code);
+        Assert.Contains("fn configure(environment: string)", Read(app, "config.kscript"));
         Assert.Contains("already exists", Make(app, "config", "base").Err);
         Assert.Equal(0, Make(app, "config", "dev").Code);
-        Assert.Contains("fn configure(environment: string)", Read(app, "config/config.dev.kscript"));
-        // In an empty project, the generator writes to the project folder.
-        using var plain = new TempSite(("kscript.json", "{}"));
-        Assert.Equal(0, Make(plain.Root, "config", "base").Code);
-        Assert.Contains("logging:", Read(plain.Root, "config.kscript"));
+        string dev = Read(app, "kscript.dev.json");
+        Assert.Contains("\"config\": {", dev);
+        Assert.Empty(ProjectConfig.Parse(dev, Path.Combine(app, "kscript.dev.json")).Warnings);
+        // An XML project's config script is XML, but the environment's file stays JSON.
+        using var xml = new TempSite(("kscript.json", "{ \"make\": { \"syntax\": \"xml\" } }"));
+        Assert.Equal(0, Make(xml.Root, "config", "base").Code);
+        Assert.Contains("<fn name=\"configure\"", Read(xml.Root, "config.ks.xml"));
+        Assert.Equal(0, Make(xml.Root, "config", "staging").Code);
+        Assert.Contains("\"app\": { \"debug\": false }", Read(xml.Root, "kscript.staging.json"));
         Assert.Equal(0, Make(app, "env", "base", "--keys", "api_token").Code);
         Assert.Equal(0, Make(app, "env", "staging").Code);
         Assert.Contains("\nAPI_TOKEN=\n", Read(app, ".env"));

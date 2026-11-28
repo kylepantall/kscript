@@ -24,7 +24,7 @@ function writeFixture(directory) {
   // Windows TEMP can contain an 8.3 alias. Use the same physical path for the document and its definitions.
   const root = fs.realpathSync.native(directory);
   const file = path.join(root, 'finish.kscript');
-  const settings = path.join(root, 'config', 'config.yaml');
+  const settings = path.join(root, 'kscript.json');
   const lines = [
     'fn path(url: string) => $url',
     'fn finish(kind: string) => @path("{$config.passkeys.url}/{$kind}/finish")',
@@ -35,9 +35,7 @@ function writeFixture(directory) {
     'echo @literal()',
   ];
   const text = lines.join('\n');
-  fs.mkdirSync(path.dirname(settings));
-  fs.writeFileSync(path.join(root, 'kscript.json'), '{"config":{"files":["config/config.yaml"]}}');
-  fs.writeFileSync(settings, 'passkeys:\n  url: https://example.test\n');
+  fs.writeFileSync(settings, '{\n  "config": {\n    "passkeys": {\n      "url": "https://example.test"\n    }\n  }\n}\n');
   fs.writeFileSync(file, text);
   return { file, settings, text, lines };
 }
@@ -76,7 +74,7 @@ module.exports = async function interpolation(connection, capabilities) {
       const hover = await request('hover', { position: cursor });
       assert.match(hover.contents.value, /kind.*string/);
     }
-    for (const [key, start, type] of [['passkeys', { line: 0, character: 0 }, 'map'], ['url', { line: 1, character: 2 }, 'string']]) {
+    for (const [key, start, type] of [['passkeys', { line: 2, character: 5 }, 'map'], ['url', { line: 3, character: 7 }, 'string']]) {
       const position = at(1, '.' + key, 2);
       assert.deepEqual(await request('definition', { position }), [location(settingsUri, start, key.length)], 'Ctrl-click opens the exact settings key');
       const hover = await request('hover', { position });

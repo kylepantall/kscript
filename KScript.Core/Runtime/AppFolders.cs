@@ -5,7 +5,7 @@ namespace KScript.Runtime
     /// <summary>
     /// Where an app keeps its files on each platform: settings, data, caches, state and logs, in the folders the
     /// operating system expects (Application Support and Caches on macOS, AppData on Windows, the XDG folders on
-    /// Linux). KScript.Storage and KScript.Cache use these, and <c>config.user</c> reads the person's settings from
+    /// Linux). KScript.Storage and KScript.Cache use these, and <c>app.user_config</c> reads the person's settings from
     /// the config folder.
     /// </summary>
     public static class AppFolders
