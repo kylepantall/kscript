@@ -1,0 +1,67 @@
+name: Update open pull requests
+
+# CI doesn't run on master (see ci.yml), and the "main" ruleset only lets a pull request merge once it is up to date
+# with master. So when something lands on master, this brings every open pull request up to date and starts its CI
+# again, and a pull request with auto-merge on then merges by itself once it is green.
+#
+# GitHub doesn't start workflows for commits made with GITHUB_TOKEN, so the update alone wouldn't run CI. Running a
+# workflow by hand (workflow_dispatch) is the exception, so this starts CI on the updated branch that way. Its checks
+# report on the branch's new head commit, which is what the pull request and the ruleset look at.
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+# Two quick merges in a row: the newer run updates the branches again, so the older one can stop.
+concurrency:
+  group: update-prs
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update:
+    name: Update open pull requests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Bring each pull request up to date and run its CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -u
+          # Open, ready pull requests from branches in this repository. Drafts can't merge, and a fork's branch
+          # can't be pushed to (and a fork's CI goes through pull_request, not a run started here).
+          gh api --paginate "repos/$GH_REPO/pulls?state=open&base=master&per_page=100" \
+            --jq '.[] | select(.draft | not) | select(.head.repo.full_name == "'"$GH_REPO"'") | "\(.number) \(.head.ref) \(.head.sha)"' |
+          while read -r number branch sha; do
+            behind=$(gh api "repos/$GH_REPO/compare/master...$sha" --jq '.behind_by')
+            if [ "$behind" = "0" ]; then
+              echo "#$number is up to date"
+              continue
+            fi
+
+            if ! gh api -X PUT "repos/$GH_REPO/pulls/$number/update-branch" -f expected_head_sha="$sha" --silent; then
+              echo "::warning::#$number couldn't be updated (a merge conflict, or a new push); it needs updating by hand"
+              continue
+            fi
+
+            # The update happens in the background: wait for the branch's new head before starting CI on it.
+            head="$sha"
+            for _ in $(seq 1 30); do
+              sleep 2
+              head=$(gh api "repos/$GH_REPO/pulls/$number" --jq '.head.sha')
+              [ "$head" != "$sha" ] && break
+            done
+            if [ "$head" = "$sha" ]; then
+              echo "::warning::#$number didn't update within a minute; CI wasn't started"
+              continue
+            fi
+
+            gh workflow run ci.yml --ref "$branch"
+            echo "#$number updated to $head, CI started"
+          done
