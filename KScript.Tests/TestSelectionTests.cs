@@ -101,7 +101,7 @@ public sealed class TestSelectionTests : IDisposable
         Edit("services/billing.kscript", "* 3", "* 2");
         Assert.Equal(new[] { "bills" }, Ran(Test().Out));
         Assert.Contains("No test failed in the last run", Test("--failed").Out);
-        Assert.Contains("Use --all or --failed", Test("--all", "--failed").Out);
+        Assert.Contains("Use one of --all, --failed and --changed", Test("--all", "--failed").Out);
     }
 
     [Fact]
@@ -208,6 +208,92 @@ public sealed class TestSelectionTests : IDisposable
         Assert.Null(TestGraph.Load(site.Root));
         Assert.Equal(4, Ran(Test().Out).Count);
         Assert.Null(TestGraph.Parse("{ \"version\": 99 }"));
+    }
+
+    private void Git(params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = site.Root, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (string a in new[] { "-c", "user.email=test@example.com", "-c", "user.name=test", "-c", "commit.gpgsign=false" }.Concat(args)) start.ArgumentList.Add(a);
+        using var git = System.Diagnostics.Process.Start(start)!;
+        git.StandardOutput.ReadToEnd();
+        string error = git.StandardError.ReadToEnd();
+        git.WaitForExit();
+        Assert.True(git.ExitCode == 0, error);
+    }
+
+    [Fact]
+    public void Changed_runs_the_tests_the_git_diff_can_affect()
+    {
+        Git("init", "-q");
+        Git("add", "-A");
+        Git("commit", "-q", "-m", "start");
+        Test();
+
+        var (none, output) = Test("--changed");
+        Assert.Equal(0, none);
+        Assert.Contains("git shows no changes", output);
+
+        // Uncommitted: the diff against HEAD, whatever the last run was.
+        Edit("types/user.kscript", "$name->upper()", "$name->upper() + ''");
+        Test();
+        Assert.Equal(new[] { "waves" }, Ran(Test("--changed").Out));
+        Assert.Contains("3 not affected by the changes", Test("--changed").Out);
+
+        Git("commit", "-q", "-am", "shout");
+        Assert.Contains("git shows no changes", Test("--changed").Out);
+        Assert.Equal(new[] { "waves" }, Ran(Test("--changed", "HEAD~1").Out));
+
+        // A test file the diff changes runs its new and changed tests; a new file runs.
+        Edit("tests/greeter.test.kscript", "'Hello Ann'", "'Hello' + ' Ann'");
+        site.Write("tests/more.test.kscript", "test(name: \"more\") {\n  expect(true, equals: true)\n}\n");
+        Assert.Equal(new[] { "greets", "more" }, Ran(Test("--changed").Out));
+
+        Edit("services/billing.kscript", "* 2", "* 2 + 0");
+        site.Write("services/unused.kscript", "fn unused() => 1\n");
+        Assert.Contains("No test reaches what changed", Test("--changed", "HEAD", Path.Combine(site.Root, "tests", "math.test.kscript")).Out);
+
+        site.Write("kscript.json", "{ \"name\": \"other\" }");
+        Assert.Contains("Running every test: kscript.json changed.", Test("--changed").Out);
+
+        var (bad, error) = Test("--changed", "no-such-branch");
+        Assert.Equal(2, bad);
+        Assert.Contains("git doesn't know no-such-branch", error);
+        Assert.Contains("Use one of --all, --failed and --changed", Test("--changed", "--all").Out);
+    }
+
+    [Fact]
+    public async Task Watch_runs_again_on_a_save_and_only_the_tests_it_can_affect()
+    {
+        Test();
+        TestCommand.WatchQuietMilliseconds = 50;
+        var output = new StringWriter { NewLine = "\n" };
+        var shared = TextWriter.Synchronized(output);
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        Task<int> watching = Task.Run(() => TestCommand.Run(new[] { "--watch" }, shared, shared, stop.Token, false, site.Root));
+        try
+        {
+            await Until(() => output.ToString().Contains("Watching for changes"));
+            Edit("services/billing.kscript", "* 2", "* 2 + 0");
+            await Until(() => output.ToString().Contains("✓ bills"));
+            Assert.DoesNotContain("✓ greets", output.ToString());
+            Assert.Contains("Changed: services/billing.kscript", output.ToString());
+
+            // A change no test reaches runs nothing.
+            site.Write("notes.txt", "hello");
+            await Until(() => output.ToString().Contains("Nothing the tests reach changed"));
+        }
+        finally
+        {
+            stop.Cancel();
+            TestCommand.WatchQuietMilliseconds = 300;
+        }
+        Assert.Equal(0, await watching);
+
+        static async Task Until(Func<bool> done)
+        {
+            for (int i = 0; i < 400 && !done(); i++) await Task.Delay(50);
+            Assert.True(done());
+        }
     }
 
     [Fact]
