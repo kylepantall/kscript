@@ -271,6 +271,8 @@ namespace KScript.Auth
         /// <summary>The id of a user given as a map ({ id: ... }) or as the id itself.</summary>
         internal static string IdOf(object user, string what) => user switch
         {
+            // A user kept in a model has the model's key, whatever it is called (key: 'uid').
+            Record record when KScript.Data.ModelInfo.Of(record) is KScript.Data.ModelInfo model && record.TryGetValue(model.Key, out object key) && key != null => AuthApp.Text(key),
             Dictionary<string, object> map when map.TryGetValue("id", out object id) && id != null => AuthApp.Text(id),
             string s when s.Length > 0 => s,
             UuidValue u => u.Text,

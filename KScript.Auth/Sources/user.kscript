@@ -1,9 +1,10 @@
 import KScript.Data
 
 /// Someone with an account. KScript.Auth keeps the users in this model when kscript.json says
-/// "http": { "auth": { "users": "User" } }: @register makes one, and @user() is the one signed in. To change
-/// its fields or its key, publish your own copy with kscript publish User, then edit models/user.kscript.
-model User(timestamps, unique: [email], hidden: [password]) {
+/// "http": { "auth": { "users": "User" } }: @register makes one, and @user() is the one signed in. It comes
+/// with KScript.Auth; kscript publish User copies it into the project's models folder, where its fields and
+/// its key can be changed.
+model User(timestamps, auto_create, unique: [email], hidden: [password]) {
   /// What they're called.
   name: string
   /// The address they sign in with.

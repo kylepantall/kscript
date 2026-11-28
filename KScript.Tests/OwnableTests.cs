@@ -196,13 +196,72 @@ public sealed class OwnableTests : StorageFixture
                 @acting_as_guest('not-a-number')
               }
             }
-            """, more: ("models/guest.kscript", """
+            """, more: new[] { ("models/guest.kscript", """
             import KScript.Data
 
             model Guest {
               label: string = 'new'
             }
-            """));
+            """) });
+        AllPass(site, "owned.test.kscript");
+    }
+
+    [Fact]
+    public void Project_copies_of_User_and_Ownable_replace_the_packages()
+    {
+        // A uuid key on the project's User makes Ownable's user_id a uuid, and the project's Ownable still owns rows.
+        using var site = Site("""
+            import KScript.Auth
+            import KScript.Data
+            import "models/note.kscript"
+
+            test(name: 'uses the copies') {
+              ada = @register('ada@example.test', 'correct-horse-battery-9', handle: 'ada')
+              @acting_as($ada)
+              note = Note->create(title: 'x')
+              expect($note.user_uid, equals: $ada.uid)
+              expect($note.user.handle, equals: 'ada')
+              expect(Note->mine()->count(), equals: 1)
+              expect(Note->mine()->first()->is_mine(), equals: true)
+              expect(Note->mine()->first()->shout(), equals: 'X')
+              expect_error(type: Forbidden) {
+                $note->update(user: null)
+              }
+            }
+            """, more: new[]
+        {
+            ("models/user.kscript", """
+                import KScript.Data
+
+                model User(key: 'uid', auto_create, unique: [email], hidden: [password]) {
+                  uid: uuid = @uuid()
+                  handle: string
+                  email: email
+                  password: password
+                }
+                """),
+            ("models/ownable.kscript", """
+                import KScript.Data
+                import KScript.Auth
+
+                model Ownable(mixin, guarded: [user, guest]) {
+                  user?: User
+                  guest?: Guest
+
+                  fn mine(query, as: any = null) {
+                    owner = $as ?? @user()
+                    if $owner != null {
+                      return $query->where(user: $owner)
+                    }
+                    return $query->where(guest: @guest())
+                  }
+
+                  fn is_mine() => @user() != null and $this.user != null and $this.user->is(@user())
+
+                  fn shout() => $title->upper()
+                }
+                """),
+        });
         AllPass(site, "owned.test.kscript");
     }
 
