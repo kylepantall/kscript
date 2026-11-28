@@ -58,8 +58,10 @@ namespace KScript.Scaffolding
         /// </summary>
         public static string PathFor(ProjectConfig project, Publishable item, string format)
         {
-            string folder = project != null ? Path.GetRelativePath(project.Directory, project.PathFor("models")).Replace('\\', '/') : "models";
-            return folder.TrimEnd('/') + "/" + item.Source.Name + (format == ScriptFormat.Xml ? ".ks.xml" : ".kscript");
+            // paths.models is relative to the project folder.
+            string folder = (project?.PathFor("models") ?? "models").Replace('\\', '/').Trim('/');
+            string file = item.Source.Name + (format == ScriptFormat.Xml ? ".ks.xml" : ".kscript");
+            return folder.Length == 0 || folder == "." ? file : folder + "/" + file;
         }
 
         /// <summary>The project's copy of a model the project already has, relative to the project folder, or null.</summary>

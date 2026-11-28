@@ -5,12 +5,12 @@ unless: db is none
 // The Note model: a type whose records live in the notes table (KScript.Data,
 // see docs/data.md).
 import KScript.Data
+{{#if auth}}
+import KScript.Auth
+{{/if}}
 
 /// A note{{#if auth}} that belongs to the user who wrote it{{/if}}.
-model Note(timestamps, auto_create{{#if auth}}, index: [user_id], hidden: [user_id]{{/if}}) {
-{{#if auth}}
-  user_id: string
-{{/if}}
+model Note(timestamps, auto_create){{#if auth}} extends Ownable{{/if}} {
   title: string(min: 1, max: 200)
   body: string = ''
   done: bool = false

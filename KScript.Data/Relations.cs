@@ -601,8 +601,11 @@ namespace KScript.Data
         {
             if (IsOwned) OwnedScope?.Invoke(call);
             MarkupElement e = Type.OwnMethods[name];
-            Scope s = Type.Closure.Child();
-            var fn = call.Interpreter.DeclareFunction(e, s, Type.Module, Type.Catches, query);
+            // A scope from a mixin runs where the mixin was written: Ownable's ->mine() is .kscript code, even in
+            // an app written in XML.
+            RecordType owner = Type.MethodOwner(name, e);
+            Scope s = owner.Closure.Child();
+            var fn = call.Interpreter.DeclareFunction(e, s, owner.Module, Type.Catches, query);
             var all = new List<object> { query };
             all.AddRange(args);
             return call.Interpreter.Call(fn, all, named, call.Scope, call.Module) as Query

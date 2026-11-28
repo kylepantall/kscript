@@ -795,7 +795,16 @@ namespace KScript.Runtime
             {
                 if (projectModelFiles.TryGetValue(directory, out List<string> known)) return known;
             }
-            List<string> files = KScript.Projects.ProjectConfig.FindAndLoad(directory)?.ModelFiles() ?? new List<string>();
+            List<string> files;
+            try
+            {
+                files = KScript.Projects.ProjectConfig.FindAndLoad(directory)?.ModelFiles() ?? new List<string>();
+            }
+            catch (KScript.Projects.ProjectConfigException)
+            {
+                // A broken kscript.json is reported where the setting is read; it has no copies to find.
+                files = new List<string>();
+            }
             lock (projectModelFiles) projectModelFiles[directory] = files;
             return files;
         }

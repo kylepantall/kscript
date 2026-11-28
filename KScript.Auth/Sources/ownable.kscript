@@ -6,11 +6,11 @@ import KScript.Auth
 /// mine() scope and ->is_mine(). It comes with KScript.Auth; kscript publish Ownable copies it into the
 /// project's models folder, where it can be changed.
 model Ownable(mixin, guarded: [user, guest]) {
-  /// The user the record belongs to, or null when a guest made it.
-  user?: User
+  /// The user the record belongs to, or null when a guest made it. Deleting the user deletes their records.
+  user?: User(on_delete: cascade)
 
   /// The guest the record belongs to, or null when a signed-in user made it.
-  guest?: Guest
+  guest?: Guest(on_delete: cascade)
 
   /// Keeps the current owner's rows. Outside a request (a test, job or script), name the user:
   /// ->mine(as: $user).
