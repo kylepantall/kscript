@@ -182,6 +182,9 @@ namespace KScript.Docs.Mcp
                 }
                 if (matched == 0) continue;
                 if (e.Kind == "page") score += 2;
+                // A query that spells out a name word by word ("read a json file") is asking for that name (@read_json),
+                // so it beats a guide section that only uses those words.
+                if (name.Contains('_') && name.Split('_').All(part => words.Contains(part))) score += 10;
                 hits.Add((e, matched, score));
             }
             if (hits.Count == 0) return new ToolResult($"Nothing in the docs matches '{query}'. Try other words, or read_doc with no page to see every page.");
