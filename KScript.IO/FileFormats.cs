@@ -12,7 +12,7 @@ namespace KScript.IO
         internal static void Register(KScriptPackage.PackageBuilder p)
         {
             p.Command("read_bytes", "path", "Reads every byte of a file as a base64 value, including binary data.", "base64",
-                c => Base64Type.EncodeBytes(File.ReadAllBytes(IOPackage.PathOf(c.Need(0), c))));
+                c => Base64Type.EncodeBytes(KScript.Runtime.Dependencies.DependencyTrace.ReadBytes(IOPackage.PathOf(c.Need(0), c))));
             p.Command("write_bytes", "path, bytes: base64", "Writes the exact bytes held by a base64 value.", KType.Null, c =>
             {
                 c.Host.CheckWrite("@write_bytes()");

@@ -60,6 +60,9 @@ namespace KScript.Data
         /// <summary>True when the model has this field.</summary>
         public bool Has(string field) => model.Column(field) != null;
 
+        /// <summary>True when a record can't be made without this field: it isn't optional and has no default.</summary>
+        public bool Requires(string field) => model.Type.Field(field) is FieldDefinition f && !f.Optional;
+
         /// <summary>The first field that holds password hashes, or null.</summary>
         public string PasswordField => model.Columns.FirstOrDefault(c => c.Kind == ColumnKind.Password)?.Name;
 

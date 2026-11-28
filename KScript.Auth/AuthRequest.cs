@@ -326,7 +326,7 @@ namespace KScript.Auth
         {
             RequestHooks.RequireWritableCookies(Request);
             string id = UserStore.IdOf(user, "@login()");
-            if (!passkeyVerified && PasskeyStore.IsUserId(id))
+            if (!passkeyVerified && Users.PasskeyOnly(id))
                 throw new KScriptException("This account signs in with a verified passkey.", "Unauthorized");
             Dictionary<string, object> record = Users.Find(id);
             Dictionary<string, object> copy = record ?? (user is Dictionary<string, object> map ? UserStore.Public(map) : null)

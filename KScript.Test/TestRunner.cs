@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using KScript.Projects;
 using KScript.Runtime;
+using KScript.Runtime.Dependencies;
 using KScript.Syntax;
 
 namespace KScript.Testing
@@ -36,6 +37,9 @@ namespace KScript.Testing
 
         public TimeSpan Duration { get; init; }
         public int Line { get; init; }
+
+        /// <summary>What the test reached while it ran (functions, models, types, files), when the run records it.</summary>
+        public DependencySet Reached { get; init; }
     }
 
     /// <summary>The tests of one file, or the error that stopped the file before its tests ran.</summary>
@@ -56,6 +60,18 @@ namespace KScript.Testing
 
         public TimeSpan Duration { get; set; }
 
+        /// <summary>What loading the file and its top-level code reached, when the run records it.</summary>
+        public DependencySet Reached { get; set; }
+
+        /// <summary>Every test the file's top-level code collected, with the fingerprint of its block (null when the file didn't load).</summary>
+        public List<(string Name, string Hash)> Collected { get; set; }
+
+        /// <summary>Tests left out because nothing they reached changed since they last passed.</summary>
+        public int Unchanged { get; set; }
+
+        /// <summary>True when the whole file was left out, because nothing its tests reached changed.</summary>
+        public bool NotRun { get; set; }
+
         public bool Failed => Error != null || Tests.Any(t => t.Outcome == TestOutcome.Failed);
     }
 
@@ -74,6 +90,9 @@ namespace KScript.Testing
         public CancellationToken Cancellation { get; set; }
 
         public PackageRegistry Packages { get; set; }
+
+        /// <summary>Which tests to run, from the project's test graph. Null runs every test and records nothing.</summary>
+        public TestSelection Selection { get; set; }
     }
 
     /// <summary>
@@ -166,13 +185,20 @@ namespace KScript.Testing
             settings ??= new TestRunSettings();
             string full = System.IO.Path.GetFullPath(path);
             var result = new TestFileResult { Path = full, DisplayPath = Display(full, settings.BaseDirectory) };
+            TestFilePlan plan = settings.Selection?.PlanFor(full) ?? TestFilePlan.All;
+            if (plan.Skip)
+            {
+                result.NotRun = true;
+                result.Unchanged = settings.Selection.Graph?.Files.TryGetValue(settings.Selection.Relative(full), out TestFileRecord record) == true ? record.Tests.Count : 0;
+                return result;
+            }
             var clock = Stopwatch.StartNew();
 
             // Scripts run on a thread with a large stack, as `kscript script.kscript` does, so deep recursion behaves the same.
             Exception crash = null;
             var thread = new Thread(() =>
             {
-                try { RunFileHere(full, settings, result, onResult); }
+                try { RunFileHere(full, settings, plan, result, onResult); }
                 catch (Exception ex) { crash = ex; }
             }, 256 * 1024 * 1024) { Name = "kscript test " + System.IO.Path.GetFileName(full) };
             thread.Start();
@@ -184,8 +210,10 @@ namespace KScript.Testing
             return result;
         }
 
-        private static void RunFileHere(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult)
+        private static void RunFileHere(string full, TestRunSettings settings, TestFilePlan plan, TestFileResult result, Action<TestResult> onResult)
         {
+            // What the file's top-level code reaches; each test then records its own (see RunTest).
+            if (settings.Selection != null) DependencyTrace.Current = result.Reached = new DependencySet();
             var fileOutput = new StringWriter();
             var host = new KScriptHost(fileOutput, fileOutput, new StringReader(string.Empty))
             {
@@ -195,15 +223,16 @@ namespace KScript.Testing
             using var storage = AppFolders.IsolateForTest(host);
             try
             {
-                RunFileIn(full, settings, result, onResult, host, fileOutput);
+                RunFileIn(full, settings, plan, result, onResult, host, fileOutput);
             }
             finally
             {
                 foreach (Action done in host.AfterFile) done();
+                DependencyTrace.Current = null;
             }
         }
 
-        private static void RunFileIn(string full, TestRunSettings settings, TestFileResult result, Action<TestResult> onResult, KScriptHost host, StringWriter fileOutput)
+        private static void RunFileIn(string full, TestRunSettings settings, TestFilePlan plan, TestFileResult result, Action<TestResult> onResult, KScriptHost host, StringWriter fileOutput)
         {
             ProjectConfig project;
             try
@@ -249,11 +278,17 @@ namespace KScript.Testing
             result.Output = TestPackage.Tidy(fileOutput.ToString());
 
             List<TestCase> tests = session.Tests;
+            if (settings.Selection != null) result.Collected = tests.Select(t => (t.FullName, SourceFingerprint.TestHash(t.Element, t.Module.Source))).ToList();
             bool anyOnly = tests.Any(t => t.Only);
             foreach (TestCase test in tests)
             {
                 settings.Cancellation.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(settings.Filter) && test.FullName.IndexOf(settings.Filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (plan.ShouldRun != null && !plan.ShouldRun(test))
+                {
+                    result.Unchanged++;
+                    continue;
+                }
 
                 if (test.Skip != null || (anyOnly && !test.Only))
                 {
@@ -286,6 +321,9 @@ namespace KScript.Testing
             string message = null;
             var scope = test.Scope.Child();
             List<TestGroup> chain = test.Group.Chain().ToList();
+            DependencySet fileReached = DependencyTrace.Current;
+            DependencySet reached = settings.Selection != null ? new DependencySet() : null;
+            if (reached != null) DependencyTrace.Current = reached;
 
             using (var limit = Limit(settings.Cancellation, timeout))
             using (interpreter.Host.CaptureOutput(output))
@@ -340,6 +378,7 @@ namespace KScript.Testing
                     interpreter.Host.TestRunning = false;
                     KScriptException ending = EndTest(interpreter.Host);
                     failure ??= ending;
+                    if (reached != null) DependencyTrace.Current = fileReached;
                 }
 
                 if (failure != null) message = Describe(failure, settings, limit, settings.Cancellation, timeout, "the test", test.Module.IsCode);
@@ -364,6 +403,7 @@ namespace KScript.Testing
                 Output = TestPackage.Tidy(output.ToString()),
                 Duration = clock.Elapsed,
                 Line = test.Line,
+                Reached = reached,
             };
         }
 

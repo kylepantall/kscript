@@ -74,4 +74,35 @@ public sealed class PublishTests
         Assert.Null(new KScript.Runtime.PackageSource("KScript.Data", "timestamps.kscript", "").ProjectCopy(new[] { file }));
         Assert.Equal(file, new KScript.Runtime.PackageSource("KScript.Auth", "timestamps.kscript", "", replaceable: true).ProjectCopy(new[] { file }));
     }
+
+    [Fact]
+    public void Queue_writes_the_tables_migration_and_turns_auto_create_off()
+    {
+        using var site = new TempSite(("kscript.json", "{\n  \"name\": \"p\",\n  \"queue\": { \"connections\": { \"jobs\": { \"driver\": \"database\", \"tables\": { \"jobs\": \"work\" } } } }\n}\n"));
+        Assert.Contains("queue (migration, KScript.Queue)", Publish(site.Root).Out);
+        Assert.Contains("There is no queue connection called nope", Publish(site.Root, "queue", "--connection", "nope").Err);
+        Assert.Contains("uses the file driver, which keeps no tables", Publish(site.Root, "queue", "--connection", "file").Err);
+        Assert.Contains("--connection is for kscript publish queue", Publish(site.Root, "User", "--connection", "jobs").Err);
+
+        var made = Publish(site.Root, "queue", "--connection", "jobs");
+        Assert.True(made.Code == 0, made.Err);
+        string file = Assert.Single(Directory.GetFiles(Path.Combine(site.Root, "database", "migrations")));
+        Assert.EndsWith("_create_queue_tables.kscript", file);
+        string migration = File.ReadAllText(file);
+        Assert.Contains("CreateTable(name: 'work') {", migration);
+        Assert.Contains("CreateTable(name: 'kscript_failed_jobs') {", migration);
+        Assert.Contains("CreateTable(name: 'kscript_job_locks') {", migration);
+        var config = KScript.Projects.ProjectConfig.Load(Path.Combine(site.Root, "kscript.json"));
+        Assert.Empty(config.Warnings);
+        Assert.False(config.Queue.Connections["jobs"].AutoCreate);
+        Assert.Equal("work", config.Queue.Connections["jobs"].JobsTable);
+        Assert.Contains("Yours: database/migrations/", Publish(site.Root).Out);
+        Assert.Contains("already has the queue tables' migration", Publish(site.Root, "queue", "--connection", "jobs").Err);
+
+        // The built-in database connection gets an entry of its own in kscript.json.
+        Assert.Equal(0, Publish(site.Root, "queue", "--force").Code);
+        config = KScript.Projects.ProjectConfig.Load(Path.Combine(site.Root, "kscript.json"));
+        Assert.False(config.Queue.Connections["database"].AutoCreate);
+        Assert.Equal("database", config.Queue.Connections["database"].Driver);
+    }
 }

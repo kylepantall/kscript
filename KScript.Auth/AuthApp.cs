@@ -150,7 +150,7 @@ namespace KScript.Auth
             Settings = settings;
             var (data, state) = StorageFolders(root, name, settings);
             Users = settings.Users != null
-                ? new ModelRecordStore(ModelStore.Load(AppFolders.TestHost ?? KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"))
+                ? new ModelRecordStore(ModelStore.Load(AppFolders.TestHost ?? KScriptHost.ForText(new StringWriter()), root, settings.Users, "http.auth.users"), settings.PasskeySignup)
                 : new FileRecordStore(Path.Combine(data, "users"));
             Sessions = settings.Sessions == "memory" ? new MemoryRecordStore() : new FileRecordStore(Path.Combine(state, "sessions"));
             Tokens = new FileRecordStore(Path.Combine(state, "tokens"));

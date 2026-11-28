@@ -43,8 +43,11 @@ namespace KScript.Auth
             }).ToList();
         }
 
-        public static bool Revoke(AuthRequest auth, string id) =>
-            auth.App.PasskeyStore.Revoke(RelyingParty(auth), UserStore.IdOf(Account(auth), "Passkeys"), id ?? string.Empty);
+        public static bool Revoke(AuthRequest auth, string id)
+        {
+            string user = UserStore.IdOf(Account(auth), "Passkeys");
+            return auth.App.PasskeyStore.Revoke(RelyingParty(auth), user, id ?? string.Empty, keepLast: auth.Users.PasskeyOnly(user));
+        }
 
         public static string Handle(AuthRequest auth, string action, string step, string body)
         {
@@ -107,6 +110,19 @@ namespace KScript.Auth
                         return "{\"ok\":true}";
                     }
 
+                    if (auth.App.Users is ModelRecordStore)
+                    {
+                        // The new user is a record of the app's User model, with no email or password yet.
+                        string key = auth.App.Users.Add(new Dictionary<string, object> { ["name"] = result.User.DisplayName });
+                        if (!store.CreateAccount(rp, key, result.User.Id, credentialId, result.PublicKey, result.SignCount, result.IsBackupEligible))
+                        {
+                            auth.App.Users.Delete(key);
+                            throw new Fido2VerificationException("Account could not be created.");
+                        }
+                        auth.LoginPasskey(key);
+                        auth.App.Succeeded(limitKey);
+                        return Values.ToJson(new Dictionary<string, object> { ["ok"] = true, ["redirect"] = auth.Intended(null) });
+                    }
                     string id = PasskeyStore.NewUserId();
                     var profile = new Dictionary<string, object>
                     {
