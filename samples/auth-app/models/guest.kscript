@@ -1,0 +1,9 @@
+import KScript.Data
+
+/// Someone using the app without an account. Each browser gets one, kept in a long-lived cookie, and it is
+/// stored the first time it owns a record. Its key is what @guest() gives. It comes with KScript.Auth;
+/// kscript publish Guest copies it into the project's models folder, where its key and fields can be changed.
+model Guest extends Timestamps {
+  /// The guest's id, made when the browser is first given one.
+  id: uuid = @uuid()
+}

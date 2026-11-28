@@ -326,7 +326,7 @@ namespace KScript.Auth
         {
             RequestHooks.RequireWritableCookies(Request);
             string id = UserStore.IdOf(user, "@login()");
-            if (!passkeyVerified && PasskeyStore.IsUserId(id))
+            if (!passkeyVerified && Users.PasskeyOnly(id))
                 throw new KScriptException("This account signs in with a verified passkey.", "Unauthorized");
             Dictionary<string, object> record = Users.Find(id);
             Dictionary<string, object> copy = record ?? (user is Dictionary<string, object> map ? UserStore.Public(map) : null)
@@ -364,22 +364,23 @@ namespace KScript.Auth
         }
 
         /// <summary>
-        /// The browser's guest id (a uuid), from its guest cookie. With <paramref name="create"/>, a browser without
-        /// one is given one, sent in a long-lived cookie when the request is answered. A test's @acting_as_guest() id
-        /// wins.
+        /// The browser's guest id, from its guest cookie, when <paramref name="valid"/> says it is one. With
+        /// <paramref name="create"/>, a browser without one is given a new one from <paramref name="make"/>, sent in a
+        /// long-lived cookie when the request is answered. A test's @acting_as_guest() id wins.
         /// </summary>
-        public string Guest(bool create)
+        public string Guest(bool create, Func<string> make = null, Func<string, bool> valid = null)
         {
             if (Request.TryGetValue(Policies.GuestKey, out object acting) && acting is string id) return id;
             if (!guestLoaded)
             {
                 guestLoaded = true;
-                if (Guid.TryParse(Cookie(App.Settings.GuestCookie), out Guid known)) guestId = known.ToString("D");
+                string known = Cookie(App.Settings.GuestCookie);
+                if (!string.IsNullOrEmpty(known) && known.Length <= 200 && (valid ?? (t => Guid.TryParse(t, out _)))(known)) guestId = known;
             }
             if (guestId == null && create)
             {
                 RequestHooks.RequireWritableCookies(Request);
-                guestId = Guid.NewGuid().ToString("D");
+                guestId = make?.Invoke() ?? Guid.NewGuid().ToString("D");
                 sendGuest = true;
                 clearGuest = false;
             }
@@ -396,7 +397,7 @@ namespace KScript.Auth
         private void NoteAdoption()
         {
             if (!App.Settings.AdoptGuest || Guest(create: false) is not string guest) return;
-            session[Adopt] = "guest:" + guest;
+            session[Adopt] = guest;
             session[Adopted] = new List<object>();
             guestId = null;
             sendGuest = false;
@@ -404,16 +405,16 @@ namespace KScript.Auth
         }
 
         /// <summary>
-        /// Moves the rows of the owned models this run knows from the guest who signed in to <paramref name="owner"/>,
+        /// Moves the rows of the owned models this run knows from the guest who signed in to the user whose id is <paramref name="user"/>,
         /// each model once a session: models other files declare move when they are first used.
         /// </summary>
-        internal void AdoptGuestRows(CallContext call, string owner)
+        internal void AdoptGuestRows(CallContext call, string user)
         {
             Dictionary<string, object> s = Session(create: false);
             if (s == null || s.GetValueOrDefault(Adopt) is not string from) return;
             if (s.GetValueOrDefault(Adopted) is not List<object> done) s[Adopted] = done = new List<object>();
             var tables = done.Select(Values.ToStr).ToList();
-            if (KScript.Data.ModelInfo.AdoptOwner(call, from, owner, tables) > 0 || tables.Count != done.Count)
+            if (KScript.Data.ModelInfo.AdoptOwner(call, Owners.Parse(call, from) ?? from, user, tables) > 0 || tables.Count != done.Count)
             {
                 s[Adopted] = tables.Cast<object>().ToList();
                 dirty = true;

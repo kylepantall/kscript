@@ -316,7 +316,8 @@ public sealed class DocsTests
             Assert.Contains($"href=\"/reference/models#{d.Anchor}\"", Site.Value.Find("/reference/" + d.Package.Substring(8).ToLowerInvariant()).Body);
         }
 
-        Assert.Contains("<code>owner</code></td><td><code>string(max: 80)</code>", models.Body);
+        Assert.Contains("<code>user?</code></td><td><code>User(on_delete: cascade)</code>", models.Body);
+        Assert.Contains(declared, d => d.Name == "User" && !d.IsMixin && d.Package == "KScript.Auth");
         // The tables KScript keeps are listed by the names the code uses.
         string[] tables = { KScript.Data.Migrations.Migrator.Table, KScript.Queueing.DatabaseQueueDriver.JobsTable, KScript.Queueing.DatabaseQueueDriver.FailedTable, KScript.Queueing.DatabaseQueueDriver.LocksTable };
         Assert.Equal(tables.OrderBy(t => t), DocsSite.KeptTables.Select(t => t.Table).OrderBy(t => t));

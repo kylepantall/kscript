@@ -85,13 +85,13 @@ fn reset(form: map) {
 
 /// Loads the signed-in user's profile for the editor component.
 fn show_profile() {
-  user_id = @user().id
+  user = @user()
   entry = null
   try {
-    entry = Profile->first_or_create({ user_id: $user_id })
+    entry = Profile->first_or_create({ user: $user })
   } catch UniqueViolation {
     // Another request just created this user's profile.
-    entry = Profile->where(user_id: $user_id)->first_or_fail()
+    entry = Profile->where(user: $user)->first_or_fail()
   }
   return @view('auth/profile', data: { profile: $entry })
 }

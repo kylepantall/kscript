@@ -101,7 +101,7 @@ public sealed class CliConventionTests : IDisposable
                 Assert.Equal("--syntax kscript|xml", o.Name);
         }
         Assert.Equal(new[] { "check", "db", "openapi", "queue", "routes" }, CliReference.Commands.Where(c => c.Options.Any(o => o.Name.StartsWith("--output", StringComparison.Ordinal))).Select(c => c.Name).OrderBy(n => n));
-        Assert.Equal(new[] { "convert", "db", "docs", "make", "mcp" }, CliReference.Commands.Where(c => c.Options.Any(o => o.Name.StartsWith("--syntax", StringComparison.Ordinal))).Select(c => c.Name).OrderBy(n => n));
+        Assert.Equal(new[] { "convert", "db", "docs", "make", "mcp", "publish" }, CliReference.Commands.Where(c => c.Options.Any(o => o.Name.StartsWith("--syntax", StringComparison.Ordinal))).Select(c => c.Name).OrderBy(n => n));
     }
 
     [Fact]

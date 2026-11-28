@@ -135,16 +135,19 @@ namespace KScript.Auth
         /// Acts as a guest until the test ends: no one is signed in, and <c>@guest()</c> is <paramref name="id"/> (a new
         /// uuid when it is null). Returns the guest id.
         /// </summary>
-        public static string ActAsGuest(KScriptHost host, string id)
+        public static object ActAsGuest(CallContext call, object id)
         {
-            if (id != null && !Guid.TryParse(id, out _))
-                throw new KScriptException($"@acting_as_guest() takes a guest id, which is a uuid, not '{id}'.", "Argument");
-            id = (id != null ? Guid.Parse(id) : Guid.NewGuid()).ToString("D");
+            KScriptHost host = call.Host;
+            id = Values.Unwrap(id);
+            object guest = id != null ? Owners.Parse(call, Values.ToStr(id)) : null;
+            if (id != null && guest == null)
+                throw new KScriptException($"@acting_as_guest() takes a guest id, which is a Guest's key, not '{Values.ToStr(id)}'.", "Argument");
+            string text = id != null ? Values.ToStr(Values.Unwrap(guest)) : Owners.New(call);
             ActAs(host, null);
             if (!host.Items.ContainsKey(GuestKey)) host.AfterTest.Add(() => host.Items.Remove(GuestKey));
-            host.Items[GuestKey] = id;
-            if (AuthRequest.Current(host) is AuthRequest auth) auth.Request[GuestKey] = id;
-            return id;
+            host.Items[GuestKey] = text;
+            if (AuthRequest.Current(host) is AuthRequest auth) auth.Request[GuestKey] = text;
+            return guest ?? Owners.Parse(call, text);
         }
 
         /// <summary>The guest id a test acts as, or null.</summary>
